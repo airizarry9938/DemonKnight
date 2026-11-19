@@ -36,8 +36,7 @@ namespace ArthurianAutobattler
                                   && rollStreak == 0)
                                  || gamblerRank >= 1;
 
-            bool cursedDice = RelicManager.Instance != null
-                              && RelicManager.Instance.Has(RelicID.CursedDiceOfCaerleon);
+            bool cursedDice = SomersetRunes.HasRelic(RelicID.CursedDiceOfCaerleon);
 
             if (roll == 1 && !firstRollSafe)
             {

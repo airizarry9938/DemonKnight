@@ -44,15 +44,14 @@ namespace ArthurianAutobattler
                 if (r.randomAvatar != null) spriteLookup[r.unitID] = r.randomAvatar;
             }
 
-            RelicManager.Instance?.ApplyMorganasMirrorClone(combatRoster);
+            SomersetRunes.ApplyMorganasMirrorClone(combatRoster);
             PartySynergyEvaluator.ApplyBattleModifiers(combatRoster);
             PerkDraftManager.Instance?.ApplyCombatPerksToParty(combatRoster);
             ApplyLegendRivalries(combatRoster);
             ApplyUsurpationStarterLegends(combatRoster);
 
             playerArmy.Clear();
-            bool hellfire = DemonicPactManager.Instance != null
-                            && DemonicPactManager.Instance.ActivePact == DemonicPactID.HellfireSteel;
+            bool hellfire = SomersetRunes.IsPact(DemonicPactID.HellfireSteel);
 
             foreach (var r in combatRoster)
             {
@@ -103,8 +102,7 @@ namespace ArthurianAutobattler
         private void ApplyUsurpationStarterLegends(List<RecruitInstance> roster)
         {
             if (currentBattleNumber != 1) return;
-            if (DemonicPactManager.Instance == null
-                || DemonicPactManager.Instance.ActivePact != DemonicPactID.Usurpation) return;
+            if (!SomersetRunes.IsPact(DemonicPactID.Usurpation)) return;
             if (roster.Any(u => u.unitType == UnitType.Mordred)) return;
 
             roster.Add(new RecruitInstance
@@ -123,9 +121,9 @@ namespace ArthurianAutobattler
 
         private void ApplyEndlessHourglassPressure(List<CombatUnit> horde)
         {
-            if (DemonicPactManager.Instance == null || GameLoopManager.Instance == null) return;
+            if (GameLoopManager.Instance == null) return;
             float spent = GameLoopManager.Instance.townSecondsSpentThisPhase;
-            int extraLords = DemonicPactManager.Instance.GetEndlessHourglassExtraDreadLords(spent);
+            int extraLords = SomersetRunes.GetEndlessHourglassExtraDreadLords(spent);
             float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
             for (int i = 0; i < extraLords; i++)
             {
@@ -285,8 +283,7 @@ namespace ArthurianAutobattler
             {
                 case UnitType.Priest:
                 {
-                    int healTargets = (RelicManager.Instance != null
-                                       && RelicManager.Instance.Has(RelicID.ChaliceOfTheGrail)) ? 2 : 1;
+                    int healTargets = SomersetRunes.HasRelic(RelicID.ChaliceOfTheGrail) ? 2 : 1;
                     var injuredList = allies
                         .Where(a => a.IsAlive && !a.cannotBeHealed && a.currentHealth < a.maxHealth)
                         .OrderBy(a => (float)a.currentHealth / a.maxHealth)
@@ -310,7 +307,7 @@ namespace ArthurianAutobattler
                 case UnitType.LadyOfTheLake:
                 {
                     // Chalice of the Grail: Lady also heals 2 allies per tick; otherwise default attack.
-                    if (RelicManager.Instance != null && RelicManager.Instance.Has(RelicID.ChaliceOfTheGrail))
+                    if (SomersetRunes.HasRelic(RelicID.ChaliceOfTheGrail))
                     {
                         foreach (var injured in allies
                                      .Where(a => a.IsAlive && !a.cannotBeHealed && a.currentHealth < a.maxHealth)
@@ -451,8 +448,7 @@ namespace ArthurianAutobattler
 
             // Scabbard of Excalibur: Arthur/Knights survive fatal hit once per battle at 1 HP.
             if (!fallen.isDemon
-                && RelicManager.Instance != null
-                && RelicManager.Instance.Has(RelicID.ScabbardOfExcalibur)
+                && SomersetRunes.HasRelic(RelicID.ScabbardOfExcalibur)
                 && !fallen.scabbardUsed
                 && (fallen.unitType == UnitType.KingArthur || fallen.unitType == UnitType.Knight))
             {
@@ -483,8 +479,7 @@ namespace ArthurianAutobattler
 
             // Silver Tongue: sacrifice highest-ATK survivor after every wave (+40g grudge).
             if (playerWon
-                && DemonicPactManager.Instance != null
-                && DemonicPactManager.Instance.ActivePact == DemonicPactID.SilverTongue)
+                && SomersetRunes.IsPact(DemonicPactID.SilverTongue))
             {
                 var victim = playerArmy.Where(u => u.IsAlive).OrderByDescending(u => u.attackDamage).FirstOrDefault();
                 if (victim != null)
@@ -515,7 +510,7 @@ namespace ArthurianAutobattler
             }
             else
             {
-                RelicManager.Instance?.TryAwardRelicForWave(currentBattleNumber);
+                SomersetRunes.TryAwardRelicForWave(currentBattleNumber);
                 currentBattleNumber++;
                 var ui = FindFirstObjectByType<TownSplitUIController>();
                 if (ui != null) ui.playerGold += goldEarned;

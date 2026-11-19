@@ -195,8 +195,7 @@ namespace ArthurianAutobattler
     {
         public static bool CanJoinParty(RecruitInstance candidate, List<RecruitInstance> currentParty, out string refusalReason)
         {
-            if (DemonicPactManager.Instance != null
-                && DemonicPactManager.Instance.ActivePact == DemonicPactID.Usurpation)
+            if (SomersetRunes.IsPact(DemonicPactID.Usurpation))
             {
                 if (candidate.unitType == UnitType.KingArthur
                     || candidate.unitType == UnitType.SirGalahad

@@ -49,7 +49,7 @@ namespace ArthurianAutobattler
             disableTownTimer = false;
             townSecondsSpentThisPhase = 0f;
             if (GrudgeSaveManager.Instance != null) GrudgeSaveManager.Instance.grudgeDeltaMultiplier = 1f;
-            DemonicPactManager.Instance?.ClearPact();
+            SomersetRunes.ClearPact();
 
             currentTownPool = rngGenerator.GenerateNewRunTown();
             int bonusGold = MerlinResurrectionManager.Instance != null

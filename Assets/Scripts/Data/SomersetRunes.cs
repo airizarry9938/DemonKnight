@@ -1,13 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Soft bridge to Merlin runes / Sin runes so GameDataTypes & UI compile even when
-    /// the Unity project still has a first-build MerlinResurrectionManager or is missing
-    /// SinRuneManager.cs. Returns safe defaults until those scripts are updated.
+    /// Soft bridge to optional managers (Merlin runes, Sin, Pacts, Relics) so the project
+    /// compiles even when those scripts were never copied into the Unity folder.
+    /// Missing managers → safe defaults (no rune, no sin, no pact, no relic).
     /// </summary>
     public static class SomersetRunes
     {
@@ -16,7 +17,6 @@ namespace ArthurianAutobattler
             var merlin = MerlinResurrectionManager.Instance;
             if (merlin == null) return 0;
 
-            // Preferred API (current package).
             MethodInfo method = merlin.GetType().GetMethod("GetRuneRank", new[] { typeof(BankRuneID) });
             if (method != null)
             {
@@ -24,7 +24,6 @@ namespace ArthurianAutobattler
                 catch { return 0; }
             }
 
-            // First-build Merlin: read public rank fields if present.
             string fieldName = id switch
             {
                 BankRuneID.Gossip => "gossipRuneRank",
@@ -42,19 +41,9 @@ namespace ArthurianAutobattler
 
         public static bool IsSinActive(SinRuneID id)
         {
-            Type t = FindType("ArthurianAutobattler.SinRuneManager");
-            if (t == null) return false;
-
-            PropertyInfo instanceProp = t.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
-            object instance = instanceProp?.GetValue(null);
-            if (instance == null)
-            {
-                FieldInfo instanceField = t.GetField("Instance", BindingFlags.Public | BindingFlags.Static);
-                instance = instanceField?.GetValue(null);
-            }
+            object instance = GetManagerInstance("ArthurianAutobattler.SinRuneManager");
             if (instance == null) return false;
-
-            MethodInfo isActive = t.GetMethod("IsActive", new[] { typeof(SinRuneID) });
+            MethodInfo isActive = instance.GetType().GetMethod("IsActive", new[] { typeof(SinRuneID) });
             if (isActive == null) return false;
             try { return (bool)isActive.Invoke(instance, new object[] { id }); }
             catch { return false; }
@@ -72,13 +61,9 @@ namespace ArthurianAutobattler
 
         public static float GetSinLegacyPointMultiplier()
         {
-            Type t = FindType("ArthurianAutobattler.SinRuneManager");
-            if (t == null) return 1f;
-            PropertyInfo instanceProp = t.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
-            object instance = instanceProp?.GetValue(null)
-                ?? t.GetField("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            object instance = GetManagerInstance("ArthurianAutobattler.SinRuneManager");
             if (instance == null) return 1f;
-            MethodInfo method = t.GetMethod("GetLegacyPointMultiplier", Type.EmptyTypes);
+            MethodInfo method = instance.GetType().GetMethod("GetLegacyPointMultiplier", Type.EmptyTypes);
             if (method == null) return 1f;
             try { return (float)method.Invoke(instance, null); }
             catch { return 1f; }
@@ -86,12 +71,70 @@ namespace ArthurianAutobattler
 
         public static void NotifyLegendFused()
         {
-            Type t = FindType("ArthurianAutobattler.SinRuneManager");
-            if (t == null) return;
-            object instance = t.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null)
+            object instance = GetManagerInstance("ArthurianAutobattler.SinRuneManager");
+            instance?.GetType().GetMethod("OnLegendFused", Type.EmptyTypes)?.Invoke(instance, null);
+        }
+
+        public static DemonicPactID GetActivePact()
+        {
+            object instance = GetManagerInstance("ArthurianAutobattler.DemonicPactManager");
+            if (instance == null) return DemonicPactID.None;
+            object active = instance.GetType().GetProperty("ActivePact")?.GetValue(instance)
+                ?? instance.GetType().GetField("ActivePact")?.GetValue(instance);
+            if (active is DemonicPactID pact) return pact;
+            if (active != null && Enum.TryParse(active.ToString(), out DemonicPactID parsed)) return parsed;
+            return DemonicPactID.None;
+        }
+
+        public static bool IsPact(DemonicPactID id) => GetActivePact() == id;
+
+        public static void ClearPact()
+        {
+            object instance = GetManagerInstance("ArthurianAutobattler.DemonicPactManager");
+            instance?.GetType().GetMethod("ClearPact", Type.EmptyTypes)?.Invoke(instance, null);
+        }
+
+        public static int GetEndlessHourglassExtraDreadLords(float townSecondsSpent)
+        {
+            object instance = GetManagerInstance("ArthurianAutobattler.DemonicPactManager");
+            if (instance == null) return 0;
+            MethodInfo method = instance.GetType().GetMethod("GetEndlessHourglassExtraDreadLords", new[] { typeof(float) });
+            if (method == null) return 0;
+            try { return (int)method.Invoke(instance, new object[] { townSecondsSpent }); }
+            catch { return 0; }
+        }
+
+        public static bool HasRelic(RelicID id)
+        {
+            object instance = GetManagerInstance("ArthurianAutobattler.RelicManager");
+            if (instance == null) return false;
+            MethodInfo method = instance.GetType().GetMethod("Has", new[] { typeof(RelicID) });
+            if (method == null) return false;
+            try { return (bool)method.Invoke(instance, new object[] { id }); }
+            catch { return false; }
+        }
+
+        public static void ApplyMorganasMirrorClone(List<RecruitInstance> roster)
+        {
+            object instance = GetManagerInstance("ArthurianAutobattler.RelicManager");
+            if (instance == null || roster == null) return;
+            instance.GetType().GetMethod("ApplyMorganasMirrorClone", new[] { typeof(List<RecruitInstance>) })
+                ?.Invoke(instance, new object[] { roster });
+        }
+
+        public static void TryAwardRelicForWave(int wave)
+        {
+            object instance = GetManagerInstance("ArthurianAutobattler.RelicManager");
+            instance?.GetType().GetMethod("TryAwardRelicForWave", new[] { typeof(int) })
+                ?.Invoke(instance, new object[] { wave });
+        }
+
+        private static object GetManagerInstance(string fullTypeName)
+        {
+            Type t = FindType(fullTypeName);
+            if (t == null) return null;
+            return t.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null)
                 ?? t.GetField("Instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
-            if (instance == null) return;
-            t.GetMethod("OnLegendFused", Type.EmptyTypes)?.Invoke(instance, null);
         }
 
         private static Type FindType(string fullName)
