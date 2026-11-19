@@ -36,7 +36,7 @@ public static class ArthurianMenuBootstrap
         bool hasGameplay = TypeExists("ArthurianAutobattler.GameLoopManager");
         bool hasPews = TypeExists("ArthurianAutobattler.ChurchPewLayout");
         bool hasBuilder = TypeExists("ArthurianSceneBuilder");
-        bool hasAlign = hasBuilder; // same class hosts Align Crowd Grid
+        bool hasAlignType = TypeExists("ArthurianAlignCrowdPews");
 
         string packageId = "(no version stamp — old first build)";
         string packageGit = "?";
@@ -60,7 +60,10 @@ public static class ArthurianMenuBootstrap
             packageGit = verType.GetField("GitHint")?.GetValue(null) as string ?? packageGit;
         }
 
-        string builderPath = Path.Combine(Application.dataPath, "Editor", "ArthurianSceneBuilder.cs");
+        string editorDir = Path.Combine(Application.dataPath, "Editor");
+        string alignPath = Path.Combine(editorDir, "ArthurianAlignCrowdPews.cs");
+        string builderPath = Path.Combine(editorDir, "ArthurianSceneBuilder.cs");
+        bool alignFileOnDisk = File.Exists(alignPath);
         string builderStamp = File.Exists(builderPath)
             ? File.GetLastWriteTimeUtc(builderPath).ToString("u") + " UTC"
             : "MISSING";
@@ -71,23 +74,31 @@ public static class ArthurianMenuBootstrap
             "DemonKnight / Arthurian diagnose\n\n" +
             $"Package: {packageId} ({packageGit})\n" +
             $"Assets path:\n{Application.dataPath}\n" +
+            $"Align script on disk: {(alignFileOnDisk ? "YES" : "NO — Unity never got the update")}\n" +
+            $"Align menu compiled: {(hasAlignType ? "YES" : "NO")}\n" +
             $"ArthurianSceneBuilder.cs mtime: {builderStamp}\n\n" +
             $"TextMeshPro loaded: {(hasTmp ? "YES" : "NO")}\n" +
             $"Gameplay scripts: {(hasGameplay ? "YES" : "NO")}\n" +
             $"Church pew layout: {(hasPews ? "YES" : "NO")}\n" +
-            $"Scene builder (Align + Build menus): {(hasBuilder ? "YES" : "NO")}\n\n";
+            $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n\n";
 
-        if (looksLikeFirstBuild)
+        if (!alignFileOnDisk)
+        {
+            msg +=
+                "ALIGN SCRIPT MISSING FROM THIS UNITY FOLDER.\n" +
+                "Cloud pushes do not land here until you pull or copy the file.\n\n" +
+                "FIX (pick one):\n" +
+                "A) In a terminal at this project root: git pull\n" +
+                "B) Download into Assets/Editor/ then Refresh:\n" +
+                "https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianAlignCrowdPews.cs\n\n" +
+                "Expected path:\n" + alignPath;
+        }
+        else if (looksLikeFirstBuild)
         {
             msg +=
                 "THIS IS THE OLD FIRST BUILD.\n" +
                 "Unity is not reading the updated DemonKnight package.\n\n" +
-                "FIX:\n" +
-                "1) In Unity Hub, open the folder that is your git clone of DemonKnight (or pull this project).\n" +
-                "2) Confirm Assets/Scripts/UI/ChurchPewLayout.cs exists on disk.\n" +
-                "3) Assets → Refresh (Ctrl/Cmd+R), wait for compile.\n" +
-                "4) Run Diagnose again — Package should say church-pews-52-seats.\n" +
-                "5) Then use Arthurian → Align Crowd Grid To Church Pews (do NOT re-run full Build unless you want a fresh scene).";
+                "FIX: git pull in the Unity Hub project folder, then Assets → Refresh.";
         }
         else if (!hasTmp)
         {

@@ -1,0 +1,13 @@
+Unity is not seeing cloud updates until these files exist on DISK in the folder Unity Hub opens.
+
+1) In Unity: Arthurian → Open Setup Guide → note the Assets path it shows.
+2) In that folder’s parent (the project root), run:
+
+   git pull
+
+   OR download this file into Assets/Editor/ then Assets → Refresh:
+
+   https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianAlignCrowdPews.cs
+
+3) You must see: Assets/Editor/ArthurianAlignCrowdPews.cs
+4) Then: Arthurian → Align Crowd Grid To Church Pews
