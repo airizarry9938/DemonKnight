@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.IO;
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -11,8 +12,35 @@ using UnityEngine.UI;
 /// Intentionally avoids TMPro and hard gameplay usings so it still shows when
 /// ArthurianSceneBuilder fails to compile.
 /// </summary>
+[InitializeOnLoad]
 public static class ArthurianAlignCrowdPews
 {
+    static ArthurianAlignCrowdPews()
+    {
+        // Old first-build SceneBuilder still uses enableWordWrapping — patch on load.
+        EditorApplication.delayCall += PatchObsoleteTmpWrapping;
+    }
+
+    [MenuItem("Arthurian/Fix Obsolete TMP Warning", false, 11)]
+    public static void PatchObsoleteTmpWrapping()
+    {
+        string path = Path.Combine(Application.dataPath, "Editor", "ArthurianSceneBuilder.cs");
+        if (!File.Exists(path)) return;
+
+        string text = File.ReadAllText(path);
+        if (!text.Contains("enableWordWrapping")) return;
+
+        string patched = text
+            .Replace("tmp.enableWordWrapping = true;", "tmp.textWrappingMode = TextWrappingModes.Normal;")
+            .Replace("enableWordWrapping = true;", "textWrappingMode = TextWrappingModes.Normal;");
+
+        if (patched == text) return;
+
+        File.WriteAllText(path, patched);
+        AssetDatabase.Refresh();
+        Debug.Log("[DemonKnight] Patched obsolete enableWordWrapping → textWrappingMode in ArthurianSceneBuilder.cs");
+    }
+
     private const int TotalSeats = 52;
     private const int PewColumns = 3;
     private const int PewRows = 4;

@@ -1,13 +1,13 @@
 Unity is not seeing cloud updates until these files exist on DISK in the folder Unity Hub opens.
 
-1) In Unity: Arthurian → Open Setup Guide → note the Assets path it shows.
-2) In that folder’s parent (the project root), run:
+Download BOTH into Assets/Editor/, then Assets → Refresh:
 
-   git pull
+1) https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianAlignCrowdPews.cs
+2) https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianSceneBuilder.cs
 
-   OR download this file into Assets/Editor/ then Assets → Refresh:
+Or git pull in the Unity Hub project root.
 
-   https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianAlignCrowdPews.cs
+CS0618 enableWordWrapping: your SceneBuilder is still the first build.
+Replace it with file (2), or run Arthurian → Fix Obsolete TMP Warning after (1) is in place.
 
-3) You must see: Assets/Editor/ArthurianAlignCrowdPews.cs
-4) Then: Arthurian → Align Crowd Grid To Church Pews
+TransientArtifactProvider messages during Refresh are Unity import noise — ignore them.
