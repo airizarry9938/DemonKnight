@@ -305,7 +305,8 @@ public static class ArthurianAlignCrowdPews
             new[] { 0.228f, 0.500f, 0.773f },
             new[] { 0.235f, 0.500f, 0.768f }
         };
-        float[] rowY = { 0.255f, 0.375f, 0.490f, 0.595f };
+        // Match ChurchPewLayout — upper 4 pew bands; camera-front pews stay empty.
+        float[] rowY = { 0.375f, 0.490f, 0.600f, 0.715f };
         float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.130f };
 
         float t = cap == 1 ? 0.5f : slot / (float)(cap - 1);

@@ -50,18 +50,19 @@ namespace ArthurianAutobattler
             // Column X centers converge slightly toward the altar (perspective).
             float[][] colXByRow =
             {
-                new[] { 0.213f, 0.500f, 0.787f }, // front
-                new[] { 0.220f, 0.500f, 0.780f },
-                new[] { 0.228f, 0.500f, 0.773f },
-                new[] { 0.235f, 0.500f, 0.768f }  // back / altar
+                new[] { 0.220f, 0.500f, 0.780f }, // nearest occupied (mid-nave)
+                new[] { 0.226f, 0.500f, 0.775f },
+                new[] { 0.232f, 0.500f, 0.770f },
+                new[] { 0.238f, 0.500f, 0.765f }  // back / altar / windows
             };
 
-            // Seat sit-line (feet) just above each pew bench top.
-            float[] rowY = { 0.255f, 0.375f, 0.490f, 0.595f };
-            float[] rowScale = { 1.00f, 0.88f, 0.76f, 0.66f };
-            float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.130f };
+            // Sit on the upper 4 pew bands — leave the camera-front pew row empty.
+            // Tuned to SomersetChurchInterior.jpg wood benches (~0.36→0.72 from bottom).
+            float[] rowY = { 0.375f, 0.490f, 0.600f, 0.715f };
+            float[] rowScale = { 0.95f, 0.84f, 0.74f, 0.64f };
+            float[] rowSpread = { 0.165f, 0.150f, 0.138f, 0.125f };
 
-            // Capacities: front row bigger (5 each), then mix to total 52.
+            // Capacities still total 52 (biggest nearest the camera among occupied rows).
             // 5+5+5 + 4+5+4 + 4+4+4 + 4+4+4 = 15+13+12+12 = 52
             int[,] caps =
             {
