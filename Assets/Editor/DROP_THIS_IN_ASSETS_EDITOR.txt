@@ -1,13 +1,28 @@
-Unity is not seeing cloud updates until these files exist on DISK in the folder Unity Hub opens.
+IMPORTANT PATHS — do not put gameplay scripts in Assets/Editor/
 
-Download BOTH into Assets/Editor/, then Assets → Refresh:
+Editor-only (Assets/Editor/):
+  ArthurianAlignCrowdPews.cs
+  ArthurianMenuBootstrap.cs
+  ArthurianSceneBuilder.cs
+  ArthurianFixMisplacedScripts.cs
+  DemonKnightPackageVersion.cs
 
-1) https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianAlignCrowdPews.cs
-2) https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianSceneBuilder.cs
+Gameplay (must be under Assets/Scripts/):
+  Assets/Scripts/Data/GameDataTypes.cs          ← has pewSeatIndex (REQUIRED)
+  Assets/Scripts/UI/ChurchStageUIController.cs
+  Assets/Scripts/UI/ChurchPewLayout.cs
+  Assets/Scripts/UI/PaperDollSeatView.cs
+  Assets/Scripts/UI/TownSplitUIController.cs
+  Assets/Scripts/Systems/GameLoopManager.cs
 
-Or git pull in the Unity Hub project root.
+If you see CS1061 pewSeatIndex / RefreshBodyPostureFromTraits:
+  1) DELETE Assets/Editor/ChurchStageUIController.cs (wrong folder)
+  2) Overwrite Assets/Scripts/Data/GameDataTypes.cs from:
+     https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Scripts/Data/GameDataTypes.cs
+  3) Put ChurchStageUIController.cs in Assets/Scripts/UI/ :
+     https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Scripts/UI/ChurchStageUIController.cs
+  4) Assets → Refresh
+  5) Or run Arthurian → Fix Misplaced Scripts
 
-CS0618 enableWordWrapping: your SceneBuilder is still the first build.
-Replace it with file (2), or run Arthurian → Fix Obsolete TMP Warning after (1) is in place.
-
-TransientArtifactProvider messages during Refresh are Unity import noise — ignore them.
+Base URL:
+  https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/
