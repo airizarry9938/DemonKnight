@@ -19,6 +19,11 @@ public static class ArthurianFixMisplacedScripts
     public static void Run()
     {
         string assets = Application.dataPath;
+
+        // Unity default stubs often get pasted over with our tools → duplicate type errors.
+        DeleteIfContains(Path.Combine(assets, "Editor", "NewMonoBehaviourScript.cs"),
+            "ArthurianFixMisplacedScripts", "ArthurianSyncFromGitHub", "ArthurianAlignCrowdPews");
+
         var moves = new (string fromRel, string toRel)[]
         {
             ("Editor/ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs"),
@@ -79,6 +84,21 @@ public static class ArthurianFixMisplacedScripts
                 "DemonKnight",
                 $"Fixed {moved} misplaced script(s). Wait for compile.",
                 "OK");
+        }
+    }
+
+    private static void DeleteIfContains(string path, params string[] needles)
+    {
+        if (!File.Exists(path)) return;
+        string text = File.ReadAllText(path);
+        foreach (string needle in needles)
+        {
+            if (text.IndexOf(needle, System.StringComparison.Ordinal) < 0) continue;
+            File.Delete(path);
+            string meta = path + ".meta";
+            if (File.Exists(meta)) File.Delete(meta);
+            Debug.Log($"[DemonKnight] Deleted duplicate stub: {path}");
+            return;
         }
     }
 }
