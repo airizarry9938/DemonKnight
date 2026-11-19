@@ -1,0 +1,45 @@
+# DemonKnight — Cursor Project Rules
+
+Unity project name: **DemonKnight**. Gameplay systems use namespace `ArthurianAutobattler`.
+
+## Stack
+- Unity 6.6 / 6000.x — 2D URP, C#, TextMeshPro, Unity UI Canvas
+- Project / product name: `DemonKnight`
+- Single C# namespace: `ArthurianAutobattler`
+- Script layout under `Assets/Scripts/`:
+  - `Data/` — shared enums & data types (`RecruitInstance`, `CombatUnit`, traits, roles)
+  - `Persistence/` — staged grudge JSON + Merlin Royal Supply Bank
+  - `Systems/` — game loop, town RNG, fusion, tavern dice, perk draft
+  - `Combat/` — horde gen, autobattler tick, 2D visuals / floating text
+  - `UI/` — 3-split town canvas + Legend Codex
+
+## High-Level Loop
+1. **TownRecruit (300–600s timer, default 420)** — hire from 52 persistent citizens (12 Knights / 15 Warriors / 25 Peasants), scout intel tiers, train Tank/Ranged, mediate, tavern dice, fuse legends.
+2. **AutoBattle** — frontlineSize=6; demons chaotic/unorganized; clear FrontlineTank before BacklineRanged.
+3. **Rewards / PerkDraft** — pick 1 of 3 run perks; shrink next town timer by 30s (floor 180).
+4. **Resurrection** — Merlin rewinds; Legacy Points → Royal Bank; grudges commit to disk.
+
+## Persistence Invariants
+- Stage grudges in memory during a run.
+- Write `Application.persistentDataPath/grudge_memory.json` **only** on full run end (Nimue win, battle loss, or Camelot Abandoned priced-out).
+- Bank levels live in PlayerPrefs (`LegacyPoints`, `BankGoldLvl`, `BankDiscountLvl`, `BankRationsLvl`).
+
+## Boss Ladder
+- W2 Black Knight · W3 Vortigern · W4 Green Knight · W5 Accolon · W6+ Nimue (petrify + seduce unless Arthur/Galahad).
+
+## Fusion Recipes (Legend Codex)
+Priest 2P · Captain 2W · Arthur 2K+1Cap · Merlin 3Pr+2W+2K · Lancelot 3K(1 Noble) · Morgan 2Pr+2 Outlaw · Lady 3Pr+1Cap · Gawain 2W+2K · Mordred 2K+2 Outlaw · Galahad 2 Zealot/Loyalist K + 1 Priest.
+
+## Coding Standards
+- `TextMeshProUGUI` for all UI text.
+- `FindFirstObjectByType<T>()` — never deprecated `FindObjectOfType`.
+- Keep combat math in `AutoBattlerEngine`; visuals only via `BattlefieldVisualizer`.
+- Clone recruit stats before battle modifiers so perks do not double-stack across waves.
+- King Arthur present → nullify hatedTrait rivalry nerfs (love synergies still apply).
+- Editor menu: **Arthurian / Build Complete Scene Hierarchy** (`Assets/Editor/ArthurianSceneBuilder.cs`).
+
+## Do Not
+- Rename the namespace without updating every script.
+- Commit staged grudges mid-run.
+- Add auth / networking / cloud saves unless asked.
+- Replace TextMeshPro with legacy UI Text.
