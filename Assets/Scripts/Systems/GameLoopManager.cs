@@ -48,7 +48,7 @@ namespace ArthurianAutobattler
             recruitedParty.Clear();
             disableTownTimer = false;
             townSecondsSpentThisPhase = 0f;
-            if (GrudgeSaveManager.Instance != null) GrudgeSaveManager.Instance.grudgeDeltaMultiplier = 1f;
+            SomersetRunes.SetGrudgeDeltaMultiplier(1f);
             SomersetRunes.ClearPact();
 
             currentTownPool = rngGenerator.GenerateNewRunTown();

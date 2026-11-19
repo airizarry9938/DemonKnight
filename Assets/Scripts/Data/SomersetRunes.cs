@@ -94,6 +94,14 @@ namespace ArthurianAutobattler
             instance?.GetType().GetMethod("ClearPact", Type.EmptyTypes)?.Invoke(instance, null);
         }
 
+        public static void SetGrudgeDeltaMultiplier(float value)
+        {
+            var grudge = GrudgeSaveManager.Instance;
+            if (grudge == null) return;
+            FieldInfo field = grudge.GetType().GetField("grudgeDeltaMultiplier", BindingFlags.Instance | BindingFlags.Public);
+            if (field != null) field.SetValue(grudge, value);
+        }
+
         public static int GetEndlessHourglassExtraDreadLords(float townSecondsSpent)
         {
             object instance = GetManagerInstance("ArthurianAutobattler.DemonicPactManager");

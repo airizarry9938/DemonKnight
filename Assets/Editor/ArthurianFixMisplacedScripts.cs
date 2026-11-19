@@ -4,8 +4,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Moves gameplay scripts that were dropped into Assets/Editor by mistake,
-/// and flags a stale GameDataTypes (missing pewSeatIndex).
+/// Moves/deletes gameplay scripts that were dropped into Assets/Editor by mistake.
 /// </summary>
 [InitializeOnLoad]
 public static class ArthurianFixMisplacedScripts
@@ -19,70 +18,75 @@ public static class ArthurianFixMisplacedScripts
     public static void Run()
     {
         string assets = Application.dataPath;
+        string editorDir = Path.Combine(assets, "Editor");
 
         // Unity default stubs often get pasted over with our tools → duplicate type errors.
-        DeleteIfContains(Path.Combine(assets, "Editor", "NewMonoBehaviourScript.cs"),
-            "ArthurianFixMisplacedScripts", "ArthurianSyncFromGitHub", "ArthurianAlignCrowdPews");
+        DeleteIfContains(Path.Combine(editorDir, "NewMonoBehaviourScript.cs"),
+            "ArthurianFixMisplacedScripts", "ArthurianSyncFromGitHub", "ArthurianAlignCrowdPews",
+            "GameLoopManager", "ChurchStageUIController");
 
-        var moves = new (string fromRel, string toRel)[]
+        // Gameplay scripts must NEVER live under Assets/Editor/.
+        var moves = new (string fileName, string toRel)[]
         {
-            ("Editor/ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs"),
-            ("Editor/ChurchPewLayout.cs", "Scripts/UI/ChurchPewLayout.cs"),
-            ("Editor/PaperDollSeatView.cs", "Scripts/UI/PaperDollSeatView.cs"),
-            ("Editor/TownSplitUIController.cs", "Scripts/UI/TownSplitUIController.cs"),
-            ("Editor/GameLoopManager.cs", "Scripts/Systems/GameLoopManager.cs"),
-            ("Editor/GameDataTypes.cs", "Scripts/Data/GameDataTypes.cs"),
-            ("Editor/TownRNGGenerator.cs", "Scripts/Systems/TownRNGGenerator.cs"),
+            ("ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs"),
+            ("ChurchPewLayout.cs", "Scripts/UI/ChurchPewLayout.cs"),
+            ("PaperDollSeatView.cs", "Scripts/UI/PaperDollSeatView.cs"),
+            ("TownSplitUIController.cs", "Scripts/UI/TownSplitUIController.cs"),
+            ("LegendCodexUI.cs", "Scripts/UI/LegendCodexUI.cs"),
+            ("GameLoopManager.cs", "Scripts/Systems/GameLoopManager.cs"),
+            ("TownRNGGenerator.cs", "Scripts/Systems/TownRNGGenerator.cs"),
+            ("TavernDiceMinigame.cs", "Scripts/Systems/TavernDiceMinigame.cs"),
+            ("CardFusionSystem.cs", "Scripts/Systems/CardFusionSystem.cs"),
+            ("PerkDraftManager.cs", "Scripts/Systems/PerkDraftManager.cs"),
+            ("DemonicPactManager.cs", "Scripts/Systems/DemonicPactManager.cs"),
+            ("RelicManager.cs", "Scripts/Systems/RelicManager.cs"),
+            ("SinRuneManager.cs", "Scripts/Systems/SinRuneManager.cs"),
+            ("GameDataTypes.cs", "Scripts/Data/GameDataTypes.cs"),
+            ("SomersetRunes.cs", "Scripts/Data/SomersetRunes.cs"),
+            ("SomersetVisualDatabase.cs", "Scripts/Data/SomersetVisualDatabase.cs"),
+            ("GrudgeSaveManager.cs", "Scripts/Persistence/GrudgeSaveManager.cs"),
+            ("MerlinResurrectionManager.cs", "Scripts/Persistence/MerlinResurrectionManager.cs"),
+            ("AutoBattlerEngine.cs", "Scripts/Combat/AutoBattlerEngine.cs"),
+            ("BattlefieldVisualizer.cs", "Scripts/Combat/BattlefieldVisualizer.cs"),
+            ("DemonHordeGenerator.cs", "Scripts/Combat/DemonHordeGenerator.cs"),
+            ("FloatingCombatText.cs", "Scripts/Combat/FloatingCombatText.cs"),
+            ("UnitVisualActor.cs", "Scripts/Combat/UnitVisualActor.cs"),
         };
 
-        int moved = 0;
-        foreach (var (fromRel, toRel) in moves)
+        int fixedCount = 0;
+        foreach (var (fileName, toRel) in moves)
         {
-            string from = Path.Combine(assets, fromRel.Replace('/', Path.DirectorySeparatorChar));
-            string to = Path.Combine(assets, toRel.Replace('/', Path.DirectorySeparatorChar));
+            string from = Path.Combine(editorDir, fileName);
             if (!File.Exists(from)) continue;
 
+            string to = Path.Combine(assets, toRel.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+
+            // Always prefer Scripts/ copy: delete the Editor misplaced file.
+            // If Scripts/ is missing, move Editor → Scripts.
             if (File.Exists(to))
             {
-                // Prefer the Editor drop only if destination is older / missing pew fields —
-                // otherwise delete the misplaced copy.
                 File.Delete(from);
                 string meta = from + ".meta";
                 if (File.Exists(meta)) File.Delete(meta);
-                Debug.Log($"[DemonKnight] Removed misplaced {fromRel} (correct copy already at {toRel}).");
+                Debug.Log($"[DemonKnight] Deleted misplaced Assets/Editor/{fileName} (use {toRel}).");
             }
             else
             {
                 File.Move(from, to);
                 string meta = from + ".meta";
                 if (File.Exists(meta)) File.Move(meta, to + ".meta");
-                Debug.Log($"[DemonKnight] Moved {fromRel} → {toRel}");
+                Debug.Log($"[DemonKnight] Moved Editor/{fileName} → {toRel}");
             }
-            moved++;
+            fixedCount++;
         }
 
-        string dataTypes = Path.Combine(assets, "Scripts", "Data", "GameDataTypes.cs");
-        bool hasPew = File.Exists(dataTypes) && File.ReadAllText(dataTypes).Contains("pewSeatIndex");
-        if (!hasPew)
-        {
-            Debug.LogError(
-                "[DemonKnight] GameDataTypes.cs is the OLD first build (no pewSeatIndex).\n" +
-                "Download and overwrite Assets/Scripts/Data/GameDataTypes.cs:\n" +
-                "https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Scripts/Data/GameDataTypes.cs");
-            EditorUtility.DisplayDialog(
-                "DemonKnight — Stale GameDataTypes",
-                "RecruitInstance is missing pewSeatIndex.\n\n" +
-                "Overwrite Assets/Scripts/Data/GameDataTypes.cs with the GitHub file, then Refresh.\n\n" +
-                "Also delete Assets/Editor/ChurchStageUIController.cs if it is still there — that script belongs in Assets/Scripts/UI/.",
-                "OK");
-        }
-        else if (moved > 0)
+        if (fixedCount > 0)
         {
             AssetDatabase.Refresh();
             EditorUtility.DisplayDialog(
                 "DemonKnight",
-                $"Fixed {moved} misplaced script(s). Wait for compile.",
+                $"Removed/moved {fixedCount} gameplay script(s) out of Assets/Editor/.\nWait for compile.",
                 "OK");
         }
     }
