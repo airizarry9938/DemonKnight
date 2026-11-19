@@ -143,10 +143,18 @@ namespace ArthurianAutobattler
                 return cmp != 0 ? cmp : a.CompareTo(b);
             });
 
-            GameObject prefab = paperDollSeatPrefab;
             var townUI = Town;
+            GameObject prefab = paperDollSeatPrefab;
             if (prefab == null && townUI != null) prefab = townUI.recruitAvatarButtonPrefab;
-            if (prefab == null) return;
+            if (prefab == null)
+            {
+                Debug.LogError("[DemonKnight] No seat prefab — assign PaperDollSeat or RecruitAvatarButton.");
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            if (pewLayout.backgroundRect == null && pewSeatLayer != null)
+                pewLayout.backgroundRect = pewSeatLayer.parent as RectTransform;
 
             foreach (int seatIndex in order)
             {
@@ -159,52 +167,18 @@ namespace ArthurianAutobattler
 
                 var rt = go.GetComponent<RectTransform>();
                 if (rt == null) rt = go.AddComponent<RectTransform>();
-
-                Vector2 norm = pewLayout.GetNormalizedSeatPosition(seatIndex);
-                float scale = pewLayout.GetSeatScale(seatIndex);
-                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.pivot = new Vector2(0.5f, 0.12f); // feet sit on the pew bench
-                rt.anchoredPosition = pewLayout.NormalizedToLocal(norm);
-                rt.sizeDelta = baseSeatSize * scale;
-                rt.localScale = Vector3.one;
+                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
 
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
                 {
                     if (recruit != null) view.Bind(recruit, OnSeatClicked);
-                    else
-                    {
-                        // Empty box placeholder until a character is assigned.
-                        if (view.bodyLayer != null)
-                        {
-                            view.bodyLayer.sprite = null;
-                            view.bodyLayer.color = new Color(0.12f, 0.10f, 0.09f, 0.45f);
-                            view.bodyLayer.enabled = true;
-                        }
-                        if (view.headLayer != null) view.headLayer.enabled = false;
-                        if (view.moodLayer != null) view.moodLayer.enabled = false;
-                        if (view.seatButton != null) view.seatButton.interactable = false;
-                    }
+                    else view.BindEmpty();
                     seats.Add(view);
                 }
                 else
                 {
-                    // Crowd avatar button path (Camelot crowd → pews).
-                    Image img = go.GetComponent<Image>();
-                    if (img != null)
-                    {
-                        if (recruit != null && recruit.randomAvatar != null)
-                        {
-                            img.sprite = recruit.randomAvatar;
-                            img.color = Color.white;
-                        }
-                        else
-                        {
-                            img.sprite = null;
-                            img.color = new Color(0.12f, 0.10f, 0.09f, 0.45f);
-                        }
-                    }
-
+                    EnsureSeatImage(go, recruit);
                     Button btn = go.GetComponent<Button>();
                     if (btn != null)
                     {
@@ -219,8 +193,39 @@ namespace ArthurianAutobattler
                 }
             }
 
+            Debug.Log($"[DemonKnight] Populated {ChurchPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied).");
             RefreshHUD();
         }
+
+        private static void EnsureSeatImage(GameObject go, RecruitInstance recruit)
+        {
+            Image img = go.GetComponent<Image>();
+            if (img == null) img = go.AddComponent<Image>();
+            if (recruit != null && recruit.randomAvatar != null)
+            {
+                img.sprite = recruit.randomAvatar;
+                img.color = Color.white;
+            }
+            else if (recruit != null)
+            {
+                img.sprite = null;
+                img.color = SeatColorForType(recruit.unitType);
+            }
+            else
+            {
+                img.sprite = null;
+                img.color = new Color(0.12f, 0.10f, 0.09f, 0.40f);
+            }
+            img.raycastTarget = recruit != null;
+        }
+
+        private static Color SeatColorForType(UnitType type) => type switch
+        {
+            UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 0.92f),
+            UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 0.92f),
+            UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 0.92f),
+            _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
+        };
 
         private void OnSeatClicked(RecruitInstance recruit)
         {

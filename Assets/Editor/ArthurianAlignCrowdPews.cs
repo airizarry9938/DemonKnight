@@ -214,7 +214,7 @@ public static class ArthurianAlignCrowdPews
         while (seatLayer.childCount > 0)
             UnityEngine.Object.DestroyImmediate(seatLayer.GetChild(0).gameObject);
 
-        Rect content = GetDrawnContentRect(bgRt, bgImage);
+        GetContentNormalizedRange(bgRt, bgImage, out Vector2 cMin, out Vector2 cMax);
 
         for (int seat = 0; seat < TotalSeats; seat++)
         {
@@ -232,11 +232,13 @@ public static class ArthurianAlignCrowdPews
 
             go.name = $"Seat_{seat:00}_Empty";
             var rt = go.GetComponent<RectTransform>() ?? go.AddComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            // Anchor-based placement (same as runtime) so Play Mode doesn't stack seats.
+            Vector2 anchor = new Vector2(
+                Mathf.Lerp(cMin.x, cMax.x, norm.x),
+                Mathf.Lerp(cMin.y, cMax.y, norm.y));
+            rt.anchorMin = rt.anchorMax = anchor;
             rt.pivot = new Vector2(0.5f, 0.12f);
-            rt.anchoredPosition = new Vector2(
-                content.xMin + norm.x * content.width,
-                content.yMin + norm.y * content.height);
+            rt.anchoredPosition = Vector2.zero;
             rt.sizeDelta = new Vector2(48f, 64f) * scale;
 
             var img = go.GetComponent<Image>();
@@ -251,24 +253,41 @@ public static class ArthurianAlignCrowdPews
         }
     }
 
-    private static Rect GetDrawnContentRect(RectTransform bgRt, Image img)
+    private static void GetContentNormalizedRange(
+        RectTransform bgRt, Image img, out Vector2 min, out Vector2 max)
     {
-        Rect r = bgRt.rect;
-        if (img == null || !img.preserveAspect || img.sprite == null || r.height <= 0.01f)
-            return r;
+        min = Vector2.zero;
+        max = Vector2.one;
+        if (bgRt == null) return;
 
-        float spriteAspect = img.sprite.rect.width / Mathf.Max(1f, img.sprite.rect.height);
-        float rectAspect = r.width / r.height;
-        if (spriteAspect > rectAspect)
+        Rect full = bgRt.rect;
+        if (full.width <= 0.01f || full.height <= 0.01f) return;
+
+        Rect content = full;
+        if (img != null && img.preserveAspect && img.sprite != null)
         {
-            float h = r.width / spriteAspect;
-            float y = r.y + (r.height - h) * 0.5f;
-            return new Rect(r.x, y, r.width, h);
+            float spriteAspect = img.sprite.rect.width / Mathf.Max(1f, img.sprite.rect.height);
+            float rectAspect = full.width / full.height;
+            if (spriteAspect > rectAspect)
+            {
+                float h = full.width / spriteAspect;
+                float y = full.y + (full.height - h) * 0.5f;
+                content = new Rect(full.x, y, full.width, h);
+            }
+            else
+            {
+                float w = full.height * spriteAspect;
+                float x = full.x + (full.width - w) * 0.5f;
+                content = new Rect(x, full.y, w, full.height);
+            }
         }
 
-        float w = r.height * spriteAspect;
-        float x = r.x + (r.width - w) * 0.5f;
-        return new Rect(x, r.y, w, r.height);
+        min = new Vector2(
+            (content.xMin - full.xMin) / full.width,
+            (content.yMin - full.yMin) / full.height);
+        max = new Vector2(
+            (content.xMax - full.xMin) / full.width,
+            (content.yMax - full.yMin) / full.height);
     }
 
     private static Vector2 GetNormalizedSeatPosition(int globalSeatIndex)

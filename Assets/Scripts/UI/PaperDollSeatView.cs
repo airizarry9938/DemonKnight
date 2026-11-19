@@ -17,23 +17,35 @@ namespace ArthurianAutobattler
         public void Bind(RecruitInstance recruit, System.Action<RecruitInstance> onClick)
         {
             Bound = recruit;
+            EnsureLayers();
+
+            Sprite body = recruit.bodySprite != null ? recruit.bodySprite : recruit.randomAvatar;
+            Sprite head = recruit.headSprite != null ? recruit.headSprite : recruit.randomAvatar;
+
             if (bodyLayer != null)
             {
-                bodyLayer.sprite = recruit.bodySprite != null ? recruit.bodySprite : recruit.randomAvatar;
-                bodyLayer.enabled = bodyLayer.sprite != null;
-                // Posture tint tells without scouting gold.
-                bodyLayer.color = recruit.bodyPosture switch
+                bodyLayer.sprite = body;
+                bodyLayer.enabled = true;
+                if (body != null)
                 {
-                    BodyPosture.EagerForward => new Color(1f, 0.95f, 0.75f),
-                    BodyPosture.SlouchedExit => new Color(0.75f, 0.78f, 0.85f),
-                    _ => Color.white
-                };
+                    bodyLayer.color = recruit.bodyPosture switch
+                    {
+                        BodyPosture.EagerForward => new Color(1f, 0.95f, 0.75f),
+                        BodyPosture.SlouchedExit => new Color(0.75f, 0.78f, 0.85f),
+                        _ => Color.white
+                    };
+                }
+                else
+                {
+                    // No art assigned yet — solid pew placeholder so all 52 seats stay visible.
+                    bodyLayer.color = PlaceholderColor(recruit.unitType);
+                }
             }
 
             if (headLayer != null)
             {
-                headLayer.sprite = recruit.headSprite != null ? recruit.headSprite : recruit.randomAvatar;
-                headLayer.enabled = headLayer.sprite != null;
+                headLayer.sprite = head;
+                headLayer.enabled = head != null;
             }
 
             if (moodLayer != null)
@@ -43,13 +55,57 @@ namespace ArthurianAutobattler
             }
 
             if (seatLabel != null)
-                seatLabel.text = recruit.isSirenEnchantress ? "♪" : "";
+            {
+                if (recruit.isSirenEnchantress) seatLabel.text = "♪";
+                else if (body == null) seatLabel.text = recruit.unitType.ToString()[..1];
+                else seatLabel.text = "";
+            }
 
             if (seatButton != null)
             {
+                seatButton.interactable = true;
                 seatButton.onClick.RemoveAllListeners();
                 seatButton.onClick.AddListener(() => onClick?.Invoke(recruit));
             }
         }
+
+        public void BindEmpty()
+        {
+            Bound = null;
+            EnsureLayers();
+            if (bodyLayer != null)
+            {
+                bodyLayer.sprite = null;
+                bodyLayer.color = new Color(0.12f, 0.10f, 0.09f, 0.40f);
+                bodyLayer.enabled = true;
+            }
+            if (headLayer != null) headLayer.enabled = false;
+            if (moodLayer != null) moodLayer.enabled = false;
+            if (seatLabel != null) seatLabel.text = "";
+            if (seatButton != null)
+            {
+                seatButton.onClick.RemoveAllListeners();
+                seatButton.interactable = false;
+            }
+        }
+
+        private void EnsureLayers()
+        {
+            if (bodyLayer == null)
+            {
+                var img = GetComponent<Image>();
+                if (img == null) img = gameObject.AddComponent<Image>();
+                bodyLayer = img;
+            }
+            if (seatButton == null) seatButton = GetComponent<Button>();
+        }
+
+        private static Color PlaceholderColor(UnitType type) => type switch
+        {
+            UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 0.92f),
+            UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 0.92f),
+            UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 0.92f),
+            _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
+        };
     }
 }

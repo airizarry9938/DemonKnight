@@ -28,6 +28,7 @@ namespace ArthurianAutobattler
         public List<RecruitInstance> recruitedParty = new List<RecruitInstance>();
         public List<RecruitInstance> currentTownPool = new List<RecruitInstance>();
         public GamePhase currentPhase;
+        private Coroutine seatPopulateRoutine;
 
         private void Awake()
         {
@@ -120,8 +121,23 @@ namespace ArthurianAutobattler
             if (townCanvasObj != null) townCanvasObj.SetActive(true);
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
 
-            // Seat the Camelot crowd on the church pews (52 boxes over the background art).
-            // Prefer church pew stage when wired; otherwise fall back to town grid placement.
+            // Wait one frame so TownCanvas RectTransforms have real sizes, then seat everyone.
+            if (seatPopulateRoutine != null) StopCoroutine(seatPopulateRoutine);
+            seatPopulateRoutine = StartCoroutine(PopulateTownSeatsNextFrame());
+        }
+
+        private System.Collections.IEnumerator PopulateTownSeatsNextFrame()
+        {
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+
+            if (rngGenerator == null) rngGenerator = FindFirstObjectByType<TownRNGGenerator>();
+            if (currentTownPool == null || currentTownPool.Count == 0)
+            {
+                if (rngGenerator != null)
+                    currentTownPool = rngGenerator.GenerateNewRunTown();
+            }
+
             if (churchUI != null && churchUI.pewSeatLayer != null)
                 churchUI.PopulatePews(currentTownPool);
             else if (townUI != null)

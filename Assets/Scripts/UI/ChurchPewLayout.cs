@@ -197,6 +197,50 @@ namespace ArthurianAutobattler
                 content.yMin + normalized.y * content.height);
         }
 
+        /// <summary>
+        /// Place a seat with anchors (not baked pixel offsets). Survives Play Mode when
+        /// RectTransform.rect is still zero during Start — pixel placement would stack every seat.
+        /// </summary>
+        public void ApplySeatTransform(RectTransform seatRt, int globalSeatIndex, Vector2 baseSize)
+        {
+            if (seatRt == null) return;
+
+            Vector2 norm = GetNormalizedSeatPosition(globalSeatIndex);
+            float scale = GetSeatScale(globalSeatIndex);
+
+            // Map 0–1 pew coords into the drawn sprite region (handles preserveAspect letterboxing).
+            GetContentNormalizedRange(out Vector2 cMin, out Vector2 cMax);
+            Vector2 anchor = new Vector2(
+                Mathf.Lerp(cMin.x, cMax.x, norm.x),
+                Mathf.Lerp(cMin.y, cMax.y, norm.y));
+
+            seatRt.anchorMin = seatRt.anchorMax = anchor;
+            seatRt.pivot = new Vector2(0.5f, 0.12f);
+            seatRt.anchoredPosition = Vector2.zero;
+            seatRt.sizeDelta = baseSize * scale;
+            seatRt.localScale = Vector3.one;
+            seatRt.localRotation = Quaternion.identity;
+        }
+
+        /// <summary>Drawn church art as normalized min/max inside backgroundRect (0–1).</summary>
+        public void GetContentNormalizedRange(out Vector2 min, out Vector2 max)
+        {
+            min = Vector2.zero;
+            max = Vector2.one;
+            if (backgroundRect == null) return;
+
+            Rect full = backgroundRect.rect;
+            if (full.width <= 0.01f || full.height <= 0.01f) return;
+
+            Rect content = GetDrawnContentRect();
+            min = new Vector2(
+                (content.xMin - full.xMin) / full.width,
+                (content.yMin - full.yMin) / full.height);
+            max = new Vector2(
+                (content.xMax - full.xMin) / full.width,
+                (content.yMax - full.yMin) / full.height);
+        }
+
         public void EnsureValid()
         {
             if (pews == null || pews.Length != PewCount)

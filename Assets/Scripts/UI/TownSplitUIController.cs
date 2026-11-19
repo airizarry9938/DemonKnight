@@ -128,30 +128,30 @@ namespace ArthurianAutobattler
             if (rt == null) rt = btnObj.AddComponent<RectTransform>();
 
             if (pewLayout != null)
-            {
-                Vector2 norm = pewLayout.GetNormalizedSeatPosition(seatIndex);
-                float scale = pewLayout.GetSeatScale(seatIndex);
-                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.pivot = new Vector2(0.5f, 0.12f); // feet sit on the pew bench
-                rt.anchoredPosition = pewLayout.NormalizedToLocal(norm);
-                rt.sizeDelta = baseSeatSize * scale;
-                rt.localScale = Vector3.one;
-            }
+                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
 
             Image img = btnObj.GetComponent<Image>();
-            if (img != null)
+            if (img == null) img = btnObj.AddComponent<Image>();
+            if (recruit != null && recruit.randomAvatar != null)
             {
-                if (recruit != null && recruit.randomAvatar != null)
+                img.sprite = recruit.randomAvatar;
+                img.color = Color.white;
+            }
+            else if (recruit != null)
+            {
+                img.sprite = null;
+                img.color = recruit.unitType switch
                 {
-                    img.sprite = recruit.randomAvatar;
-                    img.color = Color.white;
-                }
-                else
-                {
-                    // Empty seat box — ready for a character later.
-                    img.sprite = null;
-                    img.color = new Color(0.12f, 0.10f, 0.09f, 0.45f);
-                }
+                    UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 0.92f),
+                    UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 0.92f),
+                    UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 0.92f),
+                    _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
+                };
+            }
+            else
+            {
+                img.sprite = null;
+                img.color = new Color(0.12f, 0.10f, 0.09f, 0.40f);
             }
 
             Button btn = btnObj.GetComponent<Button>();
