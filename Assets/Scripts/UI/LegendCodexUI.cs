@@ -111,8 +111,10 @@ namespace ArthurianAutobattler
 
             if (ok)
             {
+                SinRuneManager.Instance?.OnLegendFused();
                 RefreshCodexList();
                 FindFirstObjectByType<TownSplitUIController>()?.UpdateHUD();
+                FindFirstObjectByType<ChurchStageUIController>()?.RefreshHUD();
             }
         }
     }

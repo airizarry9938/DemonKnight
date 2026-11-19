@@ -30,7 +30,7 @@ public static class ArthurianSceneBuilder
 
         // --- Managers root ---
         GameObject managers = new GameObject("=== SYSTEMS ===");
-        var grudge = managers.AddComponent<GrudgeSaveManager>();
+        managers.AddComponent<GrudgeSaveManager>();
         var merlin = CreateChild<MerlinResurrectionManager>(managers, "MerlinResurrectionManager");
         var perks = CreateChild<PerkDraftManager>(managers, "PerkDraftManager");
         var fusion = CreateChild<CardFusionSystem>(managers, "CardFusionSystem");
@@ -40,6 +40,9 @@ public static class ArthurianSceneBuilder
         var loop = CreateChild<GameLoopManager>(managers, "GameLoopManager");
         var visualizer = CreateChild<BattlefieldVisualizer>(managers, "BattlefieldVisualizer");
         var dice = CreateChild<TavernDiceMinigame>(managers, "TavernDiceMinigame");
+        CreateChild<RelicManager>(managers, "RelicManager");
+        CreateChild<DemonicPactManager>(managers, "DemonicPactManager");
+        CreateChild<SinRuneManager>(managers, "SinRuneManager");
 
         battle.hordeGenerator = horde;
 
@@ -66,6 +69,7 @@ public static class ArthurianSceneBuilder
         // --- Town 3-split canvas ---
         GameObject townCanvasObj = CreateCanvas("TownCanvas", 0);
         var townUI = townCanvasObj.AddComponent<TownSplitUIController>();
+        var churchUI = townCanvasObj.AddComponent<ChurchStageUIController>();
         var codex = townCanvasObj.AddComponent<LegendCodexUI>();
 
         // Top HUD bar
@@ -267,12 +271,22 @@ public static class ArthurianSceneBuilder
         merlin.discountBankText = discountBank;
         merlin.rationsBankText = rationsBank;
 
-        // Wire GameLoop
+        // Wire GameLoop + Church Stage
         loop.rngGenerator = rng;
         loop.townUI = townUI;
+        loop.churchUI = churchUI;
         loop.battleEngine = battle;
         loop.townCanvasObj = townCanvasObj;
         loop.battlefieldArenaObj = arena;
+
+        churchUI.timerText = townUI.timerText;
+        churchUI.goldText = townUI.goldText;
+        churchUI.warbandCountText = townUI.partyCountText;
+        churchUI.goToWarButton = townUI.goToWarButton;
+        churchUI.buyRoundButton = townUI.tavernRoundButton;
+        churchUI.diceModal = dicePanel;
+        churchUI.codexModal = codexPanel;
+        churchUI.dossierModal = dossier;
 
         // Camera framing for 2D battlefield
         var cam = Camera.main;

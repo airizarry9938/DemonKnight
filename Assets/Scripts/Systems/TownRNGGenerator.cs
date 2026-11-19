@@ -24,23 +24,30 @@ namespace ArthurianAutobattler
             "the Red", "the Stout", "of the Hills", "the Unlucky", "the Loyal", "Blacktooth"
         };
 
+        [Header("Paper-Doll Pools (optional)")]
+        public List<Sprite> bodyEager;
+        public List<Sprite> bodyUpright;
+        public List<Sprite> bodySlouched;
+        public List<Sprite> headPool;
+        public Sprite moodGrudge;
+        public Sprite moodLoyalist;
+        public Sprite moodCoward;
+
         public List<RecruitInstance> GenerateNewRunTown()
         {
+            // Persistent pew seats 0–51: knights 0–11, warriors 12–26, peasants 27–51.
             List<RecruitInstance> townList = new List<RecruitInstance>();
-            for (int i = 0; i < 12; i++) townList.Add(CreateRandomRecruit($"knight_{i}", UnitType.Knight, knightAvatars));
-            for (int i = 0; i < 15; i++) townList.Add(CreateRandomRecruit($"warrior_{i}", UnitType.Warrior, warriorAvatars));
-            for (int i = 0; i < 25; i++) townList.Add(CreateRandomRecruit($"peasant_{i}", UnitType.Peasant, peasantAvatars));
+            for (int i = 0; i < 12; i++) townList.Add(CreateRandomRecruit($"knight_{i}", UnitType.Knight, knightAvatars, i));
+            for (int i = 0; i < 15; i++) townList.Add(CreateRandomRecruit($"warrior_{i}", UnitType.Warrior, warriorAvatars, 12 + i));
+            for (int i = 0; i < 25; i++) townList.Add(CreateRandomRecruit($"peasant_{i}", UnitType.Peasant, peasantAvatars, 27 + i));
 
-            for (int i = townList.Count - 1; i > 0; i--)
-            {
-                int j = Random.Range(0, i + 1);
-                (townList[i], townList[j]) = (townList[j], townList[i]);
-            }
-
+            // Visual shuffle of display order is handled by pew index sort in Church UI.
+            // Keep unitID/pewSeatIndex stable; only cosmetic traits re-rolled above.
+            townList.Sort((a, b) => a.pewSeatIndex.CompareTo(b.pewSeatIndex));
             return townList;
         }
 
-        private RecruitInstance CreateRandomRecruit(string persistentID, UnitType type, List<Sprite> pool)
+        private RecruitInstance CreateRandomRecruit(string persistentID, UnitType type, List<Sprite> pool, int pewSeat)
         {
             float hpMult = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetBonusHealthMultiplier()
@@ -48,13 +55,19 @@ namespace ArthurianAutobattler
             bool freeTier1 = PerkDraftManager.Instance != null
                 && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree);
 
+            bool lustSiren = SinRuneManager.Instance != null
+                             && SinRuneManager.Instance.IsActive(SinRuneID.Lust)
+                             && Random.value < 0.25f;
+
             RecruitInstance r = new RecruitInstance
             {
                 unitID = persistentID,
                 characterName = $"{firstNames[Random.Range(0, firstNames.Length)]} {epithets[Random.Range(0, epithets.Length)]}",
                 unitType = type,
+                pewSeatIndex = pewSeat,
                 randomAvatar = (pool != null && pool.Count > 0) ? pool[Random.Range(0, pool.Count)] : null,
-                intelTierUnlocked = freeTier1 ? 1 : 0
+                intelTierUnlocked = freeTier1 ? 1 : 0,
+                isSirenEnchantress = lustSiren
             };
 
             switch (type)
@@ -82,7 +95,32 @@ namespace ArthurianAutobattler
             r.primaryTrait = RollPrimaryTrait();
             r.hatedTrait = RollSecondaryTrait(r.primaryTrait);
             r.lovedTrait = RollSecondaryTrait(r.primaryTrait);
+
+            int grudge = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID)
+                : 0;
+            r.RefreshBodyPostureFromTraits(grudge);
+            AssignPaperDollLayers(r, grudge);
             return r;
+        }
+
+        private void AssignPaperDollLayers(RecruitInstance r, int grudge)
+        {
+            List<Sprite> bodyPool = bodyUpright;
+            if (r.bodyPosture == BodyPosture.EagerForward) bodyPool = bodyEager;
+            else if (r.bodyPosture == BodyPosture.SlouchedExit) bodyPool = bodySlouched;
+
+            if (bodyPool != null && bodyPool.Count > 0)
+                r.bodySprite = bodyPool[Random.Range(0, bodyPool.Count)];
+            if (headPool != null && headPool.Count > 0)
+                r.headSprite = headPool[Random.Range(0, headPool.Count)];
+            else
+                r.headSprite = r.randomAvatar;
+
+            if (grudge > 0) r.moodOverlaySprite = moodGrudge;
+            else if (r.primaryTrait == TraitTag.Loyalist) r.moodOverlaySprite = moodLoyalist;
+            else if (r.primaryTrait == TraitTag.Coward) r.moodOverlaySprite = moodCoward;
+            else r.moodOverlaySprite = null;
         }
 
         private TraitTag RollPrimaryTrait()

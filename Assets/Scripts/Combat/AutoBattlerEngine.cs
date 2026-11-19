@@ -37,17 +37,31 @@ namespace ArthurianAutobattler
                     hatedTrait = r.hatedTrait,
                     lovedTrait = r.lovedTrait
                 };
+                copy.isSirenEnchantress = r.isSirenEnchantress;
                 combatRoster.Add(copy);
                 if (r.randomAvatar != null) spriteLookup[r.unitID] = r.randomAvatar;
             }
 
+            RelicManager.Instance?.ApplyMorganasMirrorClone(combatRoster);
             PartySynergyEvaluator.ApplyBattleModifiers(combatRoster);
             PerkDraftManager.Instance?.ApplyCombatPerksToParty(combatRoster);
             ApplyLegendRivalries(combatRoster);
+            ApplyUsurpationStarterLegends(combatRoster);
 
             playerArmy.Clear();
+            bool hellfire = DemonicPactManager.Instance != null
+                            && DemonicPactManager.Instance.ActivePact == DemonicPactID.HellfireSteel;
+
             foreach (var r in combatRoster)
             {
+                int atk = r.attackDamage;
+                float aps = Mathf.Clamp(r.attackSpeed, 1.0f, 2.0f);
+                if (hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight))
+                {
+                    atk *= 2;
+                    aps = 2.0f;
+                }
+
                 CombatUnit cu = new CombatUnit
                 {
                     unitID = r.unitID,
@@ -55,17 +69,24 @@ namespace ArthurianAutobattler
                     unitType = r.unitType,
                     assignedRole = r.assignedRole,
                     isDemon = false,
+                    isSirenEnchantress = r.isSirenEnchantress,
                     primaryTrait = r.primaryTrait,
                     maxHealth = r.maxHealth,
                     currentHealth = r.maxHealth,
-                    attackDamage = r.attackDamage,
-                    attacksPerSecond = Mathf.Clamp(r.attackSpeed, 1.0f, 2.0f)
+                    attackDamage = atk,
+                    attacksPerSecond = aps,
+                    cannotBeHealed = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight),
+                    maxHpDrainPerSecond = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight)
+                        ? r.maxHealth * 0.05f : 0f
                 };
                 cu.ResetAttackCooldown();
                 playerArmy.Add(cu);
             }
 
             demonArmy = hordeGenerator.GenerateHordeForBattle(currentBattleNumber);
+            ApplyEndlessHourglassPressure(demonArmy);
+            SpawnLustSirensIntoHorde(demonArmy);
+
             if (currentBattleNumber >= 2)
             {
                 float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
@@ -75,6 +96,63 @@ namespace ArthurianAutobattler
             foreach (var d in demonArmy) d.ResetAttackCooldown();
             TriggerBattleStartPassives();
             isBattling = true;
+        }
+
+        private void ApplyUsurpationStarterLegends(List<RecruitInstance> roster)
+        {
+            if (currentBattleNumber != 1) return;
+            if (DemonicPactManager.Instance == null
+                || DemonicPactManager.Instance.ActivePact != DemonicPactID.Usurpation) return;
+            if (roster.Any(u => u.unitType == UnitType.Mordred)) return;
+
+            roster.Add(new RecruitInstance
+            {
+                unitID = "pact_mordred", characterName = "Mordred (Pact)", unitType = UnitType.Mordred,
+                maxHealth = 240, attackDamage = 34, attackSpeed = 1.8f, primaryTrait = TraitTag.Outlaw,
+                assignedRole = CombatRole.FrontlineTank, intelTierUnlocked = 3
+            });
+            roster.Add(new RecruitInstance
+            {
+                unitID = "pact_morgan", characterName = "Morgan le Fay (Pact)", unitType = UnitType.MorganLeFay,
+                maxHealth = 165, attackDamage = 22, attackSpeed = 1.5f, primaryTrait = TraitTag.Outlaw,
+                assignedRole = CombatRole.BacklineRanged, intelTierUnlocked = 3
+            });
+        }
+
+        private void ApplyEndlessHourglassPressure(List<CombatUnit> horde)
+        {
+            if (DemonicPactManager.Instance == null || GameLoopManager.Instance == null) return;
+            float spent = GameLoopManager.Instance.townSecondsSpentThisPhase;
+            int extraLords = DemonicPactManager.Instance.GetEndlessHourglassExtraDreadLords(spent);
+            float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
+            for (int i = 0; i < extraLords; i++)
+            {
+                horde.Add(new CombatUnit
+                {
+                    unitID = $"hourglass_lord_{i}", unitName = "Hourglass Dread Lord",
+                    unitType = UnitType.DemonDreadLord, isDemon = true, isUnorganized = true, powerValue = 18,
+                    maxHealth = Mathf.RoundToInt(185 * mult), currentHealth = Mathf.RoundToInt(185 * mult),
+                    attackDamage = Mathf.RoundToInt(26 * mult), attacksPerSecond = Random.Range(0.9f, 1.8f)
+                });
+            }
+        }
+
+        private void SpawnLustSirensIntoHorde(List<CombatUnit> horde)
+        {
+            if (SinRuneManager.Instance == null || !SinRuneManager.Instance.IsActive(SinRuneID.Lust)) return;
+            int count = Mathf.Max(1, Mathf.RoundToInt(horde.Count * 0.25f));
+            float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
+            for (int i = 0; i < count; i++)
+            {
+                horde.Add(new CombatUnit
+                {
+                    unitID = $"siren_{i}", unitName = "Siren Enchantress",
+                    unitType = UnitType.SirenEnchantress, isDemon = true, isSirenEnchantress = true,
+                    isUnorganized = true, powerValue = 8,
+                    maxHealth = Mathf.RoundToInt(70 * mult), currentHealth = Mathf.RoundToInt(70 * mult),
+                    attackDamage = Mathf.RoundToInt(10 * mult), attacksPerSecond = Random.Range(1.2f, 1.8f)
+                });
+            }
         }
 
         private void ApplyLegendRivalries(List<RecruitInstance> party)
@@ -125,8 +203,18 @@ namespace ArthurianAutobattler
         {
             if (!isBattling) return;
 
-            foreach (var u in playerArmy.Where(u => u.IsAlive && u.petrifiedTimer > 0f))
-                u.petrifiedTimer -= Time.deltaTime;
+            foreach (var u in playerArmy.Where(u => u.IsAlive))
+            {
+                if (u.petrifiedTimer > 0f) u.petrifiedTimer -= Time.deltaTime;
+                if (u.charmedTimer > 0f) u.charmedTimer -= Time.deltaTime;
+                if (u.maxHpDrainPerSecond > 0f)
+                {
+                    u.currentHealth -= Mathf.RoundToInt(u.maxHpDrainPerSecond * Time.deltaTime);
+                    if (u.currentHealth <= 0) HandleUnitDeath(u);
+                }
+            }
+
+            TrySirenCharmTicks();
 
             var aliveHumans = playerArmy.Where(u => u.IsAlive).Take(frontlineSize).ToList();
             var aliveDemons = demonArmy.Where(u => u.IsAlive).Take(frontlineSize).ToList();
@@ -145,6 +233,24 @@ namespace ArthurianAutobattler
                 ProcessSideActions(aliveDemons, GetValidTargetsForDemons(aliveHumans));
         }
 
+        private void TrySirenCharmTicks()
+        {
+            bool anySiren = demonArmy.Any(d => d.IsAlive && d.isSirenEnchantress)
+                            || playerArmy.Any(u => u.IsAlive && u.isSirenEnchantress);
+            if (!anySiren) return;
+
+            foreach (var u in playerArmy.Where(u => u.IsAlive && CombatUnit.IsMaleFrontlineCharmable(u.unitType)))
+            {
+                if (CombatUnit.IsImmuneToSirenCharm(u.unitType)) continue;
+                if (u.charmedTimer > 0f) continue;
+                if (Random.value < 0.25f * Time.deltaTime) // ~chance per second scaled
+                {
+                    u.charmedTimer = 1.0f;
+                    BattlefieldVisualizer.Instance?.SpawnPopup(u, "CHARMED!", new Color(1f, 0.4f, 0.7f));
+                }
+            }
+        }
+
         private List<CombatUnit> GetValidTargetsForDemons(List<CombatUnit> aliveHumans)
         {
             var tanks = aliveHumans.Where(u => u.assignedRole == CombatRole.FrontlineTank).ToList();
@@ -155,7 +261,8 @@ namespace ArthurianAutobattler
         {
             foreach (var attacker in attackers)
             {
-                if (!attacker.IsAlive || attacker.petrifiedTimer > 0f || defenders.Count == 0) continue;
+                if (!attacker.IsAlive || attacker.petrifiedTimer > 0f || attacker.charmedTimer > 0f || defenders.Count == 0)
+                    continue;
 
                 attacker.battleElapsed += Time.deltaTime;
                 attacker.attackTimer -= Time.deltaTime;
@@ -176,18 +283,45 @@ namespace ArthurianAutobattler
             {
                 case UnitType.Priest:
                 {
-                    var injured = allies
-                        .Where(a => a.IsAlive && a.currentHealth < a.maxHealth)
+                    int healTargets = (RelicManager.Instance != null
+                                       && RelicManager.Instance.Has(RelicID.ChaliceOfTheGrail)) ? 2 : 1;
+                    var injuredList = allies
+                        .Where(a => a.IsAlive && !a.cannotBeHealed && a.currentHealth < a.maxHealth)
                         .OrderBy(a => (float)a.currentHealth / a.maxHealth)
-                        .FirstOrDefault();
-                    if (injured != null)
+                        .Take(healTargets)
+                        .ToList();
+
+                    if (injuredList.Count > 0)
                     {
-                        injured.currentHealth = Mathf.Min(injured.maxHealth, injured.currentHealth + dmg);
-                        BattlefieldVisualizer.Instance?.SpawnPopup(injured, $"+{dmg}", Color.green);
+                        foreach (var injured in injuredList)
+                        {
+                            injured.currentHealth = Mathf.Min(injured.maxHealth, injured.currentHealth + dmg);
+                            BattlefieldVisualizer.Instance?.SpawnPopup(injured, $"+{dmg}", Color.green);
+                        }
                     }
-                    else
+                    else if (enemies.Count > 0)
                     {
                         DealDamage(attacker, enemies[Random.Range(0, enemies.Count)], Mathf.Max(1, dmg / 2));
+                    }
+                    break;
+                }
+                case UnitType.LadyOfTheLake:
+                {
+                    // Chalice of the Grail: Lady also heals 2 allies per tick; otherwise default attack.
+                    if (RelicManager.Instance != null && RelicManager.Instance.Has(RelicID.ChaliceOfTheGrail))
+                    {
+                        foreach (var injured in allies
+                                     .Where(a => a.IsAlive && !a.cannotBeHealed && a.currentHealth < a.maxHealth)
+                                     .OrderBy(a => (float)a.currentHealth / a.maxHealth)
+                                     .Take(2))
+                        {
+                            injured.currentHealth = Mathf.Min(injured.maxHealth, injured.currentHealth + dmg);
+                            BattlefieldVisualizer.Instance?.SpawnPopup(injured, $"+{dmg}", Color.green);
+                        }
+                    }
+                    else if (enemies.Count > 0)
+                    {
+                        DealDamage(attacker, enemies[Random.Range(0, enemies.Count)], dmg);
                     }
                     break;
                 }
@@ -313,6 +447,19 @@ namespace ArthurianAutobattler
                 return;
             }
 
+            // Scabbard of Excalibur: Arthur/Knights survive fatal hit once per battle at 1 HP.
+            if (!fallen.isDemon
+                && RelicManager.Instance != null
+                && RelicManager.Instance.Has(RelicID.ScabbardOfExcalibur)
+                && !fallen.scabbardUsed
+                && (fallen.unitType == UnitType.KingArthur || fallen.unitType == UnitType.Knight))
+            {
+                fallen.scabbardUsed = true;
+                fallen.currentHealth = 1;
+                BattlefieldVisualizer.Instance?.SpawnPopup(fallen, "SCABBARD!", Color.yellow);
+                return;
+            }
+
             if (!fallen.isDemon)
             {
                 foreach (var lancelot in playerArmy.Where(u => u.IsAlive && u.unitType == UnitType.SirLancelot))
@@ -331,6 +478,30 @@ namespace ArthurianAutobattler
                     GrudgeSaveManager.Instance.RecordBattleOutcome(u.unitID, !u.IsAlive, !playerWon);
             }
 
+            // Silver Tongue: sacrifice highest-ATK survivor after every wave (+40g grudge).
+            if (playerWon
+                && DemonicPactManager.Instance != null
+                && DemonicPactManager.Instance.ActivePact == DemonicPactID.SilverTongue)
+            {
+                var victim = playerArmy.Where(u => u.IsAlive).OrderByDescending(u => u.attackDamage).FirstOrDefault();
+                if (victim != null)
+                {
+                    victim.currentHealth = 0;
+                    GrudgeSaveManager.Instance?.ModifyGrudgeStaging(victim.unitID, 40);
+                    var real = GameLoopManager.Instance?.recruitedParty.Find(r => r.unitID == victim.unitID);
+                    if (real != null) GameLoopManager.Instance.recruitedParty.Remove(real);
+                }
+            }
+
+            // Lust: hired Sirens drain 15g per wave.
+            if (playerWon && SinRuneManager.Instance != null && SinRuneManager.Instance.IsActive(SinRuneID.Lust))
+            {
+                int sirens = GameLoopManager.Instance != null
+                    ? GameLoopManager.Instance.recruitedParty.Count(r => r.isSirenEnchantress) : 0;
+                var uiDrain = FindFirstObjectByType<TownSplitUIController>();
+                if (uiDrain != null) uiDrain.playerGold = Mathf.Max(0, uiDrain.playerGold - sirens * 15);
+            }
+
             if (playerWon && currentBattleNumber >= finalBossWave)
             {
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(currentBattleNumber, true);
@@ -341,6 +512,7 @@ namespace ArthurianAutobattler
             }
             else
             {
+                RelicManager.Instance?.TryAwardRelicForWave(currentBattleNumber);
                 currentBattleNumber++;
                 var ui = FindFirstObjectByType<TownSplitUIController>();
                 if (ui != null) ui.playerGold += goldEarned;

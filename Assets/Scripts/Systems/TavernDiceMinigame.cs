@@ -27,22 +27,34 @@ namespace ArthurianAutobattler
             if (!isPlaying) return;
 
             int roll = Random.Range(1, 7);
-            bool firstRollSafe = PerkDraftManager.Instance != null
-                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.TavernRiggedDice)
-                && rollStreak == 0;
+            int gamblerRank = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.Gambler)
+                : 0;
+
+            bool firstRollSafe = (PerkDraftManager.Instance != null
+                                  && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.TavernRiggedDice)
+                                  && rollStreak == 0)
+                                 || gamblerRank >= 1;
+
+            bool cursedDice = RelicManager.Instance != null
+                              && RelicManager.Instance.Has(RelicID.CursedDiceOfCaerleon);
 
             if (roll == 1 && !firstRollSafe)
             {
                 currentPot = 0;
                 rollStreak = 0;
                 isPlaying = false;
+                if (cursedDice) ApplyCursedDiceGrudge();
                 OnBust?.Invoke();
             }
             else
             {
-                if (roll == 1) roll = 2; // Loaded dice protection
+                if (roll == 1) roll = 2; // Loaded / Gambler protection
                 rollStreak++;
-                currentPot += roll * rollStreak;
+                int gain = roll * rollStreak;
+                if (gamblerRank >= 2 && roll == 6) gain *= 2;
+                if (cursedDice) gain *= 2;
+                currentPot += gain;
                 OnRollSuccess?.Invoke(roll, currentPot);
             }
         }
@@ -54,6 +66,20 @@ namespace ArthurianAutobattler
             currentPot = 0;
             rollStreak = 0;
             isPlaying = false;
+
+            int gamblerRank = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.Gambler)
+                : 0;
+            if (gamblerRank >= 3 && GameLoopManager.Instance != null)
+                GameLoopManager.Instance.AddTownTimeBonus(15f);
+        }
+
+        private void ApplyCursedDiceGrudge()
+        {
+            if (GameLoopManager.Instance == null || GameLoopManager.Instance.currentTownPool.Count == 0) return;
+            var pool = GameLoopManager.Instance.currentTownPool;
+            var victim = pool[Random.Range(0, pool.Count)];
+            GrudgeSaveManager.Instance?.ModifyGrudgeStaging(victim.unitID, 10);
         }
     }
 }

@@ -4,19 +4,28 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    public enum GamePhase { TownRecruit, AutoBattle, Rewards, Resurrection }
+    public enum GamePhase { TownRecruit, AutoBattle, Rewards, Resurrection, PactSelect }
 
     public enum UnitType
     {
         Peasant, Warrior, Knight,
         Priest, Captain,
         KingArthur, Merlin, SirLancelot, MorganLeFay, LadyOfTheLake, SirGawain, Mordred, SirGalahad,
-        DemonImp, DemonHellhound, DemonDreadLord,
+        DemonImp, DemonHellhound, DemonDreadLord, SirenEnchantress,
         BossBlackKnight, BossVortigern, BossGreenKnight, BossAccolon, BossNimue
     }
 
     public enum TraitTag { None, Noble, Outlaw, Drunkard, Zealot, Coward, Loyalist }
     public enum CombatRole { Unassigned, FrontlineTank, BacklineRanged }
+    public enum BodyPosture { EagerForward, UprightFolded, SlouchedExit }
+
+    public enum BankRuneID { Gossip, Gambler, BloodOath, PeasantsCrown }
+    public enum RelicID
+    {
+        None, ScabbardOfExcalibur, ChaliceOfTheGrail, MorganasBlackMirror, HornOfCamelot, CursedDiceOfCaerleon
+    }
+    public enum DemonicPactID { None, SilverTongue, HellfireSteel, Usurpation, EndlessHourglass }
+    public enum SinRuneID { None, Jealousy, Lust }
 
     [Serializable]
     public class RecruitInstance
@@ -35,11 +44,56 @@ namespace ArthurianAutobattler
         public TraitTag lovedTrait;
         public int intelTierUnlocked = 0;
 
+        /// <summary>Persistent seat in the Somerset church (0–51).</summary>
+        public int pewSeatIndex = 0;
+
+        public BodyPosture bodyPosture = BodyPosture.UprightFolded;
+        public Sprite bodySprite;
+        public Sprite headSprite;
+        public Sprite moodOverlaySprite;
+        public bool isSirenEnchantress = false;
+
         public int GetFinalHireCost(int grudgePenalty, int globalDiscount = 0)
         {
-            int cost = Mathf.Max(1, baseHireCost + grudgePenalty - globalDiscount);
+            int effectiveGrudge = grudgePenalty;
+            int bloodRank = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.BloodOath)
+                : 0;
+            if (bloodRank > 0
+                && (primaryTrait == TraitTag.Outlaw || primaryTrait == TraitTag.Coward)
+                && grudgePenalty > 0)
+            {
+                // Blood-Oath reverses grudge into a discount for Outlaws/Cowards.
+                effectiveGrudge = -(bloodRank * 5);
+            }
+
+            int peasantCut = 0;
+            if (unitType == UnitType.Peasant && MerlinResurrectionManager.Instance != null)
+                peasantCut = MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.PeasantsCrown) * 2;
+
+            int jealousyTax = 0;
+            if (SinRuneManager.Instance != null && SinRuneManager.Instance.IsActive(SinRuneID.Jealousy)
+                && GameLoopManager.Instance != null)
+            {
+                int legendCount = 0;
+                foreach (var m in GameLoopManager.Instance.recruitedParty)
+                {
+                    if (IsLegendUnit(m.unitType)) legendCount++;
+                }
+                jealousyTax = legendCount * 10;
+            }
+
+            int cost = Mathf.Max(1, baseHireCost + effectiveGrudge - globalDiscount - peasantCut + jealousyTax);
             if (primaryTrait == TraitTag.Loyalist) cost = Mathf.Max(1, cost / 2);
             return cost;
+        }
+
+        public static bool IsLegendUnit(UnitType t)
+        {
+            return t == UnitType.KingArthur || t == UnitType.Merlin || t == UnitType.SirLancelot
+                   || t == UnitType.MorganLeFay || t == UnitType.LadyOfTheLake || t == UnitType.SirGawain
+                   || t == UnitType.Mordred || t == UnitType.SirGalahad || t == UnitType.Priest
+                   || t == UnitType.Captain;
         }
 
         public void TrainRole(CombatRole newRole)
@@ -52,9 +106,21 @@ namespace ArthurianAutobattler
                 attackDamage = Mathf.RoundToInt(attackDamage * 1.20f);
         }
 
+        public void RefreshBodyPostureFromTraits(int grudgePenalty)
+        {
+            if (primaryTrait == TraitTag.Loyalist)
+                bodyPosture = BodyPosture.EagerForward;
+            else if (primaryTrait == TraitTag.Coward || grudgePenalty > 0)
+                bodyPosture = BodyPosture.SlouchedExit;
+            else
+                bodyPosture = BodyPosture.UprightFolded;
+        }
+
         public string GetDisplayDescription()
         {
-            string info = $"<b>{characterName}</b> ({unitType}) | Role: <b>{assignedRole}</b>\n";
+            string info = $"<b>{characterName}</b> ({unitType}) | Pew #{pewSeatIndex} | Role: <b>{assignedRole}</b>\n";
+            if (isSirenEnchantress) info += "<color=#FF69B4>Siren Enchantress</color>\n";
+
             if (intelTierUnlocked >= 1)
                 info += $"HP: {maxHealth} | ATK: {attackDamage} | SPD: {attackSpeed:F1}/s\n";
             else
@@ -72,6 +138,9 @@ namespace ArthurianAutobattler
 
             return info;
         }
+
+        /// <summary>Pew row used by Gossip Rune adjacency (13 seats per row).</summary>
+        public int PewRow => pewSeatIndex / 13;
     }
 
     [Serializable]
@@ -83,6 +152,7 @@ namespace ArthurianAutobattler
         public CombatRole assignedRole;
         public bool isDemon;
         public bool isUnorganized;
+        public bool isSirenEnchantress;
         public TraitTag primaryTrait;
         public int powerValue;
         public int maxHealth;
@@ -93,8 +163,12 @@ namespace ArthurianAutobattler
         public float attackTimer;
         public bool hasRevived = false;
         public bool isHexed = false;
+        public bool scabbardUsed = false;
         public float battleElapsed = 0f;
         public float petrifiedTimer = 0f;
+        public float charmedTimer = 0f;
+        public bool cannotBeHealed = false;
+        public float maxHpDrainPerSecond = 0f;
 
         public bool IsAlive => currentHealth > 0;
 
@@ -103,12 +177,37 @@ namespace ArthurianAutobattler
             float effectiveAPS = isHexed ? attacksPerSecond * 0.5f : attacksPerSecond;
             attackTimer = 1f / Mathf.Clamp(effectiveAPS, 0.4f, 3.0f);
         }
+
+        public static bool IsImmuneToSirenCharm(UnitType t)
+        {
+            return t == UnitType.MorganLeFay || t == UnitType.LadyOfTheLake
+                   || t == UnitType.Merlin || t == UnitType.SirGalahad;
+        }
+
+        public static bool IsMaleFrontlineCharmable(UnitType t)
+        {
+            return t == UnitType.Peasant || t == UnitType.Warrior || t == UnitType.Knight
+                   || t == UnitType.SirLancelot || t == UnitType.SirGawain;
+        }
     }
 
     public static class PartySynergyEvaluator
     {
         public static bool CanJoinParty(RecruitInstance candidate, List<RecruitInstance> currentParty, out string refusalReason)
         {
+            if (DemonicPactManager.Instance != null
+                && DemonicPactManager.Instance.ActivePact == DemonicPactID.Usurpation)
+            {
+                if (candidate.unitType == UnitType.KingArthur
+                    || candidate.unitType == UnitType.SirGalahad
+                    || candidate.unitType == UnitType.Merlin
+                    || candidate.primaryTrait == TraitTag.Loyalist)
+                {
+                    refusalReason = "The Pact of Usurpation bars Arthur, Galahad, Merlin, and all Loyalists.";
+                    return false;
+                }
+            }
+
             foreach (var member in currentParty)
             {
                 if (candidate.primaryTrait == TraitTag.Noble && member.primaryTrait == TraitTag.Outlaw)
@@ -124,19 +223,31 @@ namespace ArthurianAutobattler
 
         public static void ApplyBattleModifiers(List<RecruitInstance> party)
         {
-            // King Arthur nullifies rivalry (hatedTrait) nerfs while preserving love synergies.
             bool arthurPresent = false;
+            int peasantCount = 0;
             foreach (var member in party)
             {
-                if (member.unitType == UnitType.KingArthur)
-                {
-                    arthurPresent = true;
-                    break;
-                }
+                if (member.unitType == UnitType.KingArthur) arthurPresent = true;
+                if (member.unitType == UnitType.Peasant) peasantCount++;
             }
+
+            float peasantApsBonus = 0f;
+            int crownRank = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.PeasantsCrown)
+                : 0;
+            if (crownRank > 0 && peasantCount >= 5)
+                peasantApsBonus = 0.15f * (peasantCount / 5) * crownRank;
+
+            bool jealousy = SinRuneManager.Instance != null && SinRuneManager.Instance.IsActive(SinRuneID.Jealousy);
 
             foreach (var unit in party)
             {
+                if (peasantApsBonus > 0f && unit.unitType == UnitType.Peasant)
+                    unit.attackSpeed = Mathf.Min(2.0f, unit.attackSpeed + peasantApsBonus);
+
+                if (jealousy && !RecruitInstance.IsLegendUnit(unit.unitType))
+                    unit.attackDamage = Mathf.Max(1, unit.attackDamage - 3);
+
                 foreach (var ally in party)
                 {
                     if (unit == ally) continue;

@@ -17,15 +17,22 @@ namespace ArthurianAutobattler
 
         [Header("Persistent Bank Levels")]
         public int unspentLegacyPoints = 0;
-        public int startingGoldBankLevel = 0;      // +15g starting purse per level
-        public int recruitmentDiscountLevel = 0;   // -3g base cost per level
-        public int startingSupplyRationsLevel = 0; // +10% base HP per level
+        public int startingGoldBankLevel = 0;
+        public int recruitmentDiscountLevel = 0;
+        public int startingSupplyRationsLevel = 0;
+
+        [Header("Uncapped Stackable Runes (Ranks 0–3)")]
+        public int gossipRuneRank = 0;
+        public int gamblerRuneRank = 0;
+        public int bloodOathRuneRank = 0;
+        public int peasantsCrownRuneRank = 0;
 
         [Header("Bank UI Labels")]
         public TextMeshProUGUI pointsAvailableText;
         public TextMeshProUGUI goldBankText;
         public TextMeshProUGUI discountBankText;
         public TextMeshProUGUI rationsBankText;
+        public TextMeshProUGUI runeStatusText;
 
         private void Awake()
         {
@@ -36,7 +43,13 @@ namespace ArthurianAutobattler
 
         public void TriggerEndOfRunResurrection(int wavesCleared, bool defeatedNimue, string customReason = "")
         {
-            int earnedPoints = Mathf.Max(1, wavesCleared * 2 + (defeatedNimue ? 10 : 0));
+            float mult = 1f;
+            if (DemonicPactManager.Instance != null && DemonicPactManager.Instance.ActivePact != DemonicPactID.None)
+                mult *= 1.5f;
+            if (SinRuneManager.Instance != null)
+                mult *= SinRuneManager.Instance.GetLegacyPointMultiplier();
+
+            int earnedPoints = Mathf.Max(1, Mathf.RoundToInt((wavesCleared * 2 + (defeatedNimue ? 10 : 0)) * mult));
             unspentLegacyPoints += earnedPoints;
             SaveBankData();
             GrudgeSaveManager.Instance?.CommitStagedGrudgesToDisk();
@@ -51,43 +64,47 @@ namespace ArthurianAutobattler
             if (merlinCutsceneAnimator != null)
                 merlinCutsceneAnimator.SetTrigger("CastResurrection");
 
-            if (!string.IsNullOrEmpty(customReason))
-                loreNarrativeText.text = customReason;
-            else
-                loreNarrativeText.text = defeatedNimue
-                    ? "Nimue falls, yet the abyss stirs... Merlin turns the hourglass to prepare Camelot once more."
-                    : "The horde overwhelms the gate... Merlin shatters the hourglass, pulling you and the townsfolk back from death. They remember the slaughter.";
+            if (loreNarrativeText != null)
+            {
+                if (!string.IsNullOrEmpty(customReason))
+                    loreNarrativeText.text = customReason;
+                else
+                    loreNarrativeText.text = defeatedNimue
+                        ? "Nimue falls, yet the abyss stirs... Merlin turns the hourglass inside the Somerset church once more."
+                        : "The horde breaches the churchyard... Merlin shatters the hourglass. The pews remember the slaughter.";
+            }
 
             yield return new WaitForSeconds(3.5f);
 
-            loreNarrativeText.text = $"You gained <b>+{earnedPoints} Arcane Legacy Points</b>. Allocate supplies to your Royal Bank before re-entering Camelot.";
+            if (loreNarrativeText != null)
+                loreNarrativeText.text = $"You gained <b>+{earnedPoints} Arcane Legacy Points</b>. Upgrade the Royal Bank and stackable Runes.";
             if (legacyBankPanel != null) legacyBankPanel.SetActive(true);
             RefreshBankUI();
         }
 
-        public void UpgradeStartingGold()
+        public void UpgradeStartingGold() => SpendPointOn(() => startingGoldBankLevel++);
+        public void UpgradeRecruitmentDiscount() => SpendPointOn(() => recruitmentDiscountLevel++);
+        public void UpgradeSupplyRations() => SpendPointOn(() => startingSupplyRationsLevel++);
+
+        public void UpgradeGossipRune() => UpgradeRune(ref gossipRuneRank);
+        public void UpgradeGamblerRune() => UpgradeRune(ref gamblerRuneRank);
+        public void UpgradeBloodOathRune() => UpgradeRune(ref bloodOathRuneRank);
+        public void UpgradePeasantsCrownRune() => UpgradeRune(ref peasantsCrownRuneRank);
+
+        private void UpgradeRune(ref int rank)
         {
-            if (unspentLegacyPoints <= 0) return;
+            if (unspentLegacyPoints <= 0 || rank >= 3) return;
             unspentLegacyPoints--;
-            startingGoldBankLevel++;
+            rank++;
             SaveBankData();
             RefreshBankUI();
         }
 
-        public void UpgradeRecruitmentDiscount()
+        private void SpendPointOn(System.Action apply)
         {
             if (unspentLegacyPoints <= 0) return;
             unspentLegacyPoints--;
-            recruitmentDiscountLevel++;
-            SaveBankData();
-            RefreshBankUI();
-        }
-
-        public void UpgradeSupplyRations()
-        {
-            if (unspentLegacyPoints <= 0) return;
-            unspentLegacyPoints--;
-            startingSupplyRationsLevel++;
+            apply();
             SaveBankData();
             RefreshBankUI();
         }
@@ -101,12 +118,29 @@ namespace ArthurianAutobattler
         public int GetGlobalCostDiscount() => recruitmentDiscountLevel * 3;
         public float GetBonusHealthMultiplier() => 1f + (startingSupplyRationsLevel * 0.10f);
 
+        public int GetRuneRank(BankRuneID id)
+        {
+            switch (id)
+            {
+                case BankRuneID.Gossip: return gossipRuneRank;
+                case BankRuneID.Gambler: return gamblerRuneRank;
+                case BankRuneID.BloodOath: return bloodOathRuneRank;
+                case BankRuneID.PeasantsCrown: return peasantsCrownRuneRank;
+                default: return 0;
+            }
+        }
+
         private void RefreshBankUI()
         {
             if (pointsAvailableText != null) pointsAvailableText.text = $"Legacy Points: {unspentLegacyPoints}";
             if (goldBankText != null) goldBankText.text = $"Royal Treasury (+{GetBonusStartingGold()}g Start)";
             if (discountBankText != null) discountBankText.text = $"Royal Writ (-{GetGlobalCostDiscount()}g Cost)";
             if (rationsBankText != null) rationsBankText.text = $"War Rations (+{startingSupplyRationsLevel * 10}% HP)";
+            if (runeStatusText != null)
+            {
+                runeStatusText.text =
+                    $"Gossip R{gossipRuneRank}/3 | Gambler R{gamblerRuneRank}/3 | Blood-Oath R{bloodOathRuneRank}/3 | Peasant's Crown R{peasantsCrownRuneRank}/3";
+            }
         }
 
         private void SaveBankData()
@@ -115,6 +149,10 @@ namespace ArthurianAutobattler
             PlayerPrefs.SetInt("BankGoldLvl", startingGoldBankLevel);
             PlayerPrefs.SetInt("BankDiscountLvl", recruitmentDiscountLevel);
             PlayerPrefs.SetInt("BankRationsLvl", startingSupplyRationsLevel);
+            PlayerPrefs.SetInt("RuneGossip", gossipRuneRank);
+            PlayerPrefs.SetInt("RuneGambler", gamblerRuneRank);
+            PlayerPrefs.SetInt("RuneBloodOath", bloodOathRuneRank);
+            PlayerPrefs.SetInt("RunePeasantCrown", peasantsCrownRuneRank);
             PlayerPrefs.Save();
         }
 
@@ -124,6 +162,10 @@ namespace ArthurianAutobattler
             startingGoldBankLevel = PlayerPrefs.GetInt("BankGoldLvl", 0);
             recruitmentDiscountLevel = PlayerPrefs.GetInt("BankDiscountLvl", 0);
             startingSupplyRationsLevel = PlayerPrefs.GetInt("BankRationsLvl", 0);
+            gossipRuneRank = PlayerPrefs.GetInt("RuneGossip", 0);
+            gamblerRuneRank = PlayerPrefs.GetInt("RuneGambler", 0);
+            bloodOathRuneRank = PlayerPrefs.GetInt("RuneBloodOath", 0);
+            peasantsCrownRuneRank = PlayerPrefs.GetInt("RunePeasantCrown", 0);
         }
     }
 }

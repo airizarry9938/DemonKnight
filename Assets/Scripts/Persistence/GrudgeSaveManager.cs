@@ -25,6 +25,9 @@ namespace ArthurianAutobattler
         private Dictionary<string, int> committedGrudges = new Dictionary<string, int>();
         private Dictionary<string, int> stagedGrudges = new Dictionary<string, int>();
 
+        /// <summary>Demonic Pacts set this to 2 to double staged grudge deltas.</summary>
+        public float grudgeDeltaMultiplier = 1f;
+
         private string SaveFilePath => Path.Combine(Application.persistentDataPath, "grudge_memory.json");
 
         private void Awake()
@@ -59,7 +62,8 @@ namespace ArthurianAutobattler
         {
             if (!stagedGrudges.ContainsKey(unitID))
                 stagedGrudges[unitID] = 0;
-            stagedGrudges[unitID] = Mathf.Max(0, stagedGrudges[unitID] + delta);
+            int scaled = Mathf.RoundToInt(delta * Mathf.Max(0.1f, grudgeDeltaMultiplier));
+            stagedGrudges[unitID] = Mathf.Max(0, stagedGrudges[unitID] + scaled);
         }
 
         /// <summary>
