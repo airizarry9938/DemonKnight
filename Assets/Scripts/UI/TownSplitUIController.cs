@@ -22,9 +22,12 @@ namespace ArthurianAutobattler
         public Button rollDiceButton;
         public Button cashOutButton;
 
-        [Header("Top-Right: Town Crowd Grid")]
+        [Header("Town Crowd → Church Pews")]
+        [Tooltip("Parent for seat buttons. Prefer PewSeatLayer under ChurchBackground.")]
         public Transform townGridContainer;
         public GameObject recruitAvatarButtonPrefab;
+        public ChurchPewLayout pewLayout;
+        public Vector2 baseSeatSize = new Vector2(48f, 64f);
 
         [Header("Bottom: Dossier, Role Training & Mediation")]
         public Image selectedAvatarImage;
@@ -64,17 +67,99 @@ namespace ArthurianAutobattler
 
         public void PopulateTownGrid(List<RecruitInstance> generatedTown)
         {
-            activeTownPool = generatedTown;
+            activeTownPool = generatedTown ?? new List<RecruitInstance>();
+            if (townGridContainer == null) return;
+
+            // Disable legacy GridLayoutGroup — seats are absolute on the church art.
+            var grid = townGridContainer.GetComponent<GridLayoutGroup>();
+            if (grid != null) grid.enabled = false;
+
+            if (pewLayout == null) pewLayout = GetComponent<ChurchPewLayout>();
+            if (pewLayout == null) pewLayout = FindFirstObjectByType<ChurchPewLayout>();
+            if (pewLayout != null) pewLayout.EnsureValid();
+
             foreach (Transform child in townGridContainer) Destroy(child.gameObject);
 
-            foreach (RecruitInstance recruit in activeTownPool)
+            // Index recruits by pew seat so each of the 52 boxes can receive a character later.
+            var bySeat = new Dictionary<int, RecruitInstance>();
+            foreach (var recruit in activeTownPool)
             {
-                GameObject btnObj = Instantiate(recruitAvatarButtonPrefab, townGridContainer);
-                Image img = btnObj.GetComponent<Image>();
-                if (img != null) img.sprite = recruit.randomAvatar;
+                int seat = Mathf.Clamp(recruit.pewSeatIndex, 0, ChurchPewLayout.TotalSeats - 1);
+                if (!bySeat.ContainsKey(seat)) bySeat[seat] = recruit;
+            }
 
-                Button btn = btnObj.GetComponent<Button>();
-                if (btn != null)
+            if (pewLayout != null)
+            {
+                // Back rows first so front pews draw on top.
+                var order = new List<int>(ChurchPewLayout.TotalSeats);
+                for (int i = 0; i < ChurchPewLayout.TotalSeats; i++) order.Add(i);
+                order.Sort((a, b) =>
+                {
+                    int rowA = pewLayout.GetPewRow(pewLayout.GetPewIndexForSeat(a));
+                    int rowB = pewLayout.GetPewRow(pewLayout.GetPewIndexForSeat(b));
+                    int cmp = rowB.CompareTo(rowA);
+                    return cmp != 0 ? cmp : a.CompareTo(b);
+                });
+
+                foreach (int seatIndex in order)
+                {
+                    bySeat.TryGetValue(seatIndex, out RecruitInstance recruit);
+                    CreatePewSeatButton(seatIndex, recruit);
+                }
+            }
+            else
+            {
+                // Fallback: flat list if pew layout is missing.
+                foreach (RecruitInstance recruit in activeTownPool)
+                    CreatePewSeatButton(recruit.pewSeatIndex, recruit);
+            }
+        }
+
+        private void CreatePewSeatButton(int seatIndex, RecruitInstance recruit)
+        {
+            if (recruitAvatarButtonPrefab == null || townGridContainer == null) return;
+
+            GameObject btnObj = Instantiate(recruitAvatarButtonPrefab, townGridContainer);
+            btnObj.name = recruit != null
+                ? $"Seat_{seatIndex:00}_{recruit.characterName}"
+                : $"Seat_{seatIndex:00}_Empty";
+
+            var rt = btnObj.GetComponent<RectTransform>();
+            if (rt == null) rt = btnObj.AddComponent<RectTransform>();
+
+            if (pewLayout != null)
+            {
+                Vector2 norm = pewLayout.GetNormalizedSeatPosition(seatIndex);
+                float scale = pewLayout.GetSeatScale(seatIndex);
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.12f); // feet sit on the pew bench
+                rt.anchoredPosition = pewLayout.NormalizedToLocal(norm);
+                rt.sizeDelta = baseSeatSize * scale;
+                rt.localScale = Vector3.one;
+            }
+
+            Image img = btnObj.GetComponent<Image>();
+            if (img != null)
+            {
+                if (recruit != null && recruit.randomAvatar != null)
+                {
+                    img.sprite = recruit.randomAvatar;
+                    img.color = Color.white;
+                }
+                else
+                {
+                    // Empty seat box — ready for a character later.
+                    img.sprite = null;
+                    img.color = new Color(0.12f, 0.10f, 0.09f, 0.45f);
+                }
+            }
+
+            Button btn = btnObj.GetComponent<Button>();
+            if (btn != null)
+            {
+                btn.onClick.RemoveAllListeners();
+                btn.interactable = recruit != null;
+                if (recruit != null)
                 {
                     RecruitInstance captured = recruit;
                     GameObject capturedObj = btnObj;

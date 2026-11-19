@@ -120,10 +120,14 @@ namespace ArthurianAutobattler
             if (townCanvasObj != null) townCanvasObj.SetActive(true);
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
 
-            if (churchUI != null)
+            // Seat the Camelot crowd on the church pews (52 boxes over the background art).
+            // Prefer church pew stage when wired; otherwise fall back to town grid placement.
+            if (churchUI != null && churchUI.pewSeatLayer != null)
                 churchUI.PopulatePews(currentTownPool);
+            else if (townUI != null)
+                townUI.PopulateTownGrid(currentTownPool);
             else
-                townUI?.PopulateTownGrid(currentTownPool);
+                churchUI?.PopulatePews(currentTownPool);
 
             townUI?.UpdateHUD();
             churchUI?.RefreshHUD();

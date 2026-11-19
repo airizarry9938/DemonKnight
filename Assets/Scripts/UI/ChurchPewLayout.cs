@@ -1,12 +1,13 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace ArthurianAutobattler
 {
     /// <summary>
     /// Maps 52 citizens onto the Somerset church art: 12 pews in a 3×4 grid
     /// (columns Left/Center/Right × rows front→altar), ~4–5 seats per pew.
-    /// Coordinates are normalized 0–1 over the church background RectTransform
+    /// Coordinates are normalized 0–1 over the drawn church sprite
     /// (0,0 = bottom-left, 1,1 = top-right), tuned to SomersetChurchInterior.jpg.
     /// </summary>
     [Serializable]
@@ -40,17 +41,25 @@ namespace ArthurianAutobattler
         public PewAnchor[] pews = CreateDefaultPews();
 
         /// <summary>
-        /// Default anchors matched to SomersetChurchInterior.jpg (3 cols × 4 rows).
+        /// Defaults matched to SomersetChurchInterior.jpg (1408×768).
+        /// Measured from wood-bench bands: 3 aisle columns × 4 pew rows.
         /// Row 0 = nearest/front (bottom of image), Row 3 = toward altar/windows.
         /// </summary>
         public static PewAnchor[] CreateDefaultPews()
         {
-            // Column X centers (aisles between left/center/right).
-            float[] colX = { 0.22f, 0.50f, 0.78f };
-            // Row Y centers from front (bottom) to back (top), with perspective.
-            float[] rowY = { 0.30f, 0.42f, 0.53f, 0.63f };
-            float[] rowScale = { 1.00f, 0.90f, 0.80f, 0.72f };
-            float[] rowSpread = { 0.18f, 0.17f, 0.15f, 0.14f };
+            // Column X centers converge slightly toward the altar (perspective).
+            float[][] colXByRow =
+            {
+                new[] { 0.213f, 0.500f, 0.787f }, // front
+                new[] { 0.220f, 0.500f, 0.780f },
+                new[] { 0.228f, 0.500f, 0.773f },
+                new[] { 0.235f, 0.500f, 0.768f }  // back / altar
+            };
+
+            // Seat sit-line (feet) just above each pew bench top.
+            float[] rowY = { 0.255f, 0.375f, 0.490f, 0.595f };
+            float[] rowScale = { 1.00f, 0.88f, 0.76f, 0.66f };
+            float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.130f };
 
             // Capacities: front row bigger (5 each), then mix to total 52.
             // 5+5+5 + 4+5+4 + 4+4+4 + 4+4+4 = 15+13+12+12 = 52
@@ -70,7 +79,7 @@ namespace ArthurianAutobattler
                 {
                     result[i++] = new PewAnchor
                     {
-                        normalizedCenter = new Vector2(colX[col], rowY[row]),
+                        normalizedCenter = new Vector2(colXByRow[row][col], rowY[row]),
                         seatSpread = rowSpread[row],
                         scale = rowScale[row],
                         seatCapacity = caps[row, col]
@@ -152,14 +161,40 @@ namespace ArthurianAutobattler
             return pews[GetPewIndexForSeat(globalSeatIndex)].scale;
         }
 
+        /// <summary>
+        /// Local rect of the church sprite as drawn (accounts for Image.preserveAspect letterboxing).
+        /// </summary>
+        public Rect GetDrawnContentRect()
+        {
+            if (backgroundRect == null) return new Rect(0f, 0f, 0f, 0f);
+
+            Rect r = backgroundRect.rect;
+            Image img = backgroundRect.GetComponent<Image>();
+            if (img == null || !img.preserveAspect || img.sprite == null || r.height <= 0.01f)
+                return r;
+
+            float spriteAspect = img.sprite.rect.width / Mathf.Max(1f, img.sprite.rect.height);
+            float rectAspect = r.width / r.height;
+            if (spriteAspect > rectAspect)
+            {
+                float h = r.width / spriteAspect;
+                float y = r.y + (r.height - h) * 0.5f;
+                return new Rect(r.x, y, r.width, h);
+            }
+
+            float w = r.height * spriteAspect;
+            float x = r.x + (r.width - w) * 0.5f;
+            return new Rect(x, r.y, w, r.height);
+        }
+
         /// <summary>Converts normalized 0–1 coords into local anchored position inside backgroundRect.</summary>
         public Vector2 NormalizedToLocal(Vector2 normalized)
         {
             if (backgroundRect == null) return Vector2.zero;
-            Vector2 size = backgroundRect.rect.size;
+            Rect content = GetDrawnContentRect();
             return new Vector2(
-                (normalized.x - 0.5f) * size.x,
-                (normalized.y - 0.5f) * size.y);
+                content.xMin + normalized.x * content.width,
+                content.yMin + normalized.y * content.height);
         }
 
         public void EnsureValid()

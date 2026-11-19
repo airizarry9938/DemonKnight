@@ -17,6 +17,190 @@ public static class ArthurianSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/CamelotMain.unity";
 
+    [MenuItem("Arthurian/Align Crowd Grid To Church Pews")]
+    public static void AlignCrowdGridToChurchPews()
+    {
+        var townCanvas = GameObject.Find("TownCanvas");
+        if (townCanvas == null)
+        {
+            EditorUtility.DisplayDialog("Last Knights of Somerset",
+                "No TownCanvas found in the open scene.\nOpen CamelotMain (or your town scene) first.",
+                "OK");
+            return;
+        }
+
+        // Find or create ChurchBackground under TownCanvas.
+        Transform bgTf = townCanvas.transform.Find("ChurchBackground");
+        if (bgTf == null)
+        {
+            foreach (Transform child in townCanvas.transform)
+            {
+                if (child.name.IndexOf("ChurchBackground", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || child.name.IndexOf("church", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    bgTf = child;
+                    break;
+                }
+            }
+        }
+
+        if (bgTf == null)
+        {
+            EditorUtility.DisplayDialog("Last Knights of Somerset",
+                "Add a UI Image named ChurchBackground under TownCanvas first (you said you already did — check the name).",
+                "OK");
+            return;
+        }
+
+        bgTf.SetAsFirstSibling();
+        var bgRt = bgTf as RectTransform;
+        if (bgRt == null) bgRt = bgTf.gameObject.AddComponent<RectTransform>();
+        bgRt.anchorMin = Vector2.zero;
+        bgRt.anchorMax = Vector2.one;
+        bgRt.offsetMin = Vector2.zero;
+        bgRt.offsetMax = Vector2.zero;
+
+        var bgImage = bgTf.GetComponent<Image>();
+        if (bgImage == null) bgImage = bgTf.gameObject.AddComponent<Image>();
+        bgImage.preserveAspect = true;
+        if (bgImage.sprite == null)
+        {
+            Sprite churchSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Backgrounds/SomersetChurchInterior.jpg");
+            if (churchSprite != null) bgImage.sprite = churchSprite;
+        }
+
+        // PewSeatLayer as child of the background so seats share its coordinate space.
+        Transform seatTf = bgTf.Find("PewSeatLayer");
+        if (seatTf == null)
+        {
+            var seatGo = new GameObject("PewSeatLayer", typeof(RectTransform));
+            seatGo.transform.SetParent(bgTf, false);
+            seatTf = seatGo.transform;
+        }
+
+        var seatRt = seatTf as RectTransform;
+        seatRt.anchorMin = Vector2.zero;
+        seatRt.anchorMax = Vector2.one;
+        seatRt.offsetMin = Vector2.zero;
+        seatRt.offsetMax = Vector2.zero;
+
+        var grid = seatTf.GetComponent<GridLayoutGroup>();
+        if (grid != null) grid.enabled = false;
+
+        var pewLayout = townCanvas.GetComponent<ChurchPewLayout>();
+        if (pewLayout == null) pewLayout = townCanvas.AddComponent<ChurchPewLayout>();
+        pewLayout.backgroundRect = bgRt;
+        pewLayout.ResetToChurchArtDefaults();
+
+        var churchUI = townCanvas.GetComponent<ChurchStageUIController>();
+        if (churchUI == null) churchUI = townCanvas.AddComponent<ChurchStageUIController>();
+        churchUI.churchBackgroundImage = bgImage;
+        churchUI.pewLayout = pewLayout;
+        churchUI.pewSeatLayer = seatRt;
+        if (churchUI.paperDollSeatPrefab == null)
+            churchUI.paperDollSeatPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/PaperDollSeat.prefab");
+
+        var townUI = townCanvas.GetComponent<TownSplitUIController>();
+        if (townUI == null) townUI = townCanvas.AddComponent<TownSplitUIController>();
+        townUI.pewLayout = pewLayout;
+        townUI.townGridContainer = seatRt;
+        if (townUI.recruitAvatarButtonPrefab == null)
+            townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
+
+        // Hide the old Camelot crowd side panel / grid if present.
+        string[] legacyNames = { "Panel_TownCrowd", "Panel_TownCrowd_Legacy", "TownGrid", "CamelotCrowd" };
+        foreach (string name in legacyNames)
+        {
+            Transform found = FindDeep(townCanvas.transform, name);
+            if (found == null) continue;
+            if (found.name == "TownGrid" && found.parent != null
+                && found.parent.name.IndexOf("Crowd", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                found.parent.gameObject.SetActive(false);
+            }
+            else if (found.name.IndexOf("Crowd", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                found.gameObject.SetActive(false);
+            }
+        }
+
+        var loop = Object.FindFirstObjectByType<GameLoopManager>();
+        if (loop != null)
+        {
+            loop.townUI = townUI;
+            loop.churchUI = churchUI;
+            loop.townCanvasObj = townCanvas;
+        }
+
+        EditorUtility.SetDirty(townCanvas);
+        EditorSceneManager.MarkSceneDirty(townCanvas.scene);
+
+        // Preview all 52 seat boxes in the editor so you can nudge ChurchPewLayout anchors.
+        PreviewSeatBoxes(pewLayout, seatRt, townUI.recruitAvatarButtonPrefab);
+
+        EditorUtility.DisplayDialog(
+            "Last Knights of Somerset",
+            "Camelot crowd buttons now sit on the 12 pews over ChurchBackground.\n\n" +
+            "• PewSeatLayer is a child of ChurchBackground\n" +
+            "• 52 seat boxes previewed (empty = dim, filled at Play)\n" +
+            "• Tune anchors on TownCanvas → ChurchPewLayout if a pew is off\n" +
+            "• At Play, each town citizen lands in their pewSeatIndex box",
+            "OK");
+    }
+
+    private static Transform FindDeep(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        foreach (Transform child in root)
+        {
+            var hit = FindDeep(child, name);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    private static void PreviewSeatBoxes(ChurchPewLayout pewLayout, RectTransform seatLayer, GameObject buttonPrefab)
+    {
+        if (pewLayout == null || seatLayer == null) return;
+        pewLayout.EnsureValid();
+
+        while (seatLayer.childCount > 0)
+            Object.DestroyImmediate(seatLayer.GetChild(0).gameObject);
+
+        for (int seat = 0; seat < ChurchPewLayout.TotalSeats; seat++)
+        {
+            GameObject go;
+            if (buttonPrefab != null)
+                go = (GameObject)PrefabUtility.InstantiatePrefab(buttonPrefab, seatLayer);
+            else
+            {
+                go = new GameObject($"Seat_{seat:00}", typeof(RectTransform), typeof(Image), typeof(Button));
+                go.transform.SetParent(seatLayer, false);
+            }
+
+            go.name = $"Seat_{seat:00}_Empty";
+            var rt = go.GetComponent<RectTransform>();
+            if (rt == null) rt = go.AddComponent<RectTransform>();
+
+            Vector2 norm = pewLayout.GetNormalizedSeatPosition(seat);
+            float scale = pewLayout.GetSeatScale(seat);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.12f);
+            rt.anchoredPosition = pewLayout.NormalizedToLocal(norm);
+            rt.sizeDelta = new Vector2(48f, 64f) * scale;
+
+            var img = go.GetComponent<Image>();
+            if (img != null)
+            {
+                img.sprite = null;
+                img.color = new Color(0.85f, 0.75f, 0.45f, 0.55f); // visible in editor for alignment
+            }
+
+            var btn = go.GetComponent<Button>();
+            if (btn != null) btn.interactable = false;
+        }
+    }
+
     [MenuItem("Arthurian/Build Complete Scene Hierarchy")]
     public static void BuildCompleteScene()
     {
@@ -110,6 +294,11 @@ public static class ArthurianSceneBuilder
         churchUI.pewSeatLayer = seatRt;
         churchUI.paperDollSeatPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/PaperDollSeat.prefab");
 
+        // Camelot crowd buttons land on the same pew seat layer (not a separate grid panel).
+        townUI.pewLayout = pewLayout;
+        townUI.townGridContainer = seatRt;
+        townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
+
         // Top HUD bar
         GameObject hud = CreatePanel(townCanvasObj.transform, "HUD_Bar",
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1200f, 72f),
@@ -144,15 +333,11 @@ public static class ArthurianSceneBuilder
             new Vector2(0f, -120f), new Vector2(220f, 40f), new Color(0.40f, 0.25f, 0.10f));
         townUI.diceGame = dice;
 
-        // Legacy crowd grid kept off — pews are placed on the church background instead.
+        // Legacy side-panel crowd (kept for reference, disabled — seats live on PewSeatLayer).
         GameObject crowdPanel = CreatePanel(townCanvasObj.transform, "Panel_TownCrowd_Legacy",
             new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-360f, -280f), new Vector2(680f, 420f),
             new Color(0.12f, 0.14f, 0.12f, 0.92f));
         crowdPanel.SetActive(false);
-        GameObject grid = new GameObject("TownGrid", typeof(RectTransform), typeof(GridLayoutGroup));
-        grid.transform.SetParent(crowdPanel.transform, false);
-        townUI.townGridContainer = grid.transform;
-        townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
 
         // BOTTOM: Dossier / Training / Mediation
         GameObject dossier = CreatePanel(townCanvasObj.transform, "Panel_Dossier",

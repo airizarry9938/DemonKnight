@@ -111,8 +111,6 @@ namespace ArthurianAutobattler
 
         public void PopulatePews(List<RecruitInstance> town)
         {
-            if (paperDollSeatPrefab == null) return;
-
             if (pewLayout == null) pewLayout = GetComponent<ChurchPewLayout>();
             if (pewLayout == null) pewLayout = gameObject.AddComponent<ChurchPewLayout>();
             pewLayout.EnsureValid();
@@ -126,37 +124,99 @@ namespace ArthurianAutobattler
             foreach (Transform child in pewSeatLayer) Destroy(child.gameObject);
             seats.Clear();
 
-            // Sort by seat so draw order is back→front (higher pew row first), then left→right.
-            List<RecruitInstance> ordered = new List<RecruitInstance>(town);
-            ordered.Sort((a, b) =>
+            town ??= new List<RecruitInstance>();
+            var bySeat = new Dictionary<int, RecruitInstance>();
+            foreach (var recruit in town)
             {
-                int pewA = pewLayout.GetPewIndexForSeat(a.pewSeatIndex);
-                int pewB = pewLayout.GetPewIndexForSeat(b.pewSeatIndex);
-                int rowA = pewLayout.GetPewRow(pewA);
-                int rowB = pewLayout.GetPewRow(pewB);
-                int rowCmp = rowB.CompareTo(rowA); // back rows first
-                if (rowCmp != 0) return rowCmp;
-                return a.pewSeatIndex.CompareTo(b.pewSeatIndex);
+                int seat = Mathf.Clamp(recruit.pewSeatIndex, 0, ChurchPewLayout.TotalSeats - 1);
+                if (!bySeat.ContainsKey(seat)) bySeat[seat] = recruit;
+            }
+
+            // Draw back rows first so front pew characters sit on top.
+            var order = new List<int>(ChurchPewLayout.TotalSeats);
+            for (int i = 0; i < ChurchPewLayout.TotalSeats; i++) order.Add(i);
+            order.Sort((a, b) =>
+            {
+                int rowA = pewLayout.GetPewRow(pewLayout.GetPewIndexForSeat(a));
+                int rowB = pewLayout.GetPewRow(pewLayout.GetPewIndexForSeat(b));
+                int cmp = rowB.CompareTo(rowA);
+                return cmp != 0 ? cmp : a.CompareTo(b);
             });
 
-            foreach (var recruit in ordered)
+            GameObject prefab = paperDollSeatPrefab;
+            var townUI = Town;
+            if (prefab == null && townUI != null) prefab = townUI.recruitAvatarButtonPrefab;
+            if (prefab == null) return;
+
+            foreach (int seatIndex in order)
             {
-                GameObject go = Instantiate(paperDollSeatPrefab, pewSeatLayer);
+                bySeat.TryGetValue(seatIndex, out RecruitInstance recruit);
+
+                GameObject go = Instantiate(prefab, pewSeatLayer);
+                go.name = recruit != null
+                    ? $"Seat_{seatIndex:00}_{recruit.characterName}"
+                    : $"Seat_{seatIndex:00}_Empty";
+
                 var rt = go.GetComponent<RectTransform>();
                 if (rt == null) rt = go.AddComponent<RectTransform>();
 
-                Vector2 norm = pewLayout.GetNormalizedSeatPosition(recruit.pewSeatIndex);
-                float scale = pewLayout.GetSeatScale(recruit.pewSeatIndex);
+                Vector2 norm = pewLayout.GetNormalizedSeatPosition(seatIndex);
+                float scale = pewLayout.GetSeatScale(seatIndex);
                 rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.pivot = new Vector2(0.5f, 0.15f); // feet/seat near pew bench
+                rt.pivot = new Vector2(0.5f, 0.12f); // feet sit on the pew bench
                 rt.anchoredPosition = pewLayout.NormalizedToLocal(norm);
                 rt.sizeDelta = baseSeatSize * scale;
                 rt.localScale = Vector3.one;
 
                 var view = go.GetComponent<PaperDollSeatView>();
-                if (view == null) view = go.AddComponent<PaperDollSeatView>();
-                view.Bind(recruit, OnSeatClicked);
-                seats.Add(view);
+                if (view != null)
+                {
+                    if (recruit != null) view.Bind(recruit, OnSeatClicked);
+                    else
+                    {
+                        // Empty box placeholder until a character is assigned.
+                        if (view.bodyLayer != null)
+                        {
+                            view.bodyLayer.sprite = null;
+                            view.bodyLayer.color = new Color(0.12f, 0.10f, 0.09f, 0.45f);
+                            view.bodyLayer.enabled = true;
+                        }
+                        if (view.headLayer != null) view.headLayer.enabled = false;
+                        if (view.moodLayer != null) view.moodLayer.enabled = false;
+                        if (view.seatButton != null) view.seatButton.interactable = false;
+                    }
+                    seats.Add(view);
+                }
+                else
+                {
+                    // Crowd avatar button path (Camelot crowd → pews).
+                    Image img = go.GetComponent<Image>();
+                    if (img != null)
+                    {
+                        if (recruit != null && recruit.randomAvatar != null)
+                        {
+                            img.sprite = recruit.randomAvatar;
+                            img.color = Color.white;
+                        }
+                        else
+                        {
+                            img.sprite = null;
+                            img.color = new Color(0.12f, 0.10f, 0.09f, 0.45f);
+                        }
+                    }
+
+                    Button btn = go.GetComponent<Button>();
+                    if (btn != null)
+                    {
+                        btn.onClick.RemoveAllListeners();
+                        btn.interactable = recruit != null;
+                        if (recruit != null)
+                        {
+                            RecruitInstance captured = recruit;
+                            btn.onClick.AddListener(() => OnSeatClicked(captured));
+                        }
+                    }
+                }
             }
 
             RefreshHUD();
