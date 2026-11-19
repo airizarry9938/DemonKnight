@@ -11,11 +11,14 @@ C# code lives in the `ArthurianAutobattler` namespace so scripts compile cleanly
 
 ## Quick Start
 
-1. Open the **DemonKnight** project in Unity Hub (or copy `Assets/`, `Packages/`, `ProjectSettings/` into your existing DemonKnight project).
-2. Let Unity import scripts and install package dependencies from `Packages/manifest.json`.
-3. In the menu bar: **Arthurian → Build Complete Scene Hierarchy**.
-4. Assign portrait sprites on `TownRNGGenerator` (knight / warrior / peasant lists) and hero sprites on `CardFusionSystem`.
-5. Open `Assets/Scenes/CamelotMain.unity` and press **Play**.
+1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (not an older empty local project).
+2. Use Unity **6.0 / 6.6**. Let packages import; wait until the bottom-right spinner finishes.
+3. If prompted, import **TextMeshPro Essential Resources** (`Window → TextMeshPro → Import TMP Essential Resources`).
+4. Top menu bar → **Arthurian → Diagnose Project** (always available). Fix any Console errors it reports.
+5. Top menu bar → **Arthurian → Build Complete Scene Hierarchy**.
+6. Assign portrait sprites on `TownRNGGenerator` and hero sprites on `CardFusionSystem`, then play `CamelotMain`.
+
+If you do **not** see an **Arthurian** menu at all, Unity is almost certainly open on the wrong folder (no `Assets/Editor` scripts) or scripts have not finished importing.
 
 ## How to Play
 
