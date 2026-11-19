@@ -111,7 +111,7 @@ namespace ArthurianAutobattler
 
             if (ok)
             {
-                SinRuneManager.Instance?.OnLegendFused();
+                SomersetRunes.NotifyLegendFused();
                 RefreshCodexList();
                 FindFirstObjectByType<TownSplitUIController>()?.UpdateHUD();
                 FindFirstObjectByType<ChurchStageUIController>()?.RefreshHUD();

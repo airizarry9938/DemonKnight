@@ -263,8 +263,7 @@ namespace ArthurianAutobattler
 
         private string BuildGossip(RecruitInstance center)
         {
-            int rank = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.Gossip) : 0;
+            int rank = SomersetRunes.GetRank(BankRuneID.Gossip);
             if (rank <= 0) return "Gossip Rune inactive — upgrade it in Merlin's Bank.";
 
             var pool = GameLoopManager.Instance?.currentTownPool;
@@ -426,7 +425,7 @@ namespace ArthurianAutobattler
                 warbandCountText.text = $"Warband: {loop.recruitedParty.Count}/52";
             if (timerText != null && loop != null)
             {
-                if (loop.disableTownTimer)
+                if (SomersetRunes.IsTownTimerDisabled())
                     timerText.text = "Horde Arrives: ∞ (Endless Hourglass)";
                 else
                 {

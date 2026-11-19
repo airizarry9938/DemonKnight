@@ -55,9 +55,7 @@ namespace ArthurianAutobattler
             bool freeTier1 = PerkDraftManager.Instance != null
                 && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree);
 
-            bool lustSiren = SinRuneManager.Instance != null
-                             && SinRuneManager.Instance.IsActive(SinRuneID.Lust)
-                             && Random.value < 0.25f;
+            bool lustSiren = SomersetRunes.IsSinActive(SinRuneID.Lust) && Random.value < 0.25f;
 
             RecruitInstance r = new RecruitInstance
             {

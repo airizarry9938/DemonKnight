@@ -56,9 +56,7 @@ namespace ArthurianAutobattler
         public int GetFinalHireCost(int grudgePenalty, int globalDiscount = 0)
         {
             int effectiveGrudge = grudgePenalty;
-            int bloodRank = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.BloodOath)
-                : 0;
+            int bloodRank = SomersetRunes.GetRank(BankRuneID.BloodOath);
             if (bloodRank > 0
                 && (primaryTrait == TraitTag.Outlaw || primaryTrait == TraitTag.Coward)
                 && grudgePenalty > 0)
@@ -68,12 +66,11 @@ namespace ArthurianAutobattler
             }
 
             int peasantCut = 0;
-            if (unitType == UnitType.Peasant && MerlinResurrectionManager.Instance != null)
-                peasantCut = MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.PeasantsCrown) * 2;
+            if (unitType == UnitType.Peasant)
+                peasantCut = SomersetRunes.GetRank(BankRuneID.PeasantsCrown) * 2;
 
             int jealousyTax = 0;
-            if (SinRuneManager.Instance != null && SinRuneManager.Instance.IsActive(SinRuneID.Jealousy)
-                && GameLoopManager.Instance != null)
+            if (SomersetRunes.IsSinActive(SinRuneID.Jealousy) && GameLoopManager.Instance != null)
             {
                 int legendCount = 0;
                 foreach (var m in GameLoopManager.Instance.recruitedParty)
@@ -235,13 +232,11 @@ namespace ArthurianAutobattler
             }
 
             float peasantApsBonus = 0f;
-            int crownRank = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.PeasantsCrown)
-                : 0;
+            int crownRank = SomersetRunes.GetRank(BankRuneID.PeasantsCrown);
             if (crownRank > 0 && peasantCount >= 5)
                 peasantApsBonus = 0.15f * (peasantCount / 5) * crownRank;
 
-            bool jealousy = SinRuneManager.Instance != null && SinRuneManager.Instance.IsActive(SinRuneID.Jealousy);
+            bool jealousy = SomersetRunes.IsSinActive(SinRuneID.Jealousy);
 
             foreach (var unit in party)
             {

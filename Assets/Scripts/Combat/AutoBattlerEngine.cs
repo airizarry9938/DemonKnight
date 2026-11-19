@@ -141,7 +141,7 @@ namespace ArthurianAutobattler
 
         private void SpawnLustSirensIntoHorde(List<CombatUnit> horde)
         {
-            if (SinRuneManager.Instance == null || !SinRuneManager.Instance.IsActive(SinRuneID.Lust)) return;
+            if (!SomersetRunes.IsSinActive(SinRuneID.Lust)) return;
             int count = Mathf.Max(1, Mathf.RoundToInt(horde.Count * 0.25f));
             float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
             for (int i = 0; i < count; i++)
@@ -497,7 +497,7 @@ namespace ArthurianAutobattler
             }
 
             // Lust: hired Sirens drain 15g per wave.
-            if (playerWon && SinRuneManager.Instance != null && SinRuneManager.Instance.IsActive(SinRuneID.Lust))
+            if (playerWon && SomersetRunes.IsSinActive(SinRuneID.Lust))
             {
                 int sirens = GameLoopManager.Instance != null
                     ? GameLoopManager.Instance.recruitedParty.Count(r => r.isSirenEnchantress) : 0;

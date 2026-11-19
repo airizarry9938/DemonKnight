@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -44,10 +45,19 @@ namespace ArthurianAutobattler
         public void TriggerEndOfRunResurrection(int wavesCleared, bool defeatedNimue, string customReason = "")
         {
             float mult = 1f;
-            if (DemonicPactManager.Instance != null && DemonicPactManager.Instance.ActivePact != DemonicPactID.None)
-                mult *= 1.5f;
-            if (SinRuneManager.Instance != null)
-                mult *= SinRuneManager.Instance.GetLegacyPointMultiplier();
+            // Soft lookups so first-build projects missing these managers still compile.
+            Type pactType = FindType("ArthurianAutobattler.DemonicPactManager");
+            if (pactType != null)
+            {
+                object pact = pactType.GetProperty("Instance")?.GetValue(null)
+                    ?? pactType.GetField("Instance")?.GetValue(null);
+                if (pact != null)
+                {
+                    object active = pactType.GetProperty("ActivePact")?.GetValue(pact);
+                    if (active != null && active.ToString() != "None") mult *= 1.5f;
+                }
+            }
+            mult *= SomersetRunes.GetSinLegacyPointMultiplier();
 
             int earnedPoints = Mathf.Max(1, Mathf.RoundToInt((wavesCleared * 2 + (defeatedNimue ? 10 : 0)) * mult));
             unspentLegacyPoints += earnedPoints;
@@ -166,6 +176,20 @@ namespace ArthurianAutobattler
             gamblerRuneRank = PlayerPrefs.GetInt("RuneGambler", 0);
             bloodOathRuneRank = PlayerPrefs.GetInt("RuneBloodOath", 0);
             peasantsCrownRuneRank = PlayerPrefs.GetInt("RunePeasantCrown", 0);
+        }
+
+        private static Type FindType(string fullName)
+        {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    Type t = asm.GetType(fullName, false);
+                    if (t != null) return t;
+                }
+                catch { /* ignore */ }
+            }
+            return null;
         }
     }
 }

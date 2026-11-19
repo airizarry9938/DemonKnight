@@ -28,7 +28,7 @@ namespace ArthurianAutobattler
 
             int roll = Random.Range(1, 7);
             int gamblerRank = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.Gambler)
+                ? SomersetRunes.GetRank(BankRuneID.Gambler)
                 : 0;
 
             bool firstRollSafe = (PerkDraftManager.Instance != null
@@ -68,7 +68,7 @@ namespace ArthurianAutobattler
             isPlaying = false;
 
             int gamblerRank = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetRuneRank(BankRuneID.Gambler)
+                ? SomersetRunes.GetRank(BankRuneID.Gambler)
                 : 0;
             if (gamblerRank >= 3 && GameLoopManager.Instance != null)
                 GameLoopManager.Instance.AddTownTimeBonus(15f);

@@ -24,6 +24,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/FloatingCombatText.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/Data/SomersetRunes.cs",
         "Assets/Scripts/Data/SomersetVisualDatabase.cs",
         "Assets/Scripts/Persistence/GrudgeSaveManager.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
