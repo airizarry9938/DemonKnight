@@ -18,6 +18,8 @@ namespace ArthurianAutobattler
 
         public void StartAutoBattle(List<RecruitInstance> recruitedParty)
         {
+            BattlefieldVisualizer.Instance?.ClearAllActors();
+
             List<RecruitInstance> combatRoster = new List<RecruitInstance>();
             spriteLookup.Clear();
 
@@ -470,6 +472,7 @@ namespace ArthurianAutobattler
         private void EndBattle(bool playerWon)
         {
             isBattling = false;
+            BattlefieldVisualizer.Instance?.ClearAllActors();
             int goldEarned = playerWon ? (35 + currentBattleNumber * 15) : 10;
 
             if (GrudgeSaveManager.Instance != null)

@@ -59,7 +59,8 @@ public static class ArthurianSceneBuilder
         groundMat.color = new Color(0.18f, 0.12f, 0.10f, 1f);
         ground.GetComponent<MeshRenderer>().sharedMaterial = groundMat;
 
-        visualizer.transform.SetParent(arena.transform, true);
+        // Visualizer stays under Managers (never parented under Arena) so arena toggle/destroy
+        // cannot leave AutoBattlerEngine holding a destroyed singleton.
         visualizer.unitActorPrefab = AssetDatabase.LoadAssetAtPath<UnitVisualActor>("Assets/Prefabs/UnitVisualActor.prefab");
         visualizer.combatTextPrefab = AssetDatabase.LoadAssetAtPath<FloatingCombatText>("Assets/Prefabs/FloatingCombatText.prefab");
 

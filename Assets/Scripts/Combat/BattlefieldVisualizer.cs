@@ -5,7 +5,27 @@ namespace ArthurianAutobattler
 {
     public class BattlefieldVisualizer : MonoBehaviour
     {
-        public static BattlefieldVisualizer Instance;
+        private static BattlefieldVisualizer _instance;
+
+        /// <summary>
+        /// Unity-safe singleton accessor. Destroyed objects are treated as null
+        /// (unlike C# ?. which does not use Unity's overloaded ==).
+        /// </summary>
+        public static BattlefieldVisualizer Instance
+        {
+            get
+            {
+                // Unity's overloaded == treats destroyed objects as null; clear the stale ref.
+                if (_instance == null)
+                {
+                    _instance = null;
+                    return null;
+                }
+
+                return _instance;
+            }
+            private set => _instance = value;
+        }
 
         public UnitVisualActor unitActorPrefab;
         public FloatingCombatText combatTextPrefab;
@@ -19,11 +39,40 @@ namespace ArthurianAutobattler
         public float rowSpacing = 1.1f;
         public float colOffset = 1.2f;
 
-        private Dictionary<string, UnitVisualActor> activeActors = new Dictionary<string, UnitVisualActor>();
+        private readonly Dictionary<string, UnitVisualActor> activeActors = new Dictionary<string, UnitVisualActor>();
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
+            if (_instance != null && _instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (_instance == this)
+                _instance = null;
+            activeActors.Clear();
+        }
+
+        private void OnDisable()
+        {
+            // Arena is toggled off between town/battle — clear actors so we don't keep stale refs.
+            ClearAllActors();
+        }
+
+        public void ClearAllActors()
+        {
+            foreach (var kvp in activeActors)
+            {
+                if (kvp.Value != null)
+                    Destroy(kvp.Value.gameObject);
+            }
+            activeActors.Clear();
         }
 
         public void SyncFrontlineVisuals(
@@ -31,36 +80,43 @@ namespace ArthurianAutobattler
             List<CombatUnit> aliveDemons,
             Dictionary<string, Sprite> humanSprites)
         {
+            if (this == null || !isActiveAndEnabled) return;
+            if (unitActorPrefab == null) return;
+
             CleanupDeadActors();
 
             for (int i = 0; i < aliveHumans.Count; i++)
             {
                 CombatUnit u = aliveHumans[i];
-                if (!activeActors.ContainsKey(u.unitID))
-                {
-                    UnitVisualActor actor = Instantiate(unitActorPrefab, transform);
-                    Sprite art = humanSprites.ContainsKey(u.unitID) ? humanSprites[u.unitID] : null;
-                    actor.Initialize(u, art, CalculateSlotPosition(humanOrigin, i, true), false);
-                    activeActors[u.unitID] = actor;
-                }
+                if (u == null || string.IsNullOrEmpty(u.unitID)) continue;
+                if (activeActors.ContainsKey(u.unitID)) continue;
+
+                UnitVisualActor actor = Instantiate(unitActorPrefab, transform);
+                Sprite art = humanSprites != null && humanSprites.ContainsKey(u.unitID)
+                    ? humanSprites[u.unitID]
+                    : null;
+                actor.Initialize(u, art, CalculateSlotPosition(humanOrigin, i, true), false);
+                activeActors[u.unitID] = actor;
             }
 
             for (int i = 0; i < aliveDemons.Count; i++)
             {
                 CombatUnit d = aliveDemons[i];
-                if (!activeActors.ContainsKey(d.unitID))
-                {
-                    UnitVisualActor actor = Instantiate(unitActorPrefab, transform);
-                    actor.Initialize(d, GetDemonSprite(d.unitType), CalculateSlotPosition(demonOrigin, i, false), true);
-                    activeActors[d.unitID] = actor;
-                }
+                if (d == null || string.IsNullOrEmpty(d.unitID)) continue;
+                if (activeActors.ContainsKey(d.unitID)) continue;
+
+                UnitVisualActor actor = Instantiate(unitActorPrefab, transform);
+                actor.Initialize(d, GetDemonSprite(d.unitType), CalculateSlotPosition(demonOrigin, i, false), true);
+                activeActors[d.unitID] = actor;
             }
         }
 
         public void TriggerAttackVisual(CombatUnit attacker, CombatUnit target)
         {
+            if (this == null || !isActiveAndEnabled || attacker == null || target == null) return;
             if (activeActors.TryGetValue(attacker.unitID, out var atk)
-                && activeActors.TryGetValue(target.unitID, out var def))
+                && activeActors.TryGetValue(target.unitID, out var def)
+                && atk != null && def != null)
             {
                 atk.PlayAttackLunge(def.transform.position);
                 def.PlayHitFlash();
@@ -69,6 +125,7 @@ namespace ArthurianAutobattler
 
         public void SpawnPopup(CombatUnit targetUnit, string text, Color color)
         {
+            if (this == null || !isActiveAndEnabled) return;
             if (combatTextPrefab == null || targetUnit == null) return;
             if (activeActors.TryGetValue(targetUnit.unitID, out var actor) && actor != null)
             {
@@ -98,11 +155,18 @@ namespace ArthurianAutobattler
             List<string> toRemove = new List<string>();
             foreach (var kvp in activeActors)
             {
-                if (kvp.Value == null || !kvp.Value.boundUnit.IsAlive)
+                if (kvp.Value == null)
+                {
+                    toRemove.Add(kvp.Key);
+                    continue;
+                }
+
+                if (kvp.Value.boundUnit == null || !kvp.Value.boundUnit.IsAlive)
                     toRemove.Add(kvp.Key);
             }
 
-            foreach (string k in toRemove) activeActors.Remove(k);
+            foreach (string k in toRemove)
+                activeActors.Remove(k);
         }
     }
 }
