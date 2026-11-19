@@ -572,9 +572,7 @@ public static class ArthurianSceneBuilder
         tmp.fontSize = size;
         tmp.alignment = align;
         tmp.color = new Color(0.92f, 0.88f, 0.78f);
-        // Unity 6 TMP: textWrappingMode. Fall back if an older TMP is present.
-        try { tmp.textWrappingMode = TextWrappingModes.Normal; }
-        catch { tmp.enableWordWrapping = true; }
+        tmp.textWrappingMode = TextWrappingModes.Normal;
         return tmp;
     }
 
