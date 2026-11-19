@@ -118,7 +118,7 @@ namespace ArthurianAutobattler
 
         public string GetDisplayDescription()
         {
-            string info = $"<b>{characterName}</b> ({unitType}) | Pew #{pewSeatIndex} | Role: <b>{assignedRole}</b>\n";
+            string info = $"<b>{characterName}</b> ({unitType}) | Pew {PewIndex + 1}/12 (seat {pewSeatIndex}) | Role: <b>{assignedRole}</b>\n";
             if (isSirenEnchantress) info += "<color=#FF69B4>Siren Enchantress</color>\n";
 
             if (intelTierUnlocked >= 1)
@@ -139,8 +139,11 @@ namespace ArthurianAutobattler
             return info;
         }
 
-        /// <summary>Pew row used by Gossip Rune adjacency (13 seats per row).</summary>
-        public int PewRow => pewSeatIndex / 13;
+        /// <summary>Pew index 0–11 on the 3×4 church art grid.</summary>
+        public int PewIndex => ChurchPewLayout.GetStaticPewIndex(pewSeatIndex);
+
+        /// <summary>Pew row 0–3 (front→altar) used by Gossip Rune adjacency.</summary>
+        public int PewRow => ChurchPewLayout.GetStaticPewRow(pewSeatIndex);
     }
 
     [Serializable]

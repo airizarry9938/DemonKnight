@@ -66,11 +66,48 @@ public static class ArthurianSceneBuilder
         // --- Event system ---
         EnsureEventSystem();
 
-        // --- Town 3-split canvas ---
+        // --- Town canvas (Somerset church full-screen stage) ---
         GameObject townCanvasObj = CreateCanvas("TownCanvas", 0);
         var townUI = townCanvasObj.AddComponent<TownSplitUIController>();
         var churchUI = townCanvasObj.AddComponent<ChurchStageUIController>();
+        var pewLayout = townCanvasObj.AddComponent<ChurchPewLayout>();
+        pewLayout.ResetToChurchArtDefaults();
         var codex = townCanvasObj.AddComponent<LegendCodexUI>();
+
+        // Full-screen church background (first child = behind everything)
+        GameObject churchBg = new GameObject("ChurchBackground", typeof(RectTransform), typeof(Image));
+        churchBg.transform.SetParent(townCanvasObj.transform, false);
+        churchBg.transform.SetAsFirstSibling();
+        var bgRt = churchBg.GetComponent<RectTransform>();
+        bgRt.anchorMin = Vector2.zero;
+        bgRt.anchorMax = Vector2.one;
+        bgRt.offsetMin = Vector2.zero;
+        bgRt.offsetMax = Vector2.zero;
+        var bgImage = churchBg.GetComponent<Image>();
+        bgImage.color = Color.white;
+        bgImage.preserveAspect = true;
+        Sprite churchSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Backgrounds/SomersetChurchInterior.jpg");
+        if (churchSprite != null) bgImage.sprite = churchSprite;
+        else
+        {
+            // Fallback tint until Unity imports the jpg as a Sprite.
+            bgImage.color = new Color(0.12f, 0.11f, 0.14f, 1f);
+            Debug.LogWarning("[DemonKnight] Set SomersetChurchInterior.jpg Texture Type to Sprite (2D and UI), then re-assign on ChurchBackground.");
+        }
+
+        GameObject seatLayer = new GameObject("PewSeatLayer", typeof(RectTransform));
+        seatLayer.transform.SetParent(churchBg.transform, false);
+        var seatRt = seatLayer.GetComponent<RectTransform>();
+        seatRt.anchorMin = Vector2.zero;
+        seatRt.anchorMax = Vector2.one;
+        seatRt.offsetMin = Vector2.zero;
+        seatRt.offsetMax = Vector2.zero;
+
+        pewLayout.backgroundRect = bgRt;
+        churchUI.churchBackgroundImage = bgImage;
+        churchUI.pewLayout = pewLayout;
+        churchUI.pewSeatLayer = seatRt;
+        churchUI.paperDollSeatPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/PaperDollSeat.prefab");
 
         // Top HUD bar
         GameObject hud = CreatePanel(townCanvasObj.transform, "HUD_Bar",
@@ -106,25 +143,13 @@ public static class ArthurianSceneBuilder
             new Vector2(0f, -120f), new Vector2(220f, 40f), new Color(0.40f, 0.25f, 0.10f));
         townUI.diceGame = dice;
 
-        // TOP-RIGHT: Town Crowd Grid
-        GameObject crowdPanel = CreatePanel(townCanvasObj.transform, "Panel_TownCrowd",
+        // Legacy crowd grid kept off — pews are placed on the church background instead.
+        GameObject crowdPanel = CreatePanel(townCanvasObj.transform, "Panel_TownCrowd_Legacy",
             new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-360f, -280f), new Vector2(680f, 420f),
             new Color(0.12f, 0.14f, 0.12f, 0.92f));
-        CreateTMP(crowdPanel.transform, "CrowdTitle", "CAMELOT CROWD", 22, TextAlignmentOptions.Center,
-            new Vector2(0f, 180f), new Vector2(640f, 36f));
-
+        crowdPanel.SetActive(false);
         GameObject grid = new GameObject("TownGrid", typeof(RectTransform), typeof(GridLayoutGroup));
         grid.transform.SetParent(crowdPanel.transform, false);
-        var gridRt = grid.GetComponent<RectTransform>();
-        gridRt.anchorMin = new Vector2(0.05f, 0.05f);
-        gridRt.anchorMax = new Vector2(0.95f, 0.85f);
-        gridRt.offsetMin = Vector2.zero;
-        gridRt.offsetMax = Vector2.zero;
-        var layout = grid.GetComponent<GridLayoutGroup>();
-        layout.cellSize = new Vector2(72f, 72f);
-        layout.spacing = new Vector2(8f, 8f);
-        layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        layout.constraintCount = 8;
         townUI.townGridContainer = grid.transform;
         townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
 
@@ -307,12 +332,14 @@ public static class ArthurianSceneBuilder
         AssetDatabase.Refresh();
 
         EditorUtility.DisplayDialog(
-            "DemonKnight",
+            "Last Knights of Somerset",
             "Scene built at Assets/Scenes/CamelotMain.unity\n\n" +
-            "Assign avatar/hero sprites on TownRNGGenerator and CardFusionSystem, then Press Play.",
+            "Church background + 12-pew seat layout (3×4) wired.\n" +
+            "If the background is blank: select Assets/Art/Backgrounds/SomersetChurchInterior.jpg → Texture Type = Sprite (2D and UI) → Apply, then re-run this menu or assign the sprite on TownCanvas/ChurchBackground.\n" +
+            "Tune pew anchors on TownCanvas → ChurchPewLayout if seats need nudging.",
             "OK");
 
-        Debug.Log("[DemonKnight] Complete scene hierarchy built and saved to " + ScenePath);
+        Debug.Log("[DemonKnight] Somerset church scene built with 12-pew layout → " + ScenePath);
     }
 
     private static void EnsureFolders()
@@ -332,6 +359,45 @@ public static class ArthurianSceneBuilder
             btn.GetComponent<Image>().color = new Color(0.45f, 0.40f, 0.32f, 1f);
             PrefabUtility.SaveAsPrefabAsset(btn, "Assets/Prefabs/RecruitAvatarButton.prefab");
             Object.DestroyImmediate(btn);
+        }
+
+        // Paper-doll pew seat (3 layers)
+        if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/PaperDollSeat.prefab") == null)
+        {
+            GameObject seat = new GameObject("PaperDollSeat", typeof(RectTransform), typeof(Button));
+            var srt = seat.GetComponent<RectTransform>();
+            srt.sizeDelta = new Vector2(56f, 72f);
+
+            GameObject body = new GameObject("Body", typeof(RectTransform), typeof(Image));
+            body.transform.SetParent(seat.transform, false);
+            StretchFull(body.GetComponent<RectTransform>());
+            body.GetComponent<Image>().color = new Color(0.55f, 0.48f, 0.38f, 1f);
+
+            GameObject head = new GameObject("Head", typeof(RectTransform), typeof(Image));
+            head.transform.SetParent(seat.transform, false);
+            var hrt = head.GetComponent<RectTransform>();
+            hrt.anchorMin = new Vector2(0.2f, 0.55f);
+            hrt.anchorMax = new Vector2(0.8f, 1f);
+            hrt.offsetMin = Vector2.zero;
+            hrt.offsetMax = Vector2.zero;
+
+            GameObject mood = new GameObject("Mood", typeof(RectTransform), typeof(Image));
+            mood.transform.SetParent(seat.transform, false);
+            var mrt = mood.GetComponent<RectTransform>();
+            mrt.anchorMin = new Vector2(0.65f, 0.7f);
+            mrt.anchorMax = new Vector2(1f, 1f);
+            mrt.offsetMin = Vector2.zero;
+            mrt.offsetMax = Vector2.zero;
+            mood.GetComponent<Image>().enabled = false;
+
+            var view = seat.AddComponent<PaperDollSeatView>();
+            view.bodyLayer = body.GetComponent<Image>();
+            view.headLayer = head.GetComponent<Image>();
+            view.moodLayer = mood.GetComponent<Image>();
+            view.seatButton = seat.GetComponent<Button>();
+
+            PrefabUtility.SaveAsPrefabAsset(seat, "Assets/Prefabs/PaperDollSeat.prefab");
+            Object.DestroyImmediate(seat);
         }
 
         // Unit visual actor
@@ -453,6 +519,14 @@ public static class ArthurianSceneBuilder
         GameObject go = new GameObject(name);
         go.transform.SetParent(parent.transform);
         return go.AddComponent<T>();
+    }
+
+    private static void StretchFull(RectTransform rt)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
     }
 
     private static GameObject CreateCanvas(string name, int sortOrder)

@@ -6,8 +6,8 @@ using TMPro;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Full-screen Somerset church stage: 52 pew seats + HUD + mutually exclusive modals.
-    /// Hotkeys: T dice, C codex, R warband, B tavern round, Esc close.
+    /// Full-screen Somerset church stage: characters seated on the 12 painted pews
+    /// (3 columns × 4 rows) via ChurchPewLayout. Modals: T/C/R/B/Esc.
     /// </summary>
     public class ChurchStageUIController : MonoBehaviour
     {
@@ -22,9 +22,12 @@ namespace ArthurianAutobattler
         public Button warbandButton;
         public Button buyRoundButton;
 
-        [Header("Pew Stage")]
-        public Transform pewGridContainer;
+        [Header("Church Stage")]
+        public Image churchBackgroundImage;
+        public ChurchPewLayout pewLayout;
+        public RectTransform pewSeatLayer;
         public GameObject paperDollSeatPrefab;
+        public Vector2 baseSeatSize = new Vector2(56f, 72f);
 
         [Header("Modals (mutual exclusion)")]
         public GameObject diceModal;
@@ -53,7 +56,6 @@ namespace ArthurianAutobattler
 
         private RecruitInstance selected;
         private readonly List<PaperDollSeatView> seats = new List<PaperDollSeatView>();
-        private readonly List<GameObject> openModals = new List<GameObject>();
 
         private void Start()
         {
@@ -105,18 +107,52 @@ namespace ArthurianAutobattler
             if (Input.GetKeyDown(KeyCode.B)) BuyTavernRound();
         }
 
-        public void SyncGoldFromTownUI() { /* gold lives on TownSplitUIController */ }
+        public void SyncGoldFromTownUI() { }
 
         public void PopulatePews(List<RecruitInstance> town)
         {
-            if (pewGridContainer == null || paperDollSeatPrefab == null) return;
+            if (paperDollSeatPrefab == null) return;
 
-            foreach (Transform child in pewGridContainer) Destroy(child.gameObject);
+            if (pewLayout == null) pewLayout = GetComponent<ChurchPewLayout>();
+            if (pewLayout == null) pewLayout = gameObject.AddComponent<ChurchPewLayout>();
+            pewLayout.EnsureValid();
+
+            if (pewSeatLayer == null)
+            {
+                if (pewLayout.backgroundRect != null) pewSeatLayer = pewLayout.backgroundRect;
+                else pewSeatLayer = transform as RectTransform;
+            }
+
+            foreach (Transform child in pewSeatLayer) Destroy(child.gameObject);
             seats.Clear();
 
-            foreach (var recruit in town)
+            // Sort by seat so draw order is back→front (higher pew row first), then left→right.
+            List<RecruitInstance> ordered = new List<RecruitInstance>(town);
+            ordered.Sort((a, b) =>
             {
-                GameObject go = Instantiate(paperDollSeatPrefab, pewGridContainer);
+                int pewA = pewLayout.GetPewIndexForSeat(a.pewSeatIndex);
+                int pewB = pewLayout.GetPewIndexForSeat(b.pewSeatIndex);
+                int rowA = pewLayout.GetPewRow(pewA);
+                int rowB = pewLayout.GetPewRow(pewB);
+                int rowCmp = rowB.CompareTo(rowA); // back rows first
+                if (rowCmp != 0) return rowCmp;
+                return a.pewSeatIndex.CompareTo(b.pewSeatIndex);
+            });
+
+            foreach (var recruit in ordered)
+            {
+                GameObject go = Instantiate(paperDollSeatPrefab, pewSeatLayer);
+                var rt = go.GetComponent<RectTransform>();
+                if (rt == null) rt = go.AddComponent<RectTransform>();
+
+                Vector2 norm = pewLayout.GetNormalizedSeatPosition(recruit.pewSeatIndex);
+                float scale = pewLayout.GetSeatScale(recruit.pewSeatIndex);
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.15f); // feet/seat near pew bench
+                rt.anchoredPosition = pewLayout.NormalizedToLocal(norm);
+                rt.sizeDelta = baseSeatSize * scale;
+                rt.localScale = Vector3.one;
+
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view == null) view = go.AddComponent<PaperDollSeatView>();
                 view.Bind(recruit, OnSeatClicked);
@@ -167,16 +203,24 @@ namespace ArthurianAutobattler
             if (rank <= 0) return "Gossip Rune inactive — upgrade it in Merlin's Bank.";
 
             var pool = GameLoopManager.Instance?.currentTownPool;
-            if (pool == null) return "";
+            if (pool == null || pewLayout == null) return "";
 
-            List<string> lines = new List<string> { "<b>Pew whispers:</b>" };
+            int centerPew = pewLayout.GetPewIndexForSeat(center.pewSeatIndex);
+            int centerRow = pewLayout.GetPewRow(centerPew);
+
+            List<string> lines = new List<string> { $"<b>Pew whispers (row {centerRow + 1}):</b>" };
             foreach (var n in pool)
             {
-                if (n.PewRow != center.PewRow) continue;
-                int dist = Mathf.Abs(n.pewSeatIndex - center.pewSeatIndex);
-                if (dist == 0) continue;
-                if (rank == 1 && dist != 1) continue;
-                if (rank >= 2 && dist > 1) continue;
+                if (n.unitID == center.unitID) continue;
+                int nPew = pewLayout.GetPewIndexForSeat(n.pewSeatIndex);
+                if (pewLayout.GetPewRow(nPew) != centerRow) continue;
+
+                // Same pew or adjacent pew in the same row (left/right columns).
+                int colDist = Mathf.Abs(pewLayout.GetPewColumn(nPew) - pewLayout.GetPewColumn(centerPew));
+                int seatDist = Mathf.Abs(n.pewSeatIndex - center.pewSeatIndex);
+                bool adjacent = (nPew == centerPew && seatDist == 1) || (colDist == 1 && nPew != centerPew);
+                if (rank == 1 && !adjacent) continue;
+                if (rank == 2 && colDist > 1 && nPew != centerPew) continue;
 
                 int g = GrudgeSaveManager.Instance != null
                     ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(n.unitID) : 0;
@@ -298,7 +342,6 @@ namespace ArthurianAutobattler
             if (modal == null) return;
             CloseAllModals();
             modal.SetActive(true);
-            openModals.Add(modal);
         }
 
         public void CloseAllModals()
@@ -307,7 +350,6 @@ namespace ArthurianAutobattler
             if (codexModal != null) codexModal.SetActive(false);
             if (warbandModal != null) warbandModal.SetActive(false);
             if (dossierModal != null) dossierModal.SetActive(false);
-            openModals.Clear();
         }
 
         public void RefreshHUD()
