@@ -3,7 +3,7 @@
 public static class DemonKnightPackageVersion
 {
     public const string Id = "church-pews-52-seats";
-    public const string GitHint = "84e0d91+";
-    public const string BuiltUtc = "2026-11-19T21:56:00Z";
+    public const string GitHint = "align-menu-standalone";
+    public const string BuiltUtc = "2026-11-19T22:05:00Z";
 }
 #endif
