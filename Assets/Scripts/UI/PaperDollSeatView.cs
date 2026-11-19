@@ -26,6 +26,7 @@ namespace ArthurianAutobattler
             {
                 bodyLayer.sprite = body;
                 bodyLayer.enabled = true;
+                bodyLayer.raycastTarget = true;
                 if (body != null)
                 {
                     bodyLayer.color = recruit.bodyPosture switch
@@ -61,12 +62,12 @@ namespace ArthurianAutobattler
                 else seatLabel.text = "";
             }
 
-            if (seatButton != null)
-            {
-                seatButton.interactable = true;
-                seatButton.onClick.RemoveAllListeners();
-                seatButton.onClick.AddListener(() => onClick?.Invoke(recruit));
-            }
+            if (seatButton == null) seatButton = GetComponent<Button>() ?? gameObject.AddComponent<Button>();
+            seatButton.interactable = true;
+            if (seatButton.targetGraphic == null && bodyLayer != null)
+                seatButton.targetGraphic = bodyLayer;
+            seatButton.onClick.RemoveAllListeners();
+            seatButton.onClick.AddListener(() => onClick?.Invoke(recruit));
         }
 
         public void BindEmpty()

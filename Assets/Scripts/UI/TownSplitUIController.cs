@@ -170,15 +170,32 @@ namespace ArthurianAutobattler
 
         public void SelectRecruit(RecruitInstance recruit, GameObject btnObj)
         {
+            if (recruit == null) return;
             selectedRecruit = recruit;
             selectedButtonObj = btnObj;
-            selectedAvatarImage.enabled = true;
-            selectedAvatarImage.sprite = recruit.randomAvatar;
+
+            if (selectedAvatarImage != null)
+            {
+                selectedAvatarImage.enabled = true;
+                selectedAvatarImage.sprite = recruit.randomAvatar;
+                if (recruit.randomAvatar == null)
+                {
+                    selectedAvatarImage.color = recruit.unitType switch
+                    {
+                        UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 1f),
+                        UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 1f),
+                        UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 1f),
+                        _ => new Color(0.45f, 0.40f, 0.35f, 1f)
+                    };
+                }
+                else selectedAvatarImage.color = Color.white;
+            }
 
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(recruit.unitID)
                 : 0;
-            characterDialogueText.text = GenerateDialogue(recruit, grudge);
+            if (characterDialogueText != null)
+                characterDialogueText.text = GenerateDialogue(recruit, grudge);
             RefreshDossierUI(grudge);
         }
 
@@ -297,20 +314,23 @@ namespace ArthurianAutobattler
 
         private void RefreshDossierUI(int grudge)
         {
+            if (selectedRecruit == null) return;
             int discount = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount()
                 : 0;
 
-            dossierStatsText.text = selectedRecruit.GetDisplayDescription();
-            hireButtonText.text = $"Recruit ({selectedRecruit.GetFinalHireCost(grudge, discount)}g)";
+            if (dossierStatsText != null)
+                dossierStatsText.text = selectedRecruit.GetDisplayDescription();
+            if (hireButtonText != null)
+                hireButtonText.text = $"Recruit ({selectedRecruit.GetFinalHireCost(grudge, discount)}g)";
 
-            tier1RevealButton.interactable = selectedRecruit.intelTierUnlocked < 1;
-            tier2RevealButton.interactable = selectedRecruit.intelTierUnlocked < 2;
-            tier3RevealButton.interactable = selectedRecruit.intelTierUnlocked < 3;
-            hireRecruitButton.interactable = true;
-            trainTankButton.interactable = playerGold >= 15;
-            trainRangedButton.interactable = playerGold >= 15;
-            mediateRivalryButton.interactable = playerGold >= 40;
+            if (tier1RevealButton != null) tier1RevealButton.interactable = selectedRecruit.intelTierUnlocked < 1;
+            if (tier2RevealButton != null) tier2RevealButton.interactable = selectedRecruit.intelTierUnlocked < 2;
+            if (tier3RevealButton != null) tier3RevealButton.interactable = selectedRecruit.intelTierUnlocked < 3;
+            if (hireRecruitButton != null) hireRecruitButton.interactable = true;
+            if (trainTankButton != null) trainTankButton.interactable = playerGold >= 15;
+            if (trainRangedButton != null) trainRangedButton.interactable = playerGold >= 15;
+            if (mediateRivalryButton != null) mediateRivalryButton.interactable = playerGold >= 40;
         }
 
         private void ClearBottomDossier()

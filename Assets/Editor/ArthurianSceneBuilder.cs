@@ -317,6 +317,18 @@ public static class ArthurianSceneBuilder
         churchUI.diceModal = dicePanel;
         churchUI.codexModal = codexPanel;
         churchUI.dossierModal = dossier;
+        // Dossier content lives on the shared bottom panel (wired on townUI).
+        churchUI.dossierDialogue = townUI.characterDialogueText;
+        churchUI.dossierStats = townUI.dossierStatsText;
+        churchUI.dossierPortrait = townUI.selectedAvatarImage;
+        churchUI.hireButton = townUI.hireRecruitButton;
+        churchUI.hireButtonLabel = townUI.hireButtonText;
+        churchUI.tier1Button = townUI.tier1RevealButton;
+        churchUI.tier2Button = townUI.tier2RevealButton;
+        churchUI.tier3Button = townUI.tier3RevealButton;
+        churchUI.trainTankButton = townUI.trainTankButton;
+        churchUI.trainRangedButton = townUI.trainRangedButton;
+        churchUI.mediateButton = townUI.mediateRivalryButton;
 
         // Camera framing for 2D battlefield
         var cam = Camera.main;

@@ -59,6 +59,8 @@ namespace ArthurianAutobattler
 
         private void Start()
         {
+            AutoWireDossierFromTownUI();
+
             goToWarButton?.onClick.AddListener(() => GameLoopManager.Instance?.StartBattlePhase());
             tavernDiceButton?.onClick.AddListener(() => OpenModal(diceModal));
             codexButton?.onClick.AddListener(() =>
@@ -84,10 +86,45 @@ namespace ArthurianAutobattler
             if (modalCloseButtons != null)
             {
                 foreach (var b in modalCloseButtons)
-                    b?.onClick.AddListener(CloseAllModals);
+                    b?.onClick.AddListener(CloseFloatingModals);
             }
 
-            CloseAllModals();
+            // Dice/codex/warband start closed. Dossier bottom panel stays visible.
+            CloseFloatingModals();
+            if (dossierModal != null) dossierModal.SetActive(true);
+        }
+
+        /// <summary>
+        /// Scene builder wires texts onto TownSplitUIController; copy them onto church stage
+        /// so pew clicks actually fill the dossier panel.
+        /// </summary>
+        private void AutoWireDossierFromTownUI()
+        {
+            var town = Town;
+            if (town == null) return;
+
+            if (dossierModal == null)
+            {
+                var found = transform.Find("Panel_Dossier");
+                if (found != null) dossierModal = found.gameObject;
+            }
+
+            if (dossierDialogue == null) dossierDialogue = town.characterDialogueText;
+            if (dossierStats == null) dossierStats = town.dossierStatsText;
+            if (dossierPortrait == null) dossierPortrait = town.selectedAvatarImage;
+            if (hireButton == null) hireButton = town.hireRecruitButton;
+            if (hireButtonLabel == null) hireButtonLabel = town.hireButtonText;
+            if (tier1Button == null) tier1Button = town.tier1RevealButton;
+            if (tier2Button == null) tier2Button = town.tier2RevealButton;
+            if (tier3Button == null) tier3Button = town.tier3RevealButton;
+            if (trainTankButton == null) trainTankButton = town.trainTankButton;
+            if (trainRangedButton == null) trainRangedButton = town.trainRangedButton;
+            if (mediateButton == null) mediateButton = town.mediateRivalryButton;
+            if (goToWarButton == null) goToWarButton = town.goToWarButton;
+            if (buyRoundButton == null) buyRoundButton = town.tavernRoundButton;
+            if (timerText == null) timerText = town.timerText;
+            if (goldText == null) goldText = town.goldText;
+            if (warbandCountText == null) warbandCountText = town.partyCountText;
         }
 
         public void HandleHotkeys()
@@ -229,9 +266,24 @@ namespace ArthurianAutobattler
 
         private void OnSeatClicked(RecruitInstance recruit)
         {
+            if (recruit == null) return;
+            AutoWireDossierFromTownUI();
+
             selected = recruit;
-            OpenModal(dossierModal);
+            if (dossierModal != null)
+            {
+                dossierModal.SetActive(true);
+                dossierModal.transform.SetAsLastSibling(); // draw above pew seats
+            }
+
             RefreshDossier();
+
+            // Also drive the town dossier path (same Panel_Dossier texts).
+            var town = Town;
+            if (town != null)
+                town.SelectRecruit(recruit, null);
+
+            Debug.Log($"[DemonKnight] Selected {recruit.characterName} (pew seat {recruit.pewSeatIndex}).");
         }
 
         private void RefreshDossier()
@@ -245,20 +297,42 @@ namespace ArthurianAutobattler
             if (dossierPortrait != null)
             {
                 dossierPortrait.enabled = true;
-                dossierPortrait.sprite = selected.headSprite != null ? selected.headSprite : selected.randomAvatar;
+                Sprite portrait = selected.headSprite != null ? selected.headSprite : selected.randomAvatar;
+                dossierPortrait.sprite = portrait;
+                if (portrait == null)
+                    dossierPortrait.color = selected.unitType switch
+                    {
+                        UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 1f),
+                        UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 1f),
+                        UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 1f),
+                        _ => new Color(0.45f, 0.40f, 0.35f, 1f)
+                    };
+                else
+                    dossierPortrait.color = Color.white;
             }
 
-            if (dossierDialogue != null)
-            {
-                dossierDialogue.text = grudge > 0
-                    ? $"\"I died in this pew last timeline. My price rose by {grudge}g.\""
-                    : "\"Demons claw the churchyard. Show gold — or a plan.\"";
-            }
+            string dialogue = grudge > 0
+                ? $"\"I died in this pew last timeline. My price rose by {grudge}g.\""
+                : selected.primaryTrait == TraitTag.Loyalist
+                    ? "\"For King Arthur! My blade is yours at half price.\""
+                    : selected.primaryTrait == TraitTag.Coward
+                        ? "\"I'm no hero... unless you pay to train me or steel my nerves.\""
+                        : "\"Demons claw the churchyard. Show gold — or a plan.\"";
 
+            if (dossierDialogue != null) dossierDialogue.text = dialogue;
             if (dossierStats != null) dossierStats.text = selected.GetDisplayDescription();
             if (gossipText != null) gossipText.text = BuildGossip(selected);
-            if (hireButtonLabel != null)
-                hireButtonLabel.text = $"Recruit ({selected.GetFinalHireCost(grudge, discount)}g)";
+
+            int cost = selected.GetFinalHireCost(grudge, discount);
+            if (hireButtonLabel != null) hireButtonLabel.text = $"Recruit ({cost}g)";
+
+            if (tier1Button != null) tier1Button.interactable = selected.intelTierUnlocked < 1;
+            if (tier2Button != null) tier2Button.interactable = selected.intelTierUnlocked < 2;
+            if (tier3Button != null) tier3Button.interactable = selected.intelTierUnlocked < 3;
+            if (hireButton != null) hireButton.interactable = true;
+            if (trainTankButton != null) trainTankButton.interactable = Town != null && Town.playerGold >= 15;
+            if (trainRangedButton != null) trainRangedButton.interactable = Town != null && Town.playerGold >= 15;
+            if (mediateButton != null) mediateButton.interactable = Town != null && Town.playerGold >= 40;
         }
 
         private string BuildGossip(RecruitInstance center)
@@ -404,17 +478,20 @@ namespace ArthurianAutobattler
         public void OpenModal(GameObject modal)
         {
             if (modal == null) return;
-            CloseAllModals();
+            CloseFloatingModals();
             modal.SetActive(true);
+            modal.transform.SetAsLastSibling();
         }
 
-        public void CloseAllModals()
+        /// <summary>Close floating overlays only — keep the bottom dossier panel visible.</summary>
+        public void CloseFloatingModals()
         {
             if (diceModal != null) diceModal.SetActive(false);
             if (codexModal != null) codexModal.SetActive(false);
             if (warbandModal != null) warbandModal.SetActive(false);
-            if (dossierModal != null) dossierModal.SetActive(false);
         }
+
+        public void CloseAllModals() => CloseFloatingModals();
 
         public void RefreshHUD()
         {
