@@ -348,11 +348,11 @@ namespace ArthurianAutobattler
                                  new List<RecruitInstance> { r }))
                     {
                         if (leaf != null)
-                            ReturnOneToPew(leaf, combatDead, fusionLeafDead, livingDelta, seenIds, ref returned);
+                            ReturnOneToPew(leaf, combatDead, fusionLeafDead, livingDelta, won, seenIds, ref returned);
                     }
                     continue;
                 }
-                ReturnOneToPew(r, combatDead, fusionLeafDead, livingDelta, seenIds, ref returned);
+                ReturnOneToPew(r, combatDead, fusionLeafDead, livingDelta, won, seenIds, ref returned);
             }
 
             // Rivalries / Mediate are per-wave — expire when the wave ends.
@@ -369,6 +369,7 @@ namespace ArthurianAutobattler
             HashSet<string> combatDead,
             HashSet<string> fusionLeafDead,
             int livingDelta,
+            bool waveWon,
             HashSet<string> seenIds,
             ref int returned)
         {
@@ -387,6 +388,10 @@ namespace ArthurianAutobattler
             r.fusionIngredients = null;
             GrudgeSaveManager.Instance?.RememberIntel(r.unitID, r.intelTierUnlocked);
 
+            // Wave victory → +1 experience star (stacks; each star −5g hire).
+            if (waveWon)
+                r.victoryStars = Mathf.Max(0, r.victoryStars) + 1;
+
             bool diedInCombat = combatDead != null && !string.IsNullOrEmpty(r.unitID)
                                 && combatDead.Contains(r.unitID);
             bool diedAsFusionLeaf = fusionLeafDead != null && !string.IsNullOrEmpty(r.unitID)
@@ -403,7 +408,7 @@ namespace ArthurianAutobattler
             }
             else
             {
-                // Living original: win → −10 hire, loss → +15 hire.
+                // Living original: win → −10 hire, loss → +15 hire (stacks with star −5 each).
                 GrudgeSaveManager.Instance?.ModifyGrudgeStaging(r.unitID, livingDelta);
             }
 

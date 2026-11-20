@@ -1710,6 +1710,7 @@ namespace ArthurianAutobattler
                 else
                 {
                     EnsureSeatImage(go, recruit);
+                    VictoryStarBadge.Apply(go.transform, recruit);
                     Button btn = go.GetComponent<Button>();
                     if (btn != null)
                     {

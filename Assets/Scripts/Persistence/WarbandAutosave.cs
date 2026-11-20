@@ -29,6 +29,8 @@ namespace ArthurianAutobattler
         public int pewSeatIndex;
         public BodyPosture bodyPosture;
         public bool isSirenEnchantress;
+        /// <summary>Wave-victory experience stars (−5g hire each). Run-scoped via autosave.</summary>
+        public int victoryStars;
         /// <summary>Pre-fusion ingredients (run-scoped). Wave-end expands these back to pews.</summary>
         public List<WarbandMemberSave> fusionIngredients;
     }
@@ -199,6 +201,7 @@ namespace ArthurianAutobattler
             dest.intelTierUnlocked = Mathf.Max(dest.intelTierUnlocked, src.intelTierUnlocked, 3);
             dest.bodyPosture = src.bodyPosture;
             dest.isSirenEnchantress = src.isSirenEnchantress;
+            dest.victoryStars = Mathf.Max(dest.victoryStars, src.victoryStars);
             if (src.pewSeatIndex > 0) dest.pewSeatIndex = src.pewSeatIndex;
             if (src.randomAvatar != null) dest.randomAvatar = src.randomAvatar;
             if (src.headSprite != null) dest.headSprite = src.headSprite;
@@ -303,7 +306,8 @@ namespace ArthurianAutobattler
                 intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3),
                 pewSeatIndex = r.pewSeatIndex,
                 bodyPosture = r.bodyPosture,
-                isSirenEnchantress = r.isSirenEnchantress
+                isSirenEnchantress = r.isSirenEnchantress,
+                victoryStars = Mathf.Max(0, r.victoryStars)
             };
             if (depth < 6 && r.fusionIngredients != null && r.fusionIngredients.Count > 0)
             {
@@ -335,7 +339,8 @@ namespace ArthurianAutobattler
                 intelTierUnlocked = Mathf.Max(s.intelTierUnlocked, 3),
                 pewSeatIndex = s.pewSeatIndex,
                 bodyPosture = s.bodyPosture,
-                isSirenEnchantress = s.isSirenEnchantress
+                isSirenEnchantress = s.isSirenEnchantress,
+                victoryStars = Mathf.Max(0, s.victoryStars)
             };
             if (depth < 6 && s.fusionIngredients != null && s.fusionIngredients.Count > 0)
             {
