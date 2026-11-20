@@ -216,14 +216,17 @@ namespace ArthurianAutobattler
 
             TrySirenCharmTicks();
 
-            var aliveHumans = playerArmy.Where(u => u.IsAlive).Take(frontlineSize).ToList();
-            var aliveDemons = demonArmy.Where(u => u.IsAlive).Take(frontlineSize).ToList();
+            var allHumans = playerArmy.Where(u => u.IsAlive).ToList();
+            var allDemons = demonArmy.Where(u => u.IsAlive).ToList();
+            // Visuals: every living party member / hero / demon / boss (HP bars + color blocks).
+            BattlefieldVisualizer.Instance?.SyncFrontlineVisuals(allHumans, allDemons, spriteLookup);
 
-            BattlefieldVisualizer.Instance?.SyncFrontlineVisuals(aliveHumans, aliveDemons, spriteLookup);
+            var aliveHumans = allHumans.Take(frontlineSize).ToList();
+            var aliveDemons = allDemons.Take(frontlineSize).ToList();
 
-            if (aliveHumans.Count == 0 || aliveDemons.Count == 0)
+            if (allHumans.Count == 0 || allDemons.Count == 0)
             {
-                EndBattle(aliveHumans.Count > 0);
+                EndBattle(allHumans.Count > 0);
                 return;
             }
 
@@ -469,53 +472,156 @@ namespace ArthurianAutobattler
         {
             isBattling = false;
             BattlefieldVisualizer.Instance?.ClearAllActors();
-            int goldEarned = playerWon ? (35 + currentBattleNumber * 15) : 10;
+            int goldEarned = playerWon ? GameLoopManager.WaveVictoryGold : GameLoopManager.WaveLossGold;
 
+            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+
+            // Hire-price memory: army members who DIED get the death penalty.
+            var deadIds = new HashSet<string>();
             if (GrudgeSaveManager.Instance != null)
             {
                 foreach (var u in playerArmy)
-                    GrudgeSaveManager.Instance.RecordBattleOutcome(u.unitID, !u.IsAlive, !playerWon);
+                {
+                    if (u != null && !u.isDemon && !u.IsAlive && !string.IsNullOrEmpty(u.unitID))
+                    {
+                        deadIds.Add(u.unitID);
+                        GrudgeSaveManager.Instance.RecordArmyDeath(u.unitID);
+                    }
+                }
             }
 
-            // Silver Tongue: sacrifice highest-ATK survivor after every wave (+40g grudge).
+            // Silver Tongue: sacrifice highest-ATK living marcher before disband (+40g grudge).
             if (playerWon
                 && SomersetRunes.IsPact(DemonicPactID.SilverTongue))
             {
                 var victim = playerArmy.Where(u => u.IsAlive).OrderByDescending(u => u.attackDamage).FirstOrDefault();
-                if (victim != null)
+                if (victim != null && !string.IsNullOrEmpty(victim.unitID))
                 {
                     victim.currentHealth = 0;
+                    deadIds.Add(victim.unitID);
+                    GrudgeSaveManager.Instance?.RecordArmyDeath(victim.unitID);
                     GrudgeSaveManager.Instance?.ModifyGrudgeStaging(victim.unitID, 40);
-                    var real = GameLoopManager.Instance?.recruitedParty.Find(r => r.unitID == victim.unitID);
-                    if (real != null) GameLoopManager.Instance.recruitedParty.Remove(real);
                 }
             }
 
-            // Lust: hired Sirens drain 15g per wave.
-            if (playerWon && SomersetRunes.IsSinActive(SinRuneID.Lust))
+            int sirensMarched = playerArmy.Count(u => u != null && !u.isDemon && u.isSirenEnchantress);
+
+            // PER-WAVE disband — EVERY EndBattle (win OR lose). Loud + nuclear clear.
+            // Win → pews + hire discount; loss → pews + higher hire. Stats kept.
+            Debug.LogError(
+                $"[DemonKnight] === END BATTLE DISBAND START won={playerWon} wave={currentBattleNumber} ===");
+            ForceWaveDisband(loop, deadIds, playerWon);
+            loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            int partyNow = loop?.recruitedParty?.Count ?? -1;
+            Debug.LogError($"[DemonKnight] === END BATTLE DISBAND DONE party={partyNow} ===");
+            if (partyNow > 0)
+                Debug.LogError("[DemonKnight] !!! DISBAND FAILED — party still hired after ForceWaveDisband !!!");
+
+            // Award gold on every wave outcome (win 200 / loss 50).
+            var uiGold = FindFirstObjectByType<TownSplitUIController>();
+            if (uiGold != null)
             {
-                int sirens = GameLoopManager.Instance != null
-                    ? GameLoopManager.Instance.recruitedParty.Count(r => r.isSirenEnchantress) : 0;
-                var uiDrain = FindFirstObjectByType<TownSplitUIController>();
-                if (uiDrain != null) uiDrain.playerGold = Mathf.Max(0, uiDrain.playerGold - sirens * 15);
+                uiGold.playerGold += goldEarned;
+                Debug.LogError($"[DemonKnight] Wave gold +{goldEarned}g (won={playerWon}) → purse {uiGold.playerGold}g.");
             }
+
+            // Lust: hired Sirens drain 15g per wave (count from the march, before disband).
+            if (playerWon && SomersetRunes.IsSinActive(SinRuneID.Lust) && sirensMarched > 0)
+            {
+                if (uiGold != null) uiGold.playerGold = Mathf.Max(0, uiGold.playerGold - sirensMarched * 15);
+            }
+
+            // Disband again on every branch (idempotent) so win→town cannot skip.
+            ForceWaveDisband(loop, deadIds, playerWon);
 
             if (playerWon && currentBattleNumber >= finalBossWave)
             {
-                MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(currentBattleNumber, true);
+                MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
+                    currentBattleNumber, true,
+                    $"VICTORY — Nimue falls on Wave {currentBattleNumber}. (+{goldEarned}g)\n\n"
+                    + "The abyss stirs, but Camelot endures this night. Merlin turns the hourglass in the Somerset church.");
             }
             else if (!playerWon)
             {
-                MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(currentBattleNumber - 1, false);
+                int wavesCleared = Mathf.Max(0, currentBattleNumber - 1);
+                MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
+                    wavesCleared, false,
+                    $"DEFEAT — The warband fell on Wave {currentBattleNumber}. (+{goldEarned}g consolation)\n"
+                    + $"Waves cleared this night: {wavesCleared}.\n\n"
+                    + "The horde breaches the churchyard. Merlin shatters the hourglass — the pews remember the slaughter.");
             }
             else
             {
                 SomersetRunes.TryAwardRelicForWave(currentBattleNumber);
+                int clearedWave = currentBattleNumber;
                 currentBattleNumber++;
-                var ui = FindFirstObjectByType<TownSplitUIController>();
-                if (ui != null) ui.playerGold += goldEarned;
-                PerkDraftManager.Instance?.OpenPerkDraft();
+                // Gold already awarded above.
+
+                loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+                if (loop != null)
+                {
+                    if (loop.townCanvasObj != null) loop.townCanvasObj.SetActive(true);
+                    if (loop.battlefieldArenaObj != null) loop.battlefieldArenaObj.SetActive(false);
+                    loop.currentPhase = GamePhase.Rewards;
+                    if (loop.recruitedParty != null && loop.recruitedParty.Count > 0)
+                    {
+                        Debug.LogError("[DemonKnight] Party still hired before perk draft — forcing again.");
+                        ForceWaveDisband(loop, deadIds, true);
+                        loop.mustDisbandPartyAfterCurrentWave = true;
+                    }
+                }
+
+                var perks = PerkDraftManager.Instance ?? FindFirstObjectByType<PerkDraftManager>();
+                if (perks != null)
+                {
+                    Debug.LogError($"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Party must be 0 → perk draft.");
+                    perks.OpenPerkDraft(clearedWave, goldEarned);
+                }
+                else
+                {
+                    Debug.LogWarning("[DemonKnight] PerkDraftManager missing — returning to town without perk pick.");
+                    loop?.StartTownPhase();
+                }
             }
         }
+
+        /// <summary>Loud EnsureDisbandedAfterWave + nuclear recruitedParty.Clear if anything remains.</summary>
+        private static void ForceWaveDisband(GameLoopManager loop, HashSet<string> deadIds, bool waveWon)
+        {
+            loop = loop ?? GameLoopManager.Resolve() ?? Object.FindFirstObjectByType<GameLoopManager>();
+            if (loop == null)
+            {
+                Debug.LogError("[DemonKnight] ForceWaveDisband: NO GameLoopManager — cannot clear party!");
+                return;
+            }
+
+            int before = loop.recruitedParty != null ? loop.recruitedParty.Count : 0;
+            Debug.LogError($"[DemonKnight] ForceWaveDisband before={before} won={waveWon}");
+            loop.EnsureDisbandedAfterWave(deadIds, waveWon);
+
+            if (loop.recruitedParty == null)
+                loop.recruitedParty = new List<RecruitInstance>();
+
+            if (loop.recruitedParty.Count > 0)
+            {
+                Debug.LogError(
+                    $"[DemonKnight] NUCLEAR CLEAR — dumping {loop.recruitedParty.Count} hired into pews.");
+                if (loop.currentTownPool == null)
+                    loop.currentTownPool = new List<RecruitInstance>();
+                foreach (var r in loop.recruitedParty)
+                {
+                    if (r == null) continue;
+                    r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
+                    if (!loop.currentTownPool.Contains(r))
+                        loop.currentTownPool.Add(r);
+                }
+                loop.recruitedParty.Clear();
+            }
+
+            loop.mustDisbandPartyAfterCurrentWave = false;
+            loop.AutosaveWarband();
+            Debug.LogError($"[DemonKnight] ForceWaveDisband after={loop.recruitedParty.Count}");
+        }
+
     }
 }

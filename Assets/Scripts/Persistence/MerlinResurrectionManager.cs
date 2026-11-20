@@ -108,6 +108,9 @@ namespace ArthurianAutobattler
             int earnedPoints = Mathf.Max(1, Mathf.RoundToInt((wavesCleared * 2 + (defeatedNimue ? 10 : 0)) * mult));
             unspentLegacyPoints += earnedPoints;
             SaveBankData();
+            // Lose / full-run end: force per-wave disband before Merlin bank (party → pews).
+            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            loop?.EnsureDisbandedAfterWave();
             GrudgeSaveManager.Instance?.CommitStagedGrudgesToDisk();
             StartCoroutine(PlayResurrectionSequence(earnedPoints, defeatedNimue, customReason));
         }
@@ -124,16 +127,26 @@ namespace ArthurianAutobattler
             {
                 if (!string.IsNullOrEmpty(customReason))
                     loreNarrativeText.text = customReason;
+                else if (defeatedNimue)
+                    loreNarrativeText.text =
+                        "VICTORY — Nimue is defeated.\n\n"
+                        + "Yet the abyss stirs… Merlin turns the hourglass inside the Somerset church once more.";
                 else
-                    loreNarrativeText.text = defeatedNimue
-                        ? "Nimue falls, yet the abyss stirs... Merlin turns the hourglass inside the Somerset church once more."
-                        : "The horde breaches the churchyard... Merlin shatters the hourglass. The pews remember the slaughter.";
+                    loreNarrativeText.text =
+                        "DEFEAT — Your warband was overrun.\n\n"
+                        + "The horde breaches the churchyard. Merlin shatters the hourglass. The pews remember the slaughter.";
             }
 
             yield return new WaitForSeconds(3.5f);
 
             if (loreNarrativeText != null)
-                loreNarrativeText.text = $"You gained <b>+{earnedPoints} Arcane Legacy Points</b>. Upgrade the Royal Bank and stackable Runes.";
+            {
+                string outcome = defeatedNimue ? "VICTORY" : "DEFEAT";
+                loreNarrativeText.text =
+                    $"<b>{outcome}</b>\n\n"
+                    + $"You gained <b>+{earnedPoints} Arcane Legacy Points</b>.\n"
+                    + "Spend them on the Royal Bank and stackable Runes, then enter the next night.";
+            }
             if (legacyBankPanel != null) legacyBankPanel.SetActive(true);
             WireNextRunButton();
             RefreshBankUI();
@@ -215,14 +228,40 @@ namespace ArthurianAutobattler
 
         private void RefreshBankUI()
         {
-            if (pointsAvailableText != null) pointsAvailableText.text = $"Legacy Points: {unspentLegacyPoints}";
-            if (goldBankText != null) goldBankText.text = $"Royal Treasury (+{GetBonusStartingGold()}g Start)";
-            if (discountBankText != null) discountBankText.text = $"Royal Writ (-{GetGlobalCostDiscount()}g Cost)";
-            if (rationsBankText != null) rationsBankText.text = $"War Rations (+{startingSupplyRationsLevel * 10}% HP)";
+            if (pointsAvailableText != null)
+            {
+                pointsAvailableText.text = $"Legacy Points: {unspentLegacyPoints}";
+                if (pointsAvailableText.fontSize < 24f) pointsAvailableText.fontSize = 24f;
+            }
+            if (goldBankText != null)
+            {
+                goldBankText.text = $"Royal Treasury (+{GetBonusStartingGold()}g Start)";
+                if (goldBankText.fontSize < 20f) goldBankText.fontSize = 20f;
+            }
+            if (discountBankText != null)
+            {
+                discountBankText.text = $"Royal Writ (-{GetGlobalCostDiscount()}g Cost)";
+                if (discountBankText.fontSize < 20f) discountBankText.fontSize = 20f;
+            }
+            if (rationsBankText != null)
+            {
+                rationsBankText.text = $"War Rations (+{startingSupplyRationsLevel * 10}% HP)";
+                if (rationsBankText.fontSize < 20f) rationsBankText.fontSize = 20f;
+            }
             if (runeStatusText != null)
             {
                 runeStatusText.text =
                     $"Gossip R{gossipRuneRank}/3 | Gambler R{gamblerRuneRank}/3 | Blood-Oath R{bloodOathRuneRank}/3 | Peasant's Crown R{peasantsCrownRuneRank}/3";
+                if (runeStatusText.fontSize < 18f) runeStatusText.fontSize = 18f;
+            }
+            if (loreNarrativeText != null && loreNarrativeText.fontSize < 28f)
+                loreNarrativeText.fontSize = 28f;
+            if (legacyBankPanel != null)
+            {
+                foreach (var tmp in legacyBankPanel.GetComponentsInChildren<TextMeshProUGUI>(true))
+                {
+                    if (tmp != null && tmp.fontSize < 18f) tmp.fontSize = 18f;
+                }
             }
         }
 

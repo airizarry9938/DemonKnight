@@ -23,7 +23,7 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrMain = "https://cdn.jsdelivr.net/gh/" + Repo + "@main/";
 
     // Marker that must appear in DemonKnightPackageVersion.cs after a good sync.
-    private const string ExpectedPackageId = "setnight-sync-cachebust";
+    private const string ExpectedPackageId = "cs1061-compat-api";
 
     // Every runtime script the church/pew package needs (relative to repo root).
     private static readonly string[] ScriptPaths =
@@ -38,8 +38,10 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Data/SomersetVisualDatabase.cs",
         "Assets/Scripts/Persistence/GrudgeSaveManager.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
+        "Assets/Scripts/Persistence/WarbandAutosave.cs",
         "Assets/Scripts/Systems/CardFusionSystem.cs",
         "Assets/Scripts/Systems/DemonicPactManager.cs",
+        "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
         "Assets/Scripts/Systems/RelicManager.cs",
@@ -50,11 +52,13 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/ChurchPewLayout.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
+        "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
+        "Assets/Editor/ArthurianFixMissingScripts.cs",
         "Assets/Editor/ArthurianRepairChurchStage.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianSceneBuilder.cs",
@@ -262,10 +266,15 @@ public static class ArthurianSyncFromGitHub
                    && (body.Contains("NightText") || body.Contains("ApplyNightLabel"));
         }
 
-        if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
+        if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
         {
             return Regex.IsMatch(body, @"void\s+SetNight\s*\(\s*int");
+        }
+        if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            // Stub only — must inherit SomersetChurchUI and must NOT redeclare SetNight (CS0108).
+            return Regex.IsMatch(body, @"class\s+ChurchStageUIController\s*:\s*SomersetChurchUI")
+                   && !Regex.IsMatch(body, @"void\s+SetNight\s*\(\s*int");
         }
 
         if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))

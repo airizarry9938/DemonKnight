@@ -84,6 +84,14 @@ namespace ArthurianAutobattler
                 isSirenEnchantress = lustSiren
             };
 
+            // Keep scout/dossier reveals across nights/waves until WipeAllSavedMemory.
+            if (GrudgeSaveManager.Instance != null)
+            {
+                int remembered = GrudgeSaveManager.Instance.GetRememberedIntel(persistentID);
+                if (remembered > r.intelTierUnlocked)
+                    r.intelTierUnlocked = remembered;
+            }
+
             switch (type)
             {
                 case UnitType.Knight:

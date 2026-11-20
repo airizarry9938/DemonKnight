@@ -16,43 +16,67 @@ public static class ArthurianFixMisplacedScripts
     {
         "ArthurianAlignCrowdPews.cs",
         "ArthurianFixMisplacedScripts.cs",
+        "ArthurianFixMissingScripts.cs",
         "ArthurianMenuBootstrap.cs",
+        "ArthurianRepairChurchStage.cs",
         "ArthurianSceneBuilder.cs",
         "ArthurianSyncFromGitHub.cs",
         "DemonKnightPackageVersion.cs",
         "SomersetAssetStudioWindow.cs",
     };
 
-    private static readonly Dictionary<string, string> KnownGameplayTargets = new Dictionary<string, string>
+    /// <summary>
+    /// Filename → path under Assets/. Keys must be unique (Dictionary ctor throws otherwise).
+    /// </summary>
+    private static readonly Dictionary<string, string> KnownGameplayTargets = BuildGameplayTargets();
+
+    private static Dictionary<string, string> BuildGameplayTargets()
     {
-        { "ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs" },
-        { "SomersetPewLayout.cs", "Scripts/UI/SomersetPewLayout.cs" },
-        { "SomersetChurchUI.cs", "Scripts/UI/SomersetChurchUI.cs" },
-        { "ChurchPewLayout.cs", "Scripts/UI/ChurchPewLayout.cs" },
-        { "ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs" },
-        { "SomersetRunes.cs", "Scripts/Data/SomersetRunes.cs" },
-        { "PaperDollSeatView.cs", "Scripts/UI/PaperDollSeatView.cs" },
-        { "TownSplitUIController.cs", "Scripts/UI/TownSplitUIController.cs" },
-        { "LegendCodexUI.cs", "Scripts/UI/LegendCodexUI.cs" },
-        { "GameLoopManager.cs", "Scripts/Systems/GameLoopManager.cs" },
-        { "TownRNGGenerator.cs", "Scripts/Systems/TownRNGGenerator.cs" },
-        { "TavernDiceMinigame.cs", "Scripts/Systems/TavernDiceMinigame.cs" },
-        { "CardFusionSystem.cs", "Scripts/Systems/CardFusionSystem.cs" },
-        { "PerkDraftManager.cs", "Scripts/Systems/PerkDraftManager.cs" },
-        { "DemonicPactManager.cs", "Scripts/Systems/DemonicPactManager.cs" },
-        { "RelicManager.cs", "Scripts/Systems/RelicManager.cs" },
-        { "SinRuneManager.cs", "Scripts/Systems/SinRuneManager.cs" },
-        { "GameDataTypes.cs", "Scripts/Data/GameDataTypes.cs" },
-        { "SomersetRunes.cs", "Scripts/Data/SomersetRunes.cs" },
-        { "SomersetVisualDatabase.cs", "Scripts/Data/SomersetVisualDatabase.cs" },
-        { "GrudgeSaveManager.cs", "Scripts/Persistence/GrudgeSaveManager.cs" },
-        { "MerlinResurrectionManager.cs", "Scripts/Persistence/MerlinResurrectionManager.cs" },
-        { "AutoBattlerEngine.cs", "Scripts/Combat/AutoBattlerEngine.cs" },
-        { "BattlefieldVisualizer.cs", "Scripts/Combat/BattlefieldVisualizer.cs" },
-        { "DemonHordeGenerator.cs", "Scripts/Combat/DemonHordeGenerator.cs" },
-        { "FloatingCombatText.cs", "Scripts/Combat/FloatingCombatText.cs" },
-        { "UnitVisualActor.cs", "Scripts/Combat/UnitVisualActor.cs" },
-    };
+        // Use indexer adds so a mistaken duplicate key never crashes the Editor domain reload.
+        var map = new Dictionary<string, string>();
+        void Add(string fileName, string assetsRelative)
+        {
+            if (map.ContainsKey(fileName))
+            {
+                Debug.LogWarning(
+                    $"[DemonKnight] Duplicate KnownGameplayTargets key ignored: {fileName}");
+                return;
+            }
+            map[fileName] = assetsRelative;
+        }
+
+        Add("ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs");
+        Add("SomersetPewLayout.cs", "Scripts/UI/SomersetPewLayout.cs");
+        Add("SomersetChurchUI.cs", "Scripts/UI/SomersetChurchUI.cs");
+        Add("ChurchPewLayout.cs", "Scripts/UI/ChurchPewLayout.cs");
+        Add("PaperDollSeatView.cs", "Scripts/UI/PaperDollSeatView.cs");
+        Add("TownSplitUIController.cs", "Scripts/UI/TownSplitUIController.cs");
+        Add("LegendCodexUI.cs", "Scripts/UI/LegendCodexUI.cs");
+
+        Add("GameLoopManager.cs", "Scripts/Systems/GameLoopManager.cs");
+        Add("TownRNGGenerator.cs", "Scripts/Systems/TownRNGGenerator.cs");
+        Add("TavernDiceMinigame.cs", "Scripts/Systems/TavernDiceMinigame.cs");
+        Add("CardFusionSystem.cs", "Scripts/Systems/CardFusionSystem.cs");
+        Add("PerkDraftManager.cs", "Scripts/Systems/PerkDraftManager.cs");
+        Add("DemonicPactManager.cs", "Scripts/Systems/DemonicPactManager.cs");
+        Add("RelicManager.cs", "Scripts/Systems/RelicManager.cs");
+        Add("SinRuneManager.cs", "Scripts/Systems/SinRuneManager.cs");
+
+        Add("GameDataTypes.cs", "Scripts/Data/GameDataTypes.cs");
+        Add("SomersetRunes.cs", "Scripts/Data/SomersetRunes.cs");
+        Add("SomersetVisualDatabase.cs", "Scripts/Data/SomersetVisualDatabase.cs");
+
+        Add("GrudgeSaveManager.cs", "Scripts/Persistence/GrudgeSaveManager.cs");
+        Add("MerlinResurrectionManager.cs", "Scripts/Persistence/MerlinResurrectionManager.cs");
+
+        Add("AutoBattlerEngine.cs", "Scripts/Combat/AutoBattlerEngine.cs");
+        Add("BattlefieldVisualizer.cs", "Scripts/Combat/BattlefieldVisualizer.cs");
+        Add("DemonHordeGenerator.cs", "Scripts/Combat/DemonHordeGenerator.cs");
+        Add("FloatingCombatText.cs", "Scripts/Combat/FloatingCombatText.cs");
+        Add("UnitVisualActor.cs", "Scripts/Combat/UnitVisualActor.cs");
+
+        return map;
+    }
 
     static ArthurianFixMisplacedScripts()
     {
@@ -100,17 +124,63 @@ public static class ArthurianFixMisplacedScripts
             fixedCount++;
         }
 
+        // Also kill duplicate ChurchStageUIController.cs anywhere under Assets except the canonical path.
+        fixedCount += RemoveDuplicateGameplayCopies(assets, "ChurchStageUIController.cs",
+            Path.Combine(assets, "Scripts", "UI", "ChurchStageUIController.cs"));
+        fixedCount += RemoveDuplicateGameplayCopies(assets, "SomersetChurchUI.cs",
+            Path.Combine(assets, "Scripts", "UI", "SomersetChurchUI.cs"));
+        fixedCount += RemoveDuplicateGameplayCopies(assets, "SomersetRunes.cs",
+            Path.Combine(assets, "Scripts", "Data", "SomersetRunes.cs"));
+
         if (fixedCount > 0)
         {
             AssetDatabase.Refresh();
             EditorUtility.DisplayDialog(
                 "DemonKnight",
-                $"Cleaned {fixedCount} file(s) out of Assets/Editor/.\n\n" +
-                "Only Arthurian* / Somerset* tools belong there.\n" +
+                $"Cleaned {fixedCount} file(s) out of Assets/Editor/ (and duplicate gameplay copies).\n\n" +
+                "Only Arthurian* / Somerset* tools belong in Editor.\n" +
                 "Gameplay scripts belong under Assets/Scripts/.\n\n" +
                 "Wait for compile.",
                 "OK");
         }
+    }
+
+    /// <summary>
+    /// If the same gameplay filename exists in more than one place, keep the canonical
+    /// Scripts/ path and delete the extras (common after zip / hand-copy into Downloads).
+    /// </summary>
+    private static int RemoveDuplicateGameplayCopies(string assetsRoot, string fileName, string canonicalPath)
+    {
+        int removed = 0;
+        string canonicalFull = Path.GetFullPath(canonicalPath);
+        foreach (string path in Directory.GetFiles(assetsRoot, fileName, SearchOption.AllDirectories))
+        {
+            if (path.EndsWith(".meta")) continue;
+            string full = Path.GetFullPath(path);
+            if (string.Equals(full, canonicalFull, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+            // Never touch PackageCache / something outside this project tree.
+            if (full.IndexOf($"{Path.DirectorySeparatorChar}Editor{Path.DirectorySeparatorChar}", System.StringComparison.OrdinalIgnoreCase) < 0
+                && full.IndexOf($"{Path.DirectorySeparatorChar}Scripts{Path.DirectorySeparatorChar}", System.StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                // Still under Assets but weird folder — delete if canonical exists.
+            }
+            if (!File.Exists(canonicalFull))
+            {
+                // Canonical missing: move this copy into place instead of deleting.
+                Directory.CreateDirectory(Path.GetDirectoryName(canonicalFull)!);
+                File.Move(full, canonicalFull);
+                string meta = full + ".meta";
+                if (File.Exists(meta)) File.Move(meta, canonicalFull + ".meta");
+                Debug.Log($"[DemonKnight] Restored canonical {fileName} from {full}");
+                removed++;
+                continue;
+            }
+            DeleteFileAndMeta(full);
+            Debug.Log($"[DemonKnight] Deleted duplicate {fileName} at {full} (kept {canonicalFull})");
+            removed++;
+        }
+        return removed;
     }
 
     private static void DeleteFileAndMeta(string path)

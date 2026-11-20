@@ -23,7 +23,7 @@ public static class ArthurianRepairChurchStage
         ("Assets/Scripts/UI/SomersetPewLayout.cs", @"class\s+SomersetPewLayout"),
         ("Assets/Scripts/UI/SomersetChurchUI.cs", @"void\s+SetNight\s*\(\s*int"),
         ("Assets/Scripts/UI/ChurchPewLayout.cs", @"class\s+ChurchPewLayout\s*:\s*SomersetPewLayout"),
-        ("Assets/Scripts/UI/ChurchStageUIController.cs", @"void\s+SetNight\s*\(\s*int"),
+        ("Assets/Scripts/UI/ChurchStageUIController.cs", @"class\s+ChurchStageUIController\s*:\s*SomersetChurchUI"),
         ("Assets/Scripts/Data/SomersetRunes.cs", @"class\s+SomersetRunes"),
         ("Assets/Scripts/Data/GameDataTypes.cs", @"class\s+RecruitInstance"),
         ("Assets/Scripts/UI/PaperDollSeatView.cs", @"class\s+PaperDollSeatView"),

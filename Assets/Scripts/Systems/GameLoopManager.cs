@@ -19,7 +19,12 @@ namespace ArthurianAutobattler
         [Header("Scene References")]
         public TownRNGGenerator rngGenerator;
         public TownSplitUIController townUI;
-        public ChurchStageUIController churchUI;
+        /// <summary>
+        /// Prefer SomersetChurchUI (has UpdateWarbandHudLabel / FlashMarchBlocked).
+        /// ChurchStageUIController is only a thin subclass alias — do not call those APIs
+        /// through a compile-time ChurchStageUIController when Downloads has a fat stub.
+        /// </summary>
+        public SomersetChurchUI churchUI;
         public AutoBattlerEngine battleEngine;
         public GameObject townCanvasObj;
         public GameObject battlefieldArenaObj;
@@ -33,65 +38,121 @@ namespace ArthurianAutobattler
         [Tooltip("Which night of the endless Merlin timeline the player is on.")]
         public int currentNight = 1;
 
+        /// <summary>
+        /// Set true when a March/AutoBattle wave starts. Cleared only after
+        /// <see cref="EnsureDisbandedAfterWave"/> runs. Lets StartTownPhase / perk
+        /// return paths force a disband even if a stale AutoBattlerEngine skipped it.
+        /// Per-WAVE (every AutoBattle), not only full-run Merlin wipe.
+        /// </summary>
+        public bool mustDisbandPartyAfterCurrentWave;
+
+        /// <summary>Last wave outcome for hire pricing on disband (true=win discount, false=loss penalty).</summary>
+        public bool? lastWaveWon;
+
         private Coroutine seatPopulateRoutine;
         private const string NightPrefsKey = "SomersetNight";
+        private GamePhase previousPhase;
+
+        /// <summary>Base purse for a fresh night / New Game (before bank rune bonus).</summary>
+        public const int StartingGold = 150;
+        public const int WaveVictoryGold = 200;
+        public const int WaveLossGold = 50;
+
+        public static GameLoopManager Resolve()
+        {
+            if (Instance != null) return Instance;
+            Instance = FindFirstObjectByType<GameLoopManager>();
+            return Instance;
+        }
+
+        /// <summary>
+        /// Always resolve as SomersetChurchUI so UpdateWarbandHudLabel / FlashMarchBlocked
+        /// compile against the class that actually declares them (CS1061-safe for Downloads).
+        /// </summary>
+        public SomersetChurchUI ResolveChurchUI()
+        {
+            if (churchUI != null) return churchUI;
+            churchUI = FindFirstObjectByType<SomersetChurchUI>();
+            if (churchUI == null)
+            {
+                var alias = FindFirstObjectByType<ChurchStageUIController>();
+                if (alias != null) churchUI = alias;
+            }
+            return churchUI;
+        }
 
         private void Awake()
         {
             if (Instance == null) Instance = this;
             else Destroy(gameObject);
             currentNight = Mathf.Max(1, PlayerPrefs.GetInt(NightPrefsKey, 1));
+            previousPhase = currentPhase;
+            // Earliest possible menu spawn (Downloads often never rebuilt the scene).
+            MainMenuUI.EnsureExists();
+            Debug.LogError("[DemonKnight] GameLoopManager.Awake — MainMenuUI.EnsureExists() called.");
         }
 
         private void Start()
         {
-            if (churchUI == null) churchUI = FindFirstObjectByType<ChurchStageUIController>();
+            ResolveChurchUI();
             if (townUI == null) townUI = FindFirstObjectByType<TownSplitUIController>();
-            InitializeNewRun();
-        }
 
-        public void InitializeNewRun()
-        {
-            recruitedParty.Clear();
-            disableTownTimer = false;
-            townSecondsSpentThisPhase = 0f;
-            SomersetRunes.SetGrudgeDeltaMultiplier(1f);
-            SomersetRunes.ClearPact();
-
-            if (rngGenerator == null) rngGenerator = FindFirstObjectByType<TownRNGGenerator>();
-            currentTownPool = rngGenerator != null
-                ? rngGenerator.GenerateNewRunTown()
-                : new List<RecruitInstance>();
-            int bonusGold = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetBonusStartingGold()
-                : 0;
-
-            if (townUI != null) townUI.playerGold = 75 + bonusGold;
-            if (churchUI != null) churchUI.SyncGoldFromTownUI();
-
-            int gold = townUI != null ? townUI.playerGold : 75 + bonusGold;
-            if (currentTownPool.Count > 0 && IsTownCompletelyPricedOut(gold))
+            var menu = MainMenuUI.EnsureExists();
+            if (townCanvasObj != null) townCanvasObj.SetActive(true);
+            if (menu != null)
             {
-                MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
-                    0, false,
-                    "CAMELOT ABANDONED: Every soul in the Somerset pews priced you out. Merlin rewinds time..."
-                );
+                menu.ShowMenu(boot: true);
+                Debug.LogError("[DemonKnight] GameLoopManager.Start — MAIN MENU OPEN. Esc = Quit/Restart/New/Load.");
                 return;
             }
 
-            StartTownPhase();
-            RefreshNightHUD();
+            Debug.LogError("[DemonKnight] MainMenuUI MISSING after EnsureExists — BootWithoutMenu fallback.");
+            BootWithoutMenu();
         }
 
+        /// <summary>Used when no MainMenuUI exists, or after Continue from a missing-menu build.</summary>
+        public void BootWithoutMenu()
+        {
+            if (WarbandAutosave.HasAutosave())
+            {
+                Debug.Log("[DemonKnight] Resuming timeline from automatic warband save.");
+                ContinueTimelineFromAutosave();
+                // Wave-disband design: never boot with a hired party still in the warband.
+                EnsureDisbandedAfterWave();
+            }
+            else
+            {
+                InitializeFreshCampaign();
+            }
+        }
+
+        /// <summary>Brand-new campaign (no autosave). Clears party and generates a fresh town.</summary>
+        public void InitializeFreshCampaign()
+        {
+            recruitedParty.Clear();
+            WarbandAutosave.Clear();
+            currentNight = 1;
+            PlayerPrefs.SetInt(NightPrefsKey, 1);
+            PlayerPrefs.Save();
+            BeginTownNight(keepSurvivors: false, restoreGoldFromSave: false, veterans: null);
+        }
+
+        /// <summary>Legacy name — fresh start only (does not wipe an in-progress Merlin timeline).</summary>
+        public void InitializeNewRun() => InitializeFreshCampaign();
+
         /// <summary>
-        /// Called from Merlin's "Enter Next Timeline" after a run ends. Advances the
-        /// night counter, resets battle/perk state, and returns to town recruit.
+        /// Called from Merlin's "Enter Next Timeline" after defeat/victory.
+        /// Autosaves surviving warband, advances night, restores them into the next town phase.
         /// </summary>
         public void AdvanceNightAndRestart()
         {
             currentNight = Mathf.Max(1, currentNight) + 1;
             PlayerPrefs.SetInt(NightPrefsKey, currentNight);
             PlayerPrefs.Save();
+
+            // Capture survivors AFTER night bump — automatic, no Save menu.
+            int gold = townUI != null ? townUI.playerGold : StartingGold;
+            AutosaveWarband(gold);
 
             if (battleEngine != null)
             {
@@ -102,13 +163,272 @@ namespace ArthurianAutobattler
             if (PerkDraftManager.Instance != null)
                 PerkDraftManager.Instance.unlockedPerks.Clear();
 
-            // Fresh town phase length each night (perk drafts may have shortened it).
             townTimeLimit = UnityEngine.Random.Range(300f, 600f);
 
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
             if (townCanvasObj != null) townCanvasObj.SetActive(true);
 
-            InitializeNewRun();
+            ContinueTimelineFromAutosave();
+        }
+
+        /// <summary>
+        /// Load autosave and start the next town night.
+        /// Post-March design: party is usually empty; veterans merge into pews for rehire
+        /// with kept stats/upgrades/intel. Any leftover hired party is also restored.
+        /// </summary>
+        public void ContinueTimelineFromAutosave()
+        {
+            var data = WarbandAutosave.Load();
+            recruitedParty.Clear();
+            List<RecruitInstance> veterans = null;
+
+            if (data != null)
+            {
+                if (data.night > 0) currentNight = data.night;
+                PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+                PlayerPrefs.Save();
+
+                recruitedParty = WarbandAutosave.ToRecruitList(data);
+                veterans = WarbandAutosave.ToVeteranList(data);
+                // Legacy saves: if veterans empty but survivors present after an old
+                // "keep party across nights" build, treat survivors as rehireable pew veterans
+                // when we want empty party — but if party was intentionally saved, keep it.
+                // After march-disband packs, survivors should be empty and veterans populated.
+                foreach (var r in recruitedParty)
+                {
+                    if (r == null) continue;
+                    r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
+                    GrudgeSaveManager.Instance?.RememberIntel(r.unitID, r.intelTierUnlocked);
+                    RebindPaperDoll(r);
+                }
+
+                Debug.Log(
+                    $"[DemonKnight] Night {currentNight}: restored party {recruitedParty.Count}, veterans {veterans?.Count ?? 0}.");
+            }
+
+            BeginTownNight(
+                keepSurvivors: recruitedParty.Count > 0,
+                restoreGoldFromSave: true,
+                savedGold: data != null ? data.playerGold : -1,
+                veterans: veterans);
+        }
+
+        private void BeginTownNight(
+            bool keepSurvivors,
+            bool restoreGoldFromSave,
+            int savedGold = -1,
+            List<RecruitInstance> veterans = null)
+        {
+            disableTownTimer = false;
+            townSecondsSpentThisPhase = 0f;
+            SomersetRunes.SetGrudgeDeltaMultiplier(1f);
+            SomersetRunes.ClearPact();
+
+            if (rngGenerator == null) rngGenerator = FindFirstObjectByType<TownRNGGenerator>();
+            currentTownPool = rngGenerator != null
+                ? rngGenerator.GenerateNewRunTown()
+                : new List<RecruitInstance>();
+
+            // Overlay veterans onto pews (kept stats / upgrades / intel for rehire).
+            if (veterans != null && veterans.Count > 0)
+            {
+                foreach (var v in veterans)
+                {
+                    if (v == null) continue;
+                    v.intelTierUnlocked = Mathf.Max(v.intelTierUnlocked, 3);
+                    GrudgeSaveManager.Instance?.RememberIntel(v.unitID, v.intelTierUnlocked);
+                    RebindPaperDoll(v);
+                }
+                WarbandAutosave.MergeVeteransIntoTown(currentTownPool, veterans);
+            }
+
+            // Anyone still hired stays out of the pew pool.
+            if (keepSurvivors && recruitedParty != null && recruitedParty.Count > 0)
+            {
+                var partyIds = new HashSet<string>();
+                foreach (var m in recruitedParty)
+                {
+                    if (m != null && !string.IsNullOrEmpty(m.unitID))
+                        partyIds.Add(m.unitID);
+                }
+                currentTownPool.RemoveAll(p => p != null && partyIds.Contains(p.unitID));
+            }
+
+            int bonusGold = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetBonusStartingGold()
+                : 0;
+
+            if (townUI != null)
+            {
+                if (restoreGoldFromSave && savedGold >= 0)
+                    townUI.playerGold = savedGold + bonusGold;
+                else
+                    townUI.playerGold = StartingGold + bonusGold;
+            }
+            if (churchUI != null) churchUI.SyncGoldFromTownUI();
+
+            int gold = townUI != null ? townUI.playerGold : StartingGold + bonusGold;
+            if (currentTownPool.Count > 0 && IsTownCompletelyPricedOut(gold) && recruitedParty.Count == 0)
+            {
+                MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
+                    0, false,
+                    "CAMELOT ABANDONED: Every soul in the Somerset pews priced you out. Merlin rewinds time..."
+                );
+                return;
+            }
+
+            StartTownPhase();
+            RefreshNightHUD();
+            AutosaveWarband(gold);
+        }
+
+        /// <summary>Automatic snapshot — call after hire, battle, or Merlin advance. No UI.</summary>
+        public void AutosaveWarband(int playerGold = -1)
+        {
+            if (playerGold < 0)
+                playerGold = townUI != null ? townUI.playerGold : StartingGold;
+            WarbandAutosave.SaveFromLoop(this, playerGold);
+        }
+
+        /// <summary>
+        /// After every AutoBattle WAVE: entire party returns to recruitment pews with
+        /// kept stats/upgrades/intel. Living: win → hire discount, loss → higher cost.
+        /// Dead already recorded via RecordArmyDeath.
+        /// </summary>
+        public void DisbandPartyAfterMarch(HashSet<string> deadUnitIds = null, bool? waveWon = null)
+        {
+            if (waveWon.HasValue) lastWaveWon = waveWon;
+            bool won = lastWaveWon ?? false;
+
+            if (recruitedParty == null) recruitedParty = new List<RecruitInstance>();
+            if (recruitedParty.Count == 0)
+            {
+                mustDisbandPartyAfterCurrentWave = false;
+                return;
+            }
+
+            int before = recruitedParty.Count;
+            var returning = new List<RecruitInstance>(recruitedParty);
+            recruitedParty.Clear();
+
+            if (currentTownPool == null)
+                currentTownPool = new List<RecruitInstance>();
+
+            int livingDelta = won
+                ? GrudgeSaveManager.MarchWinHireDiscount
+                : GrudgeSaveManager.MarchLossHirePenalty;
+
+            foreach (var r in returning)
+            {
+                if (r == null) continue;
+                // Keep trained stats / roles / intel on the same instance in the pews.
+                r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
+                GrudgeSaveManager.Instance?.RememberIntel(r.unitID, r.intelTierUnlocked);
+
+                bool died = deadUnitIds != null && !string.IsNullOrEmpty(r.unitID)
+                            && deadUnitIds.Contains(r.unitID);
+                if (!died)
+                    GrudgeSaveManager.Instance?.ModifyGrudgeStaging(r.unitID, livingDelta);
+
+                int grudge = GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
+                r.RefreshBodyPostureFromTraits(Mathf.Max(0, grudge));
+
+                if (!currentTownPool.Contains(r))
+                    currentTownPool.Add(r);
+            }
+
+            mustDisbandPartyAfterCurrentWave = false;
+            Debug.Log(
+                $"[DemonKnight] WAVE disband ({(won ? "WIN discount" : "LOSS penalty")}): {before} → pews += {returning.Count}.");
+            RefreshTownAfterDisband();
+        }
+
+        /// <summary>
+        /// Idempotent wave-end hook. Always ends with recruitedParty.Count == 0;
+        /// members sit in pews with stats intact for rehire.
+        /// </summary>
+        public void EnsureDisbandedAfterWave(HashSet<string> deadUnitIds = null, bool? waveWon = null)
+        {
+            if (waveWon.HasValue) lastWaveWon = waveWon;
+            if (recruitedParty == null) recruitedParty = new List<RecruitInstance>();
+            int before = recruitedParty.Count;
+            Debug.Log(
+                $"[DemonKnight] EnsureDisbandedAfterWave START (party={before}, flag={mustDisbandPartyAfterCurrentWave}, won={lastWaveWon}).");
+
+            // Clear every GameLoopManager copy (Downloads sometimes has stale duplicates).
+            var allLoops = FindObjectsByType<GameLoopManager>(FindObjectsSortMode.None);
+            if (allLoops == null || allLoops.Length == 0)
+                allLoops = new[] { this };
+
+            foreach (var g in allLoops)
+            {
+                if (g == null) continue;
+                if (waveWon.HasValue) g.lastWaveWon = waveWon;
+                if (g.recruitedParty != null && g.recruitedParty.Count > 0)
+                    g.DisbandPartyAfterMarch(deadUnitIds, g.lastWaveWon);
+                else
+                    g.mustDisbandPartyAfterCurrentWave = false;
+            }
+
+            // Nuclear: if Disband early-returned somehow, still empty the list.
+            if (recruitedParty.Count > 0)
+            {
+                Debug.LogError(
+                    $"[DemonKnight] Disband left {recruitedParty.Count} hired — force-clearing party into pews.");
+                var leftover = new List<RecruitInstance>(recruitedParty);
+                recruitedParty.Clear();
+                if (currentTownPool == null) currentTownPool = new List<RecruitInstance>();
+                foreach (var r in leftover)
+                {
+                    if (r == null) continue;
+                    r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
+                    if (!currentTownPool.Contains(r)) currentTownPool.Add(r);
+                }
+            }
+
+            mustDisbandPartyAfterCurrentWave = false;
+            AutosaveWarband();
+            RefreshTownAfterDisband();
+
+            int after = recruitedParty.Count;
+            Debug.Log($"[DemonKnight] EnsureDisbandedAfterWave END (party={after}).");
+            if (after != 0)
+                Debug.LogError("[DemonKnight] WAVE DISBAND FAILED — party still hired after Ensure.");
+        }
+
+        private void RefreshTownAfterDisband()
+        {
+            var church = ResolveChurchUI();
+            if (townUI == null) townUI = FindFirstObjectByType<TownSplitUIController>();
+            if (currentTownPool != null)
+            {
+                if (church != null && church.pewSeatLayer != null)
+                    church.PopulatePews(currentTownPool);
+                else
+                    townUI?.PopulateTownGrid(currentTownPool);
+            }
+            church?.RefreshHUD();
+            // Compat bridge avoids CS1061/CS0122 when Downloads has a partial/old church .cs.
+            DemonKnightCompatApi.UpdateWarbandHudLabel(church);
+            DemonKnightCompatApi.RefreshWarbandPanel(church);
+            townUI?.UpdateHUD();
+        }
+
+        private void RebindPaperDoll(RecruitInstance r)
+        {
+            if (r == null || rngGenerator == null) return;
+            int grudge = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
+            r.RefreshBodyPostureFromTraits(grudge);
+            // Best-effort avatar from type pools (sprites are not stored in JSON).
+            List<Sprite> pool = null;
+            if (r.unitType == UnitType.Knight) pool = rngGenerator.knightAvatars;
+            else if (r.unitType == UnitType.Warrior) pool = rngGenerator.warriorAvatars;
+            else if (r.unitType == UnitType.Peasant) pool = rngGenerator.peasantAvatars;
+            if (pool != null && pool.Count > 0 && r.randomAvatar == null)
+                r.randomAvatar = pool[UnityEngine.Random.Range(0, pool.Count)];
+            if (r.headSprite == null) r.headSprite = r.randomAvatar;
         }
 
         /// <summary>
@@ -157,7 +477,22 @@ namespace ArthurianAutobattler
 
         private void Update()
         {
+            // Esc fallback if MainMenuUI.Update somehow didn't run (Downloads edge cases).
+            if (Input.GetKeyDown(KeyCode.Escape) && currentPhase != GamePhase.AutoBattle)
+            {
+                var menu = MainMenuUI.EnsureExists();
+                if (menu != null)
+                {
+                    if (menu.IsMenuOpen) menu.HideMenu();
+                    else menu.ShowMenu(boot: false);
+                    Debug.LogError("[DemonKnight] GameLoop Esc fallback → toggled Main Menu.");
+                }
+            }
+
             if (currentPhase != GamePhase.TownRecruit) return;
+
+            var openMenu = MainMenuUI.Instance;
+            if (openMenu != null && openMenu.IsMenuOpen) return;
 
             if (isTimerRunning && !disableTownTimer)
             {
@@ -177,8 +512,37 @@ namespace ArthurianAutobattler
             churchUI?.HandleHotkeys();
         }
 
+        private void LateUpdate()
+        {
+            // Failsafe for Downloads stale AutoBattlerEngine: any exit from AutoBattle
+            // with a hired party forces per-wave disband (mid-wave win → town included).
+            if (previousPhase == GamePhase.AutoBattle && currentPhase != GamePhase.AutoBattle)
+            {
+                if (recruitedParty != null && recruitedParty.Count > 0)
+                {
+                    Debug.LogError(
+                        $"[DemonKnight] Left AutoBattle with {recruitedParty.Count} still hired — forcing EnsureDisbandedAfterWave.");
+                    EnsureDisbandedAfterWave();
+                }
+            }
+
+            if (mustDisbandPartyAfterCurrentWave && currentPhase != GamePhase.AutoBattle)
+                EnsureDisbandedAfterWave();
+
+            previousPhase = currentPhase;
+        }
+
         public void StartTownPhase()
         {
+            // Safety net: win → perk → town must not keep a hired party if EndBattle
+            // skipped disband (stale AutoBattlerEngine). Per-wave, not full-run only.
+            if (mustDisbandPartyAfterCurrentWave
+                || (recruitedParty != null && recruitedParty.Count > 0
+                    && (currentPhase == GamePhase.AutoBattle || currentPhase == GamePhase.Rewards)))
+            {
+                EnsureDisbandedAfterWave();
+            }
+
             currentPhase = GamePhase.TownRecruit;
             currentTimer = townTimeLimit;
             isTimerRunning = !disableTownTimer;
@@ -186,7 +550,6 @@ namespace ArthurianAutobattler
             if (townCanvasObj != null) townCanvasObj.SetActive(true);
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
 
-            // Wait one frame so TownCanvas RectTransforms have real sizes, then seat everyone.
             if (seatPopulateRoutine != null) StopCoroutine(seatPopulateRoutine);
             seatPopulateRoutine = StartCoroutine(PopulateTownSeatsNextFrame());
         }
@@ -203,24 +566,48 @@ namespace ArthurianAutobattler
                     currentTownPool = rngGenerator.GenerateNewRunTown();
             }
 
-            if (churchUI != null && churchUI.pewSeatLayer != null)
-                churchUI.PopulatePews(currentTownPool);
+            var church = ResolveChurchUI();
+            if (church != null && church.pewSeatLayer != null)
+                church.PopulatePews(currentTownPool);
             else if (townUI != null)
                 townUI.PopulateTownGrid(currentTownPool);
             else
-                churchUI?.PopulatePews(currentTownPool);
+                church?.PopulatePews(currentTownPool);
 
             townUI?.UpdateHUD();
-            churchUI?.RefreshHUD();
+            church?.RefreshHUD();
         }
 
         public void StartBattlePhase()
         {
+            MainMenuUI.Instance?.HideMenu();
+            var church = ResolveChurchUI();
+
+            if (recruitedParty == null || recruitedParty.Count == 0)
+            {
+                Debug.LogError("[DemonKnight] MARCH blocked — hire at least one recruit first (party empty).");
+                DemonKnightCompatApi.FlashMarchBlocked(church, "Hire at least one soul before March to War.");
+                return;
+            }
+
+            if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
+            if (battleEngine == null)
+            {
+                Debug.LogError("[DemonKnight] MARCH blocked — AutoBattlerEngine missing in scene.");
+                return;
+            }
+
             isTimerRunning = false;
             currentPhase = GamePhase.AutoBattle;
-            churchUI?.CloseAllModals();
+            // Every wave that starts MUST end with a pew disband (win or lose).
+            mustDisbandPartyAfterCurrentWave = true;
+            church?.CloseAllModals();
+            // Snapshot before March (pre-disband). Wave-end EnsureDisbanded overwrites this.
+            AutosaveWarband();
             if (townCanvasObj != null) townCanvasObj.SetActive(false);
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(true);
+            DemonKnightCompatApi.PrepareBattlefield();
+            Debug.LogError($"[DemonKnight] MARCH TO WAR — party {recruitedParty.Count}, wave {battleEngine.currentBattleNumber}.");
             battleEngine.StartAutoBattle(recruitedParty);
         }
 
