@@ -19,16 +19,30 @@ public static class ArthurianSyncFromGitHub
     private const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
-    /// <summary>Known-good commit that contains ResolveLoop CompatApi (PR #3). Bootstrap floor.</summary>
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    private const string FallbackCommitSha = "7dace7c";
+    private const string FallbackCommitSha = "8ec1d87";
 
-    private const string ExpectedPackageId = "victory-stars-hire";
+    private const string ExpectedPackageId = "sync-keep-editor-menus";
+
+    /// <summary>
+    /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
+    /// ArthurianSyncFromGitHub + MenuBootstrap first — if Unity reloaded or a download
+    /// failed mid-pass, Bootstrap / Force Delete+Sync menus vanished.
+    /// </summary>
+    private static readonly HashSet<string> NeverBulkDeleteEditorMenus = new HashSet<string>(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        "Assets/Editor/ArthurianSyncFromGitHub.cs",
+        "Assets/Editor/ArthurianMenuBootstrap.cs",
+        "Assets/Editor/DemonKnightPackageVersion.cs",
+        "Assets/Editor/ArthurianFixMisplacedScripts.cs",
+    };
 
     private static readonly string[] ScriptPaths =
     {
-        // Bootstrap trio first — so a half-failed sync still fixes Compile.
+        // Menu hosts FIRST — keep Arthurian menu alive even on a half-failed sync.
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
+        "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
@@ -63,7 +77,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
         "Assets/Editor/ArthurianFixMissingScripts.cs",
         "Assets/Editor/ArthurianRepairChurchStage.cs",
-        "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianSceneBuilder.cs",
         "Assets/Editor/SomersetAssetStudioWindow.cs",
     };
@@ -71,6 +84,7 @@ public static class ArthurianSyncFromGitHub
     private static readonly string[] AtomicCritical =
     {
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
+        "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
@@ -106,7 +120,8 @@ public static class ArthurianSyncFromGitHub
     {
         if (!EditorUtility.DisplayDialog(
                 "DemonKnight FORCE Sync",
-                "DELETE every listed DemonKnight .cs, then re-download from a pinned GitHub commit.\n\n" +
+                "DELETE listed DemonKnight .cs (except Editor menu hosts), then re-download from a pinned GitHub commit.\n\n" +
+                "Menu hosts (Sync / Bootstrap / Diagnose / PackageVersion) are NEVER bulk-deleted — they are replaced in place.\n" +
                 "Scenes/art are NOT deleted.\nDiagnose → " + ExpectedPackageId,
                 "Delete + Sync", "Cancel"))
             return;
@@ -115,19 +130,20 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// Chicken-egg fix: overwrite Sync + PackageVersion + CompatApi from a pinned commit
-    /// without requiring ExpectedPackageId to already match (old Sync rejected new PackageVersion).
+    /// Chicken-egg fix: overwrite Sync + MenuBootstrap + PackageVersion + CompatApi from a pinned
+    /// commit without requiring ExpectedPackageId to already match.
     /// </summary>
     [MenuItem("Arthurian/Bootstrap CompatApi + Sync Tools (pinned)", false, 2)]
     public static void BootstrapCompatAndSyncTools()
     {
         if (!EditorUtility.DisplayDialog(
                 "DemonKnight Bootstrap",
-                "Overwrite ONLY these three files from pinned commit " + FallbackCommitSha + " (or tip of main):\n\n" +
-                "• ArthurianSyncFromGitHub.cs\n" +
+                "Overwrite Sync menu hosts + CompatApi from pinned commit " + FallbackCommitSha + " (or tip of main):\n\n" +
+                "• ArthurianSyncFromGitHub.cs (Bootstrap / Force Delete+Sync menus)\n" +
+                "• ArthurianMenuBootstrap.cs (Diagnose menu)\n" +
                 "• DemonKnightPackageVersion.cs\n" +
                 "• DemonKnightCompatApi.cs\n\n" +
-                "Use this when Diagnose still shows cs1061-compat-api / CompatApi lacks ResolveLoop.",
+                "Use when menus are missing OR Diagnose shows cs1061-compat-api.",
                 "Bootstrap Now", "Cancel"))
             return;
 
@@ -137,6 +153,7 @@ public static class ArthurianSyncFromGitHub
         string[] bootstrap =
         {
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
+            "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         };
@@ -198,7 +215,11 @@ public static class ArthurianSyncFromGitHub
             {
                 EditorUtility.DisplayProgressBar("DemonKnight Sync", "Deleting local script copies…", 0f);
                 foreach (string rel in ScriptPaths)
+                {
+                    // NEVER wipe menu hosts first — that is what made Bootstrap/Force Sync disappear.
+                    if (NeverBulkDeleteEditorMenus.Contains(rel)) continue;
                     TryDeleteFile(Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar)));
+                }
             }
 
             for (int i = 0; i < ScriptPaths.Length; i++)
@@ -210,7 +231,9 @@ public static class ArthurianSyncFromGitHub
                 {
                     string text = DownloadPinned(rel, sha, out string source, relaxPackageId: false);
                     ValidateCritical(rel, text);
-                    WriteReplacing(dest, text, deleteFirst);
+                    // Menu hosts: in-place replace only (no delete-first gap).
+                    bool protectMenu = NeverBulkDeleteEditorMenus.Contains(rel);
+                    WriteReplacing(dest, text, deleteFirst: deleteFirst && !protectMenu);
                     VerifyOnDisk(rel, dest);
                     okFiles.Add(rel);
                     Debug.Log($"[DemonKnight] Synced {rel} via {source}");
@@ -221,6 +244,9 @@ public static class ArthurianSyncFromGitHub
                     Debug.LogError($"[DemonKnight] Sync FAILED {rel}: {ex.Message}");
                 }
             }
+
+            // If a mid-pass failure still left a menu host missing, restore it now.
+            EnsureEditorMenuHostsPresent(projectRoot, sha, errors, okFiles);
         }
         finally
         {
@@ -248,7 +274,9 @@ public static class ArthurianSyncFromGitHub
         }
         else
         {
-            msg += $"\n\nWait for compile. Diagnose must show `{ExpectedPackageId}`.\nDo NOT rebuild the scene.";
+            msg += $"\n\nWait for compile. Diagnose must show `{ExpectedPackageId}`.\n"
+                   + "Arthurian menus kept: Bootstrap / Force Delete+Sync / Diagnose.\n"
+                   + "Do NOT rebuild the scene.";
         }
 
         Debug.Log("[DemonKnight] " + msg);
@@ -319,6 +347,33 @@ public static class ArthurianSyncFromGitHub
         }
 
         throw last ?? new Exception("download failed");
+    }
+
+    /// <summary>Re-download Sync / Diagnose menu hosts if they vanished mid-sync.</summary>
+    private static void EnsureEditorMenuHostsPresent(
+        string projectRoot,
+        string sha,
+        List<string> errors,
+        List<string> okFiles)
+    {
+        foreach (string rel in NeverBulkDeleteEditorMenus)
+        {
+            string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(dest) && okFiles.Contains(rel)) continue;
+            try
+            {
+                string text = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
+                WriteReplacing(dest, text, deleteFirst: false);
+                VerifyOnDisk(rel, dest);
+                if (!okFiles.Contains(rel)) okFiles.Add(rel);
+                Debug.LogWarning($"[DemonKnight] Restored menu host {rel} via {source} @ {sha}");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{rel} (menu restore): {ex.Message}");
+                Debug.LogError($"[DemonKnight] Could not restore menu host {rel}: {ex.Message}");
+            }
+        }
     }
 
     private static void WriteReplacing(string dest, string text, bool deleteFirst)
@@ -447,6 +502,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("sync-keep-editor-menus")
                    || body.Contains("victory-stars-hire")
                    || body.Contains("mediate-mordred-wave-rules")
                    || body.Contains("hire-once-unfuse-disband")
@@ -460,8 +516,17 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("DownloadPinned") || body.Contains("BootstrapCompatAndSyncTools")
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
-            return body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
-                   || body.Contains("victory-stars-hire");
+            // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
+            return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("sync-keep-editor-menus") || body.Contains("victory-stars-hire"))
+                   && body.Contains("NeverBulkDeleteEditorMenus")
+                   && body.Contains("ForceDeleteSyncAll")
+                   && body.Contains("BootstrapCompatAndSyncTools");
+        }
+
+        if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("Diagnose Project") && body.Contains("DemonKnightPackageVersion");
         }
 
         return true;

@@ -1,16 +1,17 @@
 STOP hand-copying random files.
 
-=== PREFERRED ===
+If Arthurian → Bootstrap / Force Delete+Sync menus are GONE:
+  Delete then Save-As these TWO files from jsDelivr @pinned SHA (never @main):
+    Assets/Editor/ArthurianSyncFromGitHub.cs
+    Assets/Editor/ArthurianMenuBootstrap.cs
+  Then Assets → Refresh. Menus return. Run Bootstrap → Force Delete+Sync.
+
+=== PREFERRED (menus present) ===
 1) Wait for Unity compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → victory-stars-hire
+4) Diagnose → sync-keep-editor-menus
 
-Never use jsDelivr @main. Pin commit SHA (PR tip / merge).
+Force Sync never bulk-deletes Sync/MenuBootstrap/PackageVersion (in-place replace only).
 
-=== HARD FALLBACK ===
-Delete then Save-As CompatApi, PackageVersion, SomersetChurchUI, ArthurianSyncFromGitHub
-(+ GameDataTypes, GameLoopManager, WarbandAutosave, PaperDollSeatView, VictoryStarBadge)
-from jsDelivr @<SHA> — see ANDREW-VICTORY-STARS-HIRE.md
-
-No scene wipe.
+See ANDREW-SYNC-KEEP-EDITOR-MENUS.md
