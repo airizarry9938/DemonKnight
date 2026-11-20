@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Known-good commit that contains ResolveLoop CompatApi (PR #3). Bootstrap floor.</summary>
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    private const string FallbackCommitSha = "f8cff5b";
+    private const string FallbackCommitSha = "a54cab9";
 
-    private const string ExpectedPackageId = "hire-once-unfuse-disband";
+    private const string ExpectedPackageId = "mediate-mordred-wave-rules";
 
     private static readonly string[] ScriptPaths =
     {
@@ -446,6 +446,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("mediate-mordred-wave-rules")
                    || body.Contains("hire-once-unfuse-disband")
                    || body.Contains("hud-esc-legends-warband-pace")
                    || body.Contains("sync-pin-jsdelivr")
@@ -458,7 +459,7 @@ public static class ArthurianSyncFromGitHub
                 return body.Contains("DownloadPinned") || body.Contains("BootstrapCompatAndSyncTools")
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             return body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
-                   || body.Contains("hire-once-unfuse-disband");
+                   || body.Contains("mediate-mordred-wave-rules");
         }
 
         return true;

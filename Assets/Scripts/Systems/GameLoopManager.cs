@@ -49,6 +49,15 @@ namespace ArthurianAutobattler
         /// <summary>Last wave outcome for hire pricing on disband (true=win discount, false=loss penalty).</summary>
         public bool? lastWaveWon;
 
+        /// <summary>
+        /// Mediate (100g) suspends Noble/Outlaw + hatedTrait rivalries until this wave ends.
+        /// Cleared on <see cref="EnsureDisbandedAfterWave"/> / new night — per-wave, not permanent.
+        /// </summary>
+        public bool rivalriesSuspendedThisWave;
+
+        /// <summary>Gold cost to Mediate (wave-scoped rivalry cancel).</summary>
+        public const int MediateCostGold = 100;
+
         private Coroutine seatPopulateRoutine;
         private const string NightPrefsKey = "SomersetNight";
         private GamePhase previousPhase;
@@ -223,6 +232,7 @@ namespace ArthurianAutobattler
             townSecondsSpentThisPhase = 0f;
             SomersetRunes.SetGrudgeDeltaMultiplier(1f);
             SomersetRunes.ClearPact();
+            rivalriesSuspendedThisWave = false;
 
             if (rngGenerator == null) rngGenerator = FindFirstObjectByType<TownRNGGenerator>();
             currentTownPool = rngGenerator != null
@@ -304,6 +314,7 @@ namespace ArthurianAutobattler
             if (recruitedParty.Count == 0)
             {
                 mustDisbandPartyAfterCurrentWave = false;
+                rivalriesSuspendedThisWave = false;
                 return;
             }
 
@@ -344,6 +355,9 @@ namespace ArthurianAutobattler
                 ReturnOneToPew(r, combatDead, fusionLeafDead, livingDelta, seenIds, ref returned);
             }
 
+            // Rivalries / Mediate are per-wave — expire when the wave ends.
+            rivalriesSuspendedThisWave = false;
+
             mustDisbandPartyAfterCurrentWave = false;
             Debug.Log(
                 $"[DemonKnight] WAVE disband ({(won ? "WIN −10 hire" : "LOSS +15 hire")}): party {before} → pews += {returned} (unfused, full stats).");
@@ -359,6 +373,12 @@ namespace ArthurianAutobattler
             ref int returned)
         {
             if (r == null) return;
+            // Mordred is fuse/Legend only — never seats in pews (must fuse again next run).
+            if (r.unitType == UnitType.Mordred)
+            {
+                Debug.Log("[DemonKnight] Mordred discarded on disband — never returns to a pew.");
+                return;
+            }
             if (!string.IsNullOrEmpty(r.unitID) && !seenIds.Add(r.unitID))
                 return;
 
@@ -464,6 +484,9 @@ namespace ArthurianAutobattler
             }
 
             mustDisbandPartyAfterCurrentWave = false;
+            rivalriesSuspendedThisWave = false;
+            // Mordred never belongs in pews (fuse/Legend only).
+            currentTownPool?.RemoveAll(r => r != null && r.unitType == UnitType.Mordred);
             AutosaveWarband();
             RefreshTownAfterDisband();
 
@@ -479,6 +502,7 @@ namespace ArthurianAutobattler
             if (townUI == null) townUI = FindFirstObjectByType<TownSplitUIController>();
             if (currentTownPool != null)
             {
+                currentTownPool.RemoveAll(r => r != null && r.unitType == UnitType.Mordred);
                 if (church != null && church.pewSeatLayer != null)
                     church.PopulatePews(currentTownPool);
                 else
