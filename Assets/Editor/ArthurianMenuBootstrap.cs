@@ -149,13 +149,15 @@ public static class ArthurianMenuBootstrap
             "Assets/Editor/CharacterDatabaseEditor.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",
-            // Runtime data the Editor tools reference (CS0246 without these)
+            // Runtime data the Editor tools / portraits reference
+            "Assets/Scripts/Data/GameDataTypes.cs", // RecruitInstance.appearance
             "Assets/Scripts/Data/ModularSpriteLibrary.cs",
             "Assets/Scripts/Data/TownsfolkAppearance.cs",
             "Assets/Scripts/Data/Characters/CharacterDefinition.cs",
             "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
             "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
             "Assets/Scripts/UI/TownsfolkPortraitView.cs",
+            "Assets/Scripts/UI/PaperDollSeatView.cs",
         };
 
         int ok = 0;

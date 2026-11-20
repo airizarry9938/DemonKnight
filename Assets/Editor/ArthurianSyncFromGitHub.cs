@@ -24,7 +24,7 @@ public static class ArthurianSyncFromGitHub
     // Updated when shipping Sync packages (main tip alone is still older merges).
     private const string FallbackCommitSha = "43252d0";
 
-    private const string ExpectedPackageId = "art-tools-runtime-deps";
+    private const string ExpectedPackageId = "art-tools-gamedatatypes-appearance";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
