@@ -58,8 +58,8 @@ public class CharacterDatabaseEditor : Editor
             "OK");
     }
 
-    [MenuItem("DemonKnight/Characters/Auto-Collect Character Database")]
-    [MenuItem("Arthurian/Art Tools/Auto-Collect Character Database", false, 43)]
+    [MenuItem("Arthurian/Art Tools/Auto-Collect Character Database", false, 44)]
+    [MenuItem("DemonKnight/Characters/Auto-Collect Character Database", false, 44)]
     public static void MenuAutoCollect()
     {
         var db = EnsureDatabaseAsset();

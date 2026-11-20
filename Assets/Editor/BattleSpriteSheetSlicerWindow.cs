@@ -22,8 +22,9 @@ public class BattleSpriteSheetSlicerWindow : EditorWindow
     string label = "BattleSheet";
     Vector2 scroll;
 
-    [MenuItem("DemonKnight/Battle Sprite Sheet Slicer")]
-    [MenuItem("Arthurian/Art Tools/Battle Sprite Sheet Slicer", false, 41)]
+    // Owned only by this window — do not also register these paths on ArthurianMenuBootstrap.
+    [MenuItem("Arthurian/Art Tools/Battle Sprite Sheet Slicer", false, 42)]
+    [MenuItem("DemonKnight/Battle Sprite Sheet Slicer", false, 42)]
     public static void Open()
     {
         var win = GetWindow<BattleSpriteSheetSlicerWindow>("Battle Sprite Slicer");
