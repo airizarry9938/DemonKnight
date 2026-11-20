@@ -164,8 +164,8 @@ public static class ArthurianMenuBootstrap
             "DemonKnight Setup",
             "1) Confirm Assets/Scripts/UI/SomersetPewLayout.cs exists.\n" +
             "2) Wait for compile (bottom-right spinner).\n" +
-            "3) Arthurian → Diagnose Project (must show character-registry-battle-sprites).\n" +
-            "   Then DemonKnight → Characters → Seed Default Character Definitions.\n" +
+            "3) Arthurian → Diagnose Project (must show end-run-remove-perks-runes).\n" +
+            "   Perks/runes offline; Camelot abandon → End Run → Main Menu.\n" +
             "   If Bootstrap / Force Delete+Sync missing: overwrite ArthurianSyncFromGitHub.cs\n" +
             "   + ArthurianMenuBootstrap.cs from jsDelivr (pinned SHA) — see README.\n" +
             "4) If you already added ChurchBackground: Arthurian → Align Crowd Grid To Church Pews.\n" +

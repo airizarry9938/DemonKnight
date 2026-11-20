@@ -744,37 +744,30 @@ namespace ArthurianAutobattler
             }
             else
             {
+                // Perks/runes removed pending redesign — skip perk draft, return to church.
                 SomersetRunes.TryAwardRelicForWave(currentBattleNumber);
                 int clearedWave = currentBattleNumber;
                 currentBattleNumber++;
-                // Gold already awarded above.
 
                 loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
                 if (loop != null)
                 {
                     if (loop.townCanvasObj != null) loop.townCanvasObj.SetActive(true);
                     if (loop.battlefieldArenaObj != null) loop.battlefieldArenaObj.SetActive(false);
-                    loop.currentPhase = GamePhase.Rewards;
                     if (loop.recruitedParty != null
                         && loop.recruitedParty.Any(r => r != null && r.unitType != UnitType.Mordred))
                     {
-                        Debug.LogError("[DemonKnight] Non-Mordred still hired before perk draft — forcing again.");
                         ForceWaveDisband(loop, deadIds, true);
                         DemonKnightCompatApi.SetMustDisband(loop, true);
                     }
                 }
 
-                var perks = PerkDraftManager.Instance ?? FindFirstObjectByType<PerkDraftManager>();
-                if (perks != null)
-                {
-                    Debug.LogError($"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Party must be 0 → perk draft.");
-                    perks.OpenPerkDraft(clearedWave, goldEarned);
-                }
-                else
-                {
-                    Debug.LogWarning("[DemonKnight] PerkDraftManager missing — returning to town without perk pick.");
-                    loop?.StartTownPhase();
-                }
+                Debug.LogError(
+                    $"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Perks disabled — returning to town.");
+                var perkUi = PerkDraftManager.Instance ?? FindFirstObjectByType<PerkDraftManager>();
+                if (perkUi != null && perkUi.perkDraftPanel != null)
+                    perkUi.perkDraftPanel.SetActive(false);
+                loop?.StartTownPhase();
             }
         }
 
