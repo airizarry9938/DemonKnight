@@ -202,6 +202,10 @@ namespace ArthurianAutobattler
 
     public static class PartySynergyEvaluator
     {
+        /// <summary>True after Mediate (100g) until the current wave ends.</summary>
+        public static bool RivalriesSuspendedThisWave =>
+            GameLoopManager.Instance != null && GameLoopManager.Instance.rivalriesSuspendedThisWave;
+
         public static bool CanJoinParty(RecruitInstance candidate, List<RecruitInstance> currentParty, out string refusalReason)
         {
             if (SomersetRunes.IsPact(DemonicPactID.Usurpation))
@@ -216,17 +220,34 @@ namespace ArthurianAutobattler
                 }
             }
 
-            foreach (var member in currentParty)
+            // Mediate cancels recruitment rivalries for this wave (Noble ↔ Outlaw, etc.).
+            if (!RivalriesSuspendedThisWave && currentParty != null)
             {
-                if (candidate.primaryTrait == TraitTag.Noble && member.primaryTrait == TraitTag.Outlaw)
+                foreach (var member in currentParty)
                 {
-                    refusalReason = $"{candidate.characterName} refuses to serve alongside an Outlaw like {member.characterName}!";
-                    return false;
+                    if (member == null) continue;
+                    if (AreTraitRivals(candidate, member))
+                    {
+                        refusalReason =
+                            $"{candidate.characterName} refuses to serve alongside {member.characterName}! (Mediate for {GameLoopManager.MediateCostGold}g to cancel rivalries this wave.)";
+                        return false;
+                    }
                 }
             }
 
             refusalReason = string.Empty;
             return true;
+        }
+
+        /// <summary>Noble refuses Outlaw (and vice versa) unless Mediate suspended rivalries.</summary>
+        public static bool AreTraitRivals(RecruitInstance a, RecruitInstance b)
+        {
+            if (a == null || b == null) return false;
+            bool aNoble = a.primaryTrait == TraitTag.Noble;
+            bool bNoble = b.primaryTrait == TraitTag.Noble;
+            bool aOut = a.primaryTrait == TraitTag.Outlaw;
+            bool bOut = b.primaryTrait == TraitTag.Outlaw;
+            return (aNoble && bOut) || (aOut && bNoble);
         }
 
         public static void ApplyBattleModifiers(List<RecruitInstance> party)
@@ -245,6 +266,7 @@ namespace ArthurianAutobattler
                 peasantApsBonus = 0.15f * (peasantCount / 5) * crownRank;
 
             bool jealousy = SomersetRunes.IsSinActive(SinRuneID.Jealousy);
+            bool rivalriesOff = RivalriesSuspendedThisWave;
 
             foreach (var unit in party)
             {
@@ -257,7 +279,9 @@ namespace ArthurianAutobattler
                 foreach (var ally in party)
                 {
                     if (unit == ally) continue;
-                    if (!arthurPresent
+                    // Hated-trait rivalry ATK penalty — skipped when Mediate suspended this wave.
+                    if (!rivalriesOff
+                        && !arthurPresent
                         && unit.hatedTrait != TraitTag.None
                         && ally.primaryTrait == unit.hatedTrait)
                     {

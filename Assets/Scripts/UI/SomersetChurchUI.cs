@@ -1826,7 +1826,15 @@ namespace ArthurianAutobattler
             if (hireButton != null) hireButton.interactable = true;
             if (trainTankButton != null) trainTankButton.interactable = Town != null && Town.playerGold >= 15;
             if (trainRangedButton != null) trainRangedButton.interactable = Town != null && Town.playerGold >= 15;
-            if (mediateButton != null) mediateButton.interactable = Town != null && Town.playerGold >= 40;
+            int mediateCost = GameLoopManager.MediateCostGold;
+            if (mediateButton != null)
+            {
+                mediateButton.interactable = Town != null && Town.playerGold >= mediateCost;
+                ApplyHudButtonLabel(mediateButton,
+                    GameLoopManager.Instance != null && GameLoopManager.Instance.rivalriesSuspendedThisWave
+                        ? "Mediated ✓"
+                        : $"Mediate ({mediateCost}g)");
+            }
         }
 
         private string BuildGossip(RecruitInstance center)
@@ -1895,14 +1903,33 @@ namespace ArthurianAutobattler
             RefreshHUD();
         }
 
-        private void Mediate()
+        /// <summary>
+        /// 100g — cancel rivalries for this wave so Noble/Outlaw (etc.) can recruit together.
+        /// Expires on wave end (per-wave). Does not invent permanent trait rewrites.
+        /// </summary>
+        public void Mediate()
         {
-            if (selected == null || Town == null || Town.playerGold < 40) return;
-            Town.playerGold -= 40;
-            selected.hatedTrait = TraitTag.None;
-            if (selected.primaryTrait == TraitTag.Coward) selected.primaryTrait = TraitTag.Loyalist;
-            GrudgeSaveManager.Instance?.ModifyGrudgeStaging(selected.unitID, -20);
-            selected.RefreshBodyPostureFromTraits(0);
+            if (Town == null || GameLoopManager.Instance == null) return;
+            int cost = GameLoopManager.MediateCostGold;
+            if (Town.playerGold < cost) return;
+
+            if (GameLoopManager.Instance.rivalriesSuspendedThisWave)
+            {
+                if (dossierDialogue != null)
+                    dossierDialogue.text = "<color=#7CFF9A>Rivalries already mediated for this wave.</color>";
+                RefreshDossier();
+                return;
+            }
+
+            Town.playerGold -= cost;
+            GameLoopManager.Instance.rivalriesSuspendedThisWave = true;
+            if (dossierDialogue != null)
+            {
+                dossierDialogue.text =
+                    $"<color=#7CFF9A>Mediated ({cost}g).</color> Rivalries canceled for this wave — "
+                    + "formerly incompatible souls may recruit together until March ends.";
+            }
+            Debug.Log($"[DemonKnight] Mediate {cost}g — rivalries suspended this wave.");
             RefreshDossier();
             RefreshHUD();
         }

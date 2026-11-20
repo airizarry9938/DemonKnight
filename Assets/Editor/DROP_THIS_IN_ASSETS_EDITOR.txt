@@ -4,14 +4,13 @@ STOP hand-copying random files.
 1) Wait for Unity compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → hire-once-unfuse-disband
+4) Diagnose → mediate-mordred-wave-rules
 
 Never use jsDelivr @main (stale). Pin commit SHA after merge (or PR tip).
 
-=== HARD FALLBACK (delete then Save-As) ===
-Pin SHA (replace after merge): see ANDREW-HIRE-ONCE-UNFUSE-DISBAND.md in the agent store.
+=== HARD FALLBACK ===
+Delete then Save-As CompatApi, PackageVersion, SomersetChurchUI, ArthurianSyncFromGitHub
+(+ GameLoopManager, GameDataTypes, TownSplitUIController, CardFusionSystem if stale)
+from jsDelivr @<SHA> — see ANDREW-MEDIATE-MORDRED-WAVE-RULES.md
 
-  CompatApi, PackageVersion, SomersetChurchUI, ArthurianSyncFromGitHub
-  (+ GameLoopManager, CardFusionSystem, TownSplitUIController, AutoBattlerEngine, WarbandAutosave if still stale)
-
-No scene wipe. Align only if pews missing; Build only for empty scene.
+No scene wipe.

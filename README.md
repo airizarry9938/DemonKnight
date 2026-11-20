@@ -9,16 +9,26 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
 3. If Diagnose shows `cs1061-compat-api` / CompatApi lacks `ResolveLoop`: use the **hard fallback** below (never use jsDelivr `@main` — it lags).
-4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `hire-once-unfuse-disband`.
+4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `mediate-mordred-wave-rules`.
 5. Already have `ChurchBackground`? **Align Crowd Grid To Church Pews**. Brand-new only: **Build Complete Scene Hierarchy**.
 6. Place HUD icons on `HUD_Bar` (Play keeps them; Codex = **Legends**). Menu/Esc sits far-left; authored positions preserved (`forceEqualHudSlots` off).
 7. Press Play on `CamelotMain`.
+
+### Locked run rules (Andrew)
+
+1. **Fusion dies** → leaf pew units still take the **death hire penalty** (+15).
+2. **Combat XP** — no invented XP on unfuse; only perk/reward grants.
+3. **Mordred** — fuse/Legend only; **never returns to a pew** (must fuse again next run).
+4. **Per wave:** stacks / combat perks / win−10·loss+15 hire / taxes / **Mediate rivalries** / wave changes.
+5. **Runes** (bank / awarded / purchased) **persist across waves** in the run.
+
+**Mediate:** **100g** — cancels rivalries for **this wave** so formerly incompatible units can recruit together. Expires when the wave ends.
 
 ### Hard fallback (jsDelivr `@main` lags — pin commit)
 
 After this PR merges, pin the **merge commit SHA** (or tip of `main`). Until then, use the PR branch tip SHA from the Sync steps doc, or floor:
 
-**Floor (Sync tools that pin commits):** `f8cff5b`
+**Floor (Sync tools that pin commits):** `a54cab9`
 
 **Delete** then download Save-As (do not rely on overwrite):
 

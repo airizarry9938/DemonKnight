@@ -239,6 +239,9 @@ namespace ArthurianAutobattler
                     ExpandFusionRecursive(ing, into);
                 return;
             }
+            // Mordred is Legend/fuse-only — never a pew leaf (Usurpation or stray product).
+            if (r.unitType == UnitType.Mordred)
+                return;
             into.Add(r);
         }
 

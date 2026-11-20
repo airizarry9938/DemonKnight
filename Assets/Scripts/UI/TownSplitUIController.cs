@@ -389,18 +389,33 @@ namespace ArthurianAutobattler
 
         public void MediateSelectedRecruit()
         {
-            if (selectedRecruit == null || playerGold < 40) return;
-            playerGold -= 40;
-            selectedRecruit.hatedTrait = TraitTag.None;
-            if (selectedRecruit.primaryTrait == TraitTag.Coward)
-                selectedRecruit.primaryTrait = TraitTag.Loyalist;
+            // Prefer church Mediate (100g, wave-scoped rivalry cancel).
+            var church = FindFirstObjectByType<SomersetChurchUI>()
+                         ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
+            if (church != null)
+            {
+                DemonKnightCompatApi.ChurchInvokeMediate(church);
+                UpdateHUD();
+                return;
+            }
 
-            GrudgeSaveManager.Instance?.ModifyGrudgeStaging(selectedRecruit.unitID, -20);
+            int cost = GameLoopManager.MediateCostGold;
+            if (playerGold < cost || GameLoopManager.Instance == null) return;
+            if (GameLoopManager.Instance.rivalriesSuspendedThisWave)
+            {
+                if (characterDialogueText != null)
+                    characterDialogueText.text = "<color=#7CFF9A>Rivalries already mediated for this wave.</color>";
+                return;
+            }
+
+            playerGold -= cost;
+            GameLoopManager.Instance.rivalriesSuspendedThisWave = true;
             UpdateHUD();
-            RefreshDossierUI(GrudgeSaveManager.Instance != null
-                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
-                : 0);
-            characterDialogueText.text = "<color=green>Old grudges set aside. I will stand firm.</color>";
+            if (characterDialogueText != null)
+            {
+                characterDialogueText.text =
+                    $"<color=green>Mediated ({cost}g).</color> Rivalries canceled for this wave.";
+            }
         }
 
         public void BuyTavernRound()
@@ -436,7 +451,8 @@ namespace ArthurianAutobattler
             if (hireRecruitButton != null) hireRecruitButton.interactable = true;
             if (trainTankButton != null) trainTankButton.interactable = playerGold >= 15;
             if (trainRangedButton != null) trainRangedButton.interactable = playerGold >= 15;
-            if (mediateRivalryButton != null) mediateRivalryButton.interactable = playerGold >= 40;
+            if (mediateRivalryButton != null)
+                mediateRivalryButton.interactable = playerGold >= GameLoopManager.MediateCostGold;
         }
 
         private void ClearBottomDossier()

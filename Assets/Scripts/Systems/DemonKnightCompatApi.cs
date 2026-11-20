@@ -98,6 +98,13 @@ namespace ArthurianAutobattler
                 Debug.LogWarning("[DemonKnight] RewireDossierActionButtons missing — Sync SomersetChurchUI.cs.");
         }
 
+        public static void ChurchInvokeMediate(Component church = null)
+        {
+            church ??= FindChurch();
+            if (!TryInvoke(church, "Mediate"))
+                Debug.LogWarning("[DemonKnight] Mediate missing — Sync SomersetChurchUI.cs.");
+        }
+
         public static void EnsureCodexScrollViewport(Transform codexRoot)
         {
             if (codexRoot == null) return;
