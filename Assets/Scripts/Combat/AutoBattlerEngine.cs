@@ -12,6 +12,14 @@ namespace ArthurianAutobattler
         public bool isBattling = false;
         public int frontlineSize = 6;
 
+        [Header("Pacing")]
+        [Tooltip("Combat time scale. 1 = full speed; lower = slower/more tense. Default 0.38.")]
+        [Range(0.15f, 1.25f)]
+        public float combatPace = 0.38f;
+        [Tooltip("Extra pause (seconds, unscaled by combatPace) after each attack resolves.")]
+        [Range(0f, 0.75f)]
+        public float attackResolvePause = 0.12f;
+
         private List<CombatUnit> playerArmy = new List<CombatUnit>();
         private List<CombatUnit> demonArmy = new List<CombatUnit>();
         private Dictionary<string, Sprite> spriteLookup = new Dictionary<string, Sprite>();
@@ -199,22 +207,38 @@ namespace ArthurianAutobattler
             }
         }
 
+        private float _postAttackPauseTimer;
+
         private void Update()
         {
             if (!isBattling) return;
 
+            float pace = Mathf.Clamp(combatPace, 0.15f, 1.25f);
+            float dt = Time.deltaTime * pace;
+
+            // Brief beat after an attack for readability / tension.
+            if (_postAttackPauseTimer > 0f)
+            {
+                _postAttackPauseTimer -= Time.deltaTime;
+                BattlefieldVisualizer.Instance?.SyncFrontlineVisuals(
+                    playerArmy.Where(u => u.IsAlive).ToList(),
+                    demonArmy.Where(u => u.IsAlive).ToList(),
+                    spriteLookup);
+                return;
+            }
+
             foreach (var u in playerArmy.Where(u => u.IsAlive))
             {
-                if (u.petrifiedTimer > 0f) u.petrifiedTimer -= Time.deltaTime;
-                if (u.charmedTimer > 0f) u.charmedTimer -= Time.deltaTime;
+                if (u.petrifiedTimer > 0f) u.petrifiedTimer -= dt;
+                if (u.charmedTimer > 0f) u.charmedTimer -= dt;
                 if (u.maxHpDrainPerSecond > 0f)
                 {
-                    u.currentHealth -= Mathf.RoundToInt(u.maxHpDrainPerSecond * Time.deltaTime);
+                    u.currentHealth -= Mathf.RoundToInt(u.maxHpDrainPerSecond * dt);
                     if (u.currentHealth <= 0) HandleUnitDeath(u);
                 }
             }
 
-            TrySirenCharmTicks();
+            TrySirenCharmTicks(dt);
 
             var allHumans = playerArmy.Where(u => u.IsAlive).ToList();
             var allDemons = demonArmy.Where(u => u.IsAlive).ToList();
@@ -230,13 +254,15 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            ProcessSideActions(aliveHumans, aliveDemons);
+            bool struck = ProcessSideActions(aliveHumans, aliveDemons, dt);
             aliveDemons = demonArmy.Where(u => u.IsAlive).Take(frontlineSize).ToList();
             if (aliveDemons.Count > 0)
-                ProcessSideActions(aliveDemons, GetValidTargetsForDemons(aliveHumans));
+                struck |= ProcessSideActions(aliveDemons, GetValidTargetsForDemons(aliveHumans), dt);
+            if (struck && attackResolvePause > 0f)
+                _postAttackPauseTimer = attackResolvePause;
         }
 
-        private void TrySirenCharmTicks()
+        private void TrySirenCharmTicks(float dt)
         {
             bool anySiren = demonArmy.Any(d => d.IsAlive && d.isSirenEnchantress)
                             || playerArmy.Any(u => u.IsAlive && u.isSirenEnchantress);
@@ -246,7 +272,7 @@ namespace ArthurianAutobattler
             {
                 if (CombatUnit.IsImmuneToSirenCharm(u.unitType)) continue;
                 if (u.charmedTimer > 0f) continue;
-                if (Random.value < 0.25f * Time.deltaTime) // ~chance per second scaled
+                if (Random.value < 0.25f * dt) // ~chance per second scaled by combatPace
                 {
                     u.charmedTimer = 1.0f;
                     BattlefieldVisualizer.Instance?.SpawnPopup(u, "CHARMED!", new Color(1f, 0.4f, 0.7f));
@@ -260,21 +286,24 @@ namespace ArthurianAutobattler
             return tanks.Count > 0 ? tanks : aliveHumans;
         }
 
-        private void ProcessSideActions(List<CombatUnit> attackers, List<CombatUnit> defenders)
+        private bool ProcessSideActions(List<CombatUnit> attackers, List<CombatUnit> defenders, float dt)
         {
+            bool anyStrike = false;
             foreach (var attacker in attackers)
             {
                 if (!attacker.IsAlive || attacker.petrifiedTimer > 0f || attacker.charmedTimer > 0f || defenders.Count == 0)
                     continue;
 
-                attacker.battleElapsed += Time.deltaTime;
-                attacker.attackTimer -= Time.deltaTime;
+                attacker.battleElapsed += dt;
+                attacker.attackTimer -= dt;
                 if (attacker.attackTimer <= 0f)
                 {
                     ExecuteUnitAction(attacker, attackers, defenders);
                     attacker.ResetAttackCooldown();
+                    anyStrike = true;
                 }
             }
+            return anyStrike;
         }
 
         private void ExecuteUnitAction(CombatUnit attacker, List<CombatUnit> allies, List<CombatUnit> enemies)

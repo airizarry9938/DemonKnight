@@ -27,8 +27,8 @@ Same base URLs:
 === THEN ===
 1) Wait for Unity compile
 2) Arthurian → Force Re-Sync Night/HUD Fix   (or Sync All Scripts From GitHub)
-3) Bootstrap CompatApi + Sync Tools, then Force Delete+Sync → Diagnose: sync-pin-jsdelivr
-   If stuck on cs1061-compat-api: jsDelivr @ba26256 overwrite CompatApi+PackageVersion+SomersetChurchUI+Sync
+3) Bootstrap CompatApi + Sync Tools, then Force Delete+Sync → Diagnose: hud-esc-legends-warband-pace
+   Prefer commit-pinned jsDelivr (never @main). No scene rebuild needed for this package.
 
 === FULL REPO FALLBACK ===
 cd into the Unity project folder that contains Assets/, then:
