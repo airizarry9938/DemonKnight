@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "2f69878";
+    private const string FallbackCommitSha = "572155d";
 
-    private const string ExpectedPackageId = "balance-v2-arthurian-expansion";
+    private const string ExpectedPackageId = "fix-boss-dialog-cs0136";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -484,10 +484,17 @@ public static class ArthurianSyncFromGitHub
                    && !Regex.IsMatch(body, @"void\s+SetNight\s*\(\s*int");
         }
 
+        if (rel.EndsWith("AutoBattlerEngine.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            // Must reference BattleBossDialogUI (CS0103 if that file is missing from Sync).
+            return body.Contains("DemonKnightCompatApi")
+                   && body.Contains("BattleBossDialogUI")
+                   && body.Contains("waveBoss"); // CS0136 fix: no shadowed local `boss`
+        }
+
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("LegendCodexUI.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("MainMenuUI.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("AutoBattlerEngine.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("PerkDraftManager.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("MerlinResurrectionManager.cs", StringComparison.OrdinalIgnoreCase))
         {
@@ -512,6 +519,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-boss-dialog-cs0136")
                    || body.Contains("balance-v2-arthurian-expansion")
                    || body.Contains("autobattle-boss-dialog-video-bg")
                    || body.Contains("back-row-melee-no-attack")
@@ -539,6 +547,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("fix-boss-dialog-cs0136")
                     || body.Contains("balance-v2-arthurian-expansion")
                     || body.Contains("autobattle-boss-dialog-video-bg")
                     || body.Contains("back-row-melee-no-attack")

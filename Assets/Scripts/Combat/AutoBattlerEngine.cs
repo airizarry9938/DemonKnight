@@ -102,10 +102,10 @@ namespace ArthurianAutobattler
             if (currentBattleNumber >= 3)
             {
                 float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
-                var boss = hordeGenerator.SpawnCorruptedLegendBoss(currentBattleNumber, mult);
-                demonArmy.Insert(0, boss);
+                var waveBoss = hordeGenerator.SpawnCorruptedLegendBoss(currentBattleNumber, mult);
+                demonArmy.Insert(0, waveBoss);
                 // King Lot: summons 2 Frenzied Imps on spawn.
-                if (boss.unitType == UnitType.BossKingLot)
+                if (waveBoss.unitType == UnitType.BossKingLot)
                 {
                     demonArmy.Insert(1, DemonHordeGenerator.MakeImp(9001, mult));
                     demonArmy.Insert(2, DemonHordeGenerator.MakeImp(9002, mult));
@@ -117,9 +117,10 @@ namespace ArthurianAutobattler
             isBattling = true;
 
             // Boss waves: bottom-of-frame dialog before steel flies.
-            var boss = demonArmy.FirstOrDefault(d => d != null && BattleBossDialogUI.IsBossType(d.unitType));
-            if (boss != null)
-                BattleBossDialogUI.ShowForBoss(boss);
+            // Requires Assets/Scripts/Combat/BattleBossDialogUI.cs (on Sync ScriptPaths).
+            var dialogBoss = demonArmy.FirstOrDefault(d => d != null && BattleBossDialogUI.IsBossType(d.unitType));
+            if (dialogBoss != null)
+                BattleBossDialogUI.ShowForBoss(dialogBoss);
             else
                 BattleBossDialogUI.Hide();
         }

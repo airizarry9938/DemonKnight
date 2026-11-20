@@ -9,8 +9,9 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
 3. If Diagnose shows `cs1061-compat-api` / CompatApi lacks `ResolveLoop`: use the **hard fallback** below (never use jsDelivr `@main` — it lags).
-4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `balance-v2-arthurian-expansion`.
+4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `fix-boss-dialog-cs0136`.
    If Bootstrap / Force Delete+Sync menus are missing: overwrite `ArthurianSyncFromGitHub.cs` + `ArthurianMenuBootstrap.cs` from jsDelivr (pinned SHA), Refresh, then Bootstrap.
+   Must include `Assets/Scripts/Combat/BattleBossDialogUI.cs` (CS0103 without it).
 5. Already have `ChurchBackground`? **Align Crowd Grid To Church Pews**. Brand-new only: **Build Complete Scene Hierarchy**.
 6. Place HUD icons on `HUD_Bar` (Play keeps them; Codex = **Legends**). Menu/Esc sits far-left; authored positions preserved (`forceEqualHudSlots` off).
 7. Press Play on `CamelotMain`.
@@ -51,7 +52,7 @@ After this PR merges, pin the **merge commit SHA** (or tip of `main`). Until the
 
 **Balance V2:** start 250g; Train Ranged = crossbow; Mordred persists; bosses 3–10+; new legends; survivor bounty +10; no death/loss +15 hire.
 
-**Floor (Sync tools that pin commits):** `2f69878`
+**Floor (Sync tools that pin commits):** `572155d`
 
 **Delete** then download Save-As (do not rely on overwrite):
 
