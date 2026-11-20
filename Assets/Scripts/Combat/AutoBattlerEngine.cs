@@ -105,6 +105,13 @@ namespace ArthurianAutobattler
             foreach (var d in demonArmy) d.ResetAttackCooldown();
             TriggerBattleStartPassives();
             isBattling = true;
+
+            // Boss waves: bottom-of-frame dialog before steel flies.
+            var boss = demonArmy.FirstOrDefault(d => d != null && BattleBossDialogUI.IsBossType(d.unitType));
+            if (boss != null)
+                BattleBossDialogUI.ShowForBoss(boss);
+            else
+                BattleBossDialogUI.Hide();
         }
 
         private void ApplyUsurpationStarterLegends(List<RecruitInstance> roster)
@@ -212,6 +219,16 @@ namespace ArthurianAutobattler
         private void Update()
         {
             if (!isBattling) return;
+
+            // Hold combat while the boss intro dialog is across the bottom of the frame.
+            if (BattleBossDialogUI.IsBlockingCombat)
+            {
+                BattlefieldVisualizer.Instance?.SyncFrontlineVisuals(
+                    playerArmy.Where(u => u.IsAlive).ToList(),
+                    demonArmy.Where(u => u.IsAlive).ToList(),
+                    spriteLookup);
+                return;
+            }
 
             float pace = Mathf.Clamp(combatPace, 0.15f, 1.25f);
             float dt = Time.deltaTime * pace;
@@ -574,7 +591,9 @@ namespace ArthurianAutobattler
         private void EndBattle(bool playerWon)
         {
             isBattling = false;
+            BattleBossDialogUI.Hide();
             BattlefieldVisualizer.Instance?.ClearAllActors();
+            BattlefieldVisualizer.Instance?.StopBattleVideo();
             int goldEarned = playerWon ? DemonKnightCompatApi.WaveVictoryGold : DemonKnightCompatApi.WaveLossGold;
 
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();

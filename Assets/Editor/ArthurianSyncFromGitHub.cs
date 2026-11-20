@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "bb760f6";
+    private const string FallbackCommitSha = "46c6d91";
 
-    private const string ExpectedPackageId = "back-row-melee-no-attack";
+    private const string ExpectedPackageId = "autobattle-boss-dialog-video-bg";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -51,6 +51,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/ChurchStageUIController.cs",
         "Assets/Scripts/Combat/AutoBattlerEngine.cs",
         "Assets/Scripts/Combat/BattlefieldVisualizer.cs",
+        "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         "Assets/Scripts/Combat/DemonHordeGenerator.cs",
         "Assets/Scripts/Combat/FloatingCombatText.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
@@ -96,6 +97,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/Combat/AutoBattlerEngine.cs",
         "Assets/Scripts/Combat/BattlefieldVisualizer.cs",
+        "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
     };
@@ -494,7 +496,14 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("BattlefieldVisualizer.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("ResolveArenaBindings") && body.Contains("ApplyBackgroundArt");
+            return body.Contains("ResolveArenaBindings")
+                   && body.Contains("ApplyBackgroundArt")
+                   && body.Contains("ApplyVideoBackground");
+        }
+
+        if (rel.EndsWith("BattleBossDialogUI.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("ShowForBoss") && body.Contains("IsBlockingCombat");
         }
 
         if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))
@@ -503,6 +512,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("autobattle-boss-dialog-video-bg")
                    || body.Contains("back-row-melee-no-attack")
                    || body.Contains("perk-rune-bonus-math")
                    || body.Contains("autobattle-frontline-targeting")
@@ -528,6 +538,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("autobattle-boss-dialog-video-bg")
                     || body.Contains("back-row-melee-no-attack")
                     || body.Contains("perk-rune-bonus-math")
                     || body.Contains("autobattle-frontline-targeting")

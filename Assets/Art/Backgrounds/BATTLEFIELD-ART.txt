@@ -1,0 +1,22 @@
+Battlefield art — still + video (package back-row-melee / boss-dialog-video-bg)
+
+STILL BACKGROUND
+  Assets/Art/Backgrounds/Battlefield.jpg (or .png) — Texture Type = Sprite
+  Scene: BattlefieldArena/BattleBackground (SpriteRenderer)
+  Or assign Managers/BattlefieldVisualizer.battleBackgroundSprite
+
+VIDEO LOOP (fight scene)
+  See README-BATTLE-VIDEO.txt in this folder.
+  Drop: Assets/Art/Backgrounds/BattlefieldLoop.mp4
+  Also: Assets/Resources/Art/Backgrounds/BattlefieldLoop.mp4 (auto-load)
+  Or:   Assets/StreamingAssets/BattlefieldLoop.mp4
+
+HIERARCHY
+  BattlefieldArena
+    BattleBackground          ← still SpriteRenderer
+    BattleVideoBackground     ← Quad + RT (created at runtime if missing)
+    PlayerSlots / EnemySlots
+
+BOSS INTRO
+  Wave ≥ 2: bottom-of-frame dialog (BattleBossDialogUI) on March enter.
+  Click or wait ~4.5s to start combat.
