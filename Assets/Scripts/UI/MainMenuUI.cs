@@ -301,14 +301,14 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            GrudgeSaveManager.Instance?.WipeAllSavedMemory();
-            WarbandAutosave.Clear();
-            loop.recruitedParty?.Clear();
+            // InitializeFreshCampaign wipes bank/perks/relics/autosave and locks purse at 200g.
             DemonKnightCompatApi.SetMustDisband(loop, false);
+            loop.recruitedParty?.Clear();
             loop.InitializeFreshCampaign();
             HideMenu();
-            SetStatus("New Game started — clean slate.");
-            Debug.LogError("[DemonKnight] === MAIN MENU NEW GAME — wiped autosave, party cleared ===");
+            SetStatus($"New Game — Royal Gold {GameLoopManager.StartingGold}g (clean slate).");
+            Debug.LogError(
+                $"[DemonKnight] === MAIN MENU NEW GAME — economy wiped, gold={GameLoopManager.StartingGold}g ===");
         }
 
         private void OnContinue()

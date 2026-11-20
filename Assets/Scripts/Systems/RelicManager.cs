@@ -25,6 +25,13 @@ namespace ArthurianAutobattler
 
         public bool Has(RelicID id) => ownedRelics.Contains(id);
 
+        /// <summary>New Game — drop all run relics.</summary>
+        public void ClearAllRelics()
+        {
+            ownedRelics.Clear();
+            Debug.Log("[DemonKnight] Relics cleared for New Game.");
+        }
+
         public void TryAwardRelicForWave(int battleNumberJustCleared)
         {
             if (battleNumberJustCleared != 2 && battleNumberJustCleared != 4) return;

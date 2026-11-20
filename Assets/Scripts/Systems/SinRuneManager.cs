@@ -33,6 +33,13 @@ namespace ArthurianAutobattler
             }
         }
 
+        /// <summary>New Game — clear Jealousy / Lust.</summary>
+        public void ClearAllSins()
+        {
+            jealousyActive = false;
+            lustActive = false;
+        }
+
         public float GetLegacyPointMultiplier()
         {
             float m = 1f;

@@ -214,6 +214,25 @@ namespace ArthurianAutobattler
         public int GetGlobalCostDiscount() => recruitmentDiscountLevel * 3;
         public float GetBonusHealthMultiplier() => 1f + (startingSupplyRationsLevel * 0.10f);
 
+        /// <summary>
+        /// New Game wipe — clears Merlin bank / runes / legacy points so start gold is exactly
+        /// <see cref="GameLoopManager.StartingGold"/> with no leftover meta economy.
+        /// </summary>
+        public void ResetBankForNewGame()
+        {
+            unspentLegacyPoints = 0;
+            startingGoldBankLevel = 0;
+            recruitmentDiscountLevel = 0;
+            startingSupplyRationsLevel = 0;
+            gossipRuneRank = 0;
+            gamblerRuneRank = 0;
+            bloodOathRuneRank = 0;
+            peasantsCrownRuneRank = 0;
+            SaveBankData();
+            RefreshBankUI();
+            Debug.LogError("[DemonKnight] Merlin bank wiped for New Game (Treasury/Writ/Rations/Runes = 0).");
+        }
+
         public int GetRuneRank(BankRuneID id)
         {
             switch (id)

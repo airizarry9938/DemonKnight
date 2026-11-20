@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "98cfc1e";
+    private const string FallbackCommitSha = "3f98532";
 
-    private const string ExpectedPackageId = "tavern-discount-wave-hud";
+    private const string ExpectedPackageId = "new-game-gold-200";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -503,6 +503,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("new-game-gold-200")
                    || body.Contains("tavern-discount-wave-hud")
                    || body.Contains("stars-visible-hire-bands-gold200")
                    || body.Contains("sync-keep-editor-menus")
@@ -521,6 +522,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("new-game-gold-200")
                     || body.Contains("tavern-discount-wave-hud")
                     || body.Contains("stars-visible-hire-bands-gold200")
                     || body.Contains("sync-keep-editor-menus") || body.Contains("victory-stars-hire"))
