@@ -74,7 +74,7 @@ public static class ArthurianSceneBuilder
         GameObject townCanvasObj = CreateCanvas("TownCanvas", 0);
         var townUI = townCanvasObj.AddComponent<TownSplitUIController>();
         var churchUI = townCanvasObj.AddComponent<ChurchStageUIController>();
-        var pewLayout = townCanvasObj.AddComponent<ChurchPewLayout>();
+        var pewLayout = townCanvasObj.AddComponent<SomersetPewLayout>();
         pewLayout.ResetToChurchArtDefaults();
         var codex = townCanvasObj.AddComponent<LegendCodexUI>();
 
@@ -353,7 +353,7 @@ public static class ArthurianSceneBuilder
             "Scene built at Assets/Scenes/CamelotMain.unity\n\n" +
             "Church background + 12-pew seat layout (3×4) wired.\n" +
             "If the background is blank: select Assets/Art/Backgrounds/SomersetChurchInterior.jpg → Texture Type = Sprite (2D and UI) → Apply, then re-run this menu or assign the sprite on TownCanvas/ChurchBackground.\n" +
-            "Tune pew anchors on TownCanvas → ChurchPewLayout if seats need nudging.",
+            "Tune pew anchors on TownCanvas → SomersetPewLayout if seats need nudging.",
             "OK");
 
         Debug.Log("[DemonKnight] Somerset church scene built with 12-pew layout → " + ScenePath);

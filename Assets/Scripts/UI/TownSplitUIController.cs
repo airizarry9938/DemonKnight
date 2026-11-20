@@ -26,7 +26,7 @@ namespace ArthurianAutobattler
         [Tooltip("Parent for seat buttons. Prefer PewSeatLayer under ChurchBackground.")]
         public Transform townGridContainer;
         public GameObject recruitAvatarButtonPrefab;
-        public ChurchPewLayout pewLayout;
+        public SomersetPewLayout pewLayout;
         public Vector2 baseSeatSize = new Vector2(48f, 64f);
 
         [Header("Bottom: Dossier, Role Training & Mediation")]
@@ -74,8 +74,8 @@ namespace ArthurianAutobattler
             var grid = townGridContainer.GetComponent<GridLayoutGroup>();
             if (grid != null) grid.enabled = false;
 
-            if (pewLayout == null) pewLayout = GetComponent<ChurchPewLayout>();
-            if (pewLayout == null) pewLayout = FindFirstObjectByType<ChurchPewLayout>();
+            if (pewLayout == null) pewLayout = GetComponent<SomersetPewLayout>();
+            if (pewLayout == null) pewLayout = FindFirstObjectByType<SomersetPewLayout>();
             if (pewLayout != null) pewLayout.EnsureValid();
 
             foreach (Transform child in townGridContainer) Destroy(child.gameObject);
@@ -84,15 +84,15 @@ namespace ArthurianAutobattler
             var bySeat = new Dictionary<int, RecruitInstance>();
             foreach (var recruit in activeTownPool)
             {
-                int seat = Mathf.Clamp(recruit.pewSeatIndex, 0, ChurchPewLayout.TotalSeats - 1);
+                int seat = Mathf.Clamp(recruit.pewSeatIndex, 0, SomersetPewLayout.TotalSeats - 1);
                 if (!bySeat.ContainsKey(seat)) bySeat[seat] = recruit;
             }
 
             if (pewLayout != null)
             {
                 // Back rows first so front pews draw on top.
-                var order = new List<int>(ChurchPewLayout.TotalSeats);
-                for (int i = 0; i < ChurchPewLayout.TotalSeats; i++) order.Add(i);
+                var order = new List<int>(SomersetPewLayout.TotalSeats);
+                for (int i = 0; i < SomersetPewLayout.TotalSeats; i++) order.Add(i);
                 order.Sort((a, b) =>
                 {
                     int rowA = pewLayout.GetPewRow(pewLayout.GetPewIndexForSeat(a));

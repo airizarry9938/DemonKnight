@@ -26,7 +26,11 @@ public static class ArthurianFixMisplacedScripts
     private static readonly Dictionary<string, string> KnownGameplayTargets = new Dictionary<string, string>
     {
         { "ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs" },
+        { "SomersetPewLayout.cs", "Scripts/UI/SomersetPewLayout.cs" },
+        { "SomersetChurchUI.cs", "Scripts/UI/SomersetChurchUI.cs" },
         { "ChurchPewLayout.cs", "Scripts/UI/ChurchPewLayout.cs" },
+        { "ChurchStageUIController.cs", "Scripts/UI/ChurchStageUIController.cs" },
+        { "SomersetRunes.cs", "Scripts/Data/SomersetRunes.cs" },
         { "PaperDollSeatView.cs", "Scripts/UI/PaperDollSeatView.cs" },
         { "TownSplitUIController.cs", "Scripts/UI/TownSplitUIController.cs" },
         { "LegendCodexUI.cs", "Scripts/UI/LegendCodexUI.cs" },

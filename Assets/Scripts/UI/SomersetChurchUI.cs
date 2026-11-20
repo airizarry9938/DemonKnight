@@ -7,7 +7,7 @@ namespace ArthurianAutobattler
 {
     /// <summary>
     /// Full-screen Somerset church stage: characters seated on the 12 painted pews
-    /// (3 columns × 4 rows) via ChurchPewLayout. Modals: T/C/R/B/Esc.
+    /// (3 columns × 4 rows) via SomersetPewLayout. Modals: T/C/R/B/Esc.
     /// </summary>
     public class SomersetChurchUI : MonoBehaviour
     {
@@ -24,7 +24,7 @@ namespace ArthurianAutobattler
 
         [Header("Church Stage")]
         public Image churchBackgroundImage;
-        public ChurchPewLayout pewLayout;
+        public SomersetPewLayout pewLayout;
         public RectTransform pewSeatLayer;
         public GameObject paperDollSeatPrefab;
         public Vector2 baseSeatSize = new Vector2(56f, 72f);
@@ -148,8 +148,8 @@ namespace ArthurianAutobattler
 
         public void PopulatePews(List<RecruitInstance> town)
         {
-            if (pewLayout == null) pewLayout = GetComponent<ChurchPewLayout>();
-            if (pewLayout == null) pewLayout = gameObject.AddComponent<ChurchPewLayout>();
+            if (pewLayout == null) pewLayout = GetComponent<SomersetPewLayout>();
+            if (pewLayout == null) pewLayout = gameObject.AddComponent<SomersetPewLayout>();
             pewLayout.ApplyLatestDefaultsIfNeeded();
             pewLayout.EnsureValid();
 
@@ -166,13 +166,13 @@ namespace ArthurianAutobattler
             var bySeat = new Dictionary<int, RecruitInstance>();
             foreach (var recruit in town)
             {
-                int seat = Mathf.Clamp(recruit.pewSeatIndex, 0, ChurchPewLayout.TotalSeats - 1);
+                int seat = Mathf.Clamp(recruit.pewSeatIndex, 0, SomersetPewLayout.TotalSeats - 1);
                 if (!bySeat.ContainsKey(seat)) bySeat[seat] = recruit;
             }
 
             // Draw back rows first so front pew characters sit on top.
-            var order = new List<int>(ChurchPewLayout.TotalSeats);
-            for (int i = 0; i < ChurchPewLayout.TotalSeats; i++) order.Add(i);
+            var order = new List<int>(SomersetPewLayout.TotalSeats);
+            for (int i = 0; i < SomersetPewLayout.TotalSeats; i++) order.Add(i);
             order.Sort((a, b) =>
             {
                 int rowA = pewLayout.GetPewRow(pewLayout.GetPewIndexForSeat(a));
@@ -231,7 +231,7 @@ namespace ArthurianAutobattler
                 }
             }
 
-            Debug.Log($"[DemonKnight] Populated {ChurchPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied).");
+            Debug.Log($"[DemonKnight] Populated {SomersetPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied).");
             RefreshHUD();
         }
 

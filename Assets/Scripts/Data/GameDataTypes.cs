@@ -137,10 +137,10 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>Pew index 0–11 on the 3×4 church art grid.</summary>
-        public int PewIndex => ChurchPewLayout.GetStaticPewIndex(pewSeatIndex);
+        public int PewIndex => SomersetPewLayout.GetStaticPewIndex(pewSeatIndex);
 
         /// <summary>Pew row 0–3 (front→altar) used by Gossip Rune adjacency.</summary>
-        public int PewRow => ChurchPewLayout.GetStaticPewRow(pewSeatIndex);
+        public int PewRow => SomersetPewLayout.GetStaticPewRow(pewSeatIndex);
     }
 
     [Serializable]

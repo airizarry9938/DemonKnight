@@ -34,7 +34,7 @@ public static class ArthurianMenuBootstrap
         }
 
         bool hasGameplay = TypeExists("ArthurianAutobattler.GameLoopManager");
-        bool hasPews = TypeExists("ArthurianAutobattler.ChurchPewLayout");
+        bool hasPews = TypeExists("ArthurianAutobattler.SomersetPewLayout");
         bool hasBuilder = TypeExists("ArthurianSceneBuilder");
         bool hasAlignType = TypeExists("ArthurianAlignCrowdPews");
 
@@ -146,7 +146,7 @@ public static class ArthurianMenuBootstrap
         EditorUtility.RevealInFinder(Application.dataPath);
         EditorUtility.DisplayDialog(
             "DemonKnight Setup",
-            "1) Confirm Assets/Scripts/UI/ChurchPewLayout.cs exists.\n" +
+            "1) Confirm Assets/Scripts/UI/SomersetPewLayout.cs exists.\n" +
             "2) Wait for compile (bottom-right spinner).\n" +
             "3) Arthurian → Diagnose Project (must show church-pews-52-seats).\n" +
             "4) If you already added ChurchBackground: Arthurian → Align Crowd Grid To Church Pews.\n" +

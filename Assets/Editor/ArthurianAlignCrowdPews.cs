@@ -46,7 +46,7 @@ public static class ArthurianAlignCrowdPews
     private const int PewRows = 4;
     private const int PewCount = 12;
 
-    // Capacities matching ChurchPewLayout defaults (sum = 52).
+    // Capacities matching SomersetPewLayout defaults (sum = 52).
     private static readonly int[] Caps = { 5, 5, 5, 4, 5, 4, 4, 4, 4, 4, 4, 4 };
 
     [MenuItem("Arthurian/Align Crowd Grid To Church Pews", false, 10)]
@@ -110,7 +110,7 @@ public static class ArthurianAlignCrowdPews
         if (grid != null) grid.enabled = false;
 
         // Wire gameplay components when those scripts compiled; otherwise still drop seat boxes.
-        Component pewLayout = EnsureComponent(townCanvas, "ArthurianAutobattler.ChurchPewLayout");
+        Component pewLayout = EnsureComponent(townCanvas, "ArthurianAutobattler.SomersetPewLayout");
         if (pewLayout != null)
         {
             SetField(pewLayout, "backgroundRect", bgRt);
@@ -164,7 +164,7 @@ public static class ArthurianAlignCrowdPews
             "• PewSeatLayer is under ChurchBackground\n" +
             "• Empty boxes are dim gold (filled at Play when scripts compile)\n" +
             (gameplayOk
-                ? "• ChurchPewLayout wired — nudge anchors on TownCanvas if a row is off"
+                ? "• SomersetPewLayout wired — nudge anchors on TownCanvas if a row is off"
                 : "• Gameplay scripts not compiled yet — boxes still placed; fix Console red errors, then Align again"),
             "OK");
     }
@@ -305,7 +305,7 @@ public static class ArthurianAlignCrowdPews
             new[] { 0.228f, 0.500f, 0.773f },
             new[] { 0.235f, 0.500f, 0.768f }
         };
-        // Match ChurchPewLayout — upper 4 pew bands; camera-front pews stay empty.
+        // Match SomersetPewLayout — upper 4 pew bands; camera-front pews stay empty.
         float[] rowY = { 0.375f, 0.490f, 0.600f, 0.715f };
         float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.130f };
 
