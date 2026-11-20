@@ -22,6 +22,7 @@ namespace ArthurianAutobattler
         public Button codexButton;
         public Button warbandButton;
         public Button buyRoundButton;
+        public Button menuButton;
 
         [Header("Church Stage")]
         public Image churchBackgroundImage;
@@ -57,28 +58,163 @@ namespace ArthurianAutobattler
 
         private RecruitInstance selected;
         private readonly List<PaperDollSeatView> seats = new List<PaperDollSeatView>();
+        private bool hudButtonsWired;
+        /// <summary>True only while the player opened Dice via HUD/hotkey T.</summary>
+        private bool diceModalUserOpen;
+        private bool codexModalUserOpen;
+        private bool warbandModalUserOpen;
+        private List<GameObject> cachedDicePanels;
+        private float nextDicePanelRescan;
+        private bool diceToggleWireLogged;
+        private bool warbandToggleWireLogged;
+
+        private void Awake()
+        {
+            // Scene often serializes Panel_TavernDice Active=true — kill it before first frame.
+            diceModalUserOpen = false;
+            ForceNamedTavernDicePanelsInactive();
+        }
+
+        private void OnEnable()
+        {
+            if (!diceModalUserOpen)
+                ForceNamedTavernDicePanelsInactive();
+        }
 
         private void Start()
         {
-            AutoWireDossierFromTownUI();
-            EnsureTopHubLayout();
+            diceModalUserOpen = false;
+            codexModalUserOpen = false;
+            warbandModalUserOpen = false;
+            ForceNamedTavernDicePanelsInactive();
 
-            goToWarButton?.onClick.AddListener(() => GameLoopManager.Instance?.StartBattlePhase());
-            tavernDiceButton?.onClick.AddListener(() => OpenModal(diceModal));
+            AutoWireDossierFromTownUI();
+            EnsureDiceModalAsPopup();
+            EnsureCodexModalLarge();
+            EnsureWarbandModal();
+            EnsureTopHubLayout();
+            ApplyEnlargedMenuFonts();
+            WireHudButtonsOnce();
+            RewireDiceToggleButton();
+            RewireWarbandToggleButton();
+            MainMenuUI.EnsureExists();
+            StartCoroutine(RelayoutHudNextFrame());
+
+            if (GameLoopManager.Instance != null)
+                SetNight(GameLoopManager.Instance.currentNight);
+
+            // Dice/codex/warband start closed. Dossier bottom panel stays visible.
+            diceModalUserOpen = false;
+            warbandModalUserOpen = false;
+            CloseFloatingModals();
+            ForceNamedTavernDicePanelsInactive();
+            HideAllDicePanelsHard();
+            if (dossierModal != null) dossierModal.SetActive(true);
+        }
+
+        private System.Collections.IEnumerator RelayoutHudNextFrame()
+        {
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            EnsureDiceModalAsPopup();
+            EnsureCodexModalLarge();
+            EnsureWarbandModal();
+            EnsureTopHubLayout();
+            ApplyEnlargedMenuFonts();
+            RewireDiceToggleButton();
+            RewireWarbandToggleButton();
+            RewireMarchButton();
+            if (!diceModalUserOpen)
+            {
+                ForceNamedTavernDicePanelsInactive();
+                HideAllDicePanelsHard();
+            }
+            yield return null;
+            RewireDiceToggleButton();
+            RewireWarbandToggleButton();
+            RewireMarchButton();
+            if (!diceModalUserOpen)
+            {
+                ForceNamedTavernDicePanelsInactive();
+                HideAllDicePanelsHard();
+            }
+        }
+
+        private void LateUpdate()
+        {
+            // Scene-serialized / other scripts may re-enable Panel_TavernDice — clamp until user opens.
+            if (!diceModalUserOpen)
+            {
+                ForceNamedTavernDicePanelsInactive();
+                HideAllDicePanelsHard();
+            }
+            else if (diceModal != null && !diceModal.activeSelf)
+            {
+                // Something else deactivated us while "open" — keep flag honest.
+                diceModal.SetActive(true);
+                var cg = diceModal.GetComponent<CanvasGroup>();
+                if (cg != null) { cg.alpha = 1f; cg.interactable = true; cg.blocksRaycasts = true; }
+            }
+        }
+
+        /// <summary>
+        /// Bulletproof hide by exact panel names — does not rely on FindAllDicePanels heuristics.
+        /// Only SetActive(true) happens in OpenModal when the player clicks Dice / presses T.
+        /// </summary>
+        public void ForceNamedTavernDicePanelsInactive()
+        {
+            if (diceModalUserOpen) return;
+
+            foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+            {
+                if (t == null || !t.gameObject.scene.IsValid()) continue;
+                if (IsUnderHudBar(t)) continue;
+                if (!IsExactTavernDicePanelName(t.name)) continue;
+                if (IsDiceHudButtonOrChild(t.gameObject)) continue;
+                ApplyDicePanelInactive(t.gameObject);
+            }
+
+            if (diceModal != null && !IsDiceHudButtonOrChild(diceModal))
+                ApplyDicePanelInactive(diceModal);
+        }
+
+        private static bool IsExactTavernDicePanelName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name == "Panel_TavernDice"
+                   || name == "TavernDice"
+                   || name == "Panel_Dice"
+                   || name == "DicePanel"
+                   || name == "TavernDicePanel";
+        }
+
+        private static void ApplyDicePanelInactive(GameObject panel)
+        {
+            if (panel == null) return;
+            var cg = panel.GetComponent<CanvasGroup>();
+            if (cg == null) cg = panel.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;
+            cg.interactable = false;
+            cg.blocksRaycasts = false;
+            // Always force inactive (scene Active flag often boots true).
+            if (panel.activeSelf)
+                panel.SetActive(false);
+        }
+
+        private void WireHudButtonsOnce()
+        {
+            if (hudButtonsWired) return;
+            hudButtonsWired = true;
+
+            // March is re-bound in RewireMarchButton (same pattern as Dice — clears Inspector persistent).
+            RewireMarchButton();
+            // Dice / Warband are wired in Rewire*ToggleButton (toggle open/close).
             codexButton?.onClick.AddListener(() =>
             {
                 OpenModal(codexModal);
                 FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
             });
-            warbandButton?.onClick.AddListener(() =>
-            {
-                OpenModal(warbandModal);
-                RefreshWarbandPanel();
-            });
             buyRoundButton?.onClick.AddListener(BuyTavernRound);
-
-            if (GameLoopManager.Instance != null)
-                SetNight(GameLoopManager.Instance.currentNight);
 
             tier1Button?.onClick.AddListener(() => UnlockIntel(1));
             tier2Button?.onClick.AddListener(() => UnlockIntel(2));
@@ -93,10 +229,163 @@ namespace ArthurianAutobattler
                 foreach (var b in modalCloseButtons)
                     b?.onClick.AddListener(CloseFloatingModals);
             }
+        }
 
-            // Dice/codex/warband start closed. Dossier bottom panel stays visible.
-            CloseFloatingModals();
-            if (dossierModal != null) dossierModal.SetActive(true);
+        /// <summary>Always (re)bind Dice HUD → ToggleDiceModal so CreateHudButton after wire still works.</summary>
+        private void RewireDiceToggleButton()
+        {
+            EnsureDiceModalAsPopup();
+            ResolveDiceHudButton();
+            if (tavernDiceButton == null)
+            {
+                Debug.LogWarning("[DemonKnight] Dice HUD button missing after Ensure/Resolve — cannot wire toggle.");
+                return;
+            }
+
+            // RemoveAllListeners does NOT clear Inspector persistent calls — replace the event.
+            tavernDiceButton.onClick = new Button.ButtonClickedEvent();
+            tavernDiceButton.onClick.AddListener(ToggleDiceModal);
+            ApplyHudButtonLabel(tavernDiceButton, "Dice");
+            if (!diceToggleWireLogged)
+            {
+                diceToggleWireLogged = true;
+                Debug.Log($"[DemonKnight] Dice HUD wired → ToggleDiceModal on '{tavernDiceButton.name}'.");
+            }
+        }
+
+        /// <summary>Public entry for TownSplit Start — isolate + hide + wire Dice HUD.</summary>
+        public void EnsureDiceHudAndHidden()
+        {
+            diceModalUserOpen = false;
+            IsolateTownSplitDiceIntoModal();
+            EnsureDiceModalAsPopup();
+            RewireDiceToggleButton();
+            ForceNamedTavernDicePanelsInactive();
+            HideAllDicePanelsHard();
+        }
+
+        /// <summary>Find DiceButton / TavernDiceButton / any HUD button labeled Dice.</summary>
+        private void ResolveDiceHudButton()
+        {
+            Transform hud = FindHudBar();
+            if (tavernDiceButton == null && hud != null)
+            {
+                var existing = hud.Find("DiceButton") ?? hud.Find("TavernDiceButton") ?? hud.Find("Btn_Dice");
+                if (existing != null) tavernDiceButton = existing.GetComponent<Button>();
+            }
+
+            if (tavernDiceButton == null && hud != null)
+            {
+                foreach (var btn in hud.GetComponentsInChildren<Button>(true))
+                {
+                    if (btn == null) continue;
+                    string n = btn.gameObject.name;
+                    var label = btn.GetComponentInChildren<TextMeshProUGUI>();
+                    string text = label != null ? label.text : "";
+                    if (n.IndexOf("Dice", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || text.IndexOf("Dice", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || text.IndexOf("Tavern", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        // Skip Start/Roll/Cash inside the modal.
+                        if (n.IndexOf("Start", System.StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                        if (n.IndexOf("Roll", System.StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                        if (n.IndexOf("Cash", System.StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                        tavernDiceButton = btn;
+                        break;
+                    }
+                }
+            }
+
+            if (tavernDiceButton == null && hud != null)
+            {
+                tavernDiceButton = CreateHudButton(hud, "DiceButton", "Dice",
+                    new Color(0.35f, 0.22f, 0.12f));
+                Debug.Log("[DemonKnight] Created missing Dice HUD button.");
+            }
+        }
+
+        public void ToggleDiceModal()
+        {
+            EnsureDiceModalAsPopup();
+            IsolateTownSplitDiceIntoModal();
+            if (diceModal == null)
+            {
+                var panels = FindAllDicePanels();
+                if (panels.Count > 0) diceModal = panels[0];
+            }
+            if (diceModal == null)
+            {
+                Debug.LogWarning("[DemonKnight] No tavern/dice panel found to toggle. Check Panel_TavernDice / TownSplit dice refs.");
+                return;
+            }
+
+            bool open = diceModalUserOpen && diceModal.activeInHierarchy;
+            Debug.Log($"[DemonKnight] ToggleDiceModal → {(open ? "CLOSE" : "OPEN")} '{diceModal.name}'");
+            if (open)
+            {
+                CloseFloatingModals();
+                return;
+            }
+
+            OpenModal(diceModal);
+        }
+
+        /// <summary>HUD Warband button → toggle Camelot Crowd panel (same pattern as Dice).</summary>
+        private void RewireWarbandToggleButton()
+        {
+            EnsureWarbandModal();
+            ResolveWarbandHudButton();
+            if (warbandButton == null)
+            {
+                Debug.LogWarning("[DemonKnight] Warband HUD button missing — cannot wire Camelot Crowd toggle.");
+                return;
+            }
+
+            warbandButton.onClick = new Button.ButtonClickedEvent();
+            warbandButton.onClick.AddListener(ToggleWarbandModal);
+            if (!warbandToggleWireLogged)
+            {
+                warbandToggleWireLogged = true;
+                Debug.Log($"[DemonKnight] Warband HUD wired → ToggleWarbandModal on '{warbandButton.name}'.");
+            }
+        }
+
+        private void ResolveWarbandHudButton()
+        {
+            Transform hud = FindHudBar();
+            if (warbandButton == null && hud != null)
+            {
+                var existing = hud.Find("WarbandButton") ?? hud.Find("Btn_Warband") ?? hud.Find("CrowdButton");
+                if (existing != null) warbandButton = existing.GetComponent<Button>();
+            }
+            if (warbandButton == null && hud != null)
+            {
+                warbandButton = CreateHudButton(hud, "WarbandButton", "Warband (0)",
+                    new Color(0.22f, 0.28f, 0.22f));
+            }
+            if (warbandButton != null && warbandCountText == null)
+                warbandCountText = warbandButton.GetComponentInChildren<TextMeshProUGUI>();
+        }
+
+        public void ToggleWarbandModal()
+        {
+            EnsureWarbandModal();
+            if (warbandModal == null)
+            {
+                Debug.LogWarning("[DemonKnight] No WarbandPanel / Camelot Crowd panel to toggle.");
+                return;
+            }
+
+            bool open = warbandModalUserOpen && warbandModal.activeInHierarchy;
+            Debug.Log($"[DemonKnight] ToggleWarbandModal → {(open ? "CLOSE" : "OPEN")} '{warbandModal.name}'");
+            if (open)
+            {
+                CloseFloatingModals();
+                return;
+            }
+
+            OpenModal(warbandModal);
+            RefreshWarbandPanel();
         }
 
         /// <summary>
@@ -133,13 +422,653 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Night label + even spacing for Codex / Warband info / March to War.
-        /// Safe to call on already-built scenes — repositions existing HUD children.
+        /// Dice must be a HUD button → centered popup, never a permanent overlay on pews.
+        /// Hides every tavern/dice panel in the loaded scenes (including inactive duplicates).
+        /// </summary>
+        public void EnsureDiceModalAsPopup()
+        {
+            IsolateTownSplitDiceIntoModal();
+
+            var panels = FindAllDicePanels();
+            if (panels.Count > 0)
+            {
+                // Prefer the inspector-wired reference if it is one of the panels.
+                if (diceModal == null || !panels.Contains(diceModal))
+                    diceModal = PreferNamedDicePanel(panels);
+
+                foreach (var panel in panels)
+                    StyleDicePanelAsCenteredModal(panel);
+
+                if (!diceModalUserOpen)
+                    HideAllDicePanelsHard();
+            }
+            else
+            {
+                Debug.LogWarning("[DemonKnight] EnsureDiceModalAsPopup: no dice panels discovered.");
+            }
+
+            ResolveDiceHudButton();
+        }
+
+        private static GameObject PreferNamedDicePanel(List<GameObject> panels)
+        {
+            if (panels == null || panels.Count == 0) return null;
+            foreach (var p in panels)
+            {
+                if (p == null) continue;
+                string n = p.name;
+                if (n == "Panel_TavernDice" || n == "TavernDice" || n == "Panel_Dice" || n == "DicePanel")
+                    return p;
+            }
+            return panels[0];
+        }
+
+        private void StyleDicePanelAsCenteredModal(GameObject panel)
+        {
+            if (panel == null) return;
+            // Never restyle / dim the HUD Dice control as if it were the game panel.
+            if (IsDiceHudButtonOrChild(panel)) return;
+
+            // Never leave the modal parented under an always-on TownSplit chrome root
+            // in a way that keeps sibling dice widgets visible — keep under TownCanvas.
+            Transform canvas = FindTownCanvasTransform();
+            if (canvas != null && panel.transform.parent != canvas
+                && panel.transform.parent != null
+                && IsTownSplitChromeRoot(panel.transform.parent))
+            {
+                panel.transform.SetParent(canvas, false);
+            }
+
+            var rt = panel.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = new Vector2(560f, 440f);
+                rt.SetAsLastSibling();
+            }
+
+            var cg = panel.GetComponent<CanvasGroup>();
+            if (cg == null) cg = panel.AddComponent<CanvasGroup>();
+            if (diceModalUserOpen && diceModal == panel)
+            {
+                cg.alpha = 1f;
+                cg.interactable = true;
+                cg.blocksRaycasts = true;
+            }
+            else
+            {
+                // Default / closed: never leave the panel Active from scene serialization.
+                cg.alpha = 0f;
+                cg.interactable = false;
+                cg.blocksRaycasts = false;
+                if (panel.activeSelf)
+                    panel.SetActive(false);
+            }
+
+            EnsureModalChromeButton(panel.transform, "DiceCloseX", "X",
+                new Vector2(248f, 186f), new Vector2(48f, 48f),
+                new Color(0.45f, 0.12f, 0.12f), CloseFloatingModals);
+            EnsureModalChromeButton(panel.transform, "DiceMinimize", "—",
+                new Vector2(192f, 186f), new Vector2(48f, 48f),
+                new Color(0.25f, 0.22f, 0.18f), CloseFloatingModals);
+
+            BumpTmpUnder(panel.transform, 1.35f, 18f, 36f);
+        }
+
+        private static bool IsTownSplitChromeRoot(Transform t)
+        {
+            if (t == null) return false;
+            return t.GetComponent<TownSplitUIController>() != null
+                   || t.name.IndexOf("TownSplit", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private Transform FindTownCanvasTransform()
+        {
+            var loop = GameLoopManager.Instance;
+            if (loop != null && loop.townCanvasObj != null)
+                return loop.townCanvasObj.transform;
+            var town = Town;
+            if (town != null)
+            {
+                var canvas = town.GetComponentInParent<Canvas>();
+                if (canvas != null) return canvas.transform;
+            }
+            var found = GameObject.Find("TownCanvas");
+            return found != null ? found.transform : null;
+        }
+
+        /// <summary>
+        /// Downloads-era scenes leave StartDice / DiceResult as always-on TownSplit children.
+        /// Scoop them into Panel_TavernDice so Hide/Toggle can own visibility.
+        /// </summary>
+        public void IsolateTownSplitDiceIntoModal()
+        {
+            var town = Town ?? FindFirstObjectByType<TownSplitUIController>();
+            if (town == null) return;
+
+            var widgets = new List<Transform>(8);
+            if (town.diceResultText != null) widgets.Add(town.diceResultText.transform);
+            if (town.currentPotText != null) widgets.Add(town.currentPotText.transform);
+            if (town.startDiceButton != null) widgets.Add(town.startDiceButton.transform);
+            if (town.rollDiceButton != null) widgets.Add(town.rollDiceButton.transform);
+            if (town.cashOutButton != null) widgets.Add(town.cashOutButton.transform);
+            if (widgets.Count == 0) return;
+
+            // Already under a dedicated dice panel?
+            Transform sharedParent = widgets[0].parent;
+            bool allSameParent = true;
+            for (int i = 1; i < widgets.Count; i++)
+            {
+                if (widgets[i].parent != sharedParent) { allSameParent = false; break; }
+            }
+            if (allSameParent && sharedParent != null && IsDicePanelName(sharedParent.name))
+            {
+                diceModal = sharedParent.gameObject;
+                // Prior bug: early-return left scene Active=true Panel_TavernDice visible.
+                if (!diceModalUserOpen)
+                    ApplyDicePanelInactive(diceModal);
+                InvalidateDicePanelCache();
+                return;
+            }
+
+            Transform canvas = FindTownCanvasTransform()
+                               ?? (town.transform.parent != null ? town.transform.parent : town.transform);
+
+            GameObject panel = null;
+            if (diceModal != null && IsDicePanelName(diceModal.name))
+                panel = diceModal;
+            if (panel == null)
+            {
+                var existing = canvas.Find("Panel_TavernDice");
+                if (existing != null) panel = existing.gameObject;
+            }
+            if (panel == null)
+            {
+                foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+                {
+                    if (t == null || !t.gameObject.scene.IsValid()) continue;
+                    if (IsDicePanelName(t.name)) { panel = t.gameObject; break; }
+                }
+            }
+            if (panel == null)
+            {
+                panel = new GameObject("Panel_TavernDice", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
+                panel.transform.SetParent(canvas, false);
+                panel.GetComponent<Image>().color = new Color(0.16f, 0.10f, 0.08f, 0.97f);
+                Debug.Log("[DemonKnight] Created Panel_TavernDice to host TownSplit dice widgets.");
+            }
+
+            diceModal = panel;
+            foreach (var w in widgets)
+            {
+                if (w == null) continue;
+                if (w.parent == panel.transform) continue;
+                // Do not move HUD Dice toggle into the modal.
+                if (w.parent != null && w.parent.name == "HUD_Bar") continue;
+                w.SetParent(panel.transform, true);
+            }
+
+            if (!diceModalUserOpen)
+                panel.SetActive(false);
+
+            InvalidateDicePanelCache();
+        }
+
+        private static bool IsDicePanelName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            // Never treat the HUD toggle name as a panel (Dice / DiceButton / TavernDiceButton).
+            if (name.Equals("Dice", System.StringComparison.OrdinalIgnoreCase)) return false;
+            if (name.IndexOf("DiceButton", System.StringComparison.OrdinalIgnoreCase) >= 0) return false;
+
+            if (name == "Panel_TavernDice" || name == "TavernDice" || name == "Panel_Dice"
+                || name == "DicePanel" || name == "TavernDicePanel")
+                return true;
+            string lower = name.ToLowerInvariant();
+            return (lower.Contains("tavern") && lower.Contains("dice"))
+                   || lower.StartsWith("panel_dice")
+                   || lower.StartsWith("panel_tavern");
+        }
+
+        /// <summary>True if this transform lives under the top HUD strip (never a dice modal).</summary>
+        private static bool IsUnderHudBar(Transform t)
+        {
+            while (t != null)
+            {
+                if (t.name == "HUD_Bar") return true;
+                t = t.parent;
+            }
+            return false;
+        }
+
+        private bool IsDiceHudButtonOrChild(GameObject go)
+        {
+            if (go == null) return false;
+            if (IsUnderHudBar(go.transform)) return true;
+            if (tavernDiceButton == null) return false;
+            if (go == tavernDiceButton.gameObject) return true;
+            return go.transform.IsChildOf(tavernDiceButton.transform);
+        }
+
+        private List<GameObject> FindAllDicePanels()
+        {
+            // Rescan at most ~2 Hz from LateUpdate; force-refresh when cache null.
+            if (cachedDicePanels != null && Time.unscaledTime < nextDicePanelRescan)
+            {
+                cachedDicePanels.RemoveAll(p => p == null);
+                return cachedDicePanels;
+            }
+
+            var list = new List<GameObject>();
+            // Includes inactive objects (GameObject.Find does not).
+            foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+            {
+                if (t == null || !t.gameObject.scene.IsValid()) continue; // skip prefabs/assets
+                // Never the Dice HUD button or anything under HUD_Bar (nested or not).
+                if (IsUnderHudBar(t)) continue;
+                if (t.GetComponent<Button>() != null
+                    && t.name.IndexOf("DiceButton", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    continue;
+
+                bool named = IsDicePanelName(t.name);
+                bool hasStart = t.Find("StartDice") != null || t.Find("RollDice") != null;
+                bool hasDiceTitle = t.Find("DiceTitle") != null || t.Find("DiceResult") != null;
+                if (!named && !hasStart && !hasDiceTitle) continue;
+
+                // Prefer the panel root, not a nested StartDice button host that is the button itself.
+                GameObject root = t.gameObject;
+                if (t.GetComponent<Button>() != null && t.parent != null && IsDicePanelName(t.parent.name))
+                    root = t.parent.gameObject;
+                if (IsDiceHudButtonOrChild(root)) continue;
+
+                if (!list.Contains(root)) list.Add(root);
+            }
+
+            // TownSplit refs → panel roots (Downloads trees without Panel_TavernDice name).
+            CollectDiceRootsFromTownSplit(list);
+            list.RemoveAll(IsDiceHudButtonOrChild);
+            cachedDicePanels = list;
+            nextDicePanelRescan = Time.unscaledTime + 0.5f;
+            return list;
+        }
+
+        private void InvalidateDicePanelCache()
+        {
+            cachedDicePanels = null;
+            nextDicePanelRescan = 0f;
+        }
+
+        private void CollectDiceRootsFromTownSplit(List<GameObject> list)
+        {
+            var town = Town ?? FindFirstObjectByType<TownSplitUIController>();
+            if (town == null) return;
+
+            void AddRootFrom(Component c)
+            {
+                if (c == null) return;
+                var root = FindDicePanelRoot(c.transform);
+                if (root != null && !list.Contains(root)) list.Add(root);
+            }
+
+            AddRootFrom(town.diceResultText);
+            AddRootFrom(town.currentPotText);
+            AddRootFrom(town.startDiceButton);
+            AddRootFrom(town.rollDiceButton);
+            AddRootFrom(town.cashOutButton);
+        }
+
+        private static GameObject FindDicePanelRoot(Transform leaf)
+        {
+            if (leaf == null) return null;
+            // HUD Dice toggle is never a panel root.
+            if (IsUnderHudBar(leaf)) return null;
+
+            Transform best = null;
+            Transform t = leaf;
+            while (t != null)
+            {
+                string n = t.name;
+                if (n == "HUD_Bar" || n == "TownCanvas" || n == "ChurchBackground")
+                    break;
+                if (IsTownSplitChromeRoot(t) || t.GetComponent<Canvas>() != null)
+                    break;
+                if (n.IndexOf("DiceButton", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    return null;
+
+                if (IsDicePanelName(n))
+                    return t.gameObject;
+
+                if (t.Find("StartDice") != null || t.Find("DiceResult") != null || t.Find("RollDice") != null)
+                    best = t;
+                else if (best == null && t.GetComponent<Image>() != null && t.childCount >= 2)
+                    best = t;
+
+                t = t.parent;
+            }
+            if (best != null && IsUnderHudBar(best)) return null;
+            return best != null ? best.gameObject : null;
+        }
+
+        private void HideAllDicePanelsHard()
+        {
+            // Do NOT Isolate here — LateUpdate calls this every frame.
+            // Do NOT hide the HUD Dice button — only modal panels / orphan game widgets.
+            foreach (var panel in FindAllDicePanels())
+            {
+                if (panel == null) continue;
+                if (IsDiceHudButtonOrChild(panel)) continue;
+                if (diceModalUserOpen && panel == diceModal) continue;
+                ForceDicePanelHidden(panel);
+            }
+            if (diceModal != null && !diceModalUserOpen && !IsDiceHudButtonOrChild(diceModal))
+                ForceDicePanelHidden(diceModal);
+
+            // Last resort: hide orphan TownSplit dice widgets still outside a modal.
+            var town = Town ?? FindFirstObjectByType<TownSplitUIController>();
+            if (town != null && !diceModalUserOpen)
+            {
+                HideIfOrphanDiceWidget(town.diceResultText != null ? town.diceResultText.gameObject : null);
+                HideIfOrphanDiceWidget(town.currentPotText != null ? town.currentPotText.gameObject : null);
+                HideIfOrphanDiceWidget(town.startDiceButton != null ? town.startDiceButton.gameObject : null);
+                HideIfOrphanDiceWidget(town.rollDiceButton != null ? town.rollDiceButton.gameObject : null);
+                HideIfOrphanDiceWidget(town.cashOutButton != null ? town.cashOutButton.gameObject : null);
+            }
+
+            // Always re-assert HUD Dice visibility after any hide pass.
+            EnsureDiceHudButtonVisible();
+        }
+
+        private void HideIfOrphanDiceWidget(GameObject go)
+        {
+            if (go == null) return;
+            if (IsDiceHudButtonOrChild(go)) return;
+            if (diceModal != null && go.transform.IsChildOf(diceModal.transform)) return;
+            if (IsUnderHudBar(go.transform)) return;
+            if (go.activeSelf) go.SetActive(false);
+        }
+
+        private void ForceDicePanelHidden(GameObject panel)
+        {
+            if (panel == null) return;
+            if (IsDiceHudButtonOrChild(panel)) return; // NEVER hide the HUD Dice control
+            ApplyDicePanelInactive(panel);
+        }
+
+        /// <summary>HUD Dice toggle must stay active and labeled — hide only the game panel.</summary>
+        public void EnsureDiceHudButtonVisible()
+        {
+            ResolveDiceHudButton();
+            if (tavernDiceButton == null) return;
+
+            // Keep under HUD_Bar if something reparented it into the modal.
+            Transform hud = FindHudBar();
+            if (hud != null && tavernDiceButton.transform.parent != hud)
+            {
+                if (diceModal != null && tavernDiceButton.transform.IsChildOf(diceModal.transform))
+                    tavernDiceButton.transform.SetParent(hud, false);
+                else if (!IsUnderHudBar(tavernDiceButton.transform))
+                    tavernDiceButton.transform.SetParent(hud, false);
+            }
+
+            if (!tavernDiceButton.gameObject.activeSelf)
+                tavernDiceButton.gameObject.SetActive(true);
+
+            // Restore any CanvasGroup that a mistaken hide pass dimmed.
+            var cg = tavernDiceButton.GetComponent<CanvasGroup>();
+            if (cg != null)
+            {
+                cg.alpha = 1f;
+                cg.interactable = true;
+                cg.blocksRaycasts = true;
+            }
+
+            foreach (Transform child in tavernDiceButton.transform)
+            {
+                if (child != null && !child.gameObject.activeSelf)
+                    child.gameObject.SetActive(true);
+            }
+
+            ApplyHudButtonLabel(tavernDiceButton, "Dice");
+            tavernDiceButton.interactable = true;
+        }
+
+        /// <summary>Large centered Codex so all 10 fusion rows + Fuse buttons are readable.</summary>
+        public void EnsureCodexModalLarge()
+        {
+            if (codexModal == null)
+            {
+                var go = GameObject.Find("CodexPanel");
+                if (go == null)
+                {
+                    foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+                    {
+                        if (t != null && t.gameObject.scene.IsValid() && t.name == "CodexPanel")
+                        {
+                            go = t.gameObject;
+                            break;
+                        }
+                    }
+                }
+                if (go != null) codexModal = go;
+            }
+
+            var codexUi = FindFirstObjectByType<LegendCodexUI>();
+            if (codexModal == null && codexUi != null) codexModal = codexUi.codexPanel;
+            if (codexUi != null && codexUi.codexPanel == null && codexModal != null)
+                codexUi.codexPanel = codexModal;
+
+            if (codexModal == null) return;
+
+            var rt = codexModal.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                // Near full-screen centered modal (~92% of parent canvas).
+                rt.anchorMin = new Vector2(0.04f, 0.06f);
+                rt.anchorMax = new Vector2(0.96f, 0.94f);
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.SetAsLastSibling();
+            }
+
+            var title = codexModal.transform.Find("CodexTitle");
+            if (title != null)
+            {
+                var titleRt = title as RectTransform;
+                if (titleRt != null)
+                {
+                    titleRt.anchorMin = new Vector2(0.05f, 1f);
+                    titleRt.anchorMax = new Vector2(0.95f, 1f);
+                    titleRt.pivot = new Vector2(0.5f, 1f);
+                    titleRt.anchoredPosition = new Vector2(0f, -18f);
+                    titleRt.sizeDelta = new Vector2(0f, 48f);
+                }
+                var titleTmp = title.GetComponent<TextMeshProUGUI>();
+                if (titleTmp != null)
+                {
+                    titleTmp.fontSize = 36f;
+                    titleTmp.alignment = TextAlignmentOptions.Center;
+                    titleTmp.textWrappingMode = TextWrappingModes.NoWrap;
+                }
+            }
+
+            EnsureCodexScrollViewport(codexModal.transform);
+
+            Transform recipeList = FindCodexRecipeList(codexModal.transform);
+            if (recipeList != null)
+                ApplyTwoColumnCodexLayout(recipeList);
+
+            EnsureModalChromeButton(codexModal.transform, "CodexCloseX", "X",
+                new Vector2(0f, 0f), new Vector2(48f, 48f),
+                new Color(0.45f, 0.12f, 0.12f), CloseFloatingModals);
+            // Pin X to top-right of the stretched modal.
+            var closeTf = codexModal.transform.Find("CodexCloseX") as RectTransform;
+            if (closeTf != null)
+            {
+                closeTf.anchorMin = closeTf.anchorMax = new Vector2(1f, 1f);
+                closeTf.pivot = new Vector2(1f, 1f);
+                closeTf.anchoredPosition = new Vector2(-12f, -12f);
+                closeTf.sizeDelta = new Vector2(48f, 48f);
+            }
+
+            if (!codexModalUserOpen) codexModal.SetActive(false);
+        }
+
+        private static Transform FindCodexRecipeList(Transform codexRoot)
+        {
+            if (codexRoot == null) return null;
+            var direct = codexRoot.Find("RecipeList");
+            if (direct != null) return direct;
+            var scroll = codexRoot.Find("CodexScroll");
+            if (scroll != null)
+            {
+                var nested = scroll.Find("RecipeList");
+                if (nested != null) return nested;
+            }
+            return null;
+        }
+
+        /// <summary>Guarantee a ScrollRect viewport so all Legends recipes are reachable.</summary>
+        public static void EnsureCodexScrollViewport(Transform codexRoot)
+        {
+            if (codexRoot == null) return;
+            Transform recipeList = FindCodexRecipeList(codexRoot);
+            if (recipeList == null) return;
+
+            Transform scrollHost = codexRoot.Find("CodexScroll");
+            if (scrollHost == null)
+            {
+                // Wrap existing RecipeList in a scroll host.
+                var hostGo = new GameObject("CodexScroll", typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));
+                hostGo.transform.SetParent(codexRoot, false);
+                scrollHost = hostGo.transform;
+                var hostRt = hostGo.GetComponent<RectTransform>();
+                hostRt.anchorMin = new Vector2(0.04f, 0.06f);
+                hostRt.anchorMax = new Vector2(0.96f, 0.88f);
+                hostRt.offsetMin = Vector2.zero;
+                hostRt.offsetMax = Vector2.zero;
+                hostGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.12f);
+                hostGo.GetComponent<Mask>().showMaskGraphic = false;
+            }
+
+            // RecipeList may still be a sibling of CodexScroll — reparent into the viewport.
+            if (recipeList.parent != scrollHost)
+                recipeList.SetParent(scrollHost, false);
+
+            var scrollRt = scrollHost as RectTransform;
+            if (scrollRt != null)
+            {
+                scrollRt.anchorMin = new Vector2(0.04f, 0.06f);
+                scrollRt.anchorMax = new Vector2(0.96f, 0.88f);
+                scrollRt.offsetMin = Vector2.zero;
+                scrollRt.offsetMax = Vector2.zero;
+            }
+
+            if (scrollHost.GetComponent<Image>() == null)
+                scrollHost.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.12f);
+            if (scrollHost.GetComponent<Mask>() == null)
+            {
+                var mask = scrollHost.gameObject.AddComponent<Mask>();
+                mask.showMaskGraphic = false;
+            }
+
+            var scroll = scrollHost.GetComponent<ScrollRect>();
+            if (scroll == null) scroll = scrollHost.gameObject.AddComponent<ScrollRect>();
+            var contentRt = recipeList as RectTransform;
+            if (contentRt != null)
+            {
+                contentRt.anchorMin = new Vector2(0f, 1f);
+                contentRt.anchorMax = new Vector2(1f, 1f);
+                contentRt.pivot = new Vector2(0.5f, 1f);
+                contentRt.anchoredPosition = Vector2.zero;
+                contentRt.sizeDelta = new Vector2(0f, 0f);
+            }
+            scroll.content = contentRt;
+            scroll.viewport = scrollHost as RectTransform;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 40f;
+        }
+
+        /// <summary>Legends (Codex) recipes in two columns, not one long stack.</summary>
+        public static void ApplyTwoColumnCodexLayout(Transform recipeList)
+        {
+            if (recipeList == null) return;
+
+            // Unity allows only one LayoutGroup per GO. Destroy() is deferred to
+            // end-of-frame, so AddComponent<GridLayoutGroup> NREs / throws if a
+            // VerticalLayoutGroup is still present — use DestroyImmediate.
+            RemoveConflictingLayoutGroups(recipeList.gameObject);
+
+            var grid = recipeList.GetComponent<GridLayoutGroup>();
+            if (grid == null) grid = recipeList.gameObject.AddComponent<GridLayoutGroup>();
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 2;
+            grid.cellSize = new Vector2(440f, 120f);
+            grid.spacing = new Vector2(16f, 16f);
+            grid.padding = new RectOffset(10, 10, 10, 10);
+            grid.childAlignment = TextAnchor.UpperCenter;
+            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+            grid.enabled = true;
+
+            var fitter = recipeList.GetComponent<ContentSizeFitter>();
+            if (fitter == null) fitter = recipeList.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.enabled = true;
+        }
+
+        /// <summary>Strip other LayoutGroups so GridLayoutGroup can be added same frame.</summary>
+        private static void RemoveConflictingLayoutGroups(GameObject go)
+        {
+            if (go == null) return;
+
+            // Keep GridLayoutGroup; remove Vertical / Horizontal / other LayoutGroups.
+            var layoutGroups = go.GetComponents<LayoutGroup>();
+            for (int i = 0; i < layoutGroups.Length; i++)
+            {
+                var lg = layoutGroups[i];
+                if (lg == null || lg is GridLayoutGroup) continue;
+                Object.DestroyImmediate(lg);
+            }
+        }
+
+        /// <summary>
+        /// Stretch HUD full-width and place Night | Timer | Gold | Dice | Codex |
+        /// Warband | March in equal slots across the bar (no overlap).
         /// </summary>
         public void EnsureTopHubLayout()
         {
             Transform hud = FindHudBar();
             if (hud == null) return;
+
+            // Dice PANEL may be hidden — HUD DiceButton must always exist and stay visible.
+            EnsureDiceModalAsPopup();
+            EnsureWarbandModal();
+            ResolveDiceHudButton();
+            if (tavernDiceButton == null)
+            {
+                tavernDiceButton = CreateHudButton(hud, "DiceButton", "Dice",
+                    new Color(0.35f, 0.22f, 0.12f));
+            }
+            EnsureDiceHudButtonVisible();
+            RewireDiceToggleButton();
+            RewireWarbandToggleButton();
+            RewireMarchButton();
+            EnsureMenuHudButton(hud);
+
+            StretchHudBar(hud as RectTransform);
+
+            // Kill prior layout groups — uneven flexible widths caused visual bunching.
+            var oldLayout = hud.GetComponent<HorizontalLayoutGroup>();
+            if (oldLayout != null) Object.Destroy(oldLayout);
+            var fitter = hud.GetComponent<ContentSizeFitter>();
+            if (fitter != null) Object.Destroy(fitter);
 
             if (nightText == null)
             {
@@ -147,7 +1076,7 @@ namespace ArthurianAutobattler
                 if (existing != null) nightText = existing.GetComponent<TextMeshProUGUI>();
             }
             if (nightText == null)
-                nightText = CreateHudLabel(hud, "NightText", "Night 1", new Vector2(-540f, 0f), new Vector2(130f, 40f), 22);
+                nightText = CreateHudLabel(hud, "NightText", "Night 1", Vector2.zero, new Vector2(110f, 40f), 24);
 
             if (timerText == null)
             {
@@ -160,31 +1089,107 @@ namespace ArthurianAutobattler
                 if (g != null) goldText = g.GetComponent<TextMeshProUGUI>();
             }
 
-            // Status cluster on the left.
-            SetHudRect(timerText != null ? timerText.rectTransform : null, new Vector2(-390f, 0f), new Vector2(200f, 40f));
-            SetHudRect(goldText != null ? goldText.rectTransform : null, new Vector2(-220f, 0f), new Vector2(150f, 40f));
-            SetHudRect(nightText != null ? nightText.rectTransform : null, new Vector2(-540f, 0f), new Vector2(130f, 40f));
-
-            // Codex / Warband / March evenly spaced across the right two-thirds.
-            const float trioLeft = -40f;
-            const float trioRight = 520f;
-            float Span(int i) => trioLeft + (trioRight - trioLeft) * (i / 2f);
-
             Button codex = ResolveCodexButton(hud);
-            RectTransform warbandRt = ResolveWarbandInfo(hud);
-            Button march = goToWarButton;
-            if (march == null)
+            if (codexButton == null) codexButton = codex;
+
+            // Dice HUD slot is mandatory in the equal-width row.
+            ResolveDiceHudButton();
+            if (tavernDiceButton == null)
             {
-                var m = hud.Find("GoToWarButton");
-                if (m != null) march = m.GetComponent<Button>();
-                goToWarButton = march;
+                tavernDiceButton = CreateHudButton(hud, "DiceButton", "Dice",
+                    new Color(0.35f, 0.22f, 0.12f));
+            }
+            EnsureDiceHudButtonVisible();
+
+            RectTransform warbandRt = ResolveWarbandInfo(hud);
+            RewireMarchButton();
+            Button march = goToWarButton;
+
+            var party = hud.Find("PartyText");
+            if (party != null && warbandButton != null && party != warbandButton.transform)
+                party.gameObject.SetActive(false);
+
+            EnsureMenuHudButton(hud);
+
+            // Equal-width strip left → right. Menu (Esc) last.
+            var slots = new List<RectTransform>(9);
+            if (nightText != null) slots.Add(nightText.rectTransform);
+            if (timerText != null) slots.Add(timerText.rectTransform);
+            if (goldText != null) slots.Add(goldText.rectTransform);
+            slots.Add(tavernDiceButton.transform as RectTransform);
+            if (codex != null) slots.Add(codex.transform as RectTransform);
+            if (warbandRt != null) slots.Add(warbandRt);
+            if (march != null) slots.Add(march.transform as RectTransform);
+            if (menuButton != null) slots.Add(menuButton.transform as RectTransform);
+
+            Canvas.ForceUpdateCanvases();
+            var hudRt = hud as RectTransform;
+            float barW = hudRt != null ? hudRt.rect.width : 0f;
+            if (barW < 32f)
+            {
+                var canvasRt = hud.root as RectTransform;
+                if (canvasRt == null && hud.parent != null) canvasRt = hud.parent as RectTransform;
+                barW = canvasRt != null ? Mathf.Max(32f, canvasRt.rect.width - 24f) : Screen.width - 24f;
             }
 
-            SetHudRect(codex != null ? codex.transform as RectTransform : null, new Vector2(Span(0), 0f), new Vector2(140f, 44f));
-            SetHudRect(warbandRt, new Vector2(Span(1), 0f), new Vector2(180f, 44f));
-            SetHudRect(march != null ? march.transform as RectTransform : null, new Vector2(Span(2), 0f), new Vector2(190f, 48f));
+            const float pad = 12f;
+            const float gap = 10f;
+            const float height = 56f;
+            int n = slots.Count;
+            if (n == 0) return;
 
-            if (codexButton == null) codexButton = codex;
+            float usable = Mathf.Max(100f, barW - pad * 2f);
+            float slotW = (usable - gap * (n - 1)) / n;
+            float startX = -barW * 0.5f + pad + slotW * 0.5f;
+
+            for (int i = 0; i < n; i++)
+            {
+                var rt = slots[i];
+                if (rt == null) continue;
+                rt.SetSiblingIndex(i);
+                var le = rt.GetComponent<LayoutElement>();
+                if (le != null) le.ignoreLayout = true;
+                float x = startX + i * (slotW + gap);
+                SetHudRect(rt, new Vector2(x, 0f), new Vector2(slotW, height));
+
+                // Larger HUD type — auto-size within equal slots.
+                var tmp = rt.GetComponent<TextMeshProUGUI>()
+                          ?? rt.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null)
+                {
+                    tmp.alignment = TextAlignmentOptions.Center;
+                    tmp.enableAutoSizing = true;
+                    tmp.fontSizeMin = 16f;
+                    tmp.fontSizeMax = 26f;
+                    tmp.textWrappingMode = TextWrappingModes.NoWrap;
+                    tmp.overflowMode = TextOverflowModes.Ellipsis;
+                }
+            }
+
+            // Orphans under HUD stay out of the way — never deactivate DiceButton.
+            for (int i = 0; i < hud.childCount; i++)
+            {
+                var child = hud.GetChild(i) as RectTransform;
+                if (child == null || slots.Contains(child)) continue;
+                if (child.name == "DiceButton" || child.name == "TavernDiceButton") continue;
+                if (child.name == "PartyText") child.gameObject.SetActive(false);
+            }
+
+            EnsureDiceHudButtonVisible();
+            ApplyHudButtonLabel(tavernDiceButton, "Dice");
+        }
+
+        private static void StretchHudBar(RectTransform hudRt)
+        {
+            if (hudRt == null) return;
+            hudRt.anchorMin = new Vector2(0f, 1f);
+            hudRt.anchorMax = new Vector2(1f, 1f);
+            hudRt.pivot = new Vector2(0.5f, 1f);
+            hudRt.anchoredPosition = Vector2.zero;
+            hudRt.sizeDelta = new Vector2(0f, 84f);
+            hudRt.offsetMin = new Vector2(8f, -90f);
+            hudRt.offsetMax = new Vector2(-8f, -6f);
+            hudRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 84f);
         }
 
         public void SetNight(int night)
@@ -227,20 +1232,27 @@ namespace ArthurianAutobattler
 
         private Button ResolveCodexButton(Transform hud)
         {
-            if (codexButton != null) return codexButton;
-            var codexUi = FindFirstObjectByType<LegendCodexUI>();
-            if (codexUi != null && codexUi.toggleCodexButton != null)
+            if (codexButton == null)
             {
-                codexButton = codexUi.toggleCodexButton;
-                return codexButton;
+                var codexUi = FindFirstObjectByType<LegendCodexUI>();
+                if (codexUi != null && codexUi.toggleCodexButton != null)
+                    codexButton = codexUi.toggleCodexButton;
             }
-            Transform t = hud.Find("CodexToggle") ?? hud.Find("CodexButton");
-            if (t != null)
+            if (codexButton == null && hud != null)
             {
-                codexButton = t.GetComponent<Button>();
-                return codexButton;
+                Transform t = hud.Find("CodexToggle") ?? hud.Find("CodexButton") ?? hud.Find("LegendsButton");
+                if (t != null) codexButton = t.GetComponent<Button>();
             }
-            return null;
+            // Visible label is Legends (object name may stay CodexToggle).
+            ApplyHudButtonLabel(codexButton, "Legends");
+            return codexButton;
+        }
+
+        private static void ApplyHudButtonLabel(Button button, string label)
+        {
+            if (button == null || string.IsNullOrEmpty(label)) return;
+            var tmp = button.GetComponentInChildren<TextMeshProUGUI>();
+            if (tmp != null && tmp.text != label) tmp.text = label;
         }
 
         private RectTransform ResolveWarbandInfo(Transform hud)
@@ -291,20 +1303,189 @@ namespace ArthurianAutobattler
             rt.sizeDelta = size;
         }
 
+        private Button CreateHudButton(Transform hud, string name, string label, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(hud, false);
+            var img = go.GetComponent<Image>();
+            img.color = color;
+            var btn = go.GetComponent<Button>();
+            btn.targetGraphic = img;
+
+            var textGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textGo.transform.SetParent(go.transform, false);
+            var trt = textGo.GetComponent<RectTransform>();
+            trt.anchorMin = Vector2.zero;
+            trt.anchorMax = Vector2.one;
+            trt.offsetMin = Vector2.zero;
+            trt.offsetMax = Vector2.zero;
+            var tmp = textGo.GetComponent<TextMeshProUGUI>();
+            tmp.text = label;
+            tmp.fontSize = 22f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = Color.white;
+            if (timerText != null && timerText.font != null) tmp.font = timerText.font;
+            else if (goldText != null && goldText.font != null) tmp.font = goldText.font;
+            return btn;
+        }
+
+        /// <summary>Resolve + hard-rewire March so Inspector persistent calls cannot block StartBattlePhase.</summary>
+        public void RewireMarchButton()
+        {
+            Transform hud = FindHudBar();
+            if (goToWarButton == null && hud != null)
+            {
+                var m = hud.Find("GoToWarButton") ?? hud.Find("MarchButton") ?? hud.Find("Btn_March");
+                if (m != null) goToWarButton = m.GetComponent<Button>();
+            }
+            var town = Town;
+            if (goToWarButton == null && town != null && town.goToWarButton != null)
+                goToWarButton = town.goToWarButton;
+            if (goToWarButton == null && hud != null)
+            {
+                goToWarButton = CreateHudButton(hud, "GoToWarButton", "MARCH TO WAR",
+                    new Color(0.45f, 0.18f, 0.16f));
+            }
+            if (goToWarButton == null)
+            {
+                Debug.LogWarning("[DemonKnight] March HUD button missing — cannot wire.");
+                return;
+            }
+
+            goToWarButton.onClick = new Button.ButtonClickedEvent();
+            goToWarButton.onClick.AddListener(() =>
+            {
+                Debug.LogError("[DemonKnight] MARCH button clicked.");
+                var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+                if (loop == null)
+                {
+                    Debug.LogError("[DemonKnight] MARCH failed — no GameLoopManager.");
+                    return;
+                }
+                loop.StartBattlePhase();
+            });
+            ApplyHudButtonLabel(goToWarButton, "MARCH TO WAR");
+            goToWarButton.gameObject.SetActive(true);
+            goToWarButton.interactable = true;
+        }
+
+        /// <summary>Brief dossier/HUD feedback when March is blocked (empty party).</summary>
+        public void FlashMarchBlocked(string reason)
+        {
+            if (dossierDialogue != null)
+                dossierDialogue.text = $"<color=#FF6666>{reason}</color>";
+            Debug.LogWarning($"[DemonKnight] {reason}");
+        }
+
+        /// <summary>HUD Esc / menu icon — opens Main Menu (same as keyboard Esc).</summary>
+        private void EnsureMenuHudButton(Transform hud)
+        {
+            if (hud == null) return;
+            if (menuButton == null)
+            {
+                var existing = hud.Find("MenuButton") ?? hud.Find("EscButton") ?? hud.Find("Btn_Menu");
+                if (existing != null) menuButton = existing.GetComponent<Button>();
+            }
+            if (menuButton == null)
+            {
+                menuButton = CreateHudButton(hud, "MenuButton", "☰ Esc",
+                    new Color(0.18f, 0.22f, 0.28f));
+            }
+            else
+            {
+                var label = menuButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (label != null && string.IsNullOrEmpty(label.text))
+                    label.text = "☰ Esc";
+            }
+
+            menuButton.onClick = new Button.ButtonClickedEvent();
+            menuButton.onClick.AddListener(OpenMainMenuFromHud);
+            menuButton.gameObject.SetActive(true);
+        }
+
+        public void OpenMainMenuFromHud()
+        {
+            var menu = MainMenuUI.EnsureExists();
+            if (menu == null)
+            {
+                Debug.LogError("[DemonKnight] Menu HUD clicked but MainMenuUI missing.");
+                return;
+            }
+            menu.ShowMenu(boot: false);
+            Debug.Log("[DemonKnight] HUD Menu/Esc button → Main Menu open.");
+        }
+
+        private void EnsureModalChromeButton(
+            Transform modal,
+            string name,
+            string label,
+            Vector2 pos,
+            Vector2 size,
+            Color color,
+            UnityEngine.Events.UnityAction onClick)
+        {
+            if (modal == null) return;
+            Transform existing = modal.Find(name);
+            Button btn;
+            if (existing != null)
+            {
+                btn = existing.GetComponent<Button>();
+                if (btn == null) btn = existing.gameObject.AddComponent<Button>();
+            }
+            else
+            {
+                var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+                go.transform.SetParent(modal, false);
+                var rt = go.GetComponent<RectTransform>();
+                rt.anchoredPosition = pos;
+                rt.sizeDelta = size;
+                go.GetComponent<Image>().color = color;
+                btn = go.GetComponent<Button>();
+
+                var textGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                textGo.transform.SetParent(go.transform, false);
+                var trt = textGo.GetComponent<RectTransform>();
+                trt.anchorMin = Vector2.zero;
+                trt.anchorMax = Vector2.one;
+                trt.offsetMin = Vector2.zero;
+                trt.offsetMax = Vector2.zero;
+                var tmp = textGo.GetComponent<TextMeshProUGUI>();
+                tmp.text = label;
+                tmp.fontSize = 24f;
+                tmp.alignment = TextAlignmentOptions.Center;
+                tmp.color = Color.white;
+                if (timerText != null && timerText.font != null) tmp.font = timerText.font;
+            }
+
+            btn.onClick.RemoveListener(onClick);
+            btn.onClick.AddListener(onClick);
+
+            // Keep modalCloseButtons array aware when possible.
+            if (modalCloseButtons == null || modalCloseButtons.Length == 0)
+                modalCloseButtons = new[] { btn };
+            else
+            {
+                bool known = false;
+                foreach (var b in modalCloseButtons)
+                    if (b == btn) { known = true; break; }
+                if (!known)
+                {
+                    var list = new List<Button>(modalCloseButtons) { btn };
+                    modalCloseButtons = list.ToArray();
+                }
+            }
+        }
+
         public void HandleHotkeys()
         {
             if (Input.GetKeyDown(KeyCode.Escape)) CloseAllModals();
-            if (Input.GetKeyDown(KeyCode.T)) OpenModal(diceModal);
+            if (Input.GetKeyDown(KeyCode.T)) ToggleDiceModal();
             if (Input.GetKeyDown(KeyCode.C))
             {
                 OpenModal(codexModal);
                 FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
             }
-            if (Input.GetKeyDown(KeyCode.R))
-            {
-                OpenModal(warbandModal);
-                RefreshWarbandPanel();
-            }
+            if (Input.GetKeyDown(KeyCode.R)) ToggleWarbandModal();
             if (Input.GetKeyDown(KeyCode.B)) BuyTavernRound();
         }
 
@@ -477,7 +1658,7 @@ namespace ArthurianAutobattler
             }
 
             string dialogue = grudge > 0
-                ? $"\"I died in this pew last timeline. My price rose by {grudge}g.\""
+                ? $"\"I marched with you and fell. Bury-gold raised my hire by {grudge}g.\""
                 : selected.primaryTrait == TraitTag.Loyalist
                     ? "\"For King Arthur! My blade is yours at half price.\""
                     : selected.primaryTrait == TraitTag.Coward
@@ -552,6 +1733,7 @@ namespace ArthurianAutobattler
             if (Town.playerGold < cost || selected.intelTierUnlocked >= tier) return;
             Town.playerGold -= cost;
             selected.intelTierUnlocked = tier;
+            GrudgeSaveManager.Instance?.RememberIntel(selected.unitID, tier);
             RefreshDossier();
             RefreshHUD();
         }
@@ -597,11 +1779,18 @@ namespace ArthurianAutobattler
                     ? CombatRole.BacklineRanged : CombatRole.FrontlineTank;
 
             Town.playerGold -= cost;
+            // Recruited members always keep full stats visible (in warband and if they die back to pews).
+            selected.intelTierUnlocked = Mathf.Max(selected.intelTierUnlocked, 3);
+            GrudgeSaveManager.Instance?.RememberIntel(selected.unitID, selected.intelTierUnlocked);
             GameLoopManager.Instance.recruitedParty.Add(selected);
             GameLoopManager.Instance.currentTownPool.Remove(selected);
+            GameLoopManager.Instance.AutosaveWarband(Town.playerGold);
             PopulatePews(GameLoopManager.Instance.currentTownPool);
             CloseAllModals();
             RefreshHUD();
+            UpdateWarbandHudLabel();
+            if (warbandModal != null && warbandModal.activeSelf)
+                RefreshWarbandPanel();
         }
 
         private void BuyTavernRound()
@@ -620,43 +1809,518 @@ namespace ArthurianAutobattler
             RefreshHUD();
         }
 
-        private void RefreshWarbandPanel()
+        /// <summary>Ensure Camelot Crowd (Warband) modal exists, scrolls, and starts closed.</summary>
+        public void EnsureWarbandModal()
         {
-            if (warbandListContainer == null || GameLoopManager.Instance == null) return;
-            foreach (Transform c in warbandListContainer) Destroy(c.gameObject);
-            foreach (var m in GameLoopManager.Instance.recruitedParty)
+            if (warbandModal == null)
             {
-                if (warbandRowPrefab == null) break;
-                GameObject row = Instantiate(warbandRowPrefab, warbandListContainer);
-                var label = row.GetComponentInChildren<TextMeshProUGUI>();
-                if (label != null) label.text = $"{m.characterName} | {m.assignedRole}";
-                var buttons = row.GetComponentsInChildren<Button>();
-                if (buttons.Length >= 2)
+                var found = GameObject.Find("WarbandPanel")
+                            ?? GameObject.Find("Panel_Warband")
+                            ?? GameObject.Find("Panel_CamelotCrowd");
+                if (found == null)
                 {
-                    var captured = m;
-                    buttons[0].onClick.AddListener(() => { captured.TrainRole(CombatRole.FrontlineTank); RefreshWarbandPanel(); });
-                    buttons[1].onClick.AddListener(() => { captured.TrainRole(CombatRole.BacklineRanged); RefreshWarbandPanel(); });
+                    foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+                    {
+                        if (t == null || !t.gameObject.scene.IsValid()) continue;
+                        if (t.name == "WarbandPanel" || t.name == "Panel_Warband"
+                            || t.name == "Panel_CamelotCrowd" || t.name == "CamelotCrowd")
+                        {
+                            found = t.gameObject;
+                            break;
+                        }
+                    }
+                }
+                if (found != null) warbandModal = found;
+            }
+
+            if (warbandModal == null)
+            {
+                Transform parent = FindTownCanvasTransform() ?? transform;
+                warbandModal = new GameObject("WarbandPanel", typeof(RectTransform), typeof(Image));
+                warbandModal.transform.SetParent(parent, false);
+                warbandModal.GetComponent<Image>().color = new Color(0.07f, 0.09f, 0.08f, 0.98f);
+                Debug.Log("[DemonKnight] Created WarbandPanel (Camelot Crowd) at runtime.");
+            }
+
+            var rt = warbandModal.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0.08f, 0.08f);
+                rt.anchorMax = new Vector2(0.92f, 0.92f);
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                rt.SetAsLastSibling();
+            }
+
+            var title = warbandModal.transform.Find("WarbandTitle");
+            if (title == null)
+            {
+                var titleGo = new GameObject("WarbandTitle", typeof(RectTransform), typeof(TextMeshProUGUI));
+                titleGo.transform.SetParent(warbandModal.transform, false);
+                title = titleGo.transform;
+                var trt = title as RectTransform;
+                trt.anchorMin = new Vector2(0.05f, 1f);
+                trt.anchorMax = new Vector2(0.95f, 1f);
+                trt.pivot = new Vector2(0.5f, 1f);
+                trt.anchoredPosition = new Vector2(0f, -16f);
+                trt.sizeDelta = new Vector2(0f, 44f);
+            }
+            var titleTmp = title.GetComponent<TextMeshProUGUI>();
+            if (titleTmp != null)
+            {
+                titleTmp.text = "CAMELOT CROWD — CURRENT WARBAND";
+                titleTmp.fontSize = 28f;
+                titleTmp.alignment = TextAlignmentOptions.Center;
+                titleTmp.color = new Color(0.92f, 0.88f, 0.78f);
+            }
+
+            EnsureWarbandScrollViewport(warbandModal.transform);
+            if (warbandListContainer == null)
+            {
+                var list = warbandModal.transform.Find("WarbandScroll/WarbandList")
+                           ?? warbandModal.transform.Find("WarbandList");
+                if (list != null) warbandListContainer = list;
+            }
+
+            EnsureModalChromeButton(warbandModal.transform, "WarbandCloseX", "X",
+                new Vector2(0f, 0f), new Vector2(48f, 48f),
+                new Color(0.45f, 0.12f, 0.12f), CloseFloatingModals);
+            var closeTf = warbandModal.transform.Find("WarbandCloseX") as RectTransform;
+            if (closeTf != null)
+            {
+                closeTf.anchorMin = closeTf.anchorMax = new Vector2(1f, 1f);
+                closeTf.pivot = new Vector2(1f, 1f);
+                closeTf.anchoredPosition = new Vector2(-12f, -12f);
+                closeTf.sizeDelta = new Vector2(48f, 48f);
+            }
+
+            if (!warbandModalUserOpen) warbandModal.SetActive(false);
+        }
+
+        private static void EnsureWarbandScrollViewport(Transform warbandRoot)
+        {
+            if (warbandRoot == null) return;
+            Transform list = warbandRoot.Find("WarbandList");
+            Transform scrollHost = warbandRoot.Find("WarbandScroll");
+            if (list == null && scrollHost != null)
+                list = scrollHost.Find("WarbandList");
+            if (list == null)
+            {
+                var listGo = new GameObject("WarbandList", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+                listGo.transform.SetParent(scrollHost != null ? scrollHost : warbandRoot, false);
+                list = listGo.transform;
+                var vlg = listGo.GetComponent<VerticalLayoutGroup>();
+                vlg.spacing = 8f;
+                vlg.padding = new RectOffset(8, 8, 8, 8);
+                vlg.childForceExpandHeight = false;
+                vlg.childControlHeight = true;
+                vlg.childForceExpandWidth = true;
+                listGo.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            }
+
+            if (scrollHost == null)
+            {
+                var hostGo = new GameObject("WarbandScroll", typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));
+                hostGo.transform.SetParent(warbandRoot, false);
+                scrollHost = hostGo.transform;
+                hostGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.15f);
+                hostGo.GetComponent<Mask>().showMaskGraphic = false;
+                list.SetParent(scrollHost, false);
+            }
+            else if (list.parent != scrollHost)
+            {
+                list.SetParent(scrollHost, false);
+            }
+
+            var scrollRt = scrollHost as RectTransform;
+            if (scrollRt != null)
+            {
+                scrollRt.anchorMin = new Vector2(0.04f, 0.06f);
+                scrollRt.anchorMax = new Vector2(0.96f, 0.86f);
+                scrollRt.offsetMin = Vector2.zero;
+                scrollRt.offsetMax = Vector2.zero;
+            }
+
+            var scroll = scrollHost.GetComponent<ScrollRect>() ?? scrollHost.gameObject.AddComponent<ScrollRect>();
+            var contentRt = list as RectTransform;
+            if (contentRt != null)
+            {
+                contentRt.anchorMin = new Vector2(0f, 1f);
+                contentRt.anchorMax = new Vector2(1f, 1f);
+                contentRt.pivot = new Vector2(0.5f, 1f);
+                contentRt.anchoredPosition = Vector2.zero;
+                contentRt.sizeDelta = new Vector2(0f, 0f);
+            }
+            scroll.content = contentRt;
+            scroll.viewport = scrollHost as RectTransform;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 40f;
+        }
+
+        public void RefreshWarbandPanel()
+        {
+            EnsureWarbandModal();
+            if (warbandListContainer == null)
+            {
+                var list = warbandModal != null
+                    ? (warbandModal.transform.Find("WarbandScroll/WarbandList")
+                       ?? warbandModal.transform.Find("WarbandList"))
+                    : null;
+                if (list != null) warbandListContainer = list;
+            }
+            if (warbandListContainer == null || GameLoopManager.Instance == null) return;
+
+            foreach (Transform c in warbandListContainer) Destroy(c.gameObject);
+
+            var party = GameLoopManager.Instance.recruitedParty;
+            if (party == null || party.Count == 0)
+            {
+                BuildWarbandFallbackRow(warbandListContainer,
+                    "<i>No recruits yet.</i> Hire townsfolk from the pews — they appear here.");
+                return;
+            }
+
+            foreach (var m in party)
+            {
+                if (m == null) continue;
+                string body = BuildCrowdMemberSummary(m, party);
+                GameObject row;
+                if (warbandRowPrefab != null)
+                {
+                    row = Instantiate(warbandRowPrefab, warbandListContainer);
+                    var label = row.GetComponentInChildren<TextMeshProUGUI>();
+                    if (label != null)
+                    {
+                        label.text = body;
+                        label.fontSize = 18f;
+                        label.textWrappingMode = TextWrappingModes.Normal;
+                    }
+                    var buttons = row.GetComponentsInChildren<Button>();
+                    if (buttons.Length >= 2)
+                    {
+                        var captured = m;
+                        buttons[0].onClick.RemoveAllListeners();
+                        buttons[1].onClick.RemoveAllListeners();
+                        buttons[0].onClick.AddListener(() => { captured.TrainRole(CombatRole.FrontlineTank); RefreshWarbandPanel(); });
+                        buttons[1].onClick.AddListener(() => { captured.TrainRole(CombatRole.BacklineRanged); RefreshWarbandPanel(); });
+                    }
+                }
+                else
+                {
+                    row = BuildWarbandFallbackRow(warbandListContainer, body);
+                    AddTrainButtonsToRow(row, m);
                 }
             }
+        }
+
+        private static string BuildCrowdMemberSummary(RecruitInstance m, List<RecruitInstance> party)
+        {
+            int grudge = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(m.unitID) : 0;
+            string mood = DescribeMood(m, grudge);
+            string friends = DescribeFriends(m, party);
+            string rivals = DescribeRivals(m, party);
+
+            return $"<b>{m.characterName}</b>  ({m.unitType})  ·  {m.assignedRole}\n"
+                   + $"HP {m.maxHealth}  |  ATK {m.attackDamage}  |  SPD {m.attackSpeed:F1}/s\n"
+                   + $"Mood: {mood}  ·  Trait: {m.primaryTrait}\n"
+                   + $"<color=#7CFF9A>Friends:</color> {friends}\n"
+                   + $"<color=#FF8888>Rivals:</color> {rivals}";
+        }
+
+        private static string DescribeMood(RecruitInstance m, int grudge)
+        {
+            if (grudge > 0) return $"Grudging (+{grudge}g hire)";
+            if (m.primaryTrait == TraitTag.Loyalist) return "Eager (Loyalist)";
+            if (m.primaryTrait == TraitTag.Coward) return "Fearful (Coward)";
+            if (m.primaryTrait == TraitTag.Drunkard) return "Merry (Drunkard)";
+            if (m.primaryTrait == TraitTag.Zealot) return "Fervent (Zealot)";
+            if (m.bodyPosture == BodyPosture.EagerForward) return "Eager";
+            if (m.bodyPosture == BodyPosture.SlouchedExit) return "Uneasy";
+            return "Steady";
+        }
+
+        private static string DescribeFriends(RecruitInstance m, List<RecruitInstance> party)
+        {
+            if (m.lovedTrait == TraitTag.None) return "— (no bond preference)";
+            var names = new List<string>();
+            foreach (var ally in party)
+            {
+                if (ally == null || ally == m) continue;
+                if (ally.primaryTrait == m.lovedTrait)
+                    names.Add(ally.characterName);
+            }
+            if (names.Count == 0) return $"wants {m.lovedTrait} allies (none in crowd)";
+            return string.Join(", ", names) + $" (loves {m.lovedTrait})";
+        }
+
+        private static string DescribeRivals(RecruitInstance m, List<RecruitInstance> party)
+        {
+            if (m.hatedTrait == TraitTag.None) return "— (no rivalry)";
+            var names = new List<string>();
+            foreach (var ally in party)
+            {
+                if (ally == null || ally == m) continue;
+                if (ally.primaryTrait == m.hatedTrait)
+                    names.Add(ally.characterName);
+            }
+            if (names.Count == 0) return $"resents {m.hatedTrait} (none in crowd)";
+            return string.Join(", ", names) + $" (hates {m.hatedTrait})";
+        }
+
+        private static GameObject BuildWarbandFallbackRow(Transform parent, string text)
+        {
+            var go = new GameObject("CrowdRow", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<Image>().color = new Color(0.12f, 0.14f, 0.13f, 0.95f);
+            var le = go.GetComponent<LayoutElement>();
+            le.minHeight = 110f;
+            le.preferredHeight = 120f;
+
+            var tGo = new GameObject("Summary", typeof(RectTransform), typeof(TextMeshProUGUI));
+            tGo.transform.SetParent(go.transform, false);
+            var trt = tGo.GetComponent<RectTransform>();
+            trt.anchorMin = Vector2.zero;
+            trt.anchorMax = Vector2.one;
+            trt.offsetMin = new Vector2(12f, 8f);
+            trt.offsetMax = new Vector2(-120f, -8f);
+            var tmp = tGo.GetComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.fontSize = 17f;
+            tmp.color = new Color(0.92f, 0.88f, 0.78f);
+            tmp.textWrappingMode = TextWrappingModes.Normal;
+            tmp.richText = true;
+            return go;
+        }
+
+        private void AddTrainButtonsToRow(GameObject row, RecruitInstance member)
+        {
+            if (row == null || member == null) return;
+            void MakeTrain(string name, string label, CombatRole role, float y)
+            {
+                var btnGo = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+                btnGo.transform.SetParent(row.transform, false);
+                var brt = btnGo.GetComponent<RectTransform>();
+                brt.anchorMin = brt.anchorMax = new Vector2(1f, 0.5f);
+                brt.pivot = new Vector2(1f, 0.5f);
+                brt.anchoredPosition = new Vector2(-10f, y);
+                brt.sizeDelta = new Vector2(100f, 36f);
+                btnGo.GetComponent<Image>().color = new Color(0.25f, 0.32f, 0.40f);
+                var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                labelGo.transform.SetParent(btnGo.transform, false);
+                var lrt = labelGo.GetComponent<RectTransform>();
+                lrt.anchorMin = Vector2.zero;
+                lrt.anchorMax = Vector2.one;
+                lrt.offsetMin = Vector2.zero;
+                lrt.offsetMax = Vector2.zero;
+                var ltmp = labelGo.GetComponent<TextMeshProUGUI>();
+                ltmp.text = label;
+                ltmp.fontSize = 14f;
+                ltmp.alignment = TextAlignmentOptions.Center;
+                ltmp.color = Color.white;
+                var captured = member;
+                btnGo.GetComponent<Button>().onClick.AddListener(() =>
+                {
+                    captured.TrainRole(role);
+                    RefreshWarbandPanel();
+                });
+            }
+            MakeTrain("TrainTank", "Tank", CombatRole.FrontlineTank, 22f);
+            MakeTrain("TrainRanged", "Ranged", CombatRole.BacklineRanged, -22f);
         }
 
         public void OpenModal(GameObject modal)
         {
             if (modal == null) return;
             CloseFloatingModals();
+
+            bool isDice = modal == diceModal
+                          || modal.name == "Panel_TavernDice"
+                          || modal.name == "TavernDice"
+                          || modal.name == "Panel_Dice";
+            bool isCodex = modal == codexModal || modal.name.Contains("Codex");
+            bool isWarband = modal == warbandModal
+                             || modal.name == "WarbandPanel"
+                             || modal.name == "Panel_Warband"
+                             || modal.name == "Panel_CamelotCrowd"
+                             || modal.name.Contains("Warband")
+                             || modal.name.Contains("CamelotCrowd");
+            diceModalUserOpen = isDice;
+            codexModalUserOpen = isCodex;
+            warbandModalUserOpen = isWarband;
+
+            if (isDice)
+            {
+                diceModal = modal;
+                diceModalUserOpen = true;
+                StyleDicePanelAsCenteredModal(modal);
+                foreach (var panel in FindAllDicePanels())
+                {
+                    if (panel != null && panel != modal)
+                        ForceDicePanelHidden(panel);
+                }
+                var cg = modal.GetComponent<CanvasGroup>();
+                if (cg == null) cg = modal.AddComponent<CanvasGroup>();
+                cg.alpha = 1f;
+                cg.interactable = true;
+                cg.blocksRaycasts = true;
+            }
+            if (isCodex) EnsureCodexModalLarge();
+            if (isWarband)
+            {
+                warbandModal = modal;
+                warbandModalUserOpen = true;
+                EnsureWarbandModal();
+            }
+
             modal.SetActive(true);
             modal.transform.SetAsLastSibling();
+
+            if (isCodex)
+                FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
+            if (isWarband)
+                RefreshWarbandPanel();
         }
 
         /// <summary>Close floating overlays only — keep the bottom dossier panel visible.</summary>
         public void CloseFloatingModals()
         {
+            diceModalUserOpen = false;
+            codexModalUserOpen = false;
+            warbandModalUserOpen = false;
+            ForceNamedTavernDicePanelsInactive();
+            HideAllDicePanelsHard();
             if (diceModal != null) diceModal.SetActive(false);
             if (codexModal != null) codexModal.SetActive(false);
             if (warbandModal != null) warbandModal.SetActive(false);
+
+            // Also force-hide LegendCodexUI panel if it diverged from codexModal ref.
+            var codexUi = FindFirstObjectByType<LegendCodexUI>();
+            if (codexUi != null && codexUi.codexPanel != null)
+                codexUi.codexPanel.SetActive(false);
+        }
+
+        /// <summary>Raise menu TMP floors (idempotent — never multiplies on re-layout).</summary>
+        public void ApplyEnlargedMenuFonts()
+        {
+            Transform hud = FindHudBar();
+            if (hud != null) RaiseTmpFloorUnder(hud, 20f, 26f);
+
+            if (dossierModal != null) RaiseTmpFloorUnder(dossierModal.transform, 20f, 28f);
+            else
+            {
+                RaiseTmpFloor(dossierDialogue, 22f);
+                RaiseTmpFloor(dossierStats, 20f);
+                RaiseTmpFloor(gossipText, 18f);
+            }
+
+            if (warbandModal != null) RaiseTmpFloorUnder(warbandModal.transform, 20f, 28f);
+            if (codexModal != null) RaiseTmpFloorUnder(codexModal.transform, 20f, 36f);
+            if (diceModal != null) RaiseTmpFloorUnder(diceModal.transform, 20f, 32f);
+
+            foreach (var panel in FindAllDicePanels())
+            {
+                if (panel != null) RaiseTmpFloorUnder(panel.transform, 20f, 32f);
+            }
+
+            var perk = FindFirstObjectByType<PerkDraftManager>();
+            if (perk != null && perk.perkDraftPanel != null)
+                RaiseTmpFloorUnder(perk.perkDraftPanel.transform, 20f, 34f);
+
+            var merlin = MerlinResurrectionManager.Instance
+                         ?? FindFirstObjectByType<MerlinResurrectionManager>();
+            if (merlin != null)
+            {
+                if (merlin.resurrectionCanvas != null)
+                    RaiseTmpFloorUnder(merlin.resurrectionCanvas.transform, 22f, 40f);
+                if (merlin.legacyBankPanel != null)
+                    RaiseTmpFloorUnder(merlin.legacyBankPanel.transform, 20f, 30f);
+                RaiseTmpFloor(merlin.loreNarrativeText, 28f);
+            }
+
+            RaiseButtonLabelFloor(tier1Button, 20f);
+            RaiseButtonLabelFloor(tier2Button, 20f);
+            RaiseButtonLabelFloor(tier3Button, 20f);
+            RaiseButtonLabelFloor(trainTankButton, 20f);
+            RaiseButtonLabelFloor(trainRangedButton, 20f);
+            RaiseButtonLabelFloor(mediateButton, 20f);
+            RaiseButtonLabelFloor(hireButton, 22f);
+            RaiseButtonLabelFloor(buyRoundButton, 20f);
+            RaiseButtonLabelFloor(goToWarButton, 22f);
+            RaiseButtonLabelFloor(codexButton, 22f);
+            RaiseButtonLabelFloor(warbandButton, 22f);
+            RaiseButtonLabelFloor(tavernDiceButton, 22f);
+        }
+
+        private static void RaiseButtonLabelFloor(Button button, float size)
+        {
+            if (button == null) return;
+            RaiseTmpFloor(button.GetComponentInChildren<TextMeshProUGUI>(), size);
+        }
+
+        private static void RaiseTmpFloor(TextMeshProUGUI tmp, float floor)
+        {
+            if (tmp == null) return;
+            if (tmp.enableAutoSizing)
+            {
+                tmp.fontSizeMin = Mathf.Max(tmp.fontSizeMin, floor * 0.75f);
+                tmp.fontSizeMax = Mathf.Max(tmp.fontSizeMax, floor);
+            }
+            else if (tmp.fontSize < floor)
+            {
+                tmp.fontSize = floor;
+            }
+        }
+
+        private static void RaiseTmpFloorUnder(Transform root, float floor, float autoMax)
+        {
+            if (root == null) return;
+            foreach (var tmp in root.GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                if (tmp == null) continue;
+                if (tmp.enableAutoSizing)
+                {
+                    tmp.fontSizeMin = Mathf.Max(tmp.fontSizeMin, floor * 0.75f);
+                    tmp.fontSizeMax = Mathf.Max(tmp.fontSizeMax, autoMax);
+                }
+                else if (tmp.fontSize < floor)
+                {
+                    tmp.fontSize = floor;
+                }
+            }
+        }
+
+        /// <summary>Used by dice chrome styling — raise floors only (safe to call repeatedly).</summary>
+        private static void BumpTmpUnder(Transform root, float unusedScale, float minFloor, float maxCap)
+        {
+            RaiseTmpFloorUnder(root, minFloor, maxCap);
         }
 
         public void CloseAllModals() => CloseFloatingModals();
+
+        /// <summary>Boot menu so Downloads can New Game (clears stale autosave / hired party).</summary>
+        public static void EnsureMainMenuExists() => MainMenuUI.EnsureExists();
+
+        /// <summary>HUD Warband button label — live recruit count, e.g. "Warband (3)".</summary>
+        public void UpdateWarbandHudLabel()
+        {
+            ResolveWarbandHudButton();
+            if (warbandCountText == null && warbandButton != null)
+                warbandCountText = warbandButton.GetComponentInChildren<TextMeshProUGUI>();
+            int count = GameLoopManager.Instance != null
+                ? GameLoopManager.Instance.recruitedParty.Count
+                : 0;
+            string label = $"Warband ({count})";
+            if (warbandCountText != null)
+                warbandCountText.text = label;
+            else if (warbandButton != null)
+            {
+                var tmp = warbandButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null) tmp.text = label;
+            }
+        }
 
         public void RefreshHUD()
         {
@@ -664,16 +2328,15 @@ namespace ArthurianAutobattler
             var loop = GameLoopManager.Instance;
             if (loop != null) SetNight(loop.currentNight);
             if (goldText != null && town != null) goldText.text = $"Royal Gold: {town.playerGold}g";
-            if (warbandCountText != null && loop != null)
-                warbandCountText.text = $"Warband: {loop.recruitedParty.Count}/52";
+            UpdateWarbandHudLabel();
             if (timerText != null && loop != null)
             {
                 if (SomersetRunes.IsTownTimerDisabled())
-                    timerText.text = "Horde Arrives: ∞ (Endless Hourglass)";
+                    timerText.text = "Horde: ∞";
                 else
                 {
                     float t = loop.GetRemainingTime();
-                    timerText.text = $"Horde Arrives: {Mathf.FloorToInt(t / 60f):00}:{Mathf.FloorToInt(t % 60f):00}";
+                    timerText.text = $"Horde: {Mathf.FloorToInt(t / 60f):00}:{Mathf.FloorToInt(t % 60f):00}";
                 }
             }
 
@@ -683,8 +2346,12 @@ namespace ArthurianAutobattler
 
         private void Update()
         {
-            if (GameLoopManager.Instance != null
-                && GameLoopManager.Instance.currentPhase == GamePhase.TownRecruit)
+            var loop = GameLoopManager.Instance;
+            if (loop == null) return;
+            // Keep the Warband (N) label live whenever the party can change.
+            if (loop.currentPhase == GamePhase.TownRecruit
+                || loop.currentPhase == GamePhase.Rewards
+                || loop.currentPhase == GamePhase.Resurrection)
             {
                 RefreshHUD();
             }

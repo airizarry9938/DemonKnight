@@ -50,25 +50,62 @@ public static class ArthurianSceneBuilder
         battle.hordeGenerator = horde;
 
         // --- Battlefield arena (world space) ---
+        // Andrew: drop background art on BattleBackground; place unit markers under PlayerSlots / EnemySlots.
         GameObject arena = new GameObject("BattlefieldArena");
         arena.SetActive(false);
-        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        ground.name = "ArenaGround";
-        ground.transform.SetParent(arena.transform);
-        ground.transform.localPosition = Vector3.zero;
-        ground.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-        ground.transform.localScale = new Vector3(14f, 8f, 1f);
-        var groundMat = new Material(Shader.Find("Sprites/Default"));
-        groundMat.color = new Color(0.18f, 0.12f, 0.10f, 1f);
-        ground.GetComponent<MeshRenderer>().sharedMaterial = groundMat;
+
+        var bgGo = new GameObject("BattleBackground", typeof(SpriteRenderer));
+        bgGo.transform.SetParent(arena.transform, false);
+        bgGo.transform.localPosition = new Vector3(0f, 0f, 1f);
+        bgGo.transform.localScale = new Vector3(12f, 7f, 1f);
+        var bgSr = bgGo.GetComponent<SpriteRenderer>();
+        bgSr.color = new Color(0.22f, 0.16f, 0.12f, 1f);
+        bgSr.sortingOrder = -20;
+        Sprite battleBgSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Backgrounds/Battlefield.jpg");
+        if (battleBgSprite == null)
+            battleBgSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Backgrounds/Battlefield.png");
+        if (battleBgSprite != null)
+        {
+            bgSr.sprite = battleBgSprite;
+            bgSr.color = Color.white;
+        }
+
+        Transform playerSlotsRoot = new GameObject("PlayerSlots").transform;
+        playerSlotsRoot.SetParent(arena.transform, false);
+        Transform enemySlotsRoot = new GameObject("EnemySlots").transform;
+        enemySlotsRoot.SetParent(arena.transform, false);
+        var playerSlotArr = new Transform[12];
+        var enemySlotArr = new Transform[12];
+        for (int i = 0; i < 12; i++)
+        {
+            int row = i % 3;
+            int col = i / 3;
+            var ps = new GameObject($"Slot_{i}").transform;
+            ps.SetParent(playerSlotsRoot, false);
+            ps.localPosition = new Vector3(-3.5f - col * 1.2f, 2.0f - row * 1.1f, 0f);
+            playerSlotArr[i] = ps;
+
+            var es = new GameObject($"Slot_{i}").transform;
+            es.SetParent(enemySlotsRoot, false);
+            es.localPosition = new Vector3(3.5f + col * 1.2f, 2.0f - row * 1.1f, 0f);
+            enemySlotArr[i] = es;
+        }
 
         // Visualizer stays under Managers (never parented under Arena) so arena toggle/destroy
         // cannot leave AutoBattlerEngine holding a destroyed singleton.
         visualizer.unitActorPrefab = AssetDatabase.LoadAssetAtPath<UnitVisualActor>("Assets/Prefabs/UnitVisualActor.prefab");
         visualizer.combatTextPrefab = AssetDatabase.LoadAssetAtPath<FloatingCombatText>("Assets/Prefabs/FloatingCombatText.prefab");
+        visualizer.battleBackground = bgSr;
+        visualizer.battleBackgroundSprite = battleBgSprite;
+        visualizer.playerSlots = playerSlotArr;
+        visualizer.enemySlots = enemySlotArr;
 
         // --- Event system ---
         EnsureEventSystem();
+
+        // --- Main menu (New Game / Load / Save slots) ---
+        GameObject mainMenuCanvas = CreateCanvas("MainMenuCanvas", 200);
+        mainMenuCanvas.AddComponent<MainMenuUI>();
 
         // --- Town canvas (Somerset church full-screen stage) ---
         GameObject townCanvasObj = CreateCanvas("TownCanvas", 0);
@@ -118,48 +155,54 @@ public static class ArthurianSceneBuilder
         townUI.townGridContainer = seatRt;
         townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
 
-        // Top HUD bar — Night/Timer/Gold on the left; Codex / Warband / March evenly spaced.
+        // Top HUD bar — full-bleed strip; EnsureTopHubLayout redistributes children at runtime.
         GameObject hud = CreatePanel(townCanvasObj.transform, "HUD_Bar",
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1200f, 72f),
+            new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -6f), new Vector2(0f, 72f),
             new Color(0.08f, 0.06f, 0.05f, 0.92f));
+        var hudRt = hud.GetComponent<RectTransform>();
+        hudRt.offsetMin = new Vector2(12f, hudRt.offsetMin.y);
+        hudRt.offsetMax = new Vector2(-12f, -6f);
+        hudRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 72f);
 
-        var nightHud = CreateTMP(hud.transform, "NightText", "Night 1", 22, TextAlignmentOptions.Left,
-            new Vector2(-540f, 0f), new Vector2(130f, 40f));
-        townUI.timerText = CreateTMP(hud.transform, "TimerText", "Horde Arrives: 07:00", 18, TextAlignmentOptions.Left,
-            new Vector2(-390f, 0f), new Vector2(200f, 40f));
-        townUI.goldText = CreateTMP(hud.transform, "GoldText", "Royal Gold: 75g", 18, TextAlignmentOptions.Center,
-            new Vector2(-220f, 0f), new Vector2(150f, 40f));
+        var nightHud = CreateTMP(hud.transform, "NightText", "Night 1", 20, TextAlignmentOptions.Center,
+            Vector2.zero, new Vector2(100f, 40f));
+        townUI.timerText = CreateTMP(hud.transform, "TimerText", "Horde Arrives: 07:00", 16, TextAlignmentOptions.Center,
+            Vector2.zero, new Vector2(200f, 40f));
+        townUI.goldText = CreateTMP(hud.transform, "GoldText", "Royal Gold: 150g", 16, TextAlignmentOptions.Center,
+            Vector2.zero, new Vector2(150f, 40f));
 
-        // Evenly space Codex / Warband info / March across the right two-thirds of the bar.
-        const float trioLeft = -40f;
-        const float trioRight = 520f;
-        float TrioX(int i) => trioLeft + (trioRight - trioLeft) * (i / 2f);
-
-        var warbandBtn = CreateButton(hud.transform, "WarbandButton", "Warband: 0/52",
-            new Vector2(TrioX(1), 0f), new Vector2(180f, 44f), new Color(0.22f, 0.28f, 0.22f));
+        var diceHudBtn = CreateButton(hud.transform, "DiceButton", "Dice",
+            Vector2.zero, new Vector2(120f, 44f), new Color(0.35f, 0.22f, 0.12f));
+        var warbandBtn = CreateButton(hud.transform, "WarbandButton", "Warband (0)",
+            Vector2.zero, new Vector2(160f, 44f), new Color(0.22f, 0.28f, 0.22f));
         townUI.partyCountText = warbandBtn.GetComponentInChildren<TextMeshProUGUI>();
         townUI.goToWarButton = CreateButton(hud.transform, "GoToWarButton", "MARCH TO WAR",
-            new Vector2(TrioX(2), 0f), new Vector2(190f, 48f), new Color(0.55f, 0.12f, 0.12f));
+            Vector2.zero, new Vector2(170f, 48f), new Color(0.55f, 0.12f, 0.12f));
 
-        // TOP-LEFT: Tavern Dice
+        // Tavern Dice — centered popup modal (opened from HUD Dice button / hotkey T).
         GameObject dicePanel = CreatePanel(townCanvasObj.transform, "Panel_TavernDice",
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(220f, -260f), new Vector2(400f, 320f),
-            new Color(0.16f, 0.10f, 0.08f, 0.95f));
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(440f, 360f),
+            new Color(0.16f, 0.10f, 0.08f, 0.97f));
         CreateTMP(dicePanel.transform, "DiceTitle", "TAVERN DICE", 24, TextAlignmentOptions.Center,
-            new Vector2(0f, 120f), new Vector2(360f, 40f));
+            new Vector2(0f, 140f), new Vector2(360f, 40f));
         townUI.diceResultText = CreateTMP(dicePanel.transform, "DiceResult", "Ante up 5g to play.", 18, TextAlignmentOptions.Center,
-            new Vector2(0f, 60f), new Vector2(360f, 50f));
+            new Vector2(0f, 70f), new Vector2(360f, 50f));
         townUI.currentPotText = CreateTMP(dicePanel.transform, "CurrentPot", "Pot: 0g", 20, TextAlignmentOptions.Center,
-            new Vector2(0f, 10f), new Vector2(360f, 36f));
+            new Vector2(0f, 20f), new Vector2(360f, 36f));
         townUI.startDiceButton = CreateButton(dicePanel.transform, "StartDice", "Start (5g)",
-            new Vector2(-110f, -60f), new Vector2(140f, 44f), new Color(0.35f, 0.28f, 0.12f));
+            new Vector2(-110f, -50f), new Vector2(140f, 44f), new Color(0.35f, 0.28f, 0.12f));
         townUI.rollDiceButton = CreateButton(dicePanel.transform, "RollDice", "Roll",
-            new Vector2(0f, -60f), new Vector2(100f, 44f), new Color(0.30f, 0.22f, 0.12f));
+            new Vector2(0f, -50f), new Vector2(100f, 44f), new Color(0.30f, 0.22f, 0.12f));
         townUI.cashOutButton = CreateButton(dicePanel.transform, "CashOut", "Cash Out",
-            new Vector2(110f, -60f), new Vector2(140f, 44f), new Color(0.15f, 0.35f, 0.18f));
+            new Vector2(110f, -50f), new Vector2(140f, 44f), new Color(0.15f, 0.35f, 0.18f));
         townUI.tavernRoundButton = CreateButton(dicePanel.transform, "TavernRound", "Buy Round (50g)",
-            new Vector2(0f, -120f), new Vector2(220f, 40f), new Color(0.40f, 0.25f, 0.10f));
+            new Vector2(0f, -110f), new Vector2(220f, 40f), new Color(0.40f, 0.25f, 0.10f));
+        var diceClose = CreateButton(dicePanel.transform, "DiceCloseX", "X",
+            new Vector2(190f, 150f), new Vector2(36f, 36f), new Color(0.45f, 0.12f, 0.12f));
+        var diceMin = CreateButton(dicePanel.transform, "DiceMinimize", "—",
+            new Vector2(148f, 150f), new Vector2(36f, 36f), new Color(0.25f, 0.22f, 0.18f));
         townUI.diceGame = dice;
+        dicePanel.SetActive(false);
 
         // Legacy side-panel crowd (kept for reference, disabled — seats live on PewSeatLayer).
         GameObject crowdPanel = CreatePanel(townCanvasObj.transform, "Panel_TownCrowd_Legacy",
@@ -205,32 +248,74 @@ public static class ArthurianSceneBuilder
         townUI.mediateRivalryButton = CreateButton(dossier.transform, "Mediate", "Mediate 40g",
             new Vector2(360f, -60f), new Vector2(180f, 36f), new Color(0.30f, 0.20f, 0.35f));
 
-        // Legend Codex modal
+        // Legend Codex modal — near full-screen so all 10 recipes + Fuse buttons fit.
         GameObject codexPanel = CreatePanel(townCanvasObj.transform, "CodexPanel",
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720f, 520f),
+            new Vector2(0.04f, 0.06f), new Vector2(0.96f, 0.94f), Vector2.zero, Vector2.zero,
             new Color(0.07f, 0.08f, 0.10f, 0.98f));
         codexPanel.SetActive(false);
-        CreateTMP(codexPanel.transform, "CodexTitle", "LEGEND CODEX — 10 Arthurian Fusions", 22, TextAlignmentOptions.Center,
-            new Vector2(0f, 220f), new Vector2(680f, 40f));
+        var codexTitle = CreateTMP(codexPanel.transform, "CodexTitle", "LEGEND CODEX — 10 Arthurian Fusions", 28, TextAlignmentOptions.Center,
+            new Vector2(0f, -18f), new Vector2(0f, 48f));
+        var codexTitleRt = codexTitle.rectTransform;
+        codexTitleRt.anchorMin = new Vector2(0.05f, 1f);
+        codexTitleRt.anchorMax = new Vector2(0.95f, 1f);
+        codexTitleRt.pivot = new Vector2(0.5f, 1f);
+        CreateButton(codexPanel.transform, "CodexCloseX", "X",
+            new Vector2(-12f, -12f), new Vector2(44f, 44f), new Color(0.45f, 0.12f, 0.12f));
+        var codexCloseRt = codexPanel.transform.Find("CodexCloseX") as RectTransform;
+        if (codexCloseRt != null)
+        {
+            codexCloseRt.anchorMin = codexCloseRt.anchorMax = new Vector2(1f, 1f);
+            codexCloseRt.pivot = new Vector2(1f, 1f);
+        }
 
-        GameObject recipeList = new GameObject("RecipeList", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-        recipeList.transform.SetParent(codexPanel.transform, false);
+        // Scrollable recipe list inside the large modal.
+        var scrollHost = new GameObject("CodexScroll", typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));
+        scrollHost.transform.SetParent(codexPanel.transform, false);
+        var scrollHostRt = scrollHost.GetComponent<RectTransform>();
+        scrollHostRt.anchorMin = new Vector2(0.04f, 0.06f);
+        scrollHostRt.anchorMax = new Vector2(0.96f, 0.88f);
+        scrollHostRt.offsetMin = Vector2.zero;
+        scrollHostRt.offsetMax = Vector2.zero;
+        scrollHost.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.15f);
+        scrollHost.GetComponent<Mask>().showMaskGraphic = false;
+
+        GameObject recipeList = new GameObject("RecipeList", typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        recipeList.transform.SetParent(scrollHost.transform, false);
         var recipeRt = recipeList.GetComponent<RectTransform>();
-        recipeRt.anchorMin = new Vector2(0.05f, 0.08f);
-        recipeRt.anchorMax = new Vector2(0.95f, 0.85f);
-        recipeRt.offsetMin = Vector2.zero;
-        recipeRt.offsetMax = Vector2.zero;
-        var vlg = recipeList.GetComponent<VerticalLayoutGroup>();
-        vlg.spacing = 6f;
-        vlg.childForceExpandHeight = false;
-        vlg.childControlHeight = true;
+        recipeRt.anchorMin = new Vector2(0f, 1f);
+        recipeRt.anchorMax = new Vector2(1f, 1f);
+        recipeRt.pivot = new Vector2(0.5f, 1f);
+        recipeRt.anchoredPosition = Vector2.zero;
+        recipeRt.sizeDelta = new Vector2(0f, 0f);
+        var grid = recipeList.GetComponent<GridLayoutGroup>();
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 2;
+        grid.cellSize = new Vector2(420f, 96f);
+        grid.spacing = new Vector2(16f, 14f);
+        grid.padding = new RectOffset(10, 10, 10, 10);
+        grid.childAlignment = TextAnchor.UpperCenter;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
         recipeList.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        var hostScroll = scrollHost.GetComponent<ScrollRect>();
+        hostScroll.content = recipeRt;
+        hostScroll.viewport = scrollHostRt;
+        hostScroll.horizontal = false;
+        hostScroll.vertical = true;
+        hostScroll.movementType = ScrollRect.MovementType.Clamped;
 
         codex.codexPanel = codexPanel;
         codex.recipeListContainer = recipeList.transform;
         codex.recipeRowPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/CodexRecipeRow.prefab");
-        codex.toggleCodexButton = CreateButton(hud.transform, "CodexToggle", "Codex",
-            new Vector2(TrioX(0), 0f), new Vector2(140f, 44f), new Color(0.20f, 0.25f, 0.40f));
+        codex.toggleCodexButton = CreateButton(hud.transform, "CodexToggle", "Legends",
+            Vector2.zero, new Vector2(120f, 44f), new Color(0.20f, 0.25f, 0.40f));
+        // Sibling order for EnsureTopHubLayout: Night, Timer, Gold, Dice, Legends, Warband, March
+        nightHud.transform.SetSiblingIndex(0);
+        townUI.timerText.transform.SetSiblingIndex(1);
+        townUI.goldText.transform.SetSiblingIndex(2);
+        diceHudBtn.transform.SetSiblingIndex(3);
+        codex.toggleCodexButton.transform.SetSiblingIndex(4);
+        warbandBtn.transform.SetSiblingIndex(5);
+        townUI.goToWarButton.transform.SetSiblingIndex(6);
         SeedDefaultRecipes(codex);
 
         // Warband formation modal (opened from the evenly-spaced Warband HUD button)
@@ -238,27 +323,45 @@ public static class ArthurianSceneBuilder
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640f, 480f),
             new Color(0.07f, 0.09f, 0.08f, 0.98f));
         warbandPanel.SetActive(false);
-        CreateTMP(warbandPanel.transform, "WarbandTitle", "WARBAND FORMATION", 22, TextAlignmentOptions.Center,
+        CreateTMP(warbandPanel.transform, "WarbandTitle", "CAMELOT CROWD — CURRENT WARBAND", 24, TextAlignmentOptions.Center,
             new Vector2(0f, 200f), new Vector2(600f, 36f));
+        // Scroll host + list (SomersetChurchUI.EnsureWarbandModal will reinforce at runtime).
+        GameObject warbandScroll = new GameObject("WarbandScroll", typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));
+        warbandScroll.transform.SetParent(warbandPanel.transform, false);
+        var warbandScrollRt = warbandScroll.GetComponent<RectTransform>();
+        warbandScrollRt.anchorMin = new Vector2(0.04f, 0.06f);
+        warbandScrollRt.anchorMax = new Vector2(0.96f, 0.86f);
+        warbandScrollRt.offsetMin = Vector2.zero;
+        warbandScrollRt.offsetMax = Vector2.zero;
+        warbandScroll.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.15f);
+        warbandScroll.GetComponent<Mask>().showMaskGraphic = false;
         GameObject warbandList = new GameObject("WarbandList", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-        warbandList.transform.SetParent(warbandPanel.transform, false);
+        warbandList.transform.SetParent(warbandScroll.transform, false);
         var warbandListRt = warbandList.GetComponent<RectTransform>();
-        warbandListRt.anchorMin = new Vector2(0.06f, 0.08f);
-        warbandListRt.anchorMax = new Vector2(0.94f, 0.82f);
-        warbandListRt.offsetMin = Vector2.zero;
-        warbandListRt.offsetMax = Vector2.zero;
+        warbandListRt.anchorMin = new Vector2(0f, 1f);
+        warbandListRt.anchorMax = new Vector2(1f, 1f);
+        warbandListRt.pivot = new Vector2(0.5f, 1f);
+        warbandListRt.anchoredPosition = Vector2.zero;
+        warbandListRt.sizeDelta = new Vector2(0f, 0f);
         var warbandVlg = warbandList.GetComponent<VerticalLayoutGroup>();
-        warbandVlg.spacing = 6f;
+        warbandVlg.spacing = 8f;
+        warbandVlg.padding = new RectOffset(8, 8, 8, 8);
         warbandVlg.childForceExpandHeight = false;
         warbandVlg.childControlHeight = true;
+        warbandVlg.childForceExpandWidth = true;
         warbandList.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        var warbandScrollRect = warbandScroll.GetComponent<ScrollRect>();
+        warbandScrollRect.content = warbandListRt;
+        warbandScrollRect.viewport = warbandScrollRt;
+        warbandScrollRect.horizontal = false;
+        warbandScrollRect.vertical = true;
 
         // Perk Draft Modal
         GameObject perkPanel = CreatePanel(townCanvasObj.transform, "PerkDraftPanel",
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 360f),
             new Color(0.06f, 0.08f, 0.12f, 0.98f));
         perkPanel.SetActive(false);
-        CreateTMP(perkPanel.transform, "PerkTitle", "CHOOSE A RUN PERK", 26, TextAlignmentOptions.Center,
+        CreateTMP(perkPanel.transform, "PerkTitle", "WAVE CLEAR — CHOOSE A RUN PERK", 26, TextAlignmentOptions.Center,
             new Vector2(0f, 140f), new Vector2(860f, 40f));
 
         Button[] perkButtons = new Button[3];
@@ -345,10 +448,12 @@ public static class ArthurianSceneBuilder
         churchUI.goToWarButton = townUI.goToWarButton;
         churchUI.codexButton = codex.toggleCodexButton;
         churchUI.warbandButton = warbandBtn;
+        churchUI.tavernDiceButton = diceHudBtn;
         churchUI.buyRoundButton = townUI.tavernRoundButton;
         churchUI.diceModal = dicePanel;
         churchUI.codexModal = codexPanel;
         churchUI.warbandModal = warbandPanel;
+        churchUI.modalCloseButtons = new[] { diceClose, diceMin };
         churchUI.warbandListContainer = warbandList.transform;
         churchUI.dossierModal = dossier;
         // Dossier content lives on the shared bottom panel (wired on townUI).

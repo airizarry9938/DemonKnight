@@ -12,7 +12,7 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI goldText;
         public TextMeshProUGUI partyCountText;
         public Button goToWarButton;
-        public int playerGold = 75;
+        public int playerGold = 150;
 
         [Header("Top-Left: Tavern Dice")]
         public TavernDiceMinigame diceGame;
@@ -53,6 +53,82 @@ namespace ArthurianAutobattler
         {
             SetupButtons();
             ClearBottomDossier();
+            // Church stage owns dice modal visibility — scoop always-on corner widgets
+            // into Panel_TavernDice and force them hidden until the HUD Dice toggle opens.
+            var church = FindFirstObjectByType<SomersetChurchUI>()
+                         ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
+            if (church != null)
+            {
+                church.EnsureDiceHudAndHidden();
+                church.ForceNamedTavernDicePanelsInactive();
+            }
+            else
+            {
+                HideLegacyDiceCornerIfPresent();
+                ForcePanelTavernDiceInactiveLocal();
+            }
+        }
+
+        /// <summary>Direct SetActive(false) on Panel_TavernDice when church UI is absent.</summary>
+        private static void ForcePanelTavernDiceInactiveLocal()
+        {
+            foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+            {
+                if (t == null || !t.gameObject.scene.IsValid()) continue;
+                if (t.name != "Panel_TavernDice" && t.name != "TavernDice" && t.name != "Panel_Dice")
+                    continue;
+                // Never the HUD strip.
+                Transform p = t;
+                bool underHud = false;
+                while (p != null)
+                {
+                    if (p.name == "HUD_Bar") { underHud = true; break; }
+                    p = p.parent;
+                }
+                if (underHud) continue;
+                if (t.gameObject.activeSelf)
+                    t.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>Fallback when church UI is missing — hide top-left dice chrome (never HUD_Bar).</summary>
+        private void HideLegacyDiceCornerIfPresent()
+        {
+            void HideGo(Component c)
+            {
+                if (c == null) return;
+                // Never touch the top HUD Dice toggle.
+                Transform walk = c.transform;
+                while (walk != null)
+                {
+                    if (walk.name == "HUD_Bar") return;
+                    walk = walk.parent;
+                }
+
+                Transform p = c.transform;
+                while (p != null && p.parent != null && p.parent.GetComponent<Canvas>() == null
+                       && p.GetComponent<TownSplitUIController>() == null)
+                {
+                    string n = p.name;
+                    // HUD toggle names — skip.
+                    if (n.IndexOf("DiceButton", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                        return;
+                    if (n.IndexOf("Dice", System.StringComparison.OrdinalIgnoreCase) >= 0
+                        || n.IndexOf("Tavern", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        p.gameObject.SetActive(false);
+                        return;
+                    }
+                    p = p.parent;
+                }
+                c.gameObject.SetActive(false);
+            }
+
+            HideGo(diceResultText);
+            HideGo(currentPotText);
+            HideGo(startDiceButton);
+            HideGo(rollDiceButton);
+            HideGo(cashOutButton);
         }
 
         private void Update()
@@ -61,7 +137,7 @@ namespace ArthurianAutobattler
             {
                 float t = GameLoopManager.Instance.GetRemainingTime();
                 if (timerText != null)
-                    timerText.text = $"Horde Arrives: {Mathf.FloorToInt(t / 60f):00}:{Mathf.FloorToInt(t % 60f):00}";
+                    timerText.text = $"Horde: {Mathf.FloorToInt(t / 60f):00}:{Mathf.FloorToInt(t % 60f):00}";
             }
         }
 
@@ -202,7 +278,7 @@ namespace ArthurianAutobattler
         private string GenerateDialogue(RecruitInstance r, int grudge)
         {
             if (grudge > 0)
-                return $"\"I remember dying in the last timeline, Commander. My price rose by {grudge}g.\"";
+                return $"\"I marched with you and fell. Bury-gold raised my hire by {grudge}g.\"";
             if (r.primaryTrait == TraitTag.Loyalist)
                 return "\"For King Arthur! My blade is yours at half price.\"";
             if (r.primaryTrait == TraitTag.Coward)
@@ -223,6 +299,7 @@ namespace ArthurianAutobattler
 
             playerGold -= cost;
             selectedRecruit.intelTierUnlocked = tier;
+            GrudgeSaveManager.Instance?.RememberIntel(selectedRecruit.unitID, tier);
             UpdateHUD();
             RefreshDossierUI(GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
@@ -261,8 +338,14 @@ namespace ArthurianAutobattler
             }
 
             playerGold -= finalCost;
+            // Recruited members always keep full stats visible.
+            selectedRecruit.intelTierUnlocked = Mathf.Max(selectedRecruit.intelTierUnlocked, 3);
+            GrudgeSaveManager.Instance?.RememberIntel(selectedRecruit.unitID, selectedRecruit.intelTierUnlocked);
             GameLoopManager.Instance.recruitedParty.Add(selectedRecruit);
             activeTownPool.Remove(selectedRecruit);
+            if (GameLoopManager.Instance.currentTownPool != null)
+                GameLoopManager.Instance.currentTownPool.Remove(selectedRecruit);
+            GameLoopManager.Instance.AutosaveWarband(playerGold);
             Destroy(selectedButtonObj);
             UpdateHUD();
             ClearBottomDossier();
@@ -352,7 +435,17 @@ namespace ArthurianAutobattler
 
         private void SetupButtons()
         {
-            goToWarButton?.onClick.AddListener(() => GameLoopManager.Instance.StartBattlePhase());
+            // Prefer church RewireMarchButton (clears persistent Inspector listeners).
+            var church = FindFirstObjectByType<SomersetChurchUI>()
+                         ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
+            if (church != null)
+                church.RewireMarchButton();
+            else if (goToWarButton != null)
+            {
+                goToWarButton.onClick = new Button.ButtonClickedEvent();
+                goToWarButton.onClick.AddListener(() =>
+                    GameLoopManager.Resolve()?.StartBattlePhase());
+            }
             tier1RevealButton?.onClick.AddListener(() => UnlockIntelTier(1));
             tier2RevealButton?.onClick.AddListener(() => UnlockIntelTier(2));
             tier3RevealButton?.onClick.AddListener(() => UnlockIntelTier(3));
@@ -397,10 +490,14 @@ namespace ArthurianAutobattler
         public void UpdateHUD()
         {
             if (goldText != null) goldText.text = $"Royal Gold: {playerGold}g";
-            if (partyCountText != null && GameLoopManager.Instance != null)
-                partyCountText.text = $"Warband: {GameLoopManager.Instance.recruitedParty.Count}/52";
+            int count = GameLoopManager.Instance != null
+                ? GameLoopManager.Instance.recruitedParty.Count
+                : 0;
+            if (partyCountText != null)
+                partyCountText.text = $"Warband ({count})";
             if (tavernRoundButton != null) tavernRoundButton.interactable = playerGold >= 50;
 
+            DemonKnightCompatApi.UpdateWarbandHudLabel(FindFirstObjectByType<SomersetChurchUI>());
             FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
         }
     }
