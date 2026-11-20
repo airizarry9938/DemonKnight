@@ -2182,9 +2182,14 @@ namespace ArthurianAutobattler
             foreach (Transform c in formationDiagramRoot)
                 Destroy(c.gameObject);
 
+            bool anyMeleeBack = party != null && party.Exists(r => r != null && r.IsMeleeStuckInBackRow);
+            string captionText = anyMeleeBack
+                ? "BATTALION — Melee in BACK cannot attack!"
+                : "BATTALION — Front faces the horde · BACK = ranged only";
             var caption = MakeFormationLabel(formationDiagramRoot, "Caption",
-                "BATTALION — Front faces the horde",
-                new Vector2(0.5f, 0.92f), 15f, new Color(0.85f, 0.82f, 0.72f));
+                captionText,
+                new Vector2(0.5f, 0.92f), 14f,
+                anyMeleeBack ? new Color(1f, 0.55f, 0.35f) : new Color(0.85f, 0.82f, 0.72f));
             caption.alignment = TextAlignmentOptions.Center;
 
             // Collect slots by formation. Unassigned defaults to FRONT until trained.
@@ -2215,7 +2220,7 @@ namespace ArthurianAutobattler
             if ((party == null || party.Count == 0))
             {
                 var empty = MakeFormationLabel(formationDiagramRoot, "EmptyHint",
-                    "Hire souls, then set Tank / Ranged — boxes move here.",
+                    "Hire souls, then set Tank / Ranged — melee belongs FRONT.",
                     new Vector2(0.55f, 0.45f), 14f, new Color(0.65f, 0.65f, 0.60f));
                 empty.alignment = TextAlignmentOptions.Center;
             }
@@ -2244,7 +2249,11 @@ namespace ArthurianAutobattler
                     ? r.unitType.ToString().Substring(0, 1)
                     : "?";
                 float x = startX + i * (boxW + 0.02f);
-                MakeFormationUnitBox(parent, $"#{num}", typeLetter, boxColor, x, anchorY, dim: false);
+                bool meleeBack = r.IsMeleeStuckInBackRow;
+                Color fill = meleeBack ? new Color(0.55f, 0.12f, 0.10f) : boxColor;
+                string label = meleeBack ? $"#{num}!" : $"#{num}";
+                string letter = meleeBack ? "✗" : typeLetter;
+                MakeFormationUnitBox(parent, label, letter, fill, x, anchorY, dim: false);
             }
         }
 
@@ -2486,8 +2495,11 @@ namespace ArthurianAutobattler
                     ? "FRONT"
                     : "FRONT (unassigned)";
             string numBit = unitNum > 0 ? $"#{unitNum}  " : "";
+            string reachWarn = m.IsMeleeStuckInBackRow
+                ? "\n<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack (move to FRONT / Tank)</color>"
+                : "";
 
-            return $"<b>{numBit}{m.characterName}</b>  ({m.unitType})  ·  {m.assignedRole} → <b>{row}</b>\n"
+            return $"<b>{numBit}{m.characterName}</b>  ({m.unitType})  ·  {m.assignedRole} → <b>{row}</b>{reachWarn}\n"
                    + $"HP {m.maxHealth}  |  ATK {m.attackDamage}  |  SPD {m.attackSpeed:F1}/s\n"
                    + $"Mood: {mood}  ·  Trait: {m.primaryTrait}\n"
                    + $"<color=#7CFF9A>Friends:</color> {friends}\n"

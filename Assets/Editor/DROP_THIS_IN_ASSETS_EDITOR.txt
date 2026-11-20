@@ -4,9 +4,9 @@ STOP hand-copying random files.
 1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → perk-rune-bonus-math
+4) Diagnose → back-row-melee-no-attack
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-See ANDREW-PERK-RUNE-BONUS-MATH.md
+See ANDREW-BACK-ROW-MELEE-NO-ATTACK.md
