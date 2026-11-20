@@ -148,7 +148,9 @@ public static class ArthurianMenuBootstrap
             "DemonKnight Setup",
             "1) Confirm Assets/Scripts/UI/SomersetPewLayout.cs exists.\n" +
             "2) Wait for compile (bottom-right spinner).\n" +
-            "3) Arthurian → Diagnose Project (must show church-pews-52-seats).\n" +
+            "3) Arthurian → Diagnose Project (must show setnight-sync-cachebust).\n" +
+            "   If Sync leaves CS1061 SetNight: Arthurian → Force Re-Sync Night/HUD Fix\n" +
+            "   or overwrite GameLoopManager.cs from jsDelivr (see README hard fallback).\n" +
             "4) If you already added ChurchBackground: Arthurian → Align Crowd Grid To Church Pews.\n" +
             "5) Only use Build Complete Scene Hierarchy for a brand-new scene.\n\n" +
             "Project Assets path:\n" + Application.dataPath,

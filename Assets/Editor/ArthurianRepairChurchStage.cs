@@ -15,6 +15,8 @@ public static class ArthurianRepairChurchStage
 {
     private const string RawRoot =
         "https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/";
+    private const string JsDelivrRoot =
+        "https://cdn.jsdelivr.net/gh/airizarry9938/DemonKnight@main/";
 
     private static readonly (string rel, string check)[] Required =
     {
@@ -26,8 +28,10 @@ public static class ArthurianRepairChurchStage
         ("Assets/Scripts/Data/GameDataTypes.cs", @"class\s+RecruitInstance"),
         ("Assets/Scripts/UI/PaperDollSeatView.cs", @"class\s+PaperDollSeatView"),
         ("Assets/Scripts/UI/TownSplitUIController.cs", @"class\s+TownSplitUIController"),
-        ("Assets/Scripts/Systems/GameLoopManager.cs", @"void\s+RefreshNightHUD"),
+        // ApplyNightLabel = new RefreshNightHUD that does NOT call SetNight (CS1061-safe).
+        ("Assets/Scripts/Systems/GameLoopManager.cs", @"ApplyNightLabel"),
         ("Assets/Scripts/Persistence/MerlinResurrectionManager.cs", @"void\s+StartNextTimelineRun"),
+        ("Assets/Editor/DemonKnightPackageVersion.cs", @"setnight-sync-cachebust"),
     };
 
     [MenuItem("Arthurian/Repair Church UI (fix CS0111/CS0263)", false, 3)]
@@ -70,22 +74,40 @@ public static class ArthurianRepairChurchStage
             }
         }
 
-        using var wc = new WebClient();
-        wc.Headers.Add("User-Agent", "DemonKnight-Unity-Repair");
-
         var failures = new System.Collections.Generic.List<string>();
         int ok = 0;
+        string bust = "?t=" + DateTime.UtcNow.Ticks;
         foreach (var (rel, check) in Required)
         {
             string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                string body = wc.DownloadString(RawRoot + rel);
-                if (string.IsNullOrEmpty(body) || body.StartsWith("404"))
-                    throw new Exception("404/empty");
-                if (!Regex.IsMatch(body, check))
-                    throw new Exception("downloaded content failed sanity check: " + check);
+                string body = null;
+                Exception last = null;
+                foreach (string root in new[] { RawRoot, JsDelivrRoot })
+                {
+                    try
+                    {
+                        using var wc = new WebClient();
+                        wc.CachePolicy = new System.Net.Cache.RequestCachePolicy(
+                            System.Net.Cache.RequestCacheLevel.BypassCache);
+                        wc.Headers.Add("User-Agent", "DemonKnight-Unity-Repair");
+                        wc.Headers.Add("Cache-Control", "no-cache");
+                        body = wc.DownloadString(root + rel + bust);
+                        if (string.IsNullOrEmpty(body) || body.StartsWith("404"))
+                            throw new Exception("404/empty");
+                        if (!Regex.IsMatch(body, check))
+                            throw new Exception("sanity check failed (likely stale CDN): " + check);
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        last = ex;
+                        body = null;
+                    }
+                }
+                if (body == null) throw last ?? new Exception("download failed");
                 File.WriteAllText(dest, body);
                 ok++;
                 Debug.Log($"[DemonKnight] Wrote {rel}");

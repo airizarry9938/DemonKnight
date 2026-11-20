@@ -111,26 +111,30 @@ namespace ArthurianAutobattler
             InitializeNewRun();
         }
 
+        /// <summary>
+        /// Updates the top-HUD Night label by GameObject name only.
+        /// Deliberately does NOT call ChurchStageUIController.SetNight / SomersetChurchUI.SetNight
+        /// so this file compiles even when those UI scripts are a stale partial Sync.
+        /// </summary>
         public void RefreshNightHUD()
         {
-            // Prefer ChurchStageUIController — it always defines SetNight (even if a
-            // partial Sync left SomersetChurchUI without the night API).
-            var church = churchUI != null
-                ? churchUI
-                : FindFirstObjectByType<ChurchStageUIController>();
-            if (church != null)
-            {
-                church.SetNight(currentNight);
-                return;
-            }
+            ApplyNightLabel($"Night {Mathf.Max(1, currentNight)}");
+        }
 
-            // Last resort: write the NightText TMP by name so Play Mode still works.
-            var nightGo = GameObject.Find("NightText");
-            if (nightGo != null)
+        private static void ApplyNightLabel(string label)
+        {
+            Transform nightTf = null;
+            var hud = GameObject.Find("HUD_Bar");
+            if (hud != null) nightTf = hud.transform.Find("NightText");
+            if (nightTf == null)
             {
-                var tmp = nightGo.GetComponent<TMPro.TextMeshProUGUI>();
-                if (tmp != null) tmp.text = $"Night {Mathf.Max(1, currentNight)}";
+                var found = GameObject.Find("NightText");
+                if (found != null) nightTf = found.transform;
             }
+            if (nightTf == null) return;
+
+            var tmp = nightTf.GetComponent<TMPro.TextMeshProUGUI>();
+            if (tmp != null) tmp.text = label;
         }
 
         private bool IsTownCompletelyPricedOut(int availableGold)
