@@ -67,8 +67,8 @@ namespace ArthurianAutobattler
 
             // Ensure RecipeList sits in a scroll viewport (Legends options overflow).
             if (codexPanel != null)
-                SomersetChurchUI.EnsureCodexScrollViewport(codexPanel.transform);
-            SomersetChurchUI.ApplyTwoColumnCodexLayout(recipeListContainer);
+                DemonKnightCompatApi.EnsureCodexScrollViewport(codexPanel.transform);
+            DemonKnightCompatApi.ApplyTwoColumnCodexLayout(recipeListContainer);
 
             foreach (Transform child in recipeListContainer) Destroy(child.gameObject);
 
@@ -233,7 +233,7 @@ namespace ArthurianAutobattler
             {
                 Debug.Log($"[DemonKnight] Legend fuse {t}: party {before} → {p.Count}");
                 SomersetRunes.NotifyLegendFused();
-                loop.AutosaveWarband();
+                DemonKnightCompatApi.AutosaveWarband(loop);
                 RefreshCodexList();
                 FindFirstObjectByType<TownSplitUIController>()?.UpdateHUD();
                 var church = FindFirstObjectByType<SomersetChurchUI>()

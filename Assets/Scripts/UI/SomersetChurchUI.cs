@@ -1378,7 +1378,7 @@ namespace ArthurianAutobattler
             goToWarButton.onClick.AddListener(() =>
             {
                 Debug.LogError("[DemonKnight] MARCH button clicked.");
-                var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+                var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
                 if (loop == null)
                 {
                     Debug.LogError("[DemonKnight] MARCH failed — no GameLoopManager.");
@@ -1806,7 +1806,7 @@ namespace ArthurianAutobattler
             GrudgeSaveManager.Instance?.RememberIntel(selected.unitID, selected.intelTierUnlocked);
             GameLoopManager.Instance.recruitedParty.Add(selected);
             GameLoopManager.Instance.currentTownPool.Remove(selected);
-            GameLoopManager.Instance.AutosaveWarband(Town.playerGold);
+            DemonKnightCompatApi.AutosaveWarband(GameLoopManager.Instance, Town.playerGold);
             PopulatePews(GameLoopManager.Instance.currentTownPool);
             CloseAllModals();
             RefreshHUD();
