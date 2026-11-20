@@ -1127,7 +1127,8 @@ namespace ArthurianAutobattler
                 if (existing != null) nightText = existing.GetComponent<TextMeshProUGUI>();
             }
             if (nightText == null && forceEqualHudSlots)
-                nightText = CreateHudLabel(hud, "NightText", "Night 1", Vector2.zero, new Vector2(110f, 40f), 24);
+                nightText = CreateHudLabel(hud, "NightText", "Night 1 · Wave 1 (Horde)",
+                    Vector2.zero, new Vector2(220f, 40f), 18);
 
             if (timerText == null)
             {
@@ -1275,8 +1276,22 @@ namespace ArthurianAutobattler
                     if (existing != null) nightText = existing.GetComponent<TextMeshProUGUI>();
                 }
             }
-            if (nightText != null)
-                nightText.text = $"Night {Mathf.Max(1, night)}";
+            if (nightText == null) return;
+
+            int wave = 1;
+            var loop = GameLoopManager.Instance;
+            if (loop != null) wave = loop.CurrentWaveNumber();
+            else
+            {
+                var eng = FindFirstObjectByType<AutoBattlerEngine>();
+                if (eng != null) wave = Mathf.Max(1, eng.currentBattleNumber);
+            }
+
+            nightText.text = GameLoopManager.FormatNightWaveLabel(night, wave);
+            // Slightly smaller so "Night N · Wave M (Boss)" fits the HUD slot.
+            if (nightText.fontSize > 18f) nightText.fontSize = 18f;
+            nightText.enableWordWrapping = false;
+            nightText.overflowMode = TextOverflowModes.Overflow;
         }
 
         private Transform FindHudBar()
@@ -2007,16 +2022,40 @@ namespace ArthurianAutobattler
         private void BuyTavernRound()
         {
             var town = Town;
-            if (town == null || town.playerGold < 50) return;
-            town.playerGold -= 50;
-            if (GameLoopManager.Instance != null)
+            int cost = GameLoopManager.TavernRoundCostGold;
+            if (town == null || town.playerGold < cost) return;
+            town.playerGold -= cost;
+
+            var loop = GameLoopManager.Instance;
+            if (loop != null)
             {
-                foreach (var p in GameLoopManager.Instance.currentTownPool)
+                // −10g hire for ALL units this town session / wave.
+                loop.tavernRoundHireDiscountActive = true;
+                foreach (var p in loop.currentTownPool)
                 {
-                    if (p.unitType == UnitType.Peasant || p.primaryTrait == TraitTag.Drunkard)
+                    if (p != null
+                        && (p.unitType == UnitType.Peasant || p.primaryTrait == TraitTag.Drunkard))
                         GrudgeSaveManager.Instance?.ModifyGrudgeStaging(p.unitID, -15);
                 }
             }
+
+            if (dossierDialogue != null)
+            {
+                dossierDialogue.text =
+                    $"<color=yellow>Tavern Round ({cost}g)!</color> All hires −{GameLoopManager.TavernRoundHireDiscount}g this wave.";
+            }
+
+            // Refresh hire button price with the new discount.
+            if (selected != null)
+            {
+                int grudge = GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selected.unitID) : 0;
+                int discount = MerlinResurrectionManager.Instance != null
+                    ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
+                int hire = selected.GetFinalHireCost(grudge, discount);
+                if (hireButtonLabel != null) hireButtonLabel.text = $"Recruit ({hire}g)";
+            }
+
             RefreshHUD();
         }
 
@@ -2587,7 +2626,14 @@ namespace ArthurianAutobattler
             }
 
             if (buyRoundButton != null && town != null)
-                buyRoundButton.interactable = town.playerGold >= 50;
+            {
+                buyRoundButton.interactable = town.playerGold >= GameLoopManager.TavernRoundCostGold;
+                bool active = loop != null && loop.tavernRoundHireDiscountActive;
+                ApplyHudButtonLabel(buyRoundButton,
+                    active
+                        ? $"Round (−{GameLoopManager.TavernRoundHireDiscount}g ✓)"
+                        : $"Buy Round ({GameLoopManager.TavernRoundCostGold}g)");
+            }
         }
 
         private void Update()

@@ -99,8 +99,14 @@ namespace ArthurianAutobattler
             }
 
             int starDiscount = Mathf.Max(0, victoryStars) * VictoryStarHireDiscount;
+
+            // Buy Tavern Round: −10g hire for all units this town session / wave.
+            int tavernCut = 0;
+            if (GameLoopManager.Instance != null && GameLoopManager.Instance.tavernRoundHireDiscountActive)
+                tavernCut = GameLoopManager.TavernRoundHireDiscount;
+
             int cost = Mathf.Max(1,
-                baseHireCost + effectiveGrudge - globalDiscount - peasantCut + jealousyTax - starDiscount);
+                baseHireCost + effectiveGrudge - globalDiscount - peasantCut + jealousyTax - starDiscount - tavernCut);
             if (primaryTrait == TraitTag.Loyalist) cost = Mathf.Max(1, cost / 2);
             return cost;
         }
@@ -141,6 +147,12 @@ namespace ArthurianAutobattler
             {
                 info +=
                     $"<color=#FFD700>★ Experienced ×{victoryStars}</color> (−{victoryStars * VictoryStarHireDiscount}g hire)\n";
+            }
+
+            if (GameLoopManager.Instance != null && GameLoopManager.Instance.tavernRoundHireDiscountActive)
+            {
+                info +=
+                    $"<color=#FFE066>Tavern Round</color> (−{GameLoopManager.TavernRoundHireDiscount}g hire this wave)\n";
             }
 
             if (intelTierUnlocked >= 1)
