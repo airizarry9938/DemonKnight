@@ -80,7 +80,7 @@ namespace ArthurianAutobattler
         {
             if (!Input.GetKeyDown(KeyCode.Escape)) return;
 
-            var loop = GameLoopManager.Resolve();
+            var loop = DemonKnightCompatApi.ResolveLoop();
             if (loop != null && loop.currentPhase == GamePhase.AutoBattle)
             {
                 Debug.Log("[DemonKnight] Esc ignored during AutoBattle.");
@@ -236,7 +236,7 @@ namespace ArthurianAutobattler
             if (continueButton != null) continueButton.interactable = hasAuto;
             if (saveGameButton != null)
             {
-                var loop = GameLoopManager.Resolve();
+                var loop = DemonKnightCompatApi.ResolveLoop();
                 saveGameButton.interactable = loop != null && loop.currentPhase != GamePhase.AutoBattle;
             }
             RefreshSlotLabels();
@@ -272,7 +272,7 @@ namespace ArthurianAutobattler
 
         private void OnNewGame()
         {
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop == null)
             {
                 SetStatus("No GameLoopManager in scene.");
@@ -282,7 +282,7 @@ namespace ArthurianAutobattler
             GrudgeSaveManager.Instance?.WipeAllSavedMemory();
             WarbandAutosave.Clear();
             loop.recruitedParty?.Clear();
-            loop.mustDisbandPartyAfterCurrentWave = false;
+            DemonKnightCompatApi.SetMustDisband(loop, false);
             loop.InitializeFreshCampaign();
             HideMenu();
             SetStatus("New Game started — clean slate.");
@@ -291,21 +291,21 @@ namespace ArthurianAutobattler
 
         private void OnContinue()
         {
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop == null || !WarbandAutosave.HasAutosave())
             {
                 SetStatus("No autosave to continue.");
                 return;
             }
             loop.ContinueTimelineFromAutosave();
-            loop.EnsureDisbandedAfterWave();
+            DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
             HideMenu();
             SetStatus("Continued from autosave (party forced empty for rehire).");
         }
 
         private void OnLoadSlot(int slot)
         {
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop == null || !WarbandAutosave.HasSlot(slot))
             {
                 SetStatus($"Slot {slot} is empty.");
@@ -317,20 +317,20 @@ namespace ArthurianAutobattler
                 return;
             }
             loop.ContinueTimelineFromAutosave();
-            loop.EnsureDisbandedAfterWave();
+            DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
             HideMenu();
             SetStatus($"Loaded slot {slot}.");
         }
 
         private void OnSaveSlot(int slot)
         {
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop == null)
             {
                 SetStatus("Nothing to save.");
                 return;
             }
-            loop.AutosaveWarband();
+            DemonKnightCompatApi.AutosaveWarband(loop);
             if (WarbandAutosave.CopyAutosaveToSlot(slot))
             {
                 RefreshSlotLabels();

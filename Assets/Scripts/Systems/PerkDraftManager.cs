@@ -83,8 +83,8 @@ namespace ArthurianAutobattler
             EnsurePanelWired();
 
             // Wave win → rewards: party must already be back in pews (per-wave disband).
-            var loopEarly = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
-            loopEarly?.EnsureDisbandedAfterWave(null, true);
+            var loopEarly = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
+            DemonKnightCompatApi.EnsureDisbandedAfterWave(loopEarly, null, true);
 
             if (perkDraftPanel == null
                 || choiceButtons == null || choiceButtons.Length == 0
@@ -98,7 +98,7 @@ namespace ArthurianAutobattler
             // Parent TownCanvas may have been off during battle.
             if (perkDraftPanel.transform.root != null)
                 perkDraftPanel.transform.root.gameObject.SetActive(true);
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop != null && loop.townCanvasObj != null)
                 loop.townCanvasObj.SetActive(true);
 
@@ -346,7 +346,7 @@ namespace ArthurianAutobattler
 
             if (perkDraftPanel != null) perkDraftPanel.SetActive(false);
 
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop == null)
             {
                 Debug.LogError("[DemonKnight] No GameLoopManager after perk pick.");
@@ -355,14 +355,14 @@ namespace ArthurianAutobattler
 
             // Each wave win shortens the next town phase (floor 180s; initial range 300–600).
             loop.townTimeLimit = Mathf.Clamp(loop.townTimeLimit - 30f, 180f, 600f);
-            loop.EnsureDisbandedAfterWave();
+            DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
             loop.StartTownPhase();
         }
 
         private void FallbackToTown()
         {
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
-            loop?.EnsureDisbandedAfterWave();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
+            DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
             loop?.StartTownPhase();
         }
 

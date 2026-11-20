@@ -27,7 +27,7 @@ Same base URLs:
 === THEN ===
 1) Wait for Unity compile
 2) Arthurian → Force Re-Sync Night/HUD Fix   (or Sync All Scripts From GitHub)
-3) Arthurian → Diagnose Project  → must show package: hud-preserve-authored
+3) Arthurian → Force Delete+Sync ALL Scripts, then Diagnose → package: sync-complete-replace
 
 === FULL REPO FALLBACK ===
 cd into the Unity project folder that contains Assets/, then:

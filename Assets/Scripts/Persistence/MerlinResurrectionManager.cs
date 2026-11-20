@@ -109,8 +109,8 @@ namespace ArthurianAutobattler
             unspentLegacyPoints += earnedPoints;
             SaveBankData();
             // Lose / full-run end: force per-wave disband before Merlin bank (party → pews).
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
-            loop?.EnsureDisbandedAfterWave();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
+            DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
             GrudgeSaveManager.Instance?.CommitStagedGrudgesToDisk();
             StartCoroutine(PlayResurrectionSequence(earnedPoints, defeatedNimue, customReason));
         }

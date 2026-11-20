@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
@@ -7,15 +8,102 @@ using UnityEngine.UI;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Downloads-safe bridge: GameLoop calls these instead of typing against
-    /// ChurchStageUIController / SomersetChurchUI / BattlefieldVisualizer members
-    /// that older unzipped copies may lack (CS1061 / CS0122).
-    /// Prefers real public methods via reflection; falls back to HUD name lookups.
+    /// Downloads-safe bridge so callers compile even when Sync only partially
+    /// refreshed GameLoopManager / SomersetChurchUI / BattlefieldVisualizer.
+    /// Prefer real members via reflection; fall back where possible.
     /// </summary>
     public static class DemonKnightCompatApi
     {
+        public const int WaveVictoryGold = 200;
+        public const int WaveLossGold = 50;
+
         const BindingFlags InstancePublic =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        const BindingFlags StaticPublic =
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+
+        public static GameLoopManager ResolveLoop()
+        {
+            if (GameLoopManager.Instance != null) return GameLoopManager.Instance;
+            // Prefer GameLoopManager.Resolve when present (current package).
+            try
+            {
+                var m = typeof(GameLoopManager).GetMethod("Resolve", StaticPublic, null, Type.EmptyTypes, null);
+                if (m != null && m.ReturnType == typeof(GameLoopManager))
+                {
+                    var resolved = m.Invoke(null, null) as GameLoopManager;
+                    if (resolved != null) return resolved;
+                }
+            }
+            catch { /* fall through */ }
+            return UnityEngine.Object.FindFirstObjectByType<GameLoopManager>();
+        }
+
+        public static void AutosaveWarband(GameLoopManager loop = null, int playerGold = -1)
+        {
+            loop ??= ResolveLoop();
+            if (loop == null) return;
+            if (playerGold >= 0)
+            {
+                if (TryInvoke(loop, "AutosaveWarband", playerGold)) return;
+            }
+            if (!TryInvoke(loop, "AutosaveWarband"))
+                Debug.LogWarning("[DemonKnight] AutosaveWarband missing — Sync GameLoopManager.cs.");
+        }
+
+        public static void EnsureDisbandedAfterWave(
+            GameLoopManager loop = null,
+            HashSet<string> deadUnitIds = null,
+            bool? waveWon = null)
+        {
+            loop ??= ResolveLoop();
+            if (loop == null) return;
+            if (TryInvokeOverload(loop, "EnsureDisbandedAfterWave", deadUnitIds, waveWon)) return;
+            if (TryInvoke(loop, "EnsureDisbandedAfterWave")) return;
+            Debug.LogWarning("[DemonKnight] EnsureDisbandedAfterWave missing — Sync GameLoopManager.cs.");
+        }
+
+        public static void SetMustDisband(GameLoopManager loop, bool value)
+        {
+            loop ??= ResolveLoop();
+            if (loop == null) return;
+            var f = typeof(GameLoopManager).GetField("mustDisbandPartyAfterCurrentWave", InstancePublic);
+            if (f != null) f.SetValue(loop, value);
+        }
+
+        public static void ChurchEnsureDiceHudAndHidden(Component church = null)
+        {
+            church ??= FindChurch();
+            TryInvoke(church, "EnsureDiceHudAndHidden");
+            TryInvoke(church, "ForceNamedTavernDicePanelsInactive");
+        }
+
+        public static void ChurchForceNamedTavernDicePanelsInactive(Component church = null)
+        {
+            church ??= FindChurch();
+            TryInvoke(church, "ForceNamedTavernDicePanelsInactive");
+        }
+
+        public static void ChurchRewireMarch(Component church = null)
+        {
+            church ??= FindChurch();
+            if (!TryInvoke(church, "RewireMarchButton"))
+                Debug.LogWarning("[DemonKnight] RewireMarchButton missing — Sync SomersetChurchUI.cs.");
+        }
+
+        public static void EnsureCodexScrollViewport(Transform codexRoot)
+        {
+            if (codexRoot == null) return;
+            if (TryInvokeStatic(typeof(SomersetChurchUI), "EnsureCodexScrollViewport", codexRoot)) return;
+            Debug.LogWarning("[DemonKnight] EnsureCodexScrollViewport missing — Sync SomersetChurchUI.cs.");
+        }
+
+        public static void ApplyTwoColumnCodexLayout(Transform recipeList)
+        {
+            if (recipeList == null) return;
+            if (TryInvokeStatic(typeof(SomersetChurchUI), "ApplyTwoColumnCodexLayout", recipeList)) return;
+            Debug.LogWarning("[DemonKnight] ApplyTwoColumnCodexLayout missing — Sync SomersetChurchUI.cs.");
+        }
 
         public static void UpdateWarbandHudLabel(Component church = null)
         {
@@ -47,15 +135,64 @@ namespace ArthurianAutobattler
                 return;
             }
             if (!TryInvoke(viz, "ResolveArenaBindings"))
-                Debug.LogWarning("[DemonKnight] ResolveArenaBindings missing on BattlefieldVisualizer — overwrite that .cs from the zip.");
+                Debug.LogWarning("[DemonKnight] ResolveArenaBindings missing — Sync BattlefieldVisualizer.cs.");
             if (!TryInvoke(viz, "ApplyBackgroundArt"))
-                Debug.LogWarning("[DemonKnight] ApplyBackgroundArt missing on BattlefieldVisualizer — overwrite that .cs from the zip.");
+                Debug.LogWarning("[DemonKnight] ApplyBackgroundArt missing — Sync BattlefieldVisualizer.cs.");
         }
 
         static Component FindChurch()
         {
             return (Component)UnityEngine.Object.FindFirstObjectByType<SomersetChurchUI>()
                    ?? UnityEngine.Object.FindFirstObjectByType<ChurchStageUIController>();
+        }
+
+        static bool TryInvokeStatic(Type type, string methodName, params object[] args)
+        {
+            if (type == null) return false;
+            try
+            {
+                MethodInfo method = args == null || args.Length == 0
+                    ? type.GetMethod(methodName, StaticPublic, null, Type.EmptyTypes, null)
+                    : type.GetMethod(methodName, StaticPublic, null, ArgTypes(args), null);
+                if (method == null) return false;
+                method.Invoke(null, args == null || args.Length == 0 ? null : args);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[DemonKnight] Compat static invoke {methodName} failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        static bool TryInvokeOverload(object target, string methodName, HashSet<string> deadIds, bool? waveWon)
+        {
+            if (target == null) return false;
+            try
+            {
+                foreach (var method in target.GetType().GetMethods(InstancePublic))
+                {
+                    if (method.Name != methodName) continue;
+                    var ps = method.GetParameters();
+                    if (ps.Length == 2
+                        && typeof(HashSet<string>).IsAssignableFrom(ps[0].ParameterType)
+                        && (ps[1].ParameterType == typeof(bool?) || ps[1].ParameterType == typeof(Nullable<bool>)))
+                    {
+                        method.Invoke(target, new object[] { deadIds, waveWon });
+                        return true;
+                    }
+                    if (ps.Length == 0)
+                    {
+                        method.Invoke(target, null);
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[DemonKnight] Compat overload {methodName} failed: {ex.Message}");
+            }
+            return false;
         }
 
         static bool TryInvoke(object target, string methodName, params object[] args)
@@ -115,18 +252,16 @@ namespace ArthurianAutobattler
         static void ApplyFlashMarchBlockedFallback(Component church, string reason)
         {
             Debug.LogWarning($"[DemonKnight] {reason}");
-            if (church != null)
+            if (church == null) return;
+            foreach (var tmp in church.GetComponentsInChildren<TextMeshProUGUI>(true))
             {
-                foreach (var tmp in church.GetComponentsInChildren<TextMeshProUGUI>(true))
+                if (tmp == null) continue;
+                string n = tmp.gameObject.name;
+                if (n.IndexOf("Dialogue", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Dossier", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    if (tmp == null) continue;
-                    string n = tmp.gameObject.name;
-                    if (n.IndexOf("Dialogue", StringComparison.OrdinalIgnoreCase) >= 0
-                        || n.IndexOf("Dossier", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        tmp.text = $"<color=#FF6666>{reason}</color>";
-                        return;
-                    }
+                    tmp.text = $"<color=#FF6666>{reason}</color>";
+                    return;
                 }
             }
         }

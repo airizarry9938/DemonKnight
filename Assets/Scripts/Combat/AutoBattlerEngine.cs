@@ -472,9 +472,9 @@ namespace ArthurianAutobattler
         {
             isBattling = false;
             BattlefieldVisualizer.Instance?.ClearAllActors();
-            int goldEarned = playerWon ? GameLoopManager.WaveVictoryGold : GameLoopManager.WaveLossGold;
+            int goldEarned = playerWon ? DemonKnightCompatApi.WaveVictoryGold : DemonKnightCompatApi.WaveLossGold;
 
-            var loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
 
             // Hire-price memory: army members who DIED get the death penalty.
             var deadIds = new HashSet<string>();
@@ -511,7 +511,7 @@ namespace ArthurianAutobattler
             Debug.LogError(
                 $"[DemonKnight] === END BATTLE DISBAND START won={playerWon} wave={currentBattleNumber} ===");
             ForceWaveDisband(loop, deadIds, playerWon);
-            loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+            loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             int partyNow = loop?.recruitedParty?.Count ?? -1;
             Debug.LogError($"[DemonKnight] === END BATTLE DISBAND DONE party={partyNow} ===");
             if (partyNow > 0)
@@ -557,7 +557,7 @@ namespace ArthurianAutobattler
                 currentBattleNumber++;
                 // Gold already awarded above.
 
-                loop = GameLoopManager.Resolve() ?? FindFirstObjectByType<GameLoopManager>();
+                loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
                 if (loop != null)
                 {
                     if (loop.townCanvasObj != null) loop.townCanvasObj.SetActive(true);
@@ -567,7 +567,7 @@ namespace ArthurianAutobattler
                     {
                         Debug.LogError("[DemonKnight] Party still hired before perk draft — forcing again.");
                         ForceWaveDisband(loop, deadIds, true);
-                        loop.mustDisbandPartyAfterCurrentWave = true;
+                        DemonKnightCompatApi.SetMustDisband(loop, true);
                     }
                 }
 
@@ -588,7 +588,7 @@ namespace ArthurianAutobattler
         /// <summary>Loud EnsureDisbandedAfterWave + nuclear recruitedParty.Clear if anything remains.</summary>
         private static void ForceWaveDisband(GameLoopManager loop, HashSet<string> deadIds, bool waveWon)
         {
-            loop = loop ?? GameLoopManager.Resolve() ?? Object.FindFirstObjectByType<GameLoopManager>();
+            loop = loop ?? DemonKnightCompatApi.ResolveLoop() ?? Object.FindFirstObjectByType<GameLoopManager>();
             if (loop == null)
             {
                 Debug.LogError("[DemonKnight] ForceWaveDisband: NO GameLoopManager — cannot clear party!");
@@ -597,7 +597,7 @@ namespace ArthurianAutobattler
 
             int before = loop.recruitedParty != null ? loop.recruitedParty.Count : 0;
             Debug.LogError($"[DemonKnight] ForceWaveDisband before={before} won={waveWon}");
-            loop.EnsureDisbandedAfterWave(deadIds, waveWon);
+            DemonKnightCompatApi.EnsureDisbandedAfterWave(loop, deadIds, waveWon);
 
             if (loop.recruitedParty == null)
                 loop.recruitedParty = new List<RecruitInstance>();
@@ -618,8 +618,8 @@ namespace ArthurianAutobattler
                 loop.recruitedParty.Clear();
             }
 
-            loop.mustDisbandPartyAfterCurrentWave = false;
-            loop.AutosaveWarband();
+            DemonKnightCompatApi.SetMustDisband(loop, false);
+            DemonKnightCompatApi.AutosaveWarband(loop);
             Debug.LogError($"[DemonKnight] ForceWaveDisband after={loop.recruitedParty.Count}");
         }
 

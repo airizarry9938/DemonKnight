@@ -59,8 +59,7 @@ namespace ArthurianAutobattler
                          ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
             if (church != null)
             {
-                church.EnsureDiceHudAndHidden();
-                church.ForceNamedTavernDicePanelsInactive();
+                DemonKnightCompatApi.ChurchEnsureDiceHudAndHidden(church);
             }
             else
             {
@@ -345,7 +344,7 @@ namespace ArthurianAutobattler
             activeTownPool.Remove(selectedRecruit);
             if (GameLoopManager.Instance.currentTownPool != null)
                 GameLoopManager.Instance.currentTownPool.Remove(selectedRecruit);
-            GameLoopManager.Instance.AutosaveWarband(playerGold);
+            DemonKnightCompatApi.AutosaveWarband(GameLoopManager.Instance, playerGold);
             Destroy(selectedButtonObj);
             UpdateHUD();
             ClearBottomDossier();
@@ -439,12 +438,12 @@ namespace ArthurianAutobattler
             var church = FindFirstObjectByType<SomersetChurchUI>()
                          ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
             if (church != null)
-                church.RewireMarchButton();
+                DemonKnightCompatApi.ChurchRewireMarch(church);
             else if (goToWarButton != null)
             {
                 goToWarButton.onClick = new Button.ButtonClickedEvent();
                 goToWarButton.onClick.AddListener(() =>
-                    GameLoopManager.Resolve()?.StartBattlePhase());
+                    DemonKnightCompatApi.ResolveLoop()?.StartBattlePhase());
             }
             tier1RevealButton?.onClick.AddListener(() => UnlockIntelTier(1));
             tier2RevealButton?.onClick.AddListener(() => UnlockIntelTier(2));

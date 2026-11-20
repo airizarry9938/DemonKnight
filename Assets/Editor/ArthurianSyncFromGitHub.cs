@@ -9,12 +9,9 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// One-click: pull every gameplay script from the DemonKnight GitHub main branch
-/// into the correct Assets/Scripts folders. Use this instead of hand-copying files.
-///
-/// IMPORTANT: raw.githubusercontent.com caches /main aggressively. We always
-/// append a cache-buster and Prefer jsDelivr as a secondary source when sanity
-/// checks fail, otherwise Unity can re-download a stale GameLoopManager forever.
+/// Pull every DemonKnight gameplay + editor script from GitHub main into Assets/.
+/// Always delete-then-write so Windows/Unity cannot keep a stale .cs handle.
+/// Critical files are verified on disk after write; Sync fails loudly if incomplete.
 /// </summary>
 public static class ArthurianSyncFromGitHub
 {
@@ -22,10 +19,9 @@ public static class ArthurianSyncFromGitHub
     private const string RawMain = "https://raw.githubusercontent.com/" + Repo + "/main/";
     private const string JsDelivrMain = "https://cdn.jsdelivr.net/gh/" + Repo + "@main/";
 
-    // Marker that must appear in DemonKnightPackageVersion.cs after a good sync.
-    private const string ExpectedPackageId = "hud-preserve-authored";
+    private const string ExpectedPackageId = "sync-complete-replace";
 
-    // Every runtime script the church/pew package needs (relative to repo root).
+    /// <summary>Complete script set — keep in sync with repo Assets/Scripts + required Editor tools.</summary>
     private static readonly string[] ScriptPaths =
     {
         "Assets/Scripts/Combat/AutoBattlerEngine.cs",
@@ -67,84 +63,79 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
     };
 
+    private static readonly string[] AtomicCritical =
+    {
+        "Assets/Scripts/Systems/GameLoopManager.cs",
+        "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
+        "Assets/Scripts/UI/SomersetChurchUI.cs",
+        "Assets/Scripts/UI/ChurchStageUIController.cs",
+        "Assets/Scripts/UI/TownSplitUIController.cs",
+        "Assets/Scripts/UI/LegendCodexUI.cs",
+        "Assets/Scripts/UI/MainMenuUI.cs",
+        "Assets/Scripts/Combat/AutoBattlerEngine.cs",
+        "Assets/Scripts/Combat/BattlefieldVisualizer.cs",
+        "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
+        "Assets/Scripts/Systems/PerkDraftManager.cs",
+        "Assets/Editor/DemonKnightPackageVersion.cs",
+        "Assets/Editor/ArthurianSyncFromGitHub.cs",
+    };
+
     [MenuItem("Arthurian/Sync All Scripts From GitHub", false, 0)]
     public static void SyncAll()
     {
         if (!EditorUtility.DisplayDialog(
                 "DemonKnight Sync",
-                "Download and overwrite all DemonKnight scripts from GitHub main?\n\n" +
-                "Uses cache-busting (raw.githubusercontent.com often serves stale /main).",
+                "Download and REPLACE all DemonKnight scripts from GitHub main?\n\n" +
+                "• Deletes each .cs then rewrites it (fixes Windows/Unity partial overwrite)\n" +
+                "• Does NOT touch scenes, art, or ProjectSettings\n" +
+                "• Diagnose must show: " + ExpectedPackageId,
                 "Sync Now", "Cancel"))
             return;
 
-        RunSync(showDialog: true);
+        RunSync(showDialog: true, deleteFirst: true);
+    }
+
+    [MenuItem("Arthurian/Force Delete+Sync ALL Scripts", false, 1)]
+    public static void ForceDeleteSyncAll()
+    {
+        if (!EditorUtility.DisplayDialog(
+                "DemonKnight FORCE Sync",
+                "DELETE every listed DemonKnight .cs on disk, then re-download the full set from GitHub main.\n\n" +
+                "Use this when Diagnose still shows CS1061 after a normal Sync.\n" +
+                "Scenes/art are NOT deleted.",
+                "Delete + Sync", "Cancel"))
+            return;
+
+        RunSync(showDialog: true, deleteFirst: true, preDeleteAll: true);
     }
 
     [MenuItem("Arthurian/Force Re-Sync Night/HUD Fix", false, 2)]
     public static void ForceResyncNightFix()
     {
-        // Minimal set that fixes CS1061 SetNight — always pull these with dual CDN.
-        string[] critical =
-        {
-            "Assets/Scripts/Systems/GameLoopManager.cs",
-            "Assets/Scripts/UI/ChurchStageUIController.cs",
-            "Assets/Scripts/UI/SomersetChurchUI.cs",
-            "Assets/Editor/DemonKnightPackageVersion.cs",
-            "Assets/Editor/ArthurianSyncFromGitHub.cs",
-        };
-
-        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        var errors = new List<string>();
-        int ok = 0;
-        string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
-
-        try
-        {
-            EditorUtility.DisplayProgressBar("DemonKnight Force Sync", "Pulling night/HUD fix…", 0f);
-            for (int i = 0; i < critical.Length; i++)
-            {
-                string rel = critical[i];
-                EditorUtility.DisplayProgressBar("DemonKnight Force Sync", rel, (float)i / critical.Length);
-                try
-                {
-                    string body = DownloadFresh(rel, out string source);
-                    ValidateCritical(rel, body);
-                    string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                    File.WriteAllText(dest, body);
-                    ok++;
-                    Debug.Log($"[DemonKnight] Force-synced {rel} via {source}");
-                }
-                catch (Exception ex)
-                {
-                    errors.Add($"{rel}: {ex.Message}");
-                }
-            }
-        }
-        finally
-        {
-            EditorUtility.ClearProgressBar();
-        }
-
-        ArthurianFixMisplacedScripts.Run();
-        AssetDatabase.Refresh();
-
-        string msg = $"Force-synced {ok}/{critical.Length} night/HUD files.";
-        if (errors.Count > 0) msg += "\n\nFailures:\n" + string.Join("\n", errors);
-        else msg += $"\n\nDiagnose must show package `{ExpectedPackageId}` after compile.";
-        EditorUtility.DisplayDialog("DemonKnight Force Sync", msg, "OK");
+        // Legacy menu — now runs the full atomic critical set (not just 5 files).
+        ForceDeleteSyncAll();
     }
 
-    public static void RunSync(bool showDialog)
+    public static void RunSync(bool showDialog, bool deleteFirst = true, bool preDeleteAll = false)
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
 
         var errors = new List<string>();
-        int ok = 0;
+        var okFiles = new List<string>();
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
 
         try
         {
+            if (preDeleteAll)
+            {
+                EditorUtility.DisplayProgressBar("DemonKnight Sync", "Deleting local script copies…", 0f);
+                foreach (string rel in ScriptPaths)
+                {
+                    string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                    TryDeleteFile(dest);
+                }
+            }
+
             EditorUtility.DisplayProgressBar("DemonKnight Sync", "Starting…", 0f);
             for (int i = 0; i < ScriptPaths.Length; i++)
             {
@@ -155,16 +146,17 @@ public static class ArthurianSyncFromGitHub
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 try
                 {
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                     string text = DownloadFresh(rel, out string source);
                     ValidateCritical(rel, text);
-                    File.WriteAllText(dest, text);
-                    ok++;
+                    WriteReplacing(dest, text, deleteFirst);
+                    VerifyOnDisk(rel, dest);
+                    okFiles.Add(rel);
                     Debug.Log($"[DemonKnight] Synced {rel} via {source}");
                 }
                 catch (Exception ex)
                 {
                     errors.Add($"{rel}: {ex.Message}");
+                    Debug.LogError($"[DemonKnight] Sync FAILED {rel}: {ex.Message}");
                 }
             }
         }
@@ -176,28 +168,84 @@ public static class ArthurianSyncFromGitHub
         ArthurianFixMisplacedScripts.Run();
         AssetDatabase.Refresh();
 
-        string msg = $"Synced {ok}/{ScriptPaths.Length} files from GitHub.";
+        var missingCritical = new List<string>();
+        foreach (string rel in AtomicCritical)
+        {
+            if (!okFiles.Contains(rel))
+                missingCritical.Add(rel);
+        }
+
+        string msg = $"Synced {okFiles.Count}/{ScriptPaths.Length} files from GitHub.";
         if (errors.Count > 0)
             msg += "\n\nFailures:\n" + string.Join("\n", errors);
+        if (missingCritical.Count > 0)
+        {
+            msg += "\n\nINCOMPLETE — critical files missing/failed:\n" + string.Join("\n", missingCritical)
+                   + "\n\nRun Arthurian → Force Delete+Sync ALL Scripts again.";
+        }
         else
-            msg += $"\n\nWait for compile. Diagnose must show `{ExpectedPackageId}`.";
+        {
+            msg += $"\n\nWait for compile. Diagnose must show `{ExpectedPackageId}`."
+                   + "\nDo NOT rebuild the scene — HUD placements stay.";
+        }
 
         Debug.Log("[DemonKnight] " + msg);
         if (showDialog)
-            EditorUtility.DisplayDialog("DemonKnight Sync", msg + "\n\nWait for compile, then Play.", "OK");
+            EditorUtility.DisplayDialog(
+                missingCritical.Count > 0 ? "DemonKnight Sync INCOMPLETE" : "DemonKnight Sync",
+                msg,
+                "OK");
     }
 
-    /// <summary>
-    /// Download with cache-bust query + BypassCache. Falls back to jsDelivr if the
-    /// primary body fails a critical sanity check (stale raw CDN).
-    /// </summary>
+    private static void WriteReplacing(string dest, string text, bool deleteFirst)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+        if (deleteFirst)
+            TryDeleteFile(dest);
+
+        string tmp = dest + ".dk-sync-tmp";
+        TryDeleteFile(tmp);
+        File.WriteAllText(tmp, text);
+        if (File.Exists(dest))
+        {
+            try { File.Replace(tmp, dest, null); }
+            catch
+            {
+                TryDeleteFile(dest);
+                File.Move(tmp, dest);
+            }
+        }
+        else
+        {
+            File.Move(tmp, dest);
+        }
+        TryDeleteFile(tmp);
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        if (!File.Exists(path)) return;
+        try { File.SetAttributes(path, FileAttributes.Normal); } catch { /* ignore */ }
+        try { File.Delete(path); } catch (Exception ex)
+        {
+            throw new Exception("could not delete old file (close Unity lock?): " + ex.Message);
+        }
+    }
+
+    private static void VerifyOnDisk(string rel, string dest)
+    {
+        if (!File.Exists(dest))
+            throw new Exception("write vanished — file missing after sync");
+        string disk = File.ReadAllText(dest);
+        if (!PassesCriticalCheck(rel, disk))
+            throw new Exception("on-disk file failed sanity check after write");
+    }
+
     private static string DownloadFresh(string rel, out string source)
     {
         string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N");
         Exception last = null;
 
-        // Prefer jsDelivr first — raw.githubusercontent.com/main has been observed
-        // serving multi-commit-stale GameLoopManager bodies even with ?t= busting.
         string[] urls =
         {
             JsDelivrMain + rel + "?" + bust,
@@ -214,7 +262,6 @@ public static class ArthurianSyncFromGitHub
                 string body = DownloadString(urls[i]);
                 if (string.IsNullOrEmpty(body) || body.StartsWith("404") || body.Contains("404: Not Found"))
                     throw new Exception("Empty or 404");
-                // For critical files, reject known-stale bodies immediately and try next CDN.
                 if (IsCritical(rel) && !PassesCriticalCheck(rel, body))
                     throw new Exception("stale/cached body failed sanity check");
                 source = labels[i];
@@ -241,43 +288,80 @@ public static class ArthurianSyncFromGitHub
 
     private static bool IsCritical(string rel)
     {
-        return rel.EndsWith("GameLoopManager.cs", StringComparison.OrdinalIgnoreCase)
-               || rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase)
-               || rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
-               || rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase);
+        foreach (string c in AtomicCritical)
+        {
+            if (rel.Equals(c, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     private static void ValidateCritical(string rel, string body)
     {
         if (!IsCritical(rel)) return;
         if (!PassesCriticalCheck(rel, body))
-            throw new Exception("sanity check failed after download — CDN may still be stale; try Force Re-Sync or overwrite from commit URLs in README");
+            throw new Exception("sanity check failed after download — CDN stale; use Force Delete+Sync");
     }
 
     private static bool PassesCriticalCheck(string rel, string body)
     {
         if (rel.EndsWith("GameLoopManager.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // Must NOT be the old RefreshNightHUD that calls SomersetChurchUI.SetNight.
             if (Regex.IsMatch(body, @"FindFirstObjectByType\s*<\s*SomersetChurchUI\s*>\s*\(\s*\)[\s\S]{0,80}?SetNight"))
                 return false;
-            // Must have night counter + name-based NightText path (or ApplyNightLabel).
-            return body.Contains("currentNight")
-                   && (body.Contains("NightText") || body.Contains("ApplyNightLabel"));
+            return body.Contains("WaveVictoryGold")
+                   && body.Contains("WaveLossGold")
+                   && body.Contains("EnsureDisbandedAfterWave")
+                   && body.Contains("mustDisbandPartyAfterCurrentWave")
+                   && body.Contains("AutosaveWarband")
+                   && (body.Contains("static GameLoopManager Resolve") || body.Contains("ResolveChurchUI"));
+        }
+
+        if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("ResolveLoop")
+                   && body.Contains("WaveVictoryGold")
+                   && body.Contains("ChurchRewireMarch")
+                   && body.Contains("EnsureDisbandedAfterWave");
         }
 
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return Regex.IsMatch(body, @"void\s+SetNight\s*\(\s*int");
+            return body.Contains("RewireMarchButton")
+                   && body.Contains("ForceNamedTavernDicePanelsInactive")
+                   && body.Contains("EnsureDiceHudAndHidden")
+                   && body.Contains("EnsureCodexScrollViewport")
+                   && body.Contains("ApplyTwoColumnCodexLayout")
+                   && body.Contains("forceEqualHudSlots");
         }
+
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // Stub only — must inherit SomersetChurchUI and must NOT redeclare SetNight (CS0108).
             return Regex.IsMatch(body, @"class\s+ChurchStageUIController\s*:\s*SomersetChurchUI")
                    && !Regex.IsMatch(body, @"void\s+SetNight\s*\(\s*int");
         }
 
-        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))
+        if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("DemonKnightCompatApi");
+        }
+
+        if (rel.EndsWith("LegendCodexUI.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("MainMenuUI.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("AutoBattlerEngine.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("PerkDraftManager.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("MerlinResurrectionManager.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("DemonKnightCompatApi");
+        }
+
+        if (rel.EndsWith("BattlefieldVisualizer.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("ResolveArenaBindings") && body.Contains("ApplyBackgroundArt");
+        }
+
+        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains(ExpectedPackageId);
         }
