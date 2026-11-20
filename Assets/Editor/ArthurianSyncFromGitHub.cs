@@ -20,10 +20,11 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "d4c45c9";
+    // Package tip pin — Force Sync prefers this over main until Art Tools PRs merge.
+    // Updated when shipping Sync packages (main tip alone is still older merges).
+    private const string FallbackCommitSha = "d496433";
 
-    private const string ExpectedPackageId = "art-tools-under-arthurian";
+    private const string ExpectedPackageId = "art-tools-install-menu";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -163,7 +164,8 @@ public static class ArthurianSyncFromGitHub
             return;
 
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        string sha = ResolveMainSha() ?? FallbackCommitSha;
+        // Prefer package pin (Fallback) — main tip may lag open Art Tools PRs.
+        string sha = FallbackCommitSha;
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
         string[] bootstrap =
         {
@@ -217,8 +219,9 @@ public static class ArthurianSyncFromGitHub
     public static void RunSync(bool showDialog, bool deleteFirst = true, bool preDeleteAll = false)
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        string sha = ResolveMainSha() ?? FallbackCommitSha;
-        Debug.Log($"[DemonKnight] Sync pinning downloads to commit {sha}");
+        // Prefer package pin over tip-of-main so Andrew gets Art Tools before merge.
+        string sha = FallbackCommitSha;
+        Debug.Log($"[DemonKnight] Sync pinning downloads to commit {sha} (package pin; main may lag)");
 
         var errors = new List<string>();
         var okFiles = new List<string>();
@@ -531,6 +534,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("art-tools-install-menu")
                    || body.Contains("art-tools-under-arthurian")
                    || body.Contains("end-run-remove-perks-runes")
                    || body.Contains("character-registry-battle-sprites")
@@ -565,6 +569,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("art-tools-install-menu")
                     || body.Contains("art-tools-under-arthurian")
                     || body.Contains("end-run-remove-perks-runes")
                     || body.Contains("character-registry-battle-sprites")

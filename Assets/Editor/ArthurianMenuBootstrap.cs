@@ -1,16 +1,25 @@
 #if UNITY_EDITOR
 using System;
 using System.IO;
+using System.Net;
 using UnityEditor;
 using UnityEngine;
 
 /// <summary>
 /// Always-available menu entries that do not depend on TextMeshPro or gameplay scripts.
-/// If you can see Arthurian → Diagnose Project but not Align / Build menus,
-/// open Console — gameplay or Editor scripts failed to compile (usually missing TMP).
+/// Art Tools live HERE so they show under Arthurian even when Force Sync still pins old main
+/// (importers are downloaded on demand from the package tip SHA).
 /// </summary>
 public static class ArthurianMenuBootstrap
 {
+    /// <summary>
+    /// Package tip with Modular/Battle importers + Art Tools aliases.
+    /// Update when shipping a new Sync pin (Force Sync prefers this over main).
+    /// </summary>
+    public const string ArtToolsPinSha = "d496433";
+
+    const string Repo = "airizarry9938/DemonKnight";
+
     [MenuItem("Arthurian/Diagnose Project", false, 1)]
     public static void DiagnoseProject()
     {
@@ -84,11 +93,12 @@ public static class ArthurianMenuBootstrap
         string msg =
             "DemonKnight / Arthurian diagnose\n\n" +
             $"Package: {packageId} ({packageGit})\n" +
+            $"Art Tools pin: {ArtToolsPinSha}\n" +
             $"Assets path:\n{Application.dataPath}\n" +
-            $"Sync menus on disk: {(syncOnDisk ? "YES" : "NO — Bootstrap/Force Sync MISSING")}\n" +
+            $"Sync menus on disk: {(syncOnDisk ? "YES" : "NO")}\n" +
             $"Sync menus compiled: {(hasSyncType ? "YES" : "NO")}\n" +
             $"Diagnose host on disk: {(menuBootOnDisk ? "YES" : "NO")}\n" +
-            $"Align script on disk: {(alignFileOnDisk ? "YES" : "NO — Unity never got the update")}\n" +
+            $"Align script on disk: {(alignFileOnDisk ? "YES" : "NO")}\n" +
             $"Align menu compiled: {(hasAlignType ? "YES" : "NO")}\n" +
             $"Art importer on disk: {(modularImporterOnDisk ? "YES" : "NO")}\n" +
             $"Art importer compiled: {(hasModularImporter ? "YES" : "NO")}\n" +
@@ -100,67 +110,198 @@ public static class ArthurianMenuBootstrap
             $"Church pew layout: {(hasPews ? "YES" : "NO")}\n" +
             $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n\n";
 
-        if (!syncOnDisk || !hasSyncType)
+        if (!hasModularImporter || !hasBattleSlicer)
         {
             msg +=
-                "SYNC MENUS MISSING.\n" +
-                "Overwrite Assets/Editor/ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs from jsDelivr (pinned SHA),\n" +
-                "then Assets → Refresh. See ANDREW-SYNC-KEEP-EDITOR-MENUS.md.\n\n";
-        }
-
-        if (!alignFileOnDisk)
-        {
-            msg +=
-                "ALIGN SCRIPT MISSING FROM THIS UNITY FOLDER.\n" +
-                "Cloud pushes do not land here until you pull or copy the file.\n\n" +
-                "FIX (pick one):\n" +
-                "A) In a terminal at this project root: git pull\n" +
-                "B) Download into Assets/Editor/ then Refresh:\n" +
-                "https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Editor/ArthurianAlignCrowdPews.cs\n\n" +
-                "Expected path:\n" + alignPath;
-        }
-        else if (looksLikeFirstBuild)
-        {
-            msg +=
-                "THIS IS THE OLD FIRST BUILD.\n" +
-                "Unity is not reading the updated DemonKnight package.\n\n" +
-                "FIX: git pull in the Unity Hub project folder, then Assets → Refresh.";
-        }
-        else if (!hasTmp)
-        {
-            msg +=
-                "FIX: Window → TextMeshPro → Import TMP Essential Resources.\n" +
-                "Wait for compile, then check Console for red errors.";
-        }
-        else if (!hasGameplay || !hasBuilder)
-        {
-            msg +=
-                "FIX: Open Window → General → Console and clear red compile errors.\n" +
-                "After scripts compile you should see:\n" +
-                "• Arthurian → Align Crowd Grid To Church Pews\n" +
-                "• Arthurian → Build Complete Scene Hierarchy";
-        }
-        else if (!modularImporterOnDisk || !hasModularImporter || !battleSlicerOnDisk || !hasBattleSlicer)
-        {
-            msg +=
-                "ART TOOLS MISSING OR NOT COMPILED.\n" +
-                "Run Arthurian → Force Delete+Sync ALL Scripts, wait for compile,\n" +
-                "then use Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
-                "(also listed under DemonKnight if that top menu appears).\n";
+                "ART TOOLS NOT COMPILED YET.\n" +
+                "Use: Arthurian → Art Tools → Install Art Importers Now\n" +
+                "(Force Sync from main alone will NOT get them until that PR merges.)\n";
         }
         else
         {
             msg +=
-                "Package looks current.\n" +
-                "• Art sheets? → Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
-                "• Battle sheets? → Arthurian → Art Tools → Battle Sprite Sheet Slicer\n" +
-                "• Characters? → Arthurian → Art Tools → Seed / Auto-Collect\n" +
-                "• ChurchBackground? → Arthurian → Align Crowd Grid To Church Pews\n" +
-                "• Fresh scene? → Arthurian → Build Complete Scene Hierarchy\n";
+                "Art tools ready.\n" +
+                "• Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
+                "• Arthurian → Art Tools → Battle Sprite Sheet Slicer\n";
         }
 
         Debug.Log(msg);
         EditorUtility.DisplayDialog("Arthurian Diagnose", msg, "OK");
+    }
+
+    [MenuItem("Arthurian/Art Tools/Install Art Importers Now", false, 40)]
+    public static void InstallArtImportersNow()
+    {
+        if (!EditorUtility.DisplayDialog(
+                "Install Art Importers",
+                "Download Modular + Battle sprite importer scripts from GitHub pin "
+                + ArtToolsPinSha + " into Assets/Editor/?\n\n"
+                + "Needed because Force Sync still follows main until Art Tools merge.",
+                "Download", "Cancel"))
+            return;
+
+        string[] rels =
+        {
+            "Assets/Editor/ModularSpriteSheetImporterWindow.cs",
+            "Assets/Editor/BattleSpriteSheetSlicerWindow.cs",
+            "Assets/Editor/CharacterCatalogSeeder.cs",
+            "Assets/Editor/CharacterDatabaseEditor.cs",
+            "Assets/Editor/DemonKnightPackageVersion.cs",
+        };
+
+        int ok = 0;
+        var errors = "";
+        try
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+            for (int i = 0; i < rels.Length; i++)
+            {
+                string rel = rels[i];
+                EditorUtility.DisplayProgressBar("Art Tools Install", rel, (float)i / rels.Length);
+                try
+                {
+                    string body = DownloadRel(rel, ArtToolsPinSha);
+                    string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                    File.WriteAllText(dest, body);
+                    ok++;
+                    Debug.Log("[DemonKnight] Installed " + rel + " @ " + ArtToolsPinSha);
+                }
+                catch (Exception ex)
+                {
+                    errors += rel + ": " + ex.Message + "\n";
+                    Debug.LogError("[DemonKnight] Install failed " + rel + ": " + ex.Message);
+                }
+            }
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+
+        AssetDatabase.Refresh();
+        EditorUtility.DisplayDialog(
+            "Art Tools Install",
+            $"Installed {ok}/{rels.Length} @ {ArtToolsPinSha}.\n"
+            + "Wait for compile, then open:\n"
+            + "Arthurian → Art Tools → Modular Sprite Sheet Importer\n\n"
+            + (string.IsNullOrEmpty(errors) ? "" : "Errors:\n" + errors),
+            "OK");
+    }
+
+    [MenuItem("Arthurian/Art Tools/Modular Sprite Sheet Importer", false, 41)]
+    public static void OpenModularImporter()
+    {
+        if (!TryOpenEditorWindow("ModularSpriteSheetImporterWindow"))
+        {
+            if (EditorUtility.DisplayDialog(
+                    "Art Tools",
+                    "Modular importer script is not compiled yet.\nDownload it now?",
+                    "Install", "Cancel"))
+            {
+                InstallArtImportersNow();
+            }
+        }
+    }
+
+    [MenuItem("Arthurian/Art Tools/Battle Sprite Sheet Slicer", false, 42)]
+    public static void OpenBattleSlicer()
+    {
+        if (!TryOpenEditorWindow("BattleSpriteSheetSlicerWindow"))
+        {
+            if (EditorUtility.DisplayDialog(
+                    "Art Tools",
+                    "Battle slicer script is not compiled yet.\nDownload it now?",
+                    "Install", "Cancel"))
+            {
+                InstallArtImportersNow();
+            }
+        }
+    }
+
+    [MenuItem("Arthurian/Art Tools/Seed Default Character Definitions", false, 43)]
+    public static void SeedCharacters()
+    {
+        var t = FindType("CharacterCatalogSeeder");
+        var m = t?.GetMethod("SeedAll", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        if (m == null)
+        {
+            if (EditorUtility.DisplayDialog(
+                    "Art Tools",
+                    "Character seeder not compiled yet.\nDownload Art Importers now?",
+                    "Install", "Cancel"))
+                InstallArtImportersNow();
+            return;
+        }
+        m.Invoke(null, null);
+    }
+
+    [MenuItem("Arthurian/Art Tools/Auto-Collect Character Database", false, 44)]
+    public static void AutoCollectCharacters()
+    {
+        var t = FindType("CharacterDatabaseEditor");
+        var m = t?.GetMethod("MenuAutoCollect", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        if (m == null)
+        {
+            if (EditorUtility.DisplayDialog(
+                    "Art Tools",
+                    "CharacterDatabase editor not compiled yet.\nDownload Art Importers now?",
+                    "Install", "Cancel"))
+                InstallArtImportersNow();
+            return;
+        }
+        m.Invoke(null, null);
+    }
+
+    static bool TryOpenEditorWindow(string typeName)
+    {
+        var t = FindType(typeName);
+        if (t == null) return false;
+        EditorWindow.GetWindow(t);
+        return true;
+    }
+
+    static Type FindType(string typeName)
+    {
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            try
+            {
+                var t = asm.GetType(typeName, false);
+                if (t != null) return t;
+            }
+            catch { /* ignore */ }
+        }
+        return null;
+    }
+
+    static string DownloadRel(string rel, string sha)
+    {
+        string bust = "t=" + DateTime.UtcNow.Ticks;
+        string[] urls =
+        {
+            "https://cdn.jsdelivr.net/gh/" + Repo + "@" + sha + "/" + rel + "?" + bust,
+            "https://raw.githubusercontent.com/" + Repo + "/" + sha + "/" + rel + "?" + bust,
+        };
+        Exception last = null;
+        foreach (string url in urls)
+        {
+            try
+            {
+                using (var wc = new WebClient())
+                {
+                    wc.Headers.Add("User-Agent", "DemonKnight-ArtTools/" + sha);
+                    wc.CachePolicy = new System.Net.Cache.RequestCachePolicy(
+                        System.Net.Cache.RequestCacheLevel.BypassCache);
+                    string body = wc.DownloadString(url);
+                    if (!string.IsNullOrEmpty(body) && body.Length > 32)
+                        return body;
+                }
+            }
+            catch (Exception ex) { last = ex; }
+        }
+        throw last ?? new Exception("Download failed for " + rel);
     }
 
     private static bool TypeExists(string fullName)
@@ -182,15 +323,10 @@ public static class ArthurianMenuBootstrap
         EditorUtility.RevealInFinder(Application.dataPath);
         EditorUtility.DisplayDialog(
             "DemonKnight Setup",
-            "1) Confirm Assets/Scripts/UI/SomersetPewLayout.cs exists.\n" +
-            "2) Wait for compile (bottom-right spinner).\n" +
-            "3) Arthurian → Diagnose Project (must show art-tools-under-arthurian).\n" +
-            "   Art importers: Arthurian → Art Tools (also DemonKnight if present).\n" +
-            "   If Bootstrap / Force Delete+Sync missing: overwrite ArthurianSyncFromGitHub.cs\n" +
-            "   + ArthurianMenuBootstrap.cs from jsDelivr (pinned SHA) — see README.\n" +
-            "4) If you already added ChurchBackground: Arthurian → Align Crowd Grid To Church Pews.\n" +
-            "5) Only use Build Complete Scene Hierarchy for a brand-new scene.\n\n" +
-            "Project Assets path:\n" + Application.dataPath,
+            "Art tools: Arthurian → Art Tools → Install Art Importers Now\n"
+            + "(Force Sync from main will not bring Art Tools until that PR merges.)\n\n"
+            + "Then: Modular Sprite Sheet Importer / Battle Sprite Sheet Slicer.\n\n"
+            + "Project Assets path:\n" + Application.dataPath,
             "OK");
         Debug.Log("[DemonKnight] Assets path: " + Application.dataPath);
     }
