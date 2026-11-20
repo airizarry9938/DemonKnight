@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Video;
 
 namespace ArthurianAutobattler
 {
@@ -8,18 +9,23 @@ namespace ArthurianAutobattler
     /// so toggling the arena cannot destroy this singleton).
     ///
     /// Andrew — where to put art:
-    /// 1) Background: assign <see cref="battleBackgroundSprite"/> OR place a SpriteRenderer
-    ///    named "BattleBackground" under the BattlefieldArena object in the scene.
-    ///    Suggested path: Assets/Art/Backgrounds/Battlefield.jpg (Texture Type = Sprite).
-    /// 2) Player slots: child Transforms under "PlayerSlots" (Slot_0, Slot_1, …) on the arena
+    /// 1) Still background: assign <see cref="battleBackgroundSprite"/> OR place a SpriteRenderer
+    ///    named "BattleBackground" under BattlefieldArena.
+    ///    Path: Assets/Art/Backgrounds/Battlefield.jpg (Texture Type = Sprite).
+    /// 2) Video loop (preferred for fight scene): assign <see cref="battleBackgroundVideo"/> OR
+    ///    drop a clip at Assets/Art/Backgrounds/BattlefieldLoop.mp4 and leave the field empty —
+    ///    runtime tries Resources/Art/Backgrounds/BattlefieldLoop then StreamingAssets.
+    ///    See Assets/Art/Backgrounds/README-BATTLE-VIDEO.txt.
+    /// 3) Player slots: child Transforms under "PlayerSlots" (Slot_0, Slot_1, …) on the arena
     ///    OR leave empty and positions use <see cref="humanOrigin"/> grid math.
-    /// 3) Enemy slots: same under "EnemySlots".
+    /// 4) Enemy slots: same under "EnemySlots".
     /// Hierarchy expected (scene builder creates this):
     ///   BattlefieldArena (toggled on March)
-    ///     BattleBackground   ← SpriteRenderer (your art)
+    ///     BattleBackground      ← SpriteRenderer (still art / tint fallback)
+    ///     BattleVideoBackground ← Quad + VideoPlayer → RenderTexture (optional)
     ///     PlayerSlots/Slot_0..N
     ///     EnemySlots/Slot_0..N
-    ///   Managers/BattlefieldVisualizer  ← this component (prefabs + sprite refs)
+    ///   Managers/BattlefieldVisualizer  ← this component (prefabs + sprite / video refs)
     /// </summary>
     public class BattlefieldVisualizer : MonoBehaviour
     {
@@ -61,6 +67,16 @@ namespace ArthurianAutobattler
         [Tooltip("Tint used when no sprite is assigned (avoids pure black).")]
         public Color fallbackGroundColor = new Color(0.22f, 0.16f, 0.12f, 1f);
 
+        [Header("Video background (fight scene)")]
+        [Tooltip("Drop BattlefieldLoop.mp4 here, or leave empty and use the documented asset path.")]
+        public VideoClip battleBackgroundVideo;
+        [Tooltip("Resources path without extension (optional). Default: Art/Backgrounds/BattlefieldLoop")]
+        public string videoResourcesPath = "Art/Backgrounds/BattlefieldLoop";
+        [Tooltip("Created at runtime if null — VideoPlayer renders into this.")]
+        public RenderTexture battleVideoRT;
+        public int videoRTWidth = 1280;
+        public int videoRTHeight = 720;
+
         [Header("Formation origins (used when no PlayerSlots/EnemySlots)")]
         public Vector2 humanOrigin = new Vector2(-3.5f, 2.0f);
         public Vector2 demonOrigin = new Vector2(3.5f, 2.0f);
@@ -75,6 +91,9 @@ namespace ArthurianAutobattler
         private readonly Dictionary<string, UnitVisualActor> activeActors = new Dictionary<string, UnitVisualActor>();
         private Transform[] resolvedPlayerSlots;
         private Transform[] resolvedEnemySlots;
+        private VideoPlayer videoPlayer;
+        private MeshRenderer videoQuadRenderer;
+        private Transform arenaRoot;
 
         private void Awake()
         {
@@ -99,15 +118,17 @@ namespace ArthurianAutobattler
         {
             // Arena is toggled off between town/battle — clear actors so we don't keep stale refs.
             ClearAllActors();
+            StopBattleVideo();
         }
 
         private void OnEnable()
         {
             ResolveArenaBindings();
             ApplyBackgroundArt();
+            ApplyVideoBackground();
         }
 
-        /// <summary>Find BattlefieldArena children and apply background sprite/tint.</summary>
+        /// <summary>Find BattlefieldArena children and apply background sprite/tint + video.</summary>
         public void ResolveArenaBindings()
         {
             var loop = GameLoopManager.Instance;
@@ -120,6 +141,7 @@ namespace ArthurianAutobattler
                 if (found != null) arena = found.transform;
             }
             if (arena == null) return;
+            arenaRoot = arena;
 
             if (battleBackground == null)
             {
@@ -135,6 +157,7 @@ namespace ArthurianAutobattler
             resolvedPlayerSlots = playerSlots;
             resolvedEnemySlots = enemySlots;
             ApplyBackgroundArt();
+            ApplyVideoBackground();
         }
 
         private static Transform[] CollectSlots(Transform parent)
@@ -160,6 +183,144 @@ namespace ArthurianAutobattler
             }
             // Ensure it draws behind unit actors (sorting).
             battleBackground.sortingOrder = -20;
+        }
+
+        /// <summary>
+        /// Start looping fight-scene video into a RenderTexture on a world quad.
+        /// No clip? Still builds the quad path and logs the drop location for Andrew.
+        /// </summary>
+        public void ApplyVideoBackground()
+        {
+            if (arenaRoot == null)
+            {
+                ResolveArenaBindings();
+                if (arenaRoot == null) return;
+            }
+
+            EnsureVideoQuad(arenaRoot);
+
+            VideoClip clip = ResolveVideoClip();
+            string streamingUrl = ResolveStreamingVideoUrl();
+
+            if (clip == null && string.IsNullOrEmpty(streamingUrl))
+            {
+                Debug.Log(
+                    "[DemonKnight] No battle video clip yet. Drop a loop at "
+                    + "Assets/Art/Backgrounds/BattlefieldLoop.mp4 (also copy to "
+                    + "Assets/Resources/Art/Backgrounds/BattlefieldLoop.mp4 for auto-load), "
+                    + "or assign BattlefieldVisualizer.battleBackgroundVideo. "
+                    + "Still background / tint remains active.");
+                if (videoQuadRenderer != null)
+                    videoQuadRenderer.gameObject.SetActive(false);
+                return;
+            }
+
+            if (battleVideoRT == null)
+            {
+                battleVideoRT = new RenderTexture(Mathf.Max(640, videoRTWidth), Mathf.Max(360, videoRTHeight), 0);
+                battleVideoRT.name = "BattleVideoRT";
+            }
+
+            if (videoPlayer == null)
+            {
+                videoPlayer = gameObject.GetComponent<VideoPlayer>();
+                if (videoPlayer == null) videoPlayer = gameObject.AddComponent<VideoPlayer>();
+            }
+
+            videoPlayer.playOnAwake = false;
+            videoPlayer.isLooping = true;
+            videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+            videoPlayer.renderMode = VideoRenderMode.RenderTexture;
+            videoPlayer.targetTexture = battleVideoRT;
+            videoPlayer.skipOnDrop = true;
+
+            if (clip != null)
+            {
+                videoPlayer.source = VideoSource.VideoClip;
+                videoPlayer.clip = clip;
+                videoPlayer.url = string.Empty;
+            }
+            else
+            {
+                videoPlayer.source = VideoSource.Url;
+                videoPlayer.clip = null;
+                videoPlayer.url = streamingUrl;
+            }
+
+            if (videoQuadRenderer != null)
+            {
+                videoQuadRenderer.gameObject.SetActive(true);
+                if (videoQuadRenderer.material != null)
+                    videoQuadRenderer.material.mainTexture = battleVideoRT;
+            }
+
+            // Dim still sprite so video reads as the primary plane.
+            if (battleBackground != null)
+                battleBackground.color = new Color(0.15f, 0.12f, 0.10f, 0.35f);
+
+            if (!videoPlayer.isPlaying)
+                videoPlayer.Play();
+        }
+
+        public void StopBattleVideo()
+        {
+            if (videoPlayer != null && videoPlayer.isPlaying)
+                videoPlayer.Stop();
+        }
+
+        private VideoClip ResolveVideoClip()
+        {
+            if (battleBackgroundVideo != null) return battleBackgroundVideo;
+
+            if (!string.IsNullOrEmpty(videoResourcesPath))
+            {
+                var fromRes = Resources.Load<VideoClip>(videoResourcesPath);
+                if (fromRes != null) return fromRes;
+            }
+
+            return null;
+        }
+
+        private static string ResolveStreamingVideoUrl()
+        {
+            string streaming = System.IO.Path.Combine(Application.streamingAssetsPath, "BattlefieldLoop.mp4");
+            if (!System.IO.File.Exists(streaming)) return null;
+            return "file://" + streaming.Replace("\\", "/");
+        }
+
+        private void EnsureVideoQuad(Transform arena)
+        {
+            Transform existing = arena.Find("BattleVideoBackground");
+            GameObject quadGo;
+            if (existing != null)
+            {
+                quadGo = existing.gameObject;
+            }
+            else
+            {
+                quadGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                quadGo.name = "BattleVideoBackground";
+                quadGo.transform.SetParent(arena, false);
+                quadGo.transform.localPosition = new Vector3(0f, 0.2f, 1.5f);
+                quadGo.transform.localRotation = Quaternion.identity;
+                quadGo.transform.localScale = new Vector3(14f, 8f, 1f);
+                var col = quadGo.GetComponent<Collider>();
+                if (col != null) Destroy(col);
+            }
+
+            videoQuadRenderer = quadGo.GetComponent<MeshRenderer>();
+            if (videoQuadRenderer == null) return;
+
+            // Unlit texture material so the RT shows without scene lights.
+            Shader sh = Shader.Find("Unlit/Texture");
+            if (sh == null) sh = Shader.Find("Sprites/Default");
+            if (sh == null) sh = Shader.Find("UI/Default");
+            if (videoQuadRenderer.sharedMaterial == null || videoQuadRenderer.sharedMaterial.shader != sh)
+            {
+                var mat = new Material(sh != null ? sh : Shader.Find("Hidden/InternalErrorShader"));
+                mat.name = "BattleVideoMat";
+                videoQuadRenderer.material = mat;
+            }
         }
 
         public void ClearAllActors()

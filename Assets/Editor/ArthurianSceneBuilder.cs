@@ -6,6 +6,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using UnityEngine.Video;
 using TMPro;
 using ArthurianAutobattler;
 
@@ -70,6 +71,14 @@ public static class ArthurianSceneBuilder
             bgSr.color = Color.white;
         }
 
+        // Video loop (optional) — drop Assets/Art/Backgrounds/BattlefieldLoop.mp4
+        // and/or copy to Assets/Resources/Art/Backgrounds/BattlefieldLoop.mp4.
+        VideoClip battleVideo = AssetDatabase.LoadAssetAtPath<VideoClip>(
+            "Assets/Art/Backgrounds/BattlefieldLoop.mp4");
+        if (battleVideo == null)
+            battleVideo = AssetDatabase.LoadAssetAtPath<VideoClip>(
+                "Assets/Resources/Art/Backgrounds/BattlefieldLoop.mp4");
+
         Transform playerSlotsRoot = new GameObject("PlayerSlots").transform;
         playerSlotsRoot.SetParent(arena.transform, false);
         Transform enemySlotsRoot = new GameObject("EnemySlots").transform;
@@ -97,6 +106,7 @@ public static class ArthurianSceneBuilder
         visualizer.combatTextPrefab = AssetDatabase.LoadAssetAtPath<FloatingCombatText>("Assets/Prefabs/FloatingCombatText.prefab");
         visualizer.battleBackground = bgSr;
         visualizer.battleBackgroundSprite = battleBgSprite;
+        visualizer.battleBackgroundVideo = battleVideo;
         visualizer.playerSlots = playerSlotArr;
         visualizer.enemySlots = enemySlotArr;
 

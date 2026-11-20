@@ -152,6 +152,8 @@ namespace ArthurianAutobattler
                 Debug.LogWarning("[DemonKnight] ResolveArenaBindings missing — Sync BattlefieldVisualizer.cs.");
             if (!TryInvoke(viz, "ApplyBackgroundArt"))
                 Debug.LogWarning("[DemonKnight] ApplyBackgroundArt missing — Sync BattlefieldVisualizer.cs.");
+            if (!TryInvoke(viz, "ApplyVideoBackground"))
+                Debug.LogWarning("[DemonKnight] ApplyVideoBackground missing — Sync BattlefieldVisualizer.cs.");
         }
 
         static Component FindChurch()
