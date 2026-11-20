@@ -20,7 +20,7 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Package tip pin — Force Sync prefers this over main until this PR merges.</summary>
-    private const string FallbackCommitSha = "PLACEHOLDER";
+    private const string FallbackCommitSha = "9ffdea2";
 
     private const string ExpectedPackageId = "fix-fusion-serialize-flat-autosave";
 
