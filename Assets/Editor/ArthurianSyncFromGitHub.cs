@@ -192,14 +192,16 @@ public static class ArthurianSyncFromGitHub
         string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N");
         Exception last = null;
 
+        // Prefer jsDelivr first — raw.githubusercontent.com/main has been observed
+        // serving multi-commit-stale GameLoopManager bodies even with ?t= busting.
         string[] urls =
         {
-            RawMain + rel + "?" + bust,
             JsDelivrMain + rel + "?" + bust,
-            // Commit-less raw without query as last resort
+            JsDelivrMain + rel,
+            RawMain + rel + "?" + bust,
             RawMain + rel,
         };
-        string[] labels = { "raw+bust", "jsdelivr+bust", "raw" };
+        string[] labels = { "jsdelivr+bust", "jsdelivr", "raw+bust", "raw" };
 
         for (int i = 0; i < urls.Length; i++)
         {
