@@ -27,6 +27,55 @@ namespace ArthurianAutobattler
     public enum DemonicPactID { None, SilverTongue, HellfireSteel, Usurpation, EndlessHourglass }
     public enum SinRuneID { None, Jealousy, Lust }
 
+    /// <summary>
+    /// Single source of truth for hire add-ons / subtractions.
+    /// UI (dossier, dialogue, mood) and payment both use <see cref="RecruitInstance.ComputeHireBreakdown"/>.
+    /// </summary>
+    public struct HireCostBreakdown
+    {
+        public int baseHire;
+        public int rawGrudge;
+        public int effectiveGrudge;
+        public bool bloodOathApplied;
+        public int bloodOathRank;
+        public int writDiscount;
+        public int crownCut;
+        public int crownRank;
+        public int jealousyTax;
+        public int legendCount;
+        public int starDiscount;
+        public int victoryStars;
+        public int tavernCut;
+        public bool loyalistHalf;
+        public int preFloorCost;
+        public int floorApplied;
+        public int finalCost;
+
+        /// <summary>Net vs base hire before Loyalist ÷2 / floor (for dialogue).</summary>
+        public int NetModsBeforeLoyalistAndFloor =>
+            effectiveGrudge - writDiscount - crownCut + jealousyTax - starDiscount - tavernCut;
+
+        public string FormatDossierLines()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"Hire: <b>{finalCost}g</b>  (base {baseHire}g");
+            if (bloodOathApplied)
+                sb.Append($"; Blood-Oath R{bloodOathRank} −{bloodOathRank * 5}g (waived +{rawGrudge}g grudge)");
+            else if (rawGrudge != 0)
+                sb.Append(rawGrudge > 0 ? $"; grudge +{rawGrudge}g" : $"; win −{-rawGrudge}g");
+            if (writDiscount > 0) sb.Append($"; Writ −{writDiscount}g");
+            if (crownCut > 0) sb.Append($"; Crown R{crownRank} −{crownCut}g");
+            if (jealousyTax > 0) sb.Append($"; Jealousy +{jealousyTax}g ({legendCount} legend{(legendCount == 1 ? "" : "s")})");
+            if (starDiscount > 0) sb.Append($"; ★×{victoryStars} −{starDiscount}g");
+            if (tavernCut > 0) sb.Append($"; Tavern −{tavernCut}g");
+            if (loyalistHalf) sb.Append("; Loyalist ÷2");
+            if (floorApplied > 0 && finalCost == floorApplied && preFloorCost < floorApplied)
+                sb.Append($"; floor ≥{floorApplied}g");
+            sb.Append(')');
+            return sb.ToString();
+        }
+    }
+
     [Serializable]
     public class RecruitInstance
     {
@@ -77,49 +126,60 @@ namespace ArthurianAutobattler
         public bool IsFusedLegend =>
             fusionIngredients != null && fusionIngredients.Count > 0;
 
-        public int GetFinalHireCost(int grudgePenalty, int globalDiscount = 0)
+        public int GetFinalHireCost(int grudgePenalty, int globalDiscount = 0) =>
+            ComputeHireBreakdown(grudgePenalty, globalDiscount).finalCost;
+
+        /// <summary>
+        /// Compute every hire add-on / subtraction once. Dossier UI and payment share this.
+        /// </summary>
+        public HireCostBreakdown ComputeHireBreakdown(int grudgePenalty, int globalDiscount = 0)
         {
-            int effectiveGrudge = grudgePenalty;
-            int bloodRank = SomersetRunes.GetRank(BankRuneID.BloodOath);
-            if (bloodRank > 0
-                && (primaryTrait == TraitTag.Outlaw || primaryTrait == TraitTag.Coward)
-                && grudgePenalty > 0)
+            var b = new HireCostBreakdown
             {
-                // Blood-Oath reverses grudge into a discount for Outlaws/Cowards.
-                effectiveGrudge = -(bloodRank * 5);
-            }
+                baseHire = baseHireCost,
+                rawGrudge = grudgePenalty,
+                writDiscount = Mathf.Max(0, globalDiscount),
+                victoryStars = Mathf.Max(0, victoryStars),
+                loyalistHalf = primaryTrait == TraitTag.Loyalist,
+                floorApplied = HireFloorFor(unitType)
+            };
 
-            int peasantCut = 0;
+            b.bloodOathRank = SomersetRunes.GetRank(BankRuneID.BloodOath);
+            b.bloodOathApplied = b.bloodOathRank > 0
+                && (primaryTrait == TraitTag.Outlaw || primaryTrait == TraitTag.Coward)
+                && grudgePenalty > 0;
+            // Blood-Oath: replace positive grudge with a fixed discount (−5g × rank).
+            b.effectiveGrudge = b.bloodOathApplied
+                ? -(b.bloodOathRank * 5)
+                : grudgePenalty;
+
+            b.crownRank = SomersetRunes.GetRank(BankRuneID.PeasantsCrown);
             if (unitType == UnitType.Peasant)
-                peasantCut = SomersetRunes.GetRank(BankRuneID.PeasantsCrown) * 2;
+                b.crownCut = b.crownRank * 2;
 
-            int jealousyTax = 0;
             if (SomersetRunes.IsSinActive(SinRuneID.Jealousy) && GameLoopManager.Instance != null)
             {
-                int legendCount = 0;
                 foreach (var m in GameLoopManager.Instance.recruitedParty)
                 {
-                    if (IsLegendUnit(m.unitType)) legendCount++;
+                    if (m != null && IsLegendUnit(m.unitType)) b.legendCount++;
                 }
-                jealousyTax = legendCount * 10;
+                b.jealousyTax = b.legendCount * 10;
             }
 
-            int starDiscount = Mathf.Max(0, victoryStars) * VictoryStarHireDiscount;
+            b.starDiscount = b.victoryStars * VictoryStarHireDiscount;
 
-            // Buy Tavern Round: −10g hire for all units this town session / wave.
-            int tavernCut = 0;
             if (GameLoopManager.Instance != null && GameLoopManager.Instance.tavernRoundHireDiscountActive)
-                tavernCut = GameLoopManager.TavernRoundHireDiscount;
+                b.tavernCut = GameLoopManager.TavernRoundHireDiscount;
 
             int cost = Mathf.Max(1,
-                baseHireCost + effectiveGrudge - globalDiscount - peasantCut + jealousyTax - starDiscount - tavernCut);
-            if (primaryTrait == TraitTag.Loyalist) cost = Mathf.Max(1, cost / 2);
-
-            // Tier floors after ALL modifiers so Loyalist half-price / Crown / Writ / Tavern
-            // cannot show Peasants under 10g (or Warriors/Knights under their band floors)
-            // on New Game fresh townsfolk.
-            cost = Mathf.Max(cost, HireFloorFor(unitType));
-            return cost;
+                b.baseHire + b.effectiveGrudge - b.writDiscount - b.crownCut
+                + b.jealousyTax - b.starDiscount - b.tavernCut);
+            if (b.loyalistHalf) cost = Mathf.Max(1, cost / 2);
+            b.preFloorCost = cost;
+            // Tier floors after ALL modifiers so Loyalist / Crown / Writ / Tavern
+            // cannot undercut band floors on Fresh New Game townsfolk.
+            b.finalCost = Mathf.Max(cost, b.floorApplied);
+            return b;
         }
 
         /// <summary>Minimum displayed/paid hire after modifiers (matches initial hire bands).</summary>
@@ -161,24 +221,36 @@ namespace ArthurianAutobattler
 
         public string GetDisplayDescription()
         {
-            string info = $"<b>{characterName}</b> ({unitType}) | Pew {PewIndex + 1}/12 (seat {pewSeatIndex}) | Role: <b>{assignedRole}</b>\n";
-            if (isSirenEnchantress) info += "<color=#FF69B4>Siren Enchantress</color>\n";
-            if (victoryStars > 0)
-            {
-                info +=
-                    $"<color=#FFD700>★ Experienced ×{victoryStars}</color> (−{victoryStars * VictoryStarHireDiscount}g hire)\n";
-            }
+            int grudge = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(unitID) : 0;
+            int writ = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
+            return GetDisplayDescription(grudge, writ);
+        }
 
-            if (GameLoopManager.Instance != null && GameLoopManager.Instance.tavernRoundHireDiscountActive)
+        public string GetDisplayDescription(int grudgePenalty, int globalDiscount)
+        {
+            var hire = ComputeHireBreakdown(grudgePenalty, globalDiscount);
+
+            string info = $"<b>{characterName}</b> ({unitType}) | Pew {PewIndex + 1}/12 (seat {pewSeatIndex}) | Role: <b>{assignedRole}</b>\n";
+            if (isSirenEnchantress)
             {
-                info +=
-                    $"<color=#FFE066>Tavern Round</color> (−{GameLoopManager.TavernRoundHireDiscount}g hire this wave)\n";
+                info += "<color=#FF69B4>Siren Enchantress</color>";
+                if (SomersetRunes.IsSinActive(SinRuneID.Lust))
+                    info += " <color=#FF69B4>(Lust: −15g per marched Siren on win)</color>";
+                info += "\n";
             }
 
             if (intelTierUnlocked >= 1)
                 info += $"HP: {maxHealth} | ATK: {attackDamage} | SPD: {attackSpeed:F1}/s\n";
             else
                 info += "HP: ??? | ATK: ??? (Pay 10g to Scout)\n";
+
+            // Hire add-ons / subtractions — same math as Recruit (Ng).
+            info += $"<color=#FFE066>{hire.FormatDossierLines()}</color>\n";
+
+            // Battle-only perk / rune effects that dossier base stats omit.
+            info += FormatBattleBonusLines();
 
             if (intelTierUnlocked >= 2)
                 info += $"<color=#FF5555>Rival: Hates {hatedTrait}</color>\n";
@@ -191,6 +263,76 @@ namespace ArthurianAutobattler
                 info += "Full Potential: ??? (Pay 100g for Dossier)";
 
             return info;
+        }
+
+        /// <summary>Combat perk / rune / sin lines so dossier matches AutoBattle apply.</summary>
+        public string FormatBattleBonusLines()
+        {
+            var lines = new System.Text.StringBuilder();
+            var perks = PerkDraftManager.Instance;
+            if (perks != null)
+            {
+                if (perks.unlockedPerks.Contains(RunPerkID.PitchforkMilitia) && unitType == UnitType.Peasant)
+                    lines.AppendLine("<color=#9AD1FF>Pitchfork (battle): +10 HP, +2 ATK</color>");
+                if (perks.unlockedPerks.Contains(RunPerkID.HasteOfCamelot)
+                    && (unitType == UnitType.Warrior || unitType == UnitType.Knight))
+                    lines.AppendLine("<color=#9AD1FF>Haste (battle): +0.25 APS (cap 2.0)</color>");
+            }
+
+            int crown = SomersetRunes.GetRank(BankRuneID.PeasantsCrown);
+            if (crown > 0 && unitType == UnitType.Peasant && GameLoopManager.Instance != null)
+            {
+                int peasants = 0;
+                foreach (var m in GameLoopManager.Instance.recruitedParty)
+                    if (m != null && m.unitType == UnitType.Peasant) peasants++;
+                // Include this recruit if hired into an empty party preview: show formula.
+                int stacks = peasants / 5;
+                float aps = 0.15f * stacks * crown;
+                lines.AppendLine(stacks > 0
+                    ? $"<color=#B8E986>Crown (battle): +{aps:F2} APS (⌊{peasants}/5⌋×0.15×R{crown}, cap 2.0)</color>"
+                    : $"<color=#B8E986>Crown (battle): +0.15 APS ×⌊peasants/5⌋×R{crown} (need 5+ peasants)</color>");
+            }
+
+            if (SomersetRunes.IsSinActive(SinRuneID.Jealousy) && !IsLegendUnit(unitType))
+                lines.AppendLine("<color=#FF9A9A>Jealousy (battle): −3 ATK</color>");
+
+            return lines.ToString();
+        }
+
+        /// <summary>Dialogue that matches effective hire delta (Blood-Oath aware).</summary>
+        public string FormatHireDialogue(int grudgePenalty, int globalDiscount = 0)
+        {
+            var h = ComputeHireBreakdown(grudgePenalty, globalDiscount);
+            if (h.bloodOathApplied)
+            {
+                return $"\"Blood-Oath burned my bury-gold (+{h.rawGrudge}g). Hire is −{h.bloodOathRank * 5}g instead.\"";
+            }
+            if (h.rawGrudge > 0)
+                return $"\"I marched with you and fell. Bury-gold raised my hire by {h.rawGrudge}g.\"";
+            if (h.rawGrudge < 0)
+                return $"\"Victory softens the ledger — hire is { -h.rawGrudge}g cheaper.\"";
+            if (primaryTrait == TraitTag.Loyalist)
+                return "\"For King Arthur! My blade is yours at half price.\"";
+            if (primaryTrait == TraitTag.Coward)
+                return "\"I'm no hero... unless you pay to train me or steel my nerves.\"";
+            return "\"Demons claw the churchyard. Show gold — or a plan.\"";
+        }
+
+        /// <summary>Mood line using effective hire delta, not raw grudge.</summary>
+        public string FormatMoodLabel(int grudgePenalty, int globalDiscount = 0)
+        {
+            var h = ComputeHireBreakdown(grudgePenalty, globalDiscount);
+            if (h.bloodOathApplied)
+                return $"Blood-Oath (−{h.bloodOathRank * 5}g hire; waived +{h.rawGrudge}g)";
+            if (h.effectiveGrudge > 0) return $"Grudging (+{h.effectiveGrudge}g hire)";
+            if (h.effectiveGrudge < 0) return $"Favored ({h.effectiveGrudge}g hire)";
+            if (primaryTrait == TraitTag.Loyalist) return "Eager (Loyalist ÷2 hire)";
+            if (primaryTrait == TraitTag.Coward) return "Fearful (Coward)";
+            if (primaryTrait == TraitTag.Drunkard) return "Merry (Drunkard)";
+            if (primaryTrait == TraitTag.Zealot) return "Fervent (Zealot)";
+            if (bodyPosture == BodyPosture.EagerForward) return "Eager";
+            if (bodyPosture == BodyPosture.SlouchedExit) return "Uneasy";
+            return "Steady";
         }
 
         /// <summary>Pew index 0–11 on the 3×4 church art grid.</summary>

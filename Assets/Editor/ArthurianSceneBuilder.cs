@@ -246,7 +246,7 @@ public static class ArthurianSceneBuilder
             new Vector2(280f, -10f), new Vector2(160f, 36f), new Color(0.35f, 0.22f, 0.15f));
         townUI.trainRangedButton = CreateButton(dossier.transform, "TrainRanged", "Train Ranged 15g",
             new Vector2(450f, -10f), new Vector2(170f, 36f), new Color(0.20f, 0.30f, 0.35f));
-        townUI.mediateRivalryButton = CreateButton(dossier.transform, "Mediate", "Mediate 40g",
+        townUI.mediateRivalryButton = CreateButton(dossier.transform, "Mediate", "Mediate 100g",
             new Vector2(360f, -60f), new Vector2(180f, 36f), new Color(0.30f, 0.20f, 0.35f));
 
         // Legend Codex modal — near full-screen so all 10 recipes + Fuse buttons fit.
@@ -665,7 +665,7 @@ public static class ArthurianSceneBuilder
             new CodexRecipeEntry { heroName = "Morgan le Fay", resultingType = UnitType.MorganLeFay, ingredientFormula = "2 Priests + 2 Outlaws", combatPerkSummary = "Hexes targets (halve APS)" },
             new CodexRecipeEntry { heroName = "Lady of the Lake", resultingType = UnitType.LadyOfTheLake, ingredientFormula = "3 Priests + 1 Captain", combatPerkSummary = "Shields 3 weakest (+45)" },
             new CodexRecipeEntry { heroName = "Sir Gawain", resultingType = UnitType.SirGawain, ingredientFormula = "2 Warriors + 2 Knights", combatPerkSummary = "Double damage for first 8s" },
-            new CodexRecipeEntry { heroName = "Mordred", resultingType = UnitType.Mordred, ingredientFormula = "2 Knights + 2 Outlaws", combatPerkSummary = "+15 vs bosses; demoralizes Nobles" },
+            new CodexRecipeEntry { heroName = "Mordred", resultingType = UnitType.Mordred, ingredientFormula = "2 Knights + 2 Outlaws", combatPerkSummary = "+15 vs bosses; demoralizes Nobles & Loyalists (−3 ATK)" },
             new CodexRecipeEntry { heroName = "Sir Galahad", resultingType = UnitType.SirGalahad, ingredientFormula = "2 Zealot/Loyalist Knights + 1 Priest", combatPerkSummary = "Lifesteal to allies; blocks seduction" },
         };
         EditorUtility.SetDirty(codex);

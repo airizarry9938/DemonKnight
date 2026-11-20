@@ -1829,16 +1829,10 @@ namespace ArthurianAutobattler
                     dossierPortrait.color = Color.white;
             }
 
-            string dialogue = grudge > 0
-                ? $"\"I marched with you and fell. Bury-gold raised my hire by {grudge}g.\""
-                : selected.primaryTrait == TraitTag.Loyalist
-                    ? "\"For King Arthur! My blade is yours at half price.\""
-                    : selected.primaryTrait == TraitTag.Coward
-                        ? "\"I'm no hero... unless you pay to train me or steel my nerves.\""
-                        : "\"Demons claw the churchyard. Show gold — or a plan.\"";
-
-            if (dossierDialogue != null) dossierDialogue.text = dialogue;
-            if (dossierStats != null) dossierStats.text = selected.GetDisplayDescription();
+            if (dossierDialogue != null)
+                dossierDialogue.text = selected.FormatHireDialogue(grudge, discount);
+            if (dossierStats != null)
+                dossierStats.text = selected.GetDisplayDescription(grudge, discount);
             if (gossipText != null) gossipText.text = BuildGossip(selected);
 
             int cost = selected.GetFinalHireCost(grudge, discount);
@@ -2031,21 +2025,14 @@ namespace ArthurianAutobattler
         {
             var town = Town;
             int cost = GameLoopManager.TavernRoundCostGold;
+            var loop = GameLoopManager.Instance;
+            // One Round per wave — matches the −10g hire flag (no stacked −15 grudge).
             if (town == null || town.playerGold < cost) return;
+            if (loop != null && loop.tavernRoundHireDiscountActive) return;
             town.playerGold -= cost;
 
-            var loop = GameLoopManager.Instance;
             if (loop != null)
-            {
-                // −10g hire for ALL units this town session / wave.
                 loop.tavernRoundHireDiscountActive = true;
-                foreach (var p in loop.currentTownPool)
-                {
-                    if (p != null
-                        && (p.unitType == UnitType.Peasant || p.primaryTrait == TraitTag.Drunkard))
-                        GrudgeSaveManager.Instance?.ModifyGrudgeStaging(p.unitID, -15);
-                }
-            }
 
             if (dossierDialogue != null)
             {
@@ -2488,7 +2475,9 @@ namespace ArthurianAutobattler
         {
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(m.unitID) : 0;
-            string mood = DescribeMood(m, grudge);
+            int writ = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
+            string mood = m.FormatMoodLabel(grudge, writ);
             string friends = DescribeFriends(m, party);
             string rivals = DescribeRivals(m, party);
             string row = m.assignedRole == CombatRole.BacklineRanged
@@ -2503,18 +2492,6 @@ namespace ArthurianAutobattler
                    + $"Mood: {mood}  ·  Trait: {m.primaryTrait}\n"
                    + $"<color=#7CFF9A>Friends:</color> {friends}\n"
                    + $"<color=#FF8888>Rivals:</color> {rivals}";
-        }
-
-        private static string DescribeMood(RecruitInstance m, int grudge)
-        {
-            if (grudge > 0) return $"Grudging (+{grudge}g hire)";
-            if (m.primaryTrait == TraitTag.Loyalist) return "Eager (Loyalist)";
-            if (m.primaryTrait == TraitTag.Coward) return "Fearful (Coward)";
-            if (m.primaryTrait == TraitTag.Drunkard) return "Merry (Drunkard)";
-            if (m.primaryTrait == TraitTag.Zealot) return "Fervent (Zealot)";
-            if (m.bodyPosture == BodyPosture.EagerForward) return "Eager";
-            if (m.bodyPosture == BodyPosture.SlouchedExit) return "Uneasy";
-            return "Steady";
         }
 
         private static string DescribeFriends(RecruitInstance m, List<RecruitInstance> party)
@@ -2818,8 +2795,9 @@ namespace ArthurianAutobattler
 
             if (buyRoundButton != null && town != null)
             {
-                buyRoundButton.interactable = town.playerGold >= GameLoopManager.TavernRoundCostGold;
                 bool active = loop != null && loop.tavernRoundHireDiscountActive;
+                buyRoundButton.interactable = !active
+                    && town.playerGold >= GameLoopManager.TavernRoundCostGold;
                 ApplyHudButtonLabel(buyRoundButton,
                     active
                         ? $"Round (−{GameLoopManager.TavernRoundHireDiscount}g ✓)"

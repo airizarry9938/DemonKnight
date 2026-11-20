@@ -42,7 +42,7 @@ namespace ArthurianAutobattler
         [Header("Role Training & Morale Buttons")]
         public Button trainTankButton;      // 15g: Train Frontline Tank (+25% HP)
         public Button trainRangedButton;    // 15g: Train Backline Ranged (+20% ATK)
-        public Button mediateRivalryButton; // 40g: Remove rivalry / cure cowardice
+        public Button mediateRivalryButton; // 100g: Cancel rivalries for this wave
         public Button tavernRoundButton;    // 50g: Reduce grudges across Peasants & Drunkards
 
         private RecruitInstance selectedRecruit;
@@ -278,13 +278,9 @@ namespace ArthurianAutobattler
 
         private string GenerateDialogue(RecruitInstance r, int grudge)
         {
-            if (grudge > 0)
-                return $"\"I marched with you and fell. Bury-gold raised my hire by {grudge}g.\"";
-            if (r.primaryTrait == TraitTag.Loyalist)
-                return "\"For King Arthur! My blade is yours at half price.\"";
-            if (r.primaryTrait == TraitTag.Coward)
-                return "\"I'm no hero... unless you pay to train me or steel my nerves.\"";
-            return "\"Demons at the gate? Show me gold or prove we have a plan.\"";
+            int writ = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
+            return r.FormatHireDialogue(grudge, writ);
         }
 
         public void UnlockIntelTier(int tier)
@@ -424,18 +420,14 @@ namespace ArthurianAutobattler
         {
             int cost = GameLoopManager.TavernRoundCostGold;
             if (playerGold < cost) return;
+            // One Round per wave — −10g hire only (no stacked −15 grudge staging).
+            if (GameLoopManager.Instance != null
+                && GameLoopManager.Instance.tavernRoundHireDiscountActive)
+                return;
             playerGold -= cost;
 
-            // −10g hire for ALL units this town session / wave (clears on wave end).
             if (GameLoopManager.Instance != null)
                 GameLoopManager.Instance.tavernRoundHireDiscountActive = true;
-
-            // Soft grudge relief for Peasants & Drunkards (flavor; hire also uses tavern discount).
-            foreach (var p in activeTownPool)
-            {
-                if (p.unitType == UnitType.Peasant || p.primaryTrait == TraitTag.Drunkard)
-                    GrudgeSaveManager.Instance?.ModifyGrudgeStaging(p.unitID, -15);
-            }
 
             UpdateHUD();
             if (characterDialogueText != null)
@@ -459,7 +451,7 @@ namespace ArthurianAutobattler
                 : 0;
 
             if (dossierStatsText != null)
-                dossierStatsText.text = selectedRecruit.GetDisplayDescription();
+                dossierStatsText.text = selectedRecruit.GetDisplayDescription(grudge, discount);
             if (hireButtonText != null)
                 hireButtonText.text = $"Recruit ({selectedRecruit.GetFinalHireCost(grudge, discount)}g)";
 
@@ -470,7 +462,12 @@ namespace ArthurianAutobattler
             if (trainTankButton != null) trainTankButton.interactable = playerGold >= 15;
             if (trainRangedButton != null) trainRangedButton.interactable = playerGold >= 15;
             if (mediateRivalryButton != null)
+            {
                 mediateRivalryButton.interactable = playerGold >= GameLoopManager.MediateCostGold;
+                var medLbl = mediateRivalryButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (medLbl != null)
+                    medLbl.text = $"Mediate ({GameLoopManager.MediateCostGold}g)";
+            }
         }
 
         private void ClearBottomDossier()
@@ -545,14 +542,24 @@ namespace ArthurianAutobattler
             rollDiceButton?.onClick.AddListener(() => diceGame.RollDie());
             cashOutButton?.onClick.AddListener(() =>
             {
+                int gambler = SomersetRunes.GetRank(BankRuneID.Gambler);
                 diceGame.CashOut(ref playerGold);
                 UpdateHUD();
-                UpdateDiceUI("Cashed out!");
+                UpdateDiceUI(gambler >= 3
+                    ? "Cashed out! <color=#B8E986>Gambler R3: +15s town</color>"
+                    : "Cashed out!");
             });
 
             if (diceGame != null)
             {
-                diceGame.OnRollSuccess.AddListener((roll, pot) => UpdateDiceUI($"Rolled {roll}! Pot: {pot}g"));
+                diceGame.OnRollSuccess.AddListener((roll, pot) =>
+                {
+                    int gambler = SomersetRunes.GetRank(BankRuneID.Gambler);
+                    string extra = (gambler >= 2 && roll == 6)
+                        ? " <color=#B8E986>Gambler: ×2 on 6!</color>"
+                        : "";
+                    UpdateDiceUI($"Rolled {roll}! Pot: {pot}g{extra}");
+                });
                 diceGame.OnBust.AddListener(() => UpdateDiceUI("<color=red>ROLLED A 1! BUST!</color>"));
             }
         }
@@ -578,12 +585,13 @@ namespace ArthurianAutobattler
                 partyCountText.text = $"Warband ({count})";
             if (tavernRoundButton != null)
             {
-                tavernRoundButton.interactable = playerGold >= GameLoopManager.TavernRoundCostGold;
+                bool active = GameLoopManager.Instance != null
+                              && GameLoopManager.Instance.tavernRoundHireDiscountActive;
+                tavernRoundButton.interactable = !active
+                    && playerGold >= GameLoopManager.TavernRoundCostGold;
                 var lbl = tavernRoundButton.GetComponentInChildren<TextMeshProUGUI>();
                 if (lbl != null)
                 {
-                    bool active = GameLoopManager.Instance != null
-                                  && GameLoopManager.Instance.tavernRoundHireDiscountActive;
                     lbl.text = active
                         ? $"Round (−{GameLoopManager.TavernRoundHireDiscount}g hire ✓)"
                         : $"Buy Round ({GameLoopManager.TavernRoundCostGold}g)";

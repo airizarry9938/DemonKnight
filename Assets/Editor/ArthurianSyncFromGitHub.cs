@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "66ea36c";
+    private const string FallbackCommitSha = "52343f1";
 
-    private const string ExpectedPackageId = "autobattle-frontline-targeting";
+    private const string ExpectedPackageId = "perk-rune-bonus-math";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -503,6 +503,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("perk-rune-bonus-math")
                    || body.Contains("autobattle-frontline-targeting")
                    || body.Contains("warband-formation-diagram")
                    || body.Contains("new-game-wipe-runes-perks")
@@ -526,6 +527,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("perk-rune-bonus-math")
                     || body.Contains("autobattle-frontline-targeting")
                     || body.Contains("warband-formation-diagram")
                     || body.Contains("new-game-wipe-runes-perks")

@@ -299,8 +299,11 @@ namespace ArthurianAutobattler
             if (runeStatusText != null)
             {
                 runeStatusText.text =
-                    $"Gossip R{gossipRuneRank}/3 | Gambler R{gamblerRuneRank}/3 | Blood-Oath R{bloodOathRuneRank}/3 | Peasant's Crown R{peasantsCrownRuneRank}/3";
-                if (runeStatusText.fontSize < 18f) runeStatusText.fontSize = 18f;
+                    $"Gossip R{gossipRuneRank}/3: {DescribeGossipEffect(gossipRuneRank)}\n"
+                    + $"Gambler R{gamblerRuneRank}/3: {DescribeGamblerEffect(gamblerRuneRank)}\n"
+                    + $"Blood-Oath R{bloodOathRuneRank}/3: {DescribeBloodOathEffect(bloodOathRuneRank)}\n"
+                    + $"Peasant's Crown R{peasantsCrownRuneRank}/3: {DescribeCrownEffect(peasantsCrownRuneRank)}";
+                if (runeStatusText.fontSize < 16f) runeStatusText.fontSize = 16f;
             }
             if (loreNarrativeText != null && loreNarrativeText.fontSize < 28f)
                 loreNarrativeText.fontSize = 28f;
@@ -312,6 +315,32 @@ namespace ArthurianAutobattler
                 }
             }
         }
+
+        private static string DescribeGossipEffect(int rank) => rank switch
+        {
+            0 => "off",
+            1 => "adjacent pew trait whisper",
+            2 => "nearby pew + grudge flag",
+            _ => "full row HP/ATK whisper"
+        };
+
+        private static string DescribeGamblerEffect(int rank) => rank switch
+        {
+            0 => "off",
+            1 => "first roll cannot bust",
+            2 => "R1 + double pot on natural 6",
+            _ => "R2 + +15s town on cash-out"
+        };
+
+        private static string DescribeBloodOathEffect(int rank) =>
+            rank <= 0
+                ? "off"
+                : $"Outlaw/Coward: grudge → −{rank * 5}g hire (not +grudge)";
+
+        private static string DescribeCrownEffect(int rank) =>
+            rank <= 0
+                ? "off"
+                : $"Peasant hire −{rank * 2}g; battle +0.15 APS ×⌊peasants/5⌋×R{rank} (cap 2.0)";
 
         private void SaveBankData()
         {
