@@ -95,23 +95,41 @@ namespace ArthurianAutobattler
             switch (type)
             {
                 case UnitType.Knight:
-                    r.maxHealth = Mathf.RoundToInt(Random.Range(75, 105) * hpMult);
-                    r.attackDamage = Random.Range(10, 16);
+                {
+                    // HP 75–104, ATK 10–15 → hire 200–400 (higher stats → higher within band).
+                    int hpLo = 75, hpHi = 105;
+                    int atkLo = 10, atkHi = 16;
+                    r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
+                    r.attackDamage = Random.Range(atkLo, atkHi);
                     r.attackSpeed = Random.Range(1.5f, 2.0f);
-                    r.baseHireCost = Random.Range(35, 50);
+                    r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
+                        hpLo, hpHi - 1, atkLo, atkHi - 1, 200, 400);
                     break;
+                }
                 case UnitType.Warrior:
-                    r.maxHealth = Mathf.RoundToInt(Random.Range(32, 52) * hpMult);
-                    r.attackDamage = Random.Range(5, 9);
+                {
+                    // HP 32–51, ATK 5–8 → hire 50–100.
+                    int hpLo = 32, hpHi = 52;
+                    int atkLo = 5, atkHi = 9;
+                    r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
+                    r.attackDamage = Random.Range(atkLo, atkHi);
                     r.attackSpeed = Random.Range(1.2f, 1.6f);
-                    r.baseHireCost = Random.Range(18, 28);
+                    r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
+                        hpLo, hpHi - 1, atkLo, atkHi - 1, 50, 100);
                     break;
+                }
                 case UnitType.Peasant:
-                    r.maxHealth = Mathf.RoundToInt(Random.Range(10, 22) * hpMult);
-                    r.attackDamage = Random.Range(1, 4);
+                {
+                    // HP 10–21, ATK 1–3 → hire 10–20.
+                    int hpLo = 10, hpHi = 22;
+                    int atkLo = 1, atkHi = 4;
+                    r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
+                    r.attackDamage = Random.Range(atkLo, atkHi);
                     r.attackSpeed = Random.Range(1.0f, 1.3f);
-                    r.baseHireCost = Random.Range(6, 12);
+                    r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
+                        hpLo, hpHi - 1, atkLo, atkHi - 1, 10, 20);
                     break;
+                }
             }
 
             r.primaryTrait = RollPrimaryTrait();
@@ -124,6 +142,21 @@ namespace ArthurianAutobattler
             r.RefreshBodyPostureFromTraits(grudge);
             AssignPaperDollLayers(r, grudge);
             return r;
+        }
+
+        /// <summary>
+        /// Map HP+ATK quality into a hire band. Higher combat stats → higher cost within
+        /// Peasant 10–20 / Warrior 50–100 / Knight 200–400.
+        /// </summary>
+        private static int HireCostFromStats(
+            float hp, int atk,
+            int hpLo, int hpHi, int atkLo, int atkHi,
+            int costLo, int costHi)
+        {
+            float hpT = Mathf.InverseLerp(hpLo, Mathf.Max(hpLo + 1, hpHi), hp);
+            float atkT = Mathf.InverseLerp(atkLo, Mathf.Max(atkLo + 1, atkHi), atk);
+            float t = Mathf.Clamp01(0.55f * hpT + 0.45f * atkT);
+            return Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(costLo, costHi, t)), costLo, costHi);
         }
 
         private void AssignPaperDollLayers(RecruitInstance r, int grudge)

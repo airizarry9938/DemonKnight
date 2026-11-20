@@ -20,9 +20,9 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    private const string FallbackCommitSha = "8ec1d87";
+    private const string FallbackCommitSha = "e437be1";
 
-    private const string ExpectedPackageId = "sync-keep-editor-menus";
+    private const string ExpectedPackageId = "stars-visible-hire-bands-gold200";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -502,6 +502,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("stars-visible-hire-bands-gold200")
                    || body.Contains("sync-keep-editor-menus")
                    || body.Contains("victory-stars-hire")
                    || body.Contains("mediate-mordred-wave-rules")
@@ -518,6 +519,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("stars-visible-hire-bands-gold200")
                     || body.Contains("sync-keep-editor-menus") || body.Contains("victory-stars-hire"))
                    && body.Contains("NeverBulkDeleteEditorMenus")
                    && body.Contains("ForceDeleteSyncAll")
