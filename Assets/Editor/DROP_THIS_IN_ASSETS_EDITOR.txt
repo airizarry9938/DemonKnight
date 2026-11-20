@@ -1,43 +1,17 @@
-STOP hand-copying random files. CS1061 SetNight means Unity still has a STALE
-GameLoopManager (raw.githubusercontent.com/main was CDN-cached).
+STOP hand-copying random files.
 
-=== FASTEST FIX (CS1061 SetNight) ===
-Overwrite ONLY this file in your Unity project (Save As / replace):
-
-  Assets/Scripts/Systems/GameLoopManager.cs
-
-Prefer jsDelivr (less stale than raw /main):
-  https://cdn.jsdelivr.net/gh/airizarry9938/DemonKnight@main/Assets/Scripts/Systems/GameLoopManager.cs
-
-Or pin a commit (replace COMMIT after you pull latest SHA from github.com/airizarry9938/DemonKnight):
-  https://raw.githubusercontent.com/airizarry9938/DemonKnight/COMMIT/Assets/Scripts/Systems/GameLoopManager.cs
-
-That file's RefreshNightHUD must contain the word: ApplyNightLabel
-It must NOT contain: FindFirstObjectByType<SomersetChurchUI>
-
-Also overwrite (so Night label + Sync keep working):
-  Assets/Scripts/UI/ChurchStageUIController.cs
-  Assets/Scripts/UI/SomersetChurchUI.cs
-  Assets/Editor/DemonKnightPackageVersion.cs
-  Assets/Editor/ArthurianSyncFromGitHub.cs
-
-Same base URLs:
-  https://cdn.jsdelivr.net/gh/airizarry9938/DemonKnight@main/<path>
-
-=== THEN ===
+=== PREFERRED ===
 1) Wait for Unity compile
-2) Arthurian → Force Re-Sync Night/HUD Fix   (or Sync All Scripts From GitHub)
-3) Bootstrap CompatApi + Sync Tools, then Force Delete+Sync → Diagnose: hud-esc-legends-warband-pace
-   Prefer commit-pinned jsDelivr (never @main). No scene rebuild needed for this package.
+2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
+3) Arthurian → Force Delete+Sync ALL Scripts
+4) Diagnose → hire-once-unfuse-disband
 
-=== FULL REPO FALLBACK ===
-cd into the Unity project folder that contains Assets/, then:
-  git remote -v
-  # if this folder IS a clone of DemonKnight:
-  git fetch origin
-  git checkout main
-  git pull origin main
+Never use jsDelivr @main (stale). Pin commit SHA after merge (or PR tip).
 
-Or re-clone:
-  git clone https://github.com/airizarry9938/DemonKnight.git
-  Open THAT folder in Unity Hub (not a Downloads zip extract).
+=== HARD FALLBACK (delete then Save-As) ===
+Pin SHA (replace after merge): see ANDREW-HIRE-ONCE-UNFUSE-DISBAND.md in the agent store.
+
+  CompatApi, PackageVersion, SomersetChurchUI, ArthurianSyncFromGitHub
+  (+ GameLoopManager, CardFusionSystem, TownSplitUIController, AutoBattlerEngine, WarbandAutosave if still stale)
+
+No scene wipe. Align only if pews missing; Build only for empty scene.

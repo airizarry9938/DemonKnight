@@ -29,6 +29,8 @@ namespace ArthurianAutobattler
         public int pewSeatIndex;
         public BodyPosture bodyPosture;
         public bool isSirenEnchantress;
+        /// <summary>Pre-fusion ingredients (run-scoped). Wave-end expands these back to pews.</summary>
+        public List<WarbandMemberSave> fusionIngredients;
     }
 
     [Serializable]
@@ -200,6 +202,8 @@ namespace ArthurianAutobattler
             if (src.pewSeatIndex > 0) dest.pewSeatIndex = src.pewSeatIndex;
             if (src.randomAvatar != null) dest.randomAvatar = src.randomAvatar;
             if (src.headSprite != null) dest.headSprite = src.headSprite;
+            if (src.IsFusedLegend)
+                dest.fusionIngredients = CardFusionSystem.CloneForFusionMemory(src)?.fusionIngredients;
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(dest.unitID) : 0;
             dest.RefreshBodyPostureFromTraits(grudge);
@@ -281,9 +285,9 @@ namespace ArthurianAutobattler
             }
         }
 
-        private static WarbandMemberSave ToSave(RecruitInstance r)
+        private static WarbandMemberSave ToSave(RecruitInstance r, int depth = 0)
         {
-            return new WarbandMemberSave
+            var s = new WarbandMemberSave
             {
                 unitID = r.unitID,
                 characterName = r.characterName,
@@ -301,9 +305,19 @@ namespace ArthurianAutobattler
                 bodyPosture = r.bodyPosture,
                 isSirenEnchantress = r.isSirenEnchantress
             };
+            if (depth < 6 && r.fusionIngredients != null && r.fusionIngredients.Count > 0)
+            {
+                s.fusionIngredients = new List<WarbandMemberSave>(r.fusionIngredients.Count);
+                foreach (var ing in r.fusionIngredients)
+                {
+                    if (ing != null)
+                        s.fusionIngredients.Add(ToSave(ing, depth + 1));
+                }
+            }
+            return s;
         }
 
-        private static RecruitInstance FromSave(WarbandMemberSave s)
+        private static RecruitInstance FromSave(WarbandMemberSave s, int depth = 0)
         {
             var r = new RecruitInstance
             {
@@ -323,6 +337,15 @@ namespace ArthurianAutobattler
                 bodyPosture = s.bodyPosture,
                 isSirenEnchantress = s.isSirenEnchantress
             };
+            if (depth < 6 && s.fusionIngredients != null && s.fusionIngredients.Count > 0)
+            {
+                r.fusionIngredients = new List<RecruitInstance>(s.fusionIngredients.Count);
+                foreach (var ing in s.fusionIngredients)
+                {
+                    if (ing != null)
+                        r.fusionIngredients.Add(FromSave(ing, depth + 1));
+                }
+            }
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
             r.RefreshBodyPostureFromTraits(grudge);

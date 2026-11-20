@@ -203,10 +203,78 @@ namespace ArthurianAutobattler
                 return false;
             }
 
+            // Remember exact pre-fusion units (stats / pew seats / nested fusions) for wave-end unfuse.
+            product.fusionIngredients = new List<RecruitInstance>(chosen.Count);
+            foreach (var r in chosen)
+                product.fusionIngredients.Add(CloneForFusionMemory(r));
+
             party.Add(product);
             Debug.Log(
                 $"[DemonKnight] Fused {product.characterName}: consumed {chosen.Count} ingredient(s), party size now {party.Count}.");
             return true;
+        }
+
+        /// <summary>
+        /// Wave-end: replace every fused Legend with its original ingredients (recursive).
+        /// Base pew townsfolk keep identity/stats; fused products are discarded.
+        /// </summary>
+        public static List<RecruitInstance> UnfusePartyToOriginals(List<RecruitInstance> party)
+        {
+            var result = new List<RecruitInstance>();
+            if (party == null) return result;
+            foreach (var r in party)
+            {
+                if (r == null) continue;
+                ExpandFusionRecursive(r, result);
+            }
+            return result;
+        }
+
+        private static void ExpandFusionRecursive(RecruitInstance r, List<RecruitInstance> into)
+        {
+            if (r == null) return;
+            if (r.IsFusedLegend)
+            {
+                foreach (var ing in r.fusionIngredients)
+                    ExpandFusionRecursive(ing, into);
+                return;
+            }
+            into.Add(r);
+        }
+
+        /// <summary>Deep clone including nested fusionIngredients (sprites shared by reference).</summary>
+        public static RecruitInstance CloneForFusionMemory(RecruitInstance src)
+        {
+            if (src == null) return null;
+            var c = new RecruitInstance
+            {
+                unitID = src.unitID,
+                characterName = src.characterName,
+                unitType = src.unitType,
+                randomAvatar = src.randomAvatar,
+                assignedRole = src.assignedRole,
+                maxHealth = src.maxHealth,
+                attackDamage = src.attackDamage,
+                attackSpeed = src.attackSpeed,
+                baseHireCost = src.baseHireCost,
+                primaryTrait = src.primaryTrait,
+                hatedTrait = src.hatedTrait,
+                lovedTrait = src.lovedTrait,
+                intelTierUnlocked = src.intelTierUnlocked,
+                pewSeatIndex = src.pewSeatIndex,
+                bodyPosture = src.bodyPosture,
+                bodySprite = src.bodySprite,
+                headSprite = src.headSprite,
+                moodOverlaySprite = src.moodOverlaySprite,
+                isSirenEnchantress = src.isSirenEnchantress
+            };
+            if (src.fusionIngredients != null && src.fusionIngredients.Count > 0)
+            {
+                c.fusionIngredients = new List<RecruitInstance>(src.fusionIngredients.Count);
+                foreach (var ing in src.fusionIngredients)
+                    c.fusionIngredients.Add(CloneForFusionMemory(ing));
+            }
+            return c;
         }
 
         private static bool CanPickDistinct(

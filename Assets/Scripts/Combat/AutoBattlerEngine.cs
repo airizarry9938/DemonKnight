@@ -634,17 +634,26 @@ namespace ArthurianAutobattler
             if (loop.recruitedParty.Count > 0)
             {
                 Debug.LogError(
-                    $"[DemonKnight] NUCLEAR CLEAR — dumping {loop.recruitedParty.Count} hired into pews.");
-                if (loop.currentTownPool == null)
-                    loop.currentTownPool = new List<RecruitInstance>();
-                foreach (var r in loop.recruitedParty)
+                    $"[DemonKnight] NUCLEAR CLEAR — unfuse + DisbandPartyAfterMarch still needed.");
+                // Prefer real disband (unfuse + win/loss hire) over dumping fused products into pews.
+                DemonKnightCompatApi.EnsureDisbandedAfterWave(loop, deadIds, waveWon);
+                if (loop.recruitedParty != null && loop.recruitedParty.Count > 0)
                 {
-                    if (r == null) continue;
-                    r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
-                    if (!loop.currentTownPool.Contains(r))
-                        loop.currentTownPool.Add(r);
+                    var leaves = CardFusionSystem.UnfusePartyToOriginals(loop.recruitedParty);
+                    loop.recruitedParty.Clear();
+                    if (loop.currentTownPool == null)
+                        loop.currentTownPool = new List<RecruitInstance>();
+                    foreach (var r in leaves)
+                    {
+                        if (r == null) continue;
+                        r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
+                        r.fusionIngredients = null;
+                        if (!string.IsNullOrEmpty(r.unitID))
+                            loop.currentTownPool.RemoveAll(t => t != null && t.unitID == r.unitID && t != r);
+                        if (!loop.currentTownPool.Contains(r))
+                            loop.currentTownPool.Add(r);
+                    }
                 }
-                loop.recruitedParty.Clear();
             }
 
             DemonKnightCompatApi.SetMustDisband(loop, false);

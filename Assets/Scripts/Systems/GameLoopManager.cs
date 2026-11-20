@@ -308,40 +308,124 @@ namespace ArthurianAutobattler
             }
 
             int before = recruitedParty.Count;
-            var returning = new List<RecruitInstance>(recruitedParty);
+
+            // Combat deaths on fused products → leaf pew ids (for hire tax only).
+            var combatDead = deadUnitIds ?? new HashSet<string>();
+            var fusionLeafDead = new HashSet<string>();
+            CollectFusionLeafDeaths(combatDead, fusionLeafDead);
+
+            // Fused Legends → original pre-fusion pew units (recursive). Product discarded.
+            var returning = CardFusionSystem.UnfusePartyToOriginals(recruitedParty);
             recruitedParty.Clear();
 
             if (currentTownPool == null)
                 currentTownPool = new List<RecruitInstance>();
 
+            // Living returnees: win −10 / loss +15 (GrudgeSaveManager constants).
             int livingDelta = won
                 ? GrudgeSaveManager.MarchWinHireDiscount
                 : GrudgeSaveManager.MarchLossHirePenalty;
 
+            var seenIds = new HashSet<string>();
+            int returned = 0;
             foreach (var r in returning)
             {
                 if (r == null) continue;
-                // Keep trained stats / roles / intel on the same instance in the pews.
-                r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
-                GrudgeSaveManager.Instance?.RememberIntel(r.unitID, r.intelTierUnlocked);
-
-                bool died = deadUnitIds != null && !string.IsNullOrEmpty(r.unitID)
-                            && deadUnitIds.Contains(r.unitID);
-                if (!died)
-                    GrudgeSaveManager.Instance?.ModifyGrudgeStaging(r.unitID, livingDelta);
-
-                int grudge = GrudgeSaveManager.Instance != null
-                    ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
-                r.RefreshBodyPostureFromTraits(Mathf.Max(0, grudge));
-
-                if (!currentTownPool.Contains(r))
-                    currentTownPool.Add(r);
+                if (r.IsFusedLegend)
+                {
+                    foreach (var leaf in CardFusionSystem.UnfusePartyToOriginals(
+                                 new List<RecruitInstance> { r }))
+                    {
+                        if (leaf != null)
+                            ReturnOneToPew(leaf, combatDead, fusionLeafDead, livingDelta, seenIds, ref returned);
+                    }
+                    continue;
+                }
+                ReturnOneToPew(r, combatDead, fusionLeafDead, livingDelta, seenIds, ref returned);
             }
 
             mustDisbandPartyAfterCurrentWave = false;
             Debug.Log(
-                $"[DemonKnight] WAVE disband ({(won ? "WIN discount" : "LOSS penalty")}): {before} → pews += {returning.Count}.");
+                $"[DemonKnight] WAVE disband ({(won ? "WIN −10 hire" : "LOSS +15 hire")}): party {before} → pews += {returned} (unfused, full stats).");
             RefreshTownAfterDisband();
+        }
+
+        private void ReturnOneToPew(
+            RecruitInstance r,
+            HashSet<string> combatDead,
+            HashSet<string> fusionLeafDead,
+            int livingDelta,
+            HashSet<string> seenIds,
+            ref int returned)
+        {
+            if (r == null) return;
+            if (!string.IsNullOrEmpty(r.unitID) && !seenIds.Add(r.unitID))
+                return;
+
+            // Full stats / roles / intel visible on pew return (win or loss).
+            r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
+            r.fusionIngredients = null;
+            GrudgeSaveManager.Instance?.RememberIntel(r.unitID, r.intelTierUnlocked);
+
+            bool diedInCombat = combatDead != null && !string.IsNullOrEmpty(r.unitID)
+                                && combatDead.Contains(r.unitID);
+            bool diedAsFusionLeaf = fusionLeafDead != null && !string.IsNullOrEmpty(r.unitID)
+                                    && fusionLeafDead.Contains(r.unitID);
+
+            if (diedInCombat)
+            {
+                // EndBattle already applied ArmyDeathHirePenalty (+15) for this unitID.
+            }
+            else if (diedAsFusionLeaf)
+            {
+                // Fused product died; leaf was not separately tagged — +15 death hire.
+                GrudgeSaveManager.Instance?.RecordArmyDeath(r.unitID);
+            }
+            else
+            {
+                // Living original: win → −10 hire, loss → +15 hire.
+                GrudgeSaveManager.Instance?.ModifyGrudgeStaging(r.unitID, livingDelta);
+            }
+
+            int grudge = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
+            r.RefreshBodyPostureFromTraits(Mathf.Max(0, grudge));
+
+            if (!string.IsNullOrEmpty(r.unitID) && currentTownPool != null)
+                currentTownPool.RemoveAll(t => t != null && t.unitID == r.unitID && t != r);
+
+            if (!currentTownPool.Contains(r))
+                currentTownPool.Add(r);
+            returned++;
+        }
+
+        /// <summary>
+        /// When a fused Legend's product unitID is in combatDead, add its leaf pew unitIDs
+        /// (not already in combatDead) so they receive death hire tax after unfuse.
+        /// </summary>
+        private void CollectFusionLeafDeaths(HashSet<string> combatDead, HashSet<string> intoLeaves)
+        {
+            if (combatDead == null || intoLeaves == null || recruitedParty == null) return;
+            foreach (var r in recruitedParty)
+            {
+                if (r == null || string.IsNullOrEmpty(r.unitID) || !r.IsFusedLegend) continue;
+                if (!combatDead.Contains(r.unitID)) continue;
+                CollectLeafUnitIds(r, intoLeaves);
+            }
+            intoLeaves.RemoveWhere(id => string.IsNullOrEmpty(id) || combatDead.Contains(id));
+        }
+
+        private static void CollectLeafUnitIds(RecruitInstance r, HashSet<string> into)
+        {
+            if (r == null) return;
+            if (r.IsFusedLegend)
+            {
+                foreach (var ing in r.fusionIngredients)
+                    CollectLeafUnitIds(ing, into);
+                return;
+            }
+            if (!string.IsNullOrEmpty(r.unitID))
+                into.Add(r.unitID);
         }
 
         /// <summary>
@@ -371,20 +455,12 @@ namespace ArthurianAutobattler
                     g.mustDisbandPartyAfterCurrentWave = false;
             }
 
-            // Nuclear: if Disband early-returned somehow, still empty the list.
+            // Nuclear: if Disband early-returned somehow, still unfuse + empty the list.
             if (recruitedParty.Count > 0)
             {
                 Debug.LogError(
-                    $"[DemonKnight] Disband left {recruitedParty.Count} hired — force-clearing party into pews.");
-                var leftover = new List<RecruitInstance>(recruitedParty);
-                recruitedParty.Clear();
-                if (currentTownPool == null) currentTownPool = new List<RecruitInstance>();
-                foreach (var r in leftover)
-                {
-                    if (r == null) continue;
-                    r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
-                    if (!currentTownPool.Contains(r)) currentTownPool.Add(r);
-                }
+                    $"[DemonKnight] Disband left {recruitedParty.Count} hired — force unfuse + pews.");
+                DisbandPartyAfterMarch(deadUnitIds, lastWaveWon);
             }
 
             mustDisbandPartyAfterCurrentWave = false;
