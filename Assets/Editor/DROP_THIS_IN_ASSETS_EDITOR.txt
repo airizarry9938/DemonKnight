@@ -4,9 +4,9 @@ STOP hand-copying random files.
 1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → new-game-wipe-runes-perks
+4) Diagnose → warband-formation-diagram
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-See ANDREW-NEW-GAME-WIPE-RUNES-PERKS.md
+See ANDREW-WARBAND-FORMATION-DIAGRAM.md

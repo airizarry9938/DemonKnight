@@ -59,6 +59,8 @@ namespace ArthurianAutobattler
         [Header("Warband Formation")]
         public Transform warbandListContainer;
         public GameObject warbandRowPrefab;
+        /// <summary>Small front/back battalion diagram inside the Warband modal.</summary>
+        public RectTransform formationDiagramRoot;
 
         private RecruitInstance selected;
         private readonly List<PaperDollSeatView> seats = new List<PaperDollSeatView>();
@@ -2130,6 +2132,7 @@ namespace ArthurianAutobattler
                 titleTmp.color = new Color(0.92f, 0.88f, 0.78f);
             }
 
+            EnsureFormationDiagram(warbandModal.transform);
             EnsureWarbandScrollViewport(warbandModal.transform);
             if (warbandListContainer == null)
             {
@@ -2151,6 +2154,176 @@ namespace ArthurianAutobattler
             }
 
             if (!warbandModalUserOpen) warbandModal.SetActive(false);
+        }
+
+        /// <summary>
+        /// Tiny battalion map under the title: BACK (Ranged) above FRONT (Tank).
+        /// Unit boxes use 1-based party index (#1, #2, …).
+        /// </summary>
+        private void EnsureFormationDiagram(Transform warbandRoot)
+        {
+            if (warbandRoot == null) return;
+            if (formationDiagramRoot == null)
+            {
+                var existing = warbandRoot.Find("FormationDiagram") as RectTransform;
+                if (existing != null) formationDiagramRoot = existing;
+            }
+
+            if (formationDiagramRoot == null)
+            {
+                var go = new GameObject("FormationDiagram", typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(warbandRoot, false);
+                formationDiagramRoot = go.GetComponent<RectTransform>();
+                go.GetComponent<Image>().color = new Color(0.10f, 0.12f, 0.14f, 0.92f);
+            }
+
+            formationDiagramRoot.anchorMin = new Vector2(0.08f, 0.70f);
+            formationDiagramRoot.anchorMax = new Vector2(0.92f, 0.88f);
+            formationDiagramRoot.offsetMin = Vector2.zero;
+            formationDiagramRoot.offsetMax = Vector2.zero;
+            formationDiagramRoot.SetSiblingIndex(1); // under title, above scroll
+        }
+
+        /// <summary>Rebuild front/back boxes from current party roles.</summary>
+        private void RefreshFormationDiagram(List<RecruitInstance> party)
+        {
+            EnsureWarbandModal();
+            if (formationDiagramRoot == null && warbandModal != null)
+                EnsureFormationDiagram(warbandModal.transform);
+            if (formationDiagramRoot == null) return;
+
+            foreach (Transform c in formationDiagramRoot)
+                Destroy(c.gameObject);
+
+            var caption = MakeFormationLabel(formationDiagramRoot, "Caption",
+                "BATTALION — Front faces the horde",
+                new Vector2(0.5f, 0.92f), 15f, new Color(0.85f, 0.82f, 0.72f));
+            caption.alignment = TextAlignmentOptions.Center;
+
+            // Collect slots by formation. Unassigned defaults to FRONT until trained.
+            var front = new List<(int num, RecruitInstance r)>();
+            var back = new List<(int num, RecruitInstance r)>();
+            if (party != null)
+            {
+                for (int i = 0; i < party.Count; i++)
+                {
+                    var r = party[i];
+                    if (r == null) continue;
+                    int num = i + 1;
+                    if (r.assignedRole == CombatRole.BacklineRanged)
+                        back.Add((num, r));
+                    else
+                        front.Add((num, r)); // Tank + Unassigned → front
+                }
+            }
+
+            MakeFormationLabel(formationDiagramRoot, "BackLabel", "BACK (Ranged)",
+                new Vector2(0.12f, 0.68f), 13f, new Color(0.55f, 0.75f, 0.95f));
+            MakeFormationLabel(formationDiagramRoot, "FrontLabel", "FRONT (Tank)",
+                new Vector2(0.12f, 0.28f), 13f, new Color(0.95f, 0.70f, 0.45f));
+
+            PlaceFormationBoxes(formationDiagramRoot, back, 0.52f, new Color(0.18f, 0.28f, 0.40f));
+            PlaceFormationBoxes(formationDiagramRoot, front, 0.12f, new Color(0.40f, 0.28f, 0.16f));
+
+            if ((party == null || party.Count == 0))
+            {
+                var empty = MakeFormationLabel(formationDiagramRoot, "EmptyHint",
+                    "Hire souls, then set Tank / Ranged — boxes move here.",
+                    new Vector2(0.55f, 0.45f), 14f, new Color(0.65f, 0.65f, 0.60f));
+                empty.alignment = TextAlignmentOptions.Center;
+            }
+        }
+
+        private static void PlaceFormationBoxes(
+            Transform parent,
+            List<(int num, RecruitInstance r)> units,
+            float anchorY,
+            Color boxColor)
+        {
+            if (units == null || units.Count == 0)
+            {
+                // Empty slot placeholder so the row is still visible.
+                MakeFormationUnitBox(parent, "—", "", boxColor * 0.55f, 0.42f, anchorY, dim: true);
+                return;
+            }
+
+            const float boxW = 0.11f;
+            float total = units.Count * boxW + (units.Count - 1) * 0.02f;
+            float startX = Mathf.Clamp(0.55f - total * 0.5f, 0.28f, 0.85f);
+            for (int i = 0; i < units.Count; i++)
+            {
+                var (num, r) = units[i];
+                string typeLetter = r.unitType.ToString().Length > 0
+                    ? r.unitType.ToString().Substring(0, 1)
+                    : "?";
+                float x = startX + i * (boxW + 0.02f);
+                MakeFormationUnitBox(parent, $"#{num}", typeLetter, boxColor, x, anchorY, dim: false);
+            }
+        }
+
+        private static TextMeshProUGUI MakeFormationLabel(
+            Transform parent, string name, string text, Vector2 anchor, float size, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(420f, 22f);
+            var tmp = go.GetComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.fontSize = size;
+            tmp.color = color;
+            tmp.raycastTarget = false;
+            tmp.enableWordWrapping = false;
+            return tmp;
+        }
+
+        private static void MakeFormationUnitBox(
+            Transform parent, string numLabel, string typeLetter, Color color,
+            float anchorX, float anchorY, bool dim)
+        {
+            // Outer gold rim
+            var rim = new GameObject($"UnitBox_{numLabel}", typeof(RectTransform), typeof(Image));
+            rim.transform.SetParent(parent, false);
+            var rrt = rim.GetComponent<RectTransform>();
+            rrt.anchorMin = new Vector2(anchorX, anchorY);
+            rrt.anchorMax = new Vector2(anchorX + 0.10f, anchorY + 0.28f);
+            rrt.offsetMin = Vector2.zero;
+            rrt.offsetMax = Vector2.zero;
+            rim.GetComponent<Image>().color = dim
+                ? new Color(0.35f, 0.35f, 0.35f, 0.55f)
+                : new Color(0.92f, 0.86f, 0.55f, 0.95f);
+            rim.GetComponent<Image>().raycastTarget = false;
+
+            var go = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(rim.transform, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(2f, 2f);
+            rt.offsetMax = new Vector2(-2f, -2f);
+            go.GetComponent<Image>().color = color;
+            go.GetComponent<Image>().raycastTarget = false;
+
+            string body = string.IsNullOrEmpty(typeLetter)
+                ? numLabel
+                : $"{numLabel}\n<size=80%>{typeLetter}</size>";
+            var tmpGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            tmpGo.transform.SetParent(go.transform, false);
+            var trt = tmpGo.GetComponent<RectTransform>();
+            trt.anchorMin = Vector2.zero;
+            trt.anchorMax = Vector2.one;
+            trt.offsetMin = new Vector2(2f, 2f);
+            trt.offsetMax = new Vector2(-2f, -2f);
+            var tmp = tmpGo.GetComponent<TextMeshProUGUI>();
+            tmp.text = body;
+            tmp.fontSize = 15f;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = dim ? new Color(0.55f, 0.55f, 0.55f) : Color.white;
+            tmp.richText = true;
+            tmp.raycastTarget = false;
         }
 
         private static void EnsureWarbandScrollViewport(Transform warbandRoot)
@@ -2199,8 +2372,9 @@ namespace ArthurianAutobattler
             var scrollRt = scrollHost as RectTransform;
             if (scrollRt != null)
             {
+                // Leave room above for the battalion formation diagram.
                 scrollRt.anchorMin = new Vector2(0.04f, 0.06f);
-                scrollRt.anchorMax = new Vector2(0.96f, 0.86f);
+                scrollRt.anchorMax = new Vector2(0.96f, 0.68f);
                 scrollRt.offsetMin = Vector2.zero;
                 scrollRt.offsetMax = Vector2.zero;
             }
@@ -2242,19 +2416,24 @@ namespace ArthurianAutobattler
             EnsureWarbandScrollViewport(warbandModal != null ? warbandModal.transform : warbandListContainer.parent);
 
             var party = GameLoopManager.Instance.recruitedParty;
+            RefreshFormationDiagram(party);
+
             if (party == null || party.Count == 0)
             {
                 BuildWarbandFallbackRow(warbandListContainer,
-                    "<i>No recruits yet.</i> Hire townsfolk from the pews — they appear here.");
+                    "<i>No recruits yet.</i> Hire townsfolk from the pews — they appear here. "
+                    + "Tank / Ranged moves their box on the battalion map above.");
                 Canvas.ForceUpdateCanvases();
                 LayoutRebuilder.ForceRebuildLayoutImmediate(warbandListContainer as RectTransform);
                 return;
             }
 
-            foreach (var m in party)
+            for (int i = 0; i < party.Count; i++)
             {
+                var m = party[i];
                 if (m == null) continue;
-                string body = BuildCrowdMemberSummary(m, party);
+                int unitNum = i + 1;
+                string body = BuildCrowdMemberSummary(m, party, unitNum);
                 GameObject row;
                 if (warbandRowPrefab != null)
                 {
@@ -2305,15 +2484,21 @@ namespace ArthurianAutobattler
             }
         }
 
-        private static string BuildCrowdMemberSummary(RecruitInstance m, List<RecruitInstance> party)
+        private static string BuildCrowdMemberSummary(RecruitInstance m, List<RecruitInstance> party, int unitNum = 0)
         {
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(m.unitID) : 0;
             string mood = DescribeMood(m, grudge);
             string friends = DescribeFriends(m, party);
             string rivals = DescribeRivals(m, party);
+            string row = m.assignedRole == CombatRole.BacklineRanged
+                ? "BACK"
+                : m.assignedRole == CombatRole.FrontlineTank
+                    ? "FRONT"
+                    : "FRONT (unassigned)";
+            string numBit = unitNum > 0 ? $"#{unitNum}  " : "";
 
-            return $"<b>{m.characterName}</b>  ({m.unitType})  ·  {m.assignedRole}\n"
+            return $"<b>{numBit}{m.characterName}</b>  ({m.unitType})  ·  {m.assignedRole} → <b>{row}</b>\n"
                    + $"HP {m.maxHealth}  |  ATK {m.attackDamage}  |  SPD {m.attackSpeed:F1}/s\n"
                    + $"Mood: {mood}  ·  Trait: {m.primaryTrait}\n"
                    + $"<color=#7CFF9A>Friends:</color> {friends}\n"
