@@ -55,8 +55,20 @@ namespace ArthurianAutobattler
         /// </summary>
         public bool rivalriesSuspendedThisWave;
 
+        /// <summary>
+        /// Buy Tavern Round (50g) → −10g hire for every recruit until this wave ends.
+        /// Cleared on <see cref="EnsureDisbandedAfterWave"/> / new night.
+        /// </summary>
+        public bool tavernRoundHireDiscountActive;
+
         /// <summary>Gold cost to Mediate (wave-scoped rivalry cancel).</summary>
         public const int MediateCostGold = 100;
+
+        /// <summary>Gold cost to Buy Tavern Round.</summary>
+        public const int TavernRoundCostGold = 50;
+
+        /// <summary>Hire discount for all units after Buy Tavern Round (this wave).</summary>
+        public const int TavernRoundHireDiscount = 10;
 
         private Coroutine seatPopulateRoutine;
         private const string NightPrefsKey = "SomersetNight";
@@ -233,6 +245,7 @@ namespace ArthurianAutobattler
             SomersetRunes.SetGrudgeDeltaMultiplier(1f);
             SomersetRunes.ClearPact();
             rivalriesSuspendedThisWave = false;
+            tavernRoundHireDiscountActive = false;
 
             if (rngGenerator == null) rngGenerator = FindFirstObjectByType<TownRNGGenerator>();
             currentTownPool = rngGenerator != null
@@ -315,6 +328,7 @@ namespace ArthurianAutobattler
             {
                 mustDisbandPartyAfterCurrentWave = false;
                 rivalriesSuspendedThisWave = false;
+                tavernRoundHireDiscountActive = false;
                 return;
             }
 
@@ -355,8 +369,9 @@ namespace ArthurianAutobattler
                 ReturnOneToPew(r, combatDead, fusionLeafDead, livingDelta, won, seenIds, ref returned);
             }
 
-            // Rivalries / Mediate are per-wave — expire when the wave ends.
+            // Rivalries / Mediate / Tavern Round hire discount are per-wave — expire when the wave ends.
             rivalriesSuspendedThisWave = false;
+            tavernRoundHireDiscountActive = false;
 
             mustDisbandPartyAfterCurrentWave = false;
             Debug.Log(
@@ -490,6 +505,7 @@ namespace ArthurianAutobattler
 
             mustDisbandPartyAfterCurrentWave = false;
             rivalriesSuspendedThisWave = false;
+            tavernRoundHireDiscountActive = false;
             // Mordred never belongs in pews (fuse/Legend only).
             currentTownPool?.RemoveAll(r => r != null && r.unitType == UnitType.Mordred);
             AutosaveWarband();
@@ -543,7 +559,37 @@ namespace ArthurianAutobattler
         /// </summary>
         public void RefreshNightHUD()
         {
-            ApplyNightLabel($"Night {Mathf.Max(1, currentNight)}");
+            ApplyNightLabel(FormatNightWaveLabel(currentNight, CurrentWaveNumber()));
+        }
+
+        /// <summary>Upcoming / current AutoBattle wave index (1-based).</summary>
+        public int CurrentWaveNumber()
+        {
+            if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
+            return battleEngine != null ? Mathf.Max(1, battleEngine.currentBattleNumber) : 1;
+        }
+
+        /// <summary>e.g. "Night 2 · Wave 3 (Vortigern)".</summary>
+        public static string FormatNightWaveLabel(int night, int wave)
+        {
+            night = Mathf.Max(1, night);
+            wave = Mathf.Max(1, wave);
+            return $"Night {night} · {DescribeWave(wave)}";
+        }
+
+        /// <summary>Wave number + boss/horde type for HUD.</summary>
+        public static string DescribeWave(int wave)
+        {
+            wave = Mathf.Max(1, wave);
+            return wave switch
+            {
+                1 => "Wave 1 (Horde)",
+                2 => "Wave 2 (Black Knight)",
+                3 => "Wave 3 (Vortigern)",
+                4 => "Wave 4 (Green Knight)",
+                5 => "Wave 5 (Accolon)",
+                _ => $"Wave {wave} (Nimue)"
+            };
         }
 
         private static void ApplyNightLabel(string label)

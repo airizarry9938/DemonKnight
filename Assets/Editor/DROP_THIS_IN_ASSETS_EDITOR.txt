@@ -4,9 +4,9 @@ STOP hand-copying random files.
 1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → stars-visible-hire-bands-gold200
+4) Diagnose → tavern-discount-wave-hud
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-See ANDREW-STARS-VISIBLE-HIRE-BANDS-GOLD200.md
+See ANDREW-TAVERN-DISCOUNT-WAVE-HUD.md

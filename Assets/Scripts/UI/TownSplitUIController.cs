@@ -422,9 +422,15 @@ namespace ArthurianAutobattler
 
         public void BuyTavernRound()
         {
-            if (playerGold < 50) return;
-            playerGold -= 50;
+            int cost = GameLoopManager.TavernRoundCostGold;
+            if (playerGold < cost) return;
+            playerGold -= cost;
 
+            // −10g hire for ALL units this town session / wave (clears on wave end).
+            if (GameLoopManager.Instance != null)
+                GameLoopManager.Instance.tavernRoundHireDiscountActive = true;
+
+            // Soft grudge relief for Peasants & Drunkards (flavor; hire also uses tavern discount).
             foreach (var p in activeTownPool)
             {
                 if (p.unitType == UnitType.Peasant || p.primaryTrait == TraitTag.Drunkard)
@@ -432,7 +438,17 @@ namespace ArthurianAutobattler
             }
 
             UpdateHUD();
-            characterDialogueText.text = "<color=yellow>A round for the tavern! Spirits rise across Camelot!</color>";
+            if (characterDialogueText != null)
+            {
+                characterDialogueText.text =
+                    $"<color=yellow>Tavern Round ({cost}g)!</color> All hires −{GameLoopManager.TavernRoundHireDiscount}g this wave.";
+            }
+            if (selectedRecruit != null)
+            {
+                int grudge = GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID) : 0;
+                RefreshDossierUI(grudge);
+            }
         }
 
         private void RefreshDossierUI(int grudge)
@@ -560,7 +576,19 @@ namespace ArthurianAutobattler
                 : 0;
             if (partyCountText != null)
                 partyCountText.text = $"Warband ({count})";
-            if (tavernRoundButton != null) tavernRoundButton.interactable = playerGold >= 50;
+            if (tavernRoundButton != null)
+            {
+                tavernRoundButton.interactable = playerGold >= GameLoopManager.TavernRoundCostGold;
+                var lbl = tavernRoundButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (lbl != null)
+                {
+                    bool active = GameLoopManager.Instance != null
+                                  && GameLoopManager.Instance.tavernRoundHireDiscountActive;
+                    lbl.text = active
+                        ? $"Round (−{GameLoopManager.TavernRoundHireDiscount}g hire ✓)"
+                        : $"Buy Round ({GameLoopManager.TavernRoundCostGold}g)";
+                }
+            }
 
             DemonKnightCompatApi.UpdateWarbandHudLabel(FindFirstObjectByType<SomersetChurchUI>());
             FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
