@@ -41,7 +41,7 @@ namespace ArthurianAutobattler
             {
                 perkID = RunPerkID.PitchforkMilitia,
                 title = "Pitchfork Militia",
-                description = "All Peasants gain +10 Max HP and +2 Attack."
+                description = "In battle: all Peasants gain +10 Max HP and +2 Attack (pew dossier stays base)."
             },
             new RunPerkOption
             {
@@ -53,13 +53,13 @@ namespace ArthurianAutobattler
             {
                 perkID = RunPerkID.RoyalScoutingDecree,
                 title = "Royal Scouting Decree",
-                description = "Tier 1 Basic Stats are revealed free on all townsfolk."
+                description = "Tier 1 Basic Stats revealed free on all current and future townsfolk."
             },
             new RunPerkOption
             {
                 perkID = RunPerkID.HasteOfCamelot,
                 title = "Haste of Camelot",
-                description = "All Warriors and Knights gain +0.25 Attacks/Sec."
+                description = "In battle: Warriors and Knights gain +0.25 APS (cap 2.0)."
             },
             new RunPerkOption
             {
@@ -344,9 +344,21 @@ namespace ArthurianAutobattler
                 if (ui != null) ui.playerGold += 40;
             }
 
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
+
+            // Scouting must unlock Tier 1 on the CURRENT pew pool (not only next GenerateNewRunTown).
+            if (chosen.perkID == RunPerkID.RoyalScoutingDecree && loop?.currentTownPool != null)
+            {
+                foreach (var r in loop.currentTownPool)
+                {
+                    if (r == null) continue;
+                    if (r.intelTierUnlocked < 1) r.intelTierUnlocked = 1;
+                }
+                Debug.Log("[DemonKnight] Royal Scouting: Tier 1 unlocked on current town pool.");
+            }
+
             if (perkDraftPanel != null) perkDraftPanel.SetActive(false);
 
-            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop == null)
             {
                 Debug.LogError("[DemonKnight] No GameLoopManager after perk pick.");
