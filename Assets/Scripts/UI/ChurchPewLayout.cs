@@ -34,16 +34,21 @@ namespace ArthurianAutobattler
         public const int PewCount = 12;
         public const int TotalSeats = 52;
 
+        /// <summary>Bump when default pew anchors change so Play Mode refreshes stale scene data.</summary>
+        public const int CurrentLayoutVersion = 3;
+
         [Header("Background (full-screen church art)")]
         public RectTransform backgroundRect;
 
         [Header("12 Pew Anchors (row-major: front-left → altar-right)")]
         public PewAnchor[] pews = CreateDefaultPews();
 
+        [HideInInspector]
+        public int layoutVersion = 0;
+
         /// <summary>
         /// Defaults matched to SomersetChurchInterior.jpg (1408×768).
-        /// Measured from wood-bench bands: 3 aisle columns × 4 pew rows.
-        /// Row 0 = nearest/front (bottom of image), Row 3 = toward altar/windows.
+        /// Occupied rows sit mid→altar; camera-front pews stay empty.
         /// </summary>
         public static PewAnchor[] CreateDefaultPews()
         {
@@ -94,7 +99,26 @@ namespace ArthurianAutobattler
         public void ResetToChurchArtDefaults()
         {
             pews = CreateDefaultPews();
+            layoutVersion = CurrentLayoutVersion;
         }
+
+        /// <summary>
+        /// Scene-serialized pews keep old Y values after script updates. Call before seating.
+        /// </summary>
+        public void ApplyLatestDefaultsIfNeeded(bool force = false)
+        {
+            bool staleVersion = layoutVersion < CurrentLayoutVersion;
+            bool looksLikeOldFrontRow = pews != null && pews.Length > 0 && pews[0] != null
+                && pews[0].normalizedCenter.y < 0.32f; // old layout sat at ~0.255
+
+            if (force || staleVersion || looksLikeOldFrontRow || pews == null || pews.Length != PewCount)
+            {
+                ResetToChurchArtDefaults();
+                Debug.Log($"[DemonKnight] ChurchPewLayout refreshed to v{CurrentLayoutVersion} (front pews empty, seats shifted up).");
+            }
+        }
+
+        private void Awake() => ApplyLatestDefaultsIfNeeded();
 
         public int GetPewIndexForSeat(int globalSeatIndex)
         {
@@ -244,8 +268,13 @@ namespace ArthurianAutobattler
 
         public void EnsureValid()
         {
+            ApplyLatestDefaultsIfNeeded();
+
             if (pews == null || pews.Length != PewCount)
+            {
                 pews = CreateDefaultPews();
+                layoutVersion = CurrentLayoutVersion;
+            }
 
             int sum = 0;
             for (int i = 0; i < pews.Length; i++)

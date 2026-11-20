@@ -150,6 +150,7 @@ namespace ArthurianAutobattler
         {
             if (pewLayout == null) pewLayout = GetComponent<ChurchPewLayout>();
             if (pewLayout == null) pewLayout = gameObject.AddComponent<ChurchPewLayout>();
+            pewLayout.ApplyLatestDefaultsIfNeeded();
             pewLayout.EnsureValid();
 
             if (pewSeatLayer == null)
