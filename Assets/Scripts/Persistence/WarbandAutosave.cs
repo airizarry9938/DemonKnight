@@ -33,18 +33,19 @@ namespace ArthurianAutobattler
         public bool canAttackFromBack;
         /// <summary>Wave-victory experience stars (−5g hire each). Run-scoped via autosave.</summary>
         public int victoryStars;
-        /// <summary>Pre-fusion ingredients (run-scoped). Wave-end expands these back to pews.</summary>
-        public List<WarbandMemberSave> fusionIngredients;
+        // NOTE: Do NOT add List<WarbandMemberSave> here — Unity JsonUtility serialization
+        // depth cycle (limit 10). Fusion trees use flat fusionParts + ownerUnitId.
+    }
 
-        // Modular appearance indices (ints only — no Sprite refs in JSON).
-        public bool hasAppearance;
-        public int appearanceSeed;
-        public int skinToneIndex;
-        public int hairColorIndex;
-        public int poseIndex;
-        public int outfitIndex;
-        public int headIndex;
-        public int propIndex;
+    /// <summary>
+    /// One flat fusion-ingredient row. ownerUnitId = product unitID that consumed this part.
+    /// Nested fusions: a part that is itself a product also appears as owner of deeper parts.
+    /// </summary>
+    [Serializable]
+    public class WarbandFusionPartSave
+    {
+        public string ownerUnitId;
+        public WarbandMemberSave member;
     }
 
     [Serializable]
@@ -57,6 +58,8 @@ namespace ArthurianAutobattler
         public List<WarbandMemberSave> survivors = new List<WarbandMemberSave>();
         /// <summary>Town veterans with kept stats/upgrades/intel for rehire next night.</summary>
         public List<WarbandMemberSave> veterans = new List<WarbandMemberSave>();
+        /// <summary>Flat fusion ingredient snapshots (no nested List self-ref).</summary>
+        public List<WarbandFusionPartSave> fusionParts = new List<WarbandFusionPartSave>();
     }
 
     public static class WarbandAutosave
@@ -64,6 +67,7 @@ namespace ArthurianAutobattler
         private static string FilePath => Path.Combine(Application.persistentDataPath, "warband_autosave.json");
         private const string PrefsNight = "SomersetNight";
         private const string PrefsHasWarband = "SomersetHasWarbandAutosave";
+        private const int MaxFusionDepth = 8;
 
         public static bool HasAutosave()
         {
@@ -80,7 +84,8 @@ namespace ArthurianAutobattler
                 battleNumber = loop.battleEngine != null ? Mathf.Max(1, loop.battleEngine.currentBattleNumber) : 1,
                 playerGold = Mathf.Max(0, playerGold),
                 survivors = new List<WarbandMemberSave>(),
-                veterans = new List<WarbandMemberSave>()
+                veterans = new List<WarbandMemberSave>(),
+                fusionParts = new List<WarbandFusionPartSave>()
             };
 
             var seen = new HashSet<string>();
@@ -90,7 +95,7 @@ namespace ArthurianAutobattler
                 foreach (var r in loop.recruitedParty)
                 {
                     if (r == null || string.IsNullOrEmpty(r.unitID)) continue;
-                    data.survivors.Add(ToSave(r));
+                    data.survivors.Add(ToSaveFlat(r, data.fusionParts));
                     seen.Add(r.unitID);
                     GrudgeSaveManager.Instance?.RememberIntel(r.unitID, Mathf.Max(r.intelTierUnlocked, 3));
                 }
@@ -103,7 +108,7 @@ namespace ArthurianAutobattler
                 {
                     if (r == null || string.IsNullOrEmpty(r.unitID) || seen.Contains(r.unitID)) continue;
                     if (!IsVeteran(r)) continue;
-                    data.veterans.Add(ToSave(r));
+                    data.veterans.Add(ToSaveFlat(r, data.fusionParts));
                     seen.Add(r.unitID);
                     GrudgeSaveManager.Instance?.RememberIntel(r.unitID, Mathf.Max(r.intelTierUnlocked, 1));
                 }
@@ -116,7 +121,7 @@ namespace ArthurianAutobattler
                 PlayerPrefs.SetInt(PrefsHasWarband, 1);
                 PlayerPrefs.Save();
                 Debug.Log(
-                    $"[DemonKnight] Autosaved night {data.night}: party {data.survivors.Count}, veterans {data.veterans.Count} → {FilePath}");
+                    $"[DemonKnight] Autosaved night {data.night}: party {data.survivors.Count}, veterans {data.veterans.Count}, fusionParts {data.fusionParts.Count} → {FilePath}");
             }
             catch (Exception e)
             {
@@ -143,6 +148,7 @@ namespace ArthurianAutobattler
                 if (data == null) return null;
                 if (data.survivors == null) data.survivors = new List<WarbandMemberSave>();
                 if (data.veterans == null) data.veterans = new List<WarbandMemberSave>();
+                if (data.fusionParts == null) data.fusionParts = new List<WarbandFusionPartSave>();
                 return data;
             }
             catch (Exception e)
@@ -159,7 +165,7 @@ namespace ArthurianAutobattler
             foreach (var s in data.survivors)
             {
                 if (s == null || string.IsNullOrEmpty(s.unitID)) continue;
-                list.Add(FromSave(s));
+                list.Add(FromSaveFlat(s, data.fusionParts));
             }
             return list;
         }
@@ -171,7 +177,7 @@ namespace ArthurianAutobattler
             foreach (var s in data.veterans)
             {
                 if (s == null || string.IsNullOrEmpty(s.unitID)) continue;
-                list.Add(FromSave(s));
+                list.Add(FromSaveFlat(s, data.fusionParts));
             }
             return list;
         }
@@ -218,8 +224,6 @@ namespace ArthurianAutobattler
             if (src.pewSeatIndex > 0) dest.pewSeatIndex = src.pewSeatIndex;
             if (src.randomAvatar != null) dest.randomAvatar = src.randomAvatar;
             if (src.headSprite != null) dest.headSprite = src.headSprite;
-            if (src.appearance != null)
-                dest.appearance = CloneAppearance(src.appearance);
             if (src.IsFusedLegend)
                 dest.fusionIngredients = CardFusionSystem.CloneForFusionMemory(src)?.fusionIngredients;
             int grudge = GrudgeSaveManager.Instance != null
@@ -303,9 +307,10 @@ namespace ArthurianAutobattler
             }
         }
 
-        private static WarbandMemberSave ToSave(RecruitInstance r, int depth = 0)
+        /// <summary>Scalar snapshot only — never nests List&lt;WarbandMemberSave&gt;.</summary>
+        private static WarbandMemberSave ToMemberScalars(RecruitInstance r)
         {
-            var s = new WarbandMemberSave
+            return new WarbandMemberSave
             {
                 unitID = r.unitID,
                 characterName = r.characterName,
@@ -325,20 +330,40 @@ namespace ArthurianAutobattler
                 canAttackFromBack = r.canAttackFromBack,
                 victoryStars = Mathf.Max(0, r.victoryStars)
             };
-            WriteAppearance(s, r.appearance);
-            if (depth < 6 && r.fusionIngredients != null && r.fusionIngredients.Count > 0)
-            {
-                s.fusionIngredients = new List<WarbandMemberSave>(r.fusionIngredients.Count);
-                foreach (var ing in r.fusionIngredients)
-                {
-                    if (ing != null)
-                        s.fusionIngredients.Add(ToSave(ing, depth + 1));
-                }
-            }
+        }
+
+        private static WarbandMemberSave ToSaveFlat(RecruitInstance r, List<WarbandFusionPartSave> parts)
+        {
+            var s = ToMemberScalars(r);
+            AppendFusionParts(r, parts, depth: 0, visited: new HashSet<string>());
             return s;
         }
 
-        private static RecruitInstance FromSave(WarbandMemberSave s, int depth = 0)
+        private static void AppendFusionParts(
+            RecruitInstance owner,
+            List<WarbandFusionPartSave> parts,
+            int depth,
+            HashSet<string> visited)
+        {
+            if (owner == null || parts == null) return;
+            if (depth >= MaxFusionDepth) return;
+            if (owner.fusionIngredients == null || owner.fusionIngredients.Count == 0) return;
+            if (!string.IsNullOrEmpty(owner.unitID) && !visited.Add(owner.unitID))
+                return; // cycle guard
+
+            foreach (var ing in owner.fusionIngredients)
+            {
+                if (ing == null) continue;
+                parts.Add(new WarbandFusionPartSave
+                {
+                    ownerUnitId = owner.unitID,
+                    member = ToMemberScalars(ing)
+                });
+                AppendFusionParts(ing, parts, depth + 1, visited);
+            }
+        }
+
+        private static RecruitInstance FromMemberScalars(WarbandMemberSave s)
         {
             var r = new RecruitInstance
             {
@@ -360,69 +385,38 @@ namespace ArthurianAutobattler
                 canAttackFromBack = s.canAttackFromBack,
                 victoryStars = Mathf.Max(0, s.victoryStars)
             };
-            r.appearance = ReadAppearance(s, r.unitType);
-            if (depth < 6 && s.fusionIngredients != null && s.fusionIngredients.Count > 0)
-            {
-                r.fusionIngredients = new List<RecruitInstance>(s.fusionIngredients.Count);
-                foreach (var ing in s.fusionIngredients)
-                {
-                    if (ing != null)
-                        r.fusionIngredients.Add(FromSave(ing, depth + 1));
-                }
-            }
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
             r.RefreshBodyPostureFromTraits(grudge);
             return r;
         }
 
-        static void WriteAppearance(WarbandMemberSave s, TownsfolkAppearance a)
+        private static RecruitInstance FromSaveFlat(
+            WarbandMemberSave s,
+            List<WarbandFusionPartSave> parts,
+            int depth = 0,
+            HashSet<string> assembling = null)
         {
-            if (s == null || a == null)
+            if (s == null) return null;
+            assembling ??= new HashSet<string>();
+            var r = FromMemberScalars(s);
+            if (depth >= MaxFusionDepth || parts == null || parts.Count == 0)
+                return r;
+            if (!string.IsNullOrEmpty(s.unitID) && !assembling.Add(s.unitID))
+                return r; // cycle guard
+
+            List<RecruitInstance> ings = null;
+            for (int i = 0; i < parts.Count; i++)
             {
-                if (s != null) s.hasAppearance = false;
-                return;
+                var part = parts[i];
+                if (part == null || part.member == null) continue;
+                if (!string.Equals(part.ownerUnitId, s.unitID, StringComparison.Ordinal)) continue;
+                ings ??= new List<RecruitInstance>();
+                ings.Add(FromSaveFlat(part.member, parts, depth + 1, assembling));
             }
-            s.hasAppearance = true;
-            s.appearanceSeed = a.seed;
-            s.skinToneIndex = a.skinToneIndex;
-            s.hairColorIndex = a.hairColorIndex;
-            s.poseIndex = a.poseIndex;
-            s.outfitIndex = a.outfitIndex;
-            s.headIndex = a.headIndex;
-            s.propIndex = a.propIndex;
-        }
-
-        static TownsfolkAppearance ReadAppearance(WarbandMemberSave s, UnitType tier)
-        {
-            if (s == null || !s.hasAppearance) return null;
-            return new TownsfolkAppearance
-            {
-                tier = tier,
-                seed = s.appearanceSeed,
-                skinToneIndex = s.skinToneIndex,
-                hairColorIndex = s.hairColorIndex,
-                poseIndex = s.poseIndex,
-                outfitIndex = s.outfitIndex,
-                headIndex = s.headIndex,
-                propIndex = s.propIndex
-            };
-        }
-
-        static TownsfolkAppearance CloneAppearance(TownsfolkAppearance a)
-        {
-            if (a == null) return null;
-            return new TownsfolkAppearance
-            {
-                tier = a.tier,
-                seed = a.seed,
-                skinToneIndex = a.skinToneIndex,
-                hairColorIndex = a.hairColorIndex,
-                poseIndex = a.poseIndex,
-                outfitIndex = a.outfitIndex,
-                headIndex = a.headIndex,
-                propIndex = a.propIndex
-            };
+            if (ings != null && ings.Count > 0)
+                r.fusionIngredients = ings;
+            return r;
         }
     }
 }

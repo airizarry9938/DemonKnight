@@ -44,12 +44,18 @@ namespace ArthurianAutobattler
         {
             loop ??= ResolveLoop();
             if (loop == null) return;
-            if (playerGold >= 0)
+            // GameLoopManager only declares AutosaveWarband(int) — never a 0-arg overload.
+            // Always invoke with int so reflection matches (default -1 resolves gold inside).
+            if (TryInvoke(loop, "AutosaveWarband", playerGold)) return;
+            try
             {
-                if (TryInvoke(loop, "AutosaveWarband", playerGold)) return;
+                WarbandAutosave.SaveFromLoop(loop, playerGold);
             }
-            if (!TryInvoke(loop, "AutosaveWarband"))
-                Debug.LogWarning("[DemonKnight] AutosaveWarband missing — Sync GameLoopManager.cs.");
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] AutosaveWarband fallback failed: " + ex.Message
+                    + " — Sync GameLoopManager.cs / WarbandAutosave.cs.");
+            }
         }
 
         public static void EnsureDisbandedAfterWave(

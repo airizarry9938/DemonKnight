@@ -24,7 +24,7 @@ public static class ArthurianSyncFromGitHub
     // Updated when shipping Sync packages (main tip alone is still older merges).
     private const string FallbackCommitSha = "0a56289";
 
-    private const string ExpectedPackageId = "art-tools-no-menu-conflict";
+    private const string ExpectedPackageId = "fix-fusion-serialize-flat-autosave";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
