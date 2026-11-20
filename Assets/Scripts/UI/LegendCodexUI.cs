@@ -28,8 +28,7 @@ namespace ArthurianAutobattler
         {
             if (codexPanel != null) codexPanel.SetActive(false);
 
-            // Route through church OpenModal so Esc/X and mutual exclusion stay consistent.
-            // Do NOT locally toggle activeSelf — that fought SomersetChurchUI and left tiny panels.
+            // Toggle open/close via church (same as Dice/Warband). Do NOT only OpenModal.
             toggleCodexButton?.onClick.RemoveAllListeners();
             toggleCodexButton?.onClick.AddListener(OpenViaChurchOrToggle);
         }
@@ -38,9 +37,10 @@ namespace ArthurianAutobattler
         {
             var church = FindFirstObjectByType<SomersetChurchUI>()
                          ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
-            if (church != null && codexPanel != null)
+            if (church != null)
             {
-                church.OpenModal(codexPanel);
+                if (codexPanel != null) church.codexModal = codexPanel;
+                church.ToggleCodexModal();
                 return;
             }
 

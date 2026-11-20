@@ -477,16 +477,15 @@ namespace ArthurianAutobattler
 
         private void Update()
         {
-            // Esc fallback if MainMenuUI.Update somehow didn't run (Downloads edge cases).
-            if (Input.GetKeyDown(KeyCode.Escape) && currentPhase != GamePhase.AutoBattle)
+            // Esc fallback only when MainMenuUI.Update did not run (Downloads edge cases).
+            // If Instance exists, MainMenuUI owns Esc (avoid double-toggle same frame).
+            if (Input.GetKeyDown(KeyCode.Escape)
+                && currentPhase != GamePhase.AutoBattle
+                && MainMenuUI.Instance == null)
             {
                 var menu = MainMenuUI.EnsureExists();
-                if (menu != null)
-                {
-                    if (menu.IsMenuOpen) menu.HideMenu();
-                    else menu.ShowMenu(boot: false);
-                    Debug.LogError("[DemonKnight] GameLoop Esc fallback → toggled Main Menu.");
-                }
+                menu?.HandleEscapeKey();
+                Debug.LogError("[DemonKnight] GameLoop Esc fallback → HandleEscapeKey.");
             }
 
             if (currentPhase != GamePhase.TownRecruit) return;

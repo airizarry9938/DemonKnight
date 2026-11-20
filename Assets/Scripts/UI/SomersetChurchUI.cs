@@ -127,6 +127,7 @@ namespace ArthurianAutobattler
             ApplyEnlargedMenuFonts();
             RewireDiceToggleButton();
             RewireWarbandToggleButton();
+            RewireLegendsToggleButton();
             RewireMarchButton();
             if (!diceModalUserOpen)
             {
@@ -136,6 +137,7 @@ namespace ArthurianAutobattler
             yield return null;
             RewireDiceToggleButton();
             RewireWarbandToggleButton();
+            RewireLegendsToggleButton();
             RewireMarchButton();
             if (!diceModalUserOpen)
             {
@@ -212,12 +214,8 @@ namespace ArthurianAutobattler
 
             // March is re-bound in RewireMarchButton (same pattern as Dice — clears Inspector persistent).
             RewireMarchButton();
-            // Dice / Warband are wired in Rewire*ToggleButton (toggle open/close).
-            codexButton?.onClick.AddListener(() =>
-            {
-                OpenModal(codexModal);
-                FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
-            });
+            // Dice / Warband / Legends are wired in Rewire*ToggleButton (toggle open/close).
+            RewireLegendsToggleButton();
             buyRoundButton?.onClick.AddListener(BuyTavernRound);
 
             tier1Button?.onClick.AddListener(() => UnlockIntel(1));
@@ -1065,6 +1063,7 @@ namespace ArthurianAutobattler
             EnsureDiceHudButtonVisible();
             RewireDiceToggleButton();
             RewireWarbandToggleButton();
+            RewireLegendsToggleButton();
             RewireMarchButton();
             EnsureMenuHudButton(hud);
 
@@ -1112,15 +1111,17 @@ namespace ArthurianAutobattler
                 party.gameObject.SetActive(false);
 
             EnsureMenuHudButton(hud);
+            PlaceMenuButtonFarLeft(hud);
 
-            // Labels only — do not move RectTransforms unless legacy equal-slot mode is on.
+            // Labels only — do not move other authored RectTransforms unless legacy equal-slot mode is on.
             ApplyHudButtonLabel(tavernDiceButton, "Dice");
             ApplyHudButtonLabel(codexButton, "Legends");
             ApplyHudButtonLabel(goToWarButton, "MARCH TO WAR");
+            ApplyHudButtonLabel(menuButton, "☰ Esc");
 
             if (!forceEqualHudSlots)
             {
-                Debug.Log("[DemonKnight] HUD layout preserved (editor RectTransforms). Codex label=Legends.");
+                Debug.Log("[DemonKnight] HUD layout preserved (editor RectTransforms). Menu→far left. Codex=Legends.");
                 return;
             }
 
@@ -1136,6 +1137,8 @@ namespace ArthurianAutobattler
             Button march = goToWarButton;
 
             var slots = new List<RectTransform>(9);
+            // Menu first = far left in legacy equal-slot strip.
+            if (menuButton != null) slots.Add(menuButton.transform as RectTransform);
             if (nightText != null) slots.Add(nightText.rectTransform);
             if (timerText != null) slots.Add(timerText.rectTransform);
             if (goldText != null) slots.Add(goldText.rectTransform);
@@ -1143,7 +1146,6 @@ namespace ArthurianAutobattler
             if (codex != null) slots.Add(codex.transform as RectTransform);
             if (warbandRt != null) slots.Add(warbandRt);
             if (march != null) slots.Add(march.transform as RectTransform);
-            if (menuButton != null) slots.Add(menuButton.transform as RectTransform);
 
             Canvas.ForceUpdateCanvases();
             var hudRt = hud as RectTransform;
@@ -1399,7 +1401,7 @@ namespace ArthurianAutobattler
             Debug.LogWarning($"[DemonKnight] {reason}");
         }
 
-        /// <summary>HUD Esc / menu icon — opens Main Menu (same as keyboard Esc).</summary>
+        /// <summary>HUD Esc / menu icon — toggles Main Menu (same as keyboard Esc).</summary>
         private void EnsureMenuHudButton(Transform hud)
         {
             if (hud == null) return;
@@ -1415,26 +1417,105 @@ namespace ArthurianAutobattler
             }
             else
             {
-                var label = menuButton.GetComponentInChildren<TextMeshProUGUI>();
-                if (label != null && string.IsNullOrEmpty(label.text))
-                    label.text = "☰ Esc";
+                ApplyHudButtonLabel(menuButton, "☰ Esc");
             }
 
             menuButton.onClick = new Button.ButtonClickedEvent();
-            menuButton.onClick.AddListener(OpenMainMenuFromHud);
+            menuButton.onClick.AddListener(ToggleMainMenuFromHud);
             menuButton.gameObject.SetActive(true);
+            menuButton.interactable = true;
         }
 
-        public void OpenMainMenuFromHud()
+        /// <summary>
+        /// Far-left of HUD_Bar only — does not reposition Dice/Legends/Warband/March.
+        /// </summary>
+        private void PlaceMenuButtonFarLeft(Transform hud)
         {
+            if (menuButton == null || hud == null) return;
+            if (menuButton.transform.parent != hud)
+                menuButton.transform.SetParent(hud, true);
+            menuButton.transform.SetAsFirstSibling();
+
+            // Legacy equal-slot path places Menu via ApplyLegacyEqualHudSlots.
+            if (forceEqualHudSlots) return;
+
+            var rt = menuButton.transform as RectTransform;
+            if (rt == null) return;
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(10f, 0f);
+            if (rt.sizeDelta.x < 90f || rt.sizeDelta.y < 40f)
+                rt.sizeDelta = new Vector2(110f, 56f);
+        }
+
+        public void ToggleMainMenuFromHud()
+        {
+            // Prefer closing floating HUD modals first (same Esc priority).
+            if (AnyFloatingModalOpen())
+            {
+                CloseFloatingModals();
+                Debug.Log("[DemonKnight] HUD Menu/Esc → closed floating modal.");
+                return;
+            }
+
             var menu = MainMenuUI.EnsureExists();
             if (menu == null)
             {
                 Debug.LogError("[DemonKnight] Menu HUD clicked but MainMenuUI missing.");
                 return;
             }
-            menu.ShowMenu(boot: false);
-            Debug.Log("[DemonKnight] HUD Menu/Esc button → Main Menu open.");
+            menu.ToggleMenu();
+            Debug.Log($"[DemonKnight] HUD Menu/Esc button → Main Menu {(menu.IsMenuOpen ? "open" : "closed")}.");
+        }
+
+        /// <summary>Legacy alias — toggles (open or close).</summary>
+        public void OpenMainMenuFromHud() => ToggleMainMenuFromHud();
+
+        public bool AnyFloatingModalOpen()
+        {
+            if (diceModalUserOpen) return true;
+            if (codexModalUserOpen) return true;
+            if (warbandModalUserOpen) return true;
+            if (diceModal != null && diceModal.activeSelf) return true;
+            if (codexModal != null && codexModal.activeSelf) return true;
+            if (warbandModal != null && warbandModal.activeSelf) return true;
+            var codexUi = FindFirstObjectByType<LegendCodexUI>();
+            if (codexUi != null && codexUi.codexPanel != null && codexUi.codexPanel.activeSelf) return true;
+            return false;
+        }
+
+        /// <summary>Legends HUD / hotkey C — toggle open/close like Dice & Warband.</summary>
+        public void RewireLegendsToggleButton()
+        {
+            Transform hud = FindHudBar();
+            ResolveCodexButton(hud);
+            if (codexButton == null) return;
+            codexButton.onClick = new Button.ButtonClickedEvent();
+            codexButton.onClick.AddListener(ToggleCodexModal);
+            ApplyHudButtonLabel(codexButton, "Legends");
+            codexButton.gameObject.SetActive(true);
+            codexButton.interactable = true;
+        }
+
+        public void ToggleCodexModal()
+        {
+            EnsureCodexModalLarge();
+            if (codexModal == null)
+            {
+                var codexUi = FindFirstObjectByType<LegendCodexUI>();
+                if (codexUi != null) codexModal = codexUi.codexPanel;
+            }
+            bool open = codexModalUserOpen
+                        || (codexModal != null && codexModal.activeSelf);
+            if (open)
+            {
+                CloseFloatingModals();
+                Debug.Log("[DemonKnight] ToggleCodexModal → CLOSE");
+                return;
+            }
+            OpenModal(codexModal);
+            FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
+            Debug.Log("[DemonKnight] ToggleCodexModal → OPEN");
         }
 
         private void EnsureModalChromeButton(
@@ -1500,13 +1581,10 @@ namespace ArthurianAutobattler
 
         public void HandleHotkeys()
         {
-            if (Input.GetKeyDown(KeyCode.Escape)) CloseAllModals();
+            // Esc is owned by MainMenuUI / GameLoop (toggle menu; close modals first).
+            // Do NOT CloseAllModals here — that fought the Esc toggle.
             if (Input.GetKeyDown(KeyCode.T)) ToggleDiceModal();
-            if (Input.GetKeyDown(KeyCode.C))
-            {
-                OpenModal(codexModal);
-                FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();
-            }
+            if (Input.GetKeyDown(KeyCode.C)) ToggleCodexModal();
             if (Input.GetKeyDown(KeyCode.R)) ToggleWarbandModal();
             if (Input.GetKeyDown(KeyCode.B)) BuyTavernRound();
         }
@@ -1931,14 +2009,22 @@ namespace ArthurianAutobattler
                 var listGo = new GameObject("WarbandList", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
                 listGo.transform.SetParent(scrollHost != null ? scrollHost : warbandRoot, false);
                 list = listGo.transform;
-                var vlg = listGo.GetComponent<VerticalLayoutGroup>();
-                vlg.spacing = 8f;
-                vlg.padding = new RectOffset(8, 8, 8, 8);
-                vlg.childForceExpandHeight = false;
-                vlg.childControlHeight = true;
-                vlg.childForceExpandWidth = true;
-                listGo.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             }
+
+            // Always (re)apply vertical layout — existing lists often had no VLG → rows stacked at 0,0.
+            var vlg = list.GetComponent<VerticalLayoutGroup>();
+            if (vlg == null) vlg = list.gameObject.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = 14f;
+            vlg.padding = new RectOffset(10, 10, 10, 10);
+            vlg.childAlignment = TextAnchor.UpperCenter;
+            vlg.childForceExpandHeight = false;
+            vlg.childControlHeight = true;
+            vlg.childForceExpandWidth = true;
+            vlg.childControlWidth = true;
+            var fitter = list.GetComponent<ContentSizeFitter>();
+            if (fitter == null) fitter = list.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             if (scrollHost == null)
             {
@@ -1979,6 +2065,8 @@ namespace ArthurianAutobattler
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 40f;
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRt);
         }
 
         public void RefreshWarbandPanel()
@@ -1995,12 +2083,15 @@ namespace ArthurianAutobattler
             if (warbandListContainer == null || GameLoopManager.Instance == null) return;
 
             foreach (Transform c in warbandListContainer) Destroy(c.gameObject);
+            EnsureWarbandScrollViewport(warbandModal != null ? warbandModal.transform : warbandListContainer.parent);
 
             var party = GameLoopManager.Instance.recruitedParty;
             if (party == null || party.Count == 0)
             {
                 BuildWarbandFallbackRow(warbandListContainer,
                     "<i>No recruits yet.</i> Hire townsfolk from the pews — they appear here.");
+                Canvas.ForceUpdateCanvases();
+                LayoutRebuilder.ForceRebuildLayoutImmediate(warbandListContainer as RectTransform);
                 return;
             }
 
@@ -2012,6 +2103,7 @@ namespace ArthurianAutobattler
                 if (warbandRowPrefab != null)
                 {
                     row = Instantiate(warbandRowPrefab, warbandListContainer);
+                    EnsureWarbandRowLayout(row);
                     var label = row.GetComponentInChildren<TextMeshProUGUI>();
                     if (label != null)
                     {
@@ -2034,6 +2126,26 @@ namespace ArthurianAutobattler
                     row = BuildWarbandFallbackRow(warbandListContainer, body);
                     AddTrainButtonsToRow(row, m);
                 }
+            }
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(warbandListContainer as RectTransform);
+        }
+
+        private static void EnsureWarbandRowLayout(GameObject row)
+        {
+            if (row == null) return;
+            var le = row.GetComponent<LayoutElement>();
+            if (le == null) le = row.AddComponent<LayoutElement>();
+            le.minHeight = 120f;
+            le.preferredHeight = 132f;
+            le.flexibleHeight = 0f;
+            var rt = row.transform as RectTransform;
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0f, 1f);
+                rt.anchorMax = new Vector2(1f, 1f);
+                rt.pivot = new Vector2(0.5f, 1f);
             }
         }
 
@@ -2098,8 +2210,9 @@ namespace ArthurianAutobattler
             go.transform.SetParent(parent, false);
             go.GetComponent<Image>().color = new Color(0.12f, 0.14f, 0.13f, 0.95f);
             var le = go.GetComponent<LayoutElement>();
-            le.minHeight = 110f;
-            le.preferredHeight = 120f;
+            le.minHeight = 120f;
+            le.preferredHeight = 132f;
+            le.flexibleHeight = 0f;
 
             var tGo = new GameObject("Summary", typeof(RectTransform), typeof(TextMeshProUGUI));
             tGo.transform.SetParent(go.transform, false);

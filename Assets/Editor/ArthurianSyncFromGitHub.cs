@@ -20,9 +20,10 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Known-good commit that contains ResolveLoop CompatApi (PR #3). Bootstrap floor.</summary>
-    private const string FallbackCommitSha = "ba26256";
+    /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
+    private const string FallbackCommitSha = "e3718ec";
 
-    private const string ExpectedPackageId = "sync-pin-jsdelivr";
+    private const string ExpectedPackageId = "hud-esc-legends-warband-pace";
 
     private static readonly string[] ScriptPaths =
     {
@@ -445,8 +446,9 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
-                   || body.Contains("sync-complete-replace")
-                   || body.Contains("sync-pin-jsdelivr");
+                   || body.Contains("hud-esc-legends-warband-pace")
+                   || body.Contains("sync-pin-jsdelivr")
+                   || body.Contains("sync-complete-replace");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
@@ -454,7 +456,8 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("DownloadPinned") || body.Contains("BootstrapCompatAndSyncTools")
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
-            return body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned");
+            return body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                   || body.Contains("hud-esc-legends-warband-pace");
         }
 
         return true;

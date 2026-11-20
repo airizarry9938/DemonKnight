@@ -79,7 +79,12 @@ namespace ArthurianAutobattler
         private void Update()
         {
             if (!Input.GetKeyDown(KeyCode.Escape)) return;
+            HandleEscapeKey();
+        }
 
+        /// <summary>Shared by keyboard Esc and HUD ☰ Esc button.</summary>
+        public void HandleEscapeKey()
+        {
             var loop = DemonKnightCompatApi.ResolveLoop();
             if (loop != null && loop.currentPhase == GamePhase.AutoBattle)
             {
@@ -87,7 +92,23 @@ namespace ArthurianAutobattler
                 return;
             }
 
+            // Close Dice/Legends/Warband first — same priority as HUD menu button.
+            var church = FindFirstObjectByType<SomersetChurchUI>()
+                         ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
+            if (church != null && church.AnyFloatingModalOpen())
+            {
+                church.CloseFloatingModals();
+                Debug.Log("[DemonKnight] Esc → closed floating modal.");
+                return;
+            }
+
+            ToggleMenu();
+        }
+
+        public void ToggleMenu()
+        {
             EnsureBuilt();
+            var loop = DemonKnightCompatApi.ResolveLoop();
             if (menuRoot != null && menuRoot.activeSelf)
             {
                 // At boot with no campaign yet, Esc should not hide without starting.
@@ -97,11 +118,12 @@ namespace ArthurianAutobattler
                     return;
                 }
                 HideMenu();
+                Debug.Log("[DemonKnight] Esc/Menu → Main Menu closed.");
             }
             else
             {
                 ShowMenu(boot: false);
-                Debug.Log("[DemonKnight] Esc → Main Menu open (Quit / Restart / New / Load).");
+                Debug.Log("[DemonKnight] Esc/Menu → Main Menu open (Quit / Restart / New / Load).");
             }
         }
 
