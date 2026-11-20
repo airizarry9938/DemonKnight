@@ -8,6 +8,8 @@ namespace ArthurianAutobattler
     /// <summary>
     /// Full-screen Somerset church stage: characters seated on the 12 painted pews
     /// (3 columns × 4 rows) via ChurchPewLayout. Modals: T/C/R/B/Esc.
+    /// Single clean copy — if Unity reports duplicate CloseFloatingModals/RefreshHUD,
+    /// delete this file and re-download (do not paste into an old copy).
     /// </summary>
     public class ChurchStageUIController : MonoBehaviour
     {
