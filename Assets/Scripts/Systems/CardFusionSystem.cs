@@ -341,7 +341,18 @@ namespace ArthurianAutobattler
                 moodOverlaySprite = src.moodOverlaySprite,
                 isSirenEnchantress = src.isSirenEnchantress,
                 victoryStars = src.victoryStars,
-                canAttackFromBack = src.canAttackFromBack
+                canAttackFromBack = src.canAttackFromBack,
+                appearance = src.appearance == null ? null : new TownsfolkAppearance
+                {
+                    tier = src.appearance.tier,
+                    seed = src.appearance.seed,
+                    skinToneIndex = src.appearance.skinToneIndex,
+                    hairColorIndex = src.appearance.hairColorIndex,
+                    poseIndex = src.appearance.poseIndex,
+                    outfitIndex = src.appearance.outfitIndex,
+                    headIndex = src.appearance.headIndex,
+                    propIndex = src.appearance.propIndex
+                }
             };
             if (src.fusionIngredients != null && src.fusionIngredients.Count > 0)
             {

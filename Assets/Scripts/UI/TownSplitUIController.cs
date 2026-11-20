@@ -253,19 +253,19 @@ namespace ArthurianAutobattler
 
             if (selectedAvatarImage != null)
             {
-                selectedAvatarImage.enabled = true;
-                selectedAvatarImage.sprite = recruit.randomAvatar;
-                if (recruit.randomAvatar == null)
+                var portrait = TownsfolkPortraitView.EnsureOn(
+                    selectedAvatarImage,
+                    selectedAvatarImage.transform.parent);
+                if (portrait != null)
+                    portrait.Apply(recruit);
+                else
                 {
-                    selectedAvatarImage.color = recruit.unitType switch
-                    {
-                        UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 1f),
-                        UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 1f),
-                        UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 1f),
-                        _ => new Color(0.45f, 0.40f, 0.35f, 1f)
-                    };
+                    selectedAvatarImage.enabled = true;
+                    selectedAvatarImage.sprite = recruit.randomAvatar;
+                    selectedAvatarImage.color = recruit.randomAvatar != null
+                        ? Color.white
+                        : TownsfolkVisualApplier.PlaceholderColor(recruit.unitType);
                 }
-                else selectedAvatarImage.color = Color.white;
             }
 
             int grudge = GrudgeSaveManager.Instance != null

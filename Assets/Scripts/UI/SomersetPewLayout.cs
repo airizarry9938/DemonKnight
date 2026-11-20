@@ -227,6 +227,10 @@ namespace ArthurianAutobattler
         /// RectTransform.rect is still zero during Start — pixel placement would stack every seat.
         /// </summary>
         public void ApplySeatTransform(RectTransform seatRt, int globalSeatIndex, Vector2 baseSize)
+            => ApplySeatTransform(seatRt, globalSeatIndex, baseSize, jitterXPixels: 0f);
+
+        /// <param name="jitterXPixels">Deterministic horizontal offset (±2px) for natural crowding.</param>
+        public void ApplySeatTransform(RectTransform seatRt, int globalSeatIndex, Vector2 baseSize, float jitterXPixels)
         {
             if (seatRt == null) return;
 
@@ -241,7 +245,7 @@ namespace ArthurianAutobattler
 
             seatRt.anchorMin = seatRt.anchorMax = anchor;
             seatRt.pivot = new Vector2(0.5f, 0.12f);
-            seatRt.anchoredPosition = Vector2.zero;
+            seatRt.anchoredPosition = new Vector2(Mathf.Clamp(jitterXPixels, -2f, 2f), 0f);
             seatRt.sizeDelta = baseSize * scale;
             seatRt.localScale = Vector3.one;
             seatRt.localRotation = Quaternion.identity;

@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "572155d";
+    private const string FallbackCommitSha = "d4c45c9";
 
-    private const string ExpectedPackageId = "fix-boss-dialog-cs0136";
+    private const string ExpectedPackageId = "modular-townsfolk-appearance";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -56,6 +56,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/FloatingCombatText.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/Data/TownsfolkAppearance.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
         "Assets/Scripts/Data/SomersetRunes.cs",
         "Assets/Scripts/Data/SomersetVisualDatabase.cs",
         "Assets/Scripts/Persistence/GrudgeSaveManager.cs",
@@ -73,6 +75,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
+        "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
+        "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
@@ -81,6 +85,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianRepairChurchStage.cs",
         "Assets/Editor/ArthurianSceneBuilder.cs",
         "Assets/Editor/SomersetAssetStudioWindow.cs",
+        "Assets/Editor/ModularSpriteSheetImporterWindow.cs",
     };
 
     private static readonly string[] AtomicCritical =
@@ -519,6 +524,9 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("modular-townsfolk-appearance")
+                   || body.Contains("fix-night-double-advance")
+                   || body.Contains("fix-fusion-serialize-intel-costs")
                    || body.Contains("fix-boss-dialog-cs0136")
                    || body.Contains("balance-v2-arthurian-expansion")
                    || body.Contains("autobattle-boss-dialog-video-bg")
@@ -547,6 +555,9 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("modular-townsfolk-appearance")
+                    || body.Contains("fix-night-double-advance")
+                    || body.Contains("fix-fusion-serialize-intel-costs")
                     || body.Contains("fix-boss-dialog-cs0136")
                     || body.Contains("balance-v2-arthurian-expansion")
                     || body.Contains("autobattle-boss-dialog-video-bg")

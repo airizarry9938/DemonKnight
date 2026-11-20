@@ -9,7 +9,8 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
 3. If Diagnose shows `cs1061-compat-api` / CompatApi lacks `ResolveLoop`: use the **hard fallback** below (never use jsDelivr `@main` — it lags).
-4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `fix-boss-dialog-cs0136`.
+4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `modular-townsfolk-appearance`.
+   Modular pew looks: **DemonKnight → Modular Sprite Sheet Importer** (poses/outfits/heads sheets → `ModularSpriteLibrary`).
    If Bootstrap / Force Delete+Sync menus are missing: overwrite `ArthurianSyncFromGitHub.cs` + `ArthurianMenuBootstrap.cs` from jsDelivr (pinned SHA), Refresh, then Bootstrap.
    Must include `Assets/Scripts/Combat/BattleBossDialogUI.cs` (CS0103 without it).
 5. Already have `ChurchBackground`? **Align Crowd Grid To Church Pews**. Brand-new only: **Build Complete Scene Hierarchy**.

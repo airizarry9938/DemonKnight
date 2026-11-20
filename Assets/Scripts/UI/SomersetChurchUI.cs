@@ -44,6 +44,7 @@ namespace ArthurianAutobattler
 
         [Header("Dossier")]
         public Image dossierPortrait;
+        public TownsfolkPortraitView dossierModularPortrait;
         public TextMeshProUGUI dossierDialogue;
         public TextMeshProUGUI dossierStats;
         public TextMeshProUGUI gossipText;
@@ -1721,7 +1722,13 @@ namespace ArthurianAutobattler
 
                 var rt = go.GetComponent<RectTransform>();
                 if (rt == null) rt = go.AddComponent<RectTransform>();
-                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
+                float jitterX = 0f;
+                if (recruit?.appearance != null)
+                {
+                    recruit.appearance.BindSeatSalt(seatIndex);
+                    jitterX = recruit.appearance.PewJitterX;
+                }
+                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize, jitterX);
 
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
@@ -1812,22 +1819,7 @@ namespace ArthurianAutobattler
             int discount = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
 
-            if (dossierPortrait != null)
-            {
-                dossierPortrait.enabled = true;
-                Sprite portrait = selected.headSprite != null ? selected.headSprite : selected.randomAvatar;
-                dossierPortrait.sprite = portrait;
-                if (portrait == null)
-                    dossierPortrait.color = selected.unitType switch
-                    {
-                        UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 1f),
-                        UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 1f),
-                        UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 1f),
-                        _ => new Color(0.45f, 0.40f, 0.35f, 1f)
-                    };
-                else
-                    dossierPortrait.color = Color.white;
-            }
+            ApplyDossierPortrait(selected);
 
             if (dossierDialogue != null)
                 dossierDialogue.text = selected.FormatHireDialogue(grudge, discount);
@@ -1853,6 +1845,30 @@ namespace ArthurianAutobattler
                         ? "Mediated ✓"
                         : $"Mediate ({mediateCost}g)");
             }
+        }
+
+        /// <summary>Stack Body/Outfit/Head/Prop from the same TownsfolkAppearance as the pew seat.</summary>
+        private void ApplyDossierPortrait(RecruitInstance recruit)
+        {
+            if (dossierModularPortrait == null)
+                dossierModularPortrait = TownsfolkPortraitView.EnsureOn(
+                    dossierPortrait,
+                    dossierPortrait != null ? dossierPortrait.transform.parent : transform);
+
+            if (dossierModularPortrait != null)
+            {
+                dossierModularPortrait.Apply(recruit);
+                return;
+            }
+
+            // Last resort: legacy single-image portrait.
+            if (dossierPortrait == null) return;
+            dossierPortrait.enabled = true;
+            Sprite portrait = recruit.headSprite != null ? recruit.headSprite : recruit.randomAvatar;
+            dossierPortrait.sprite = portrait;
+            dossierPortrait.color = portrait != null
+                ? Color.white
+                : TownsfolkVisualApplier.PlaceholderColor(recruit.unitType);
         }
 
         private string BuildGossip(RecruitInstance center)

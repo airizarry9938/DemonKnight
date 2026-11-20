@@ -105,6 +105,12 @@ namespace ArthurianAutobattler
         public bool isSirenEnchantress = false;
 
         /// <summary>
+        /// Modular pew/dossier look (deterministic seed). When set, PaperDoll + portrait
+        /// resolve through ModularSpriteLibrary instead of randomAvatar alone.
+        /// </summary>
+        public TownsfolkAppearance appearance;
+
+        /// <summary>
         /// Wave victories while this soul marched (and returned to a pew). Stacks.
         /// Each star → −5g hire (stacks with win −10 grudge; Balance V2 removed loss/death +15).
         /// </summary>

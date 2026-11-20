@@ -35,6 +35,16 @@ namespace ArthurianAutobattler
         public int victoryStars;
         /// <summary>Pre-fusion ingredients (run-scoped). Wave-end expands these back to pews.</summary>
         public List<WarbandMemberSave> fusionIngredients;
+
+        // Modular appearance indices (ints only — no Sprite refs in JSON).
+        public bool hasAppearance;
+        public int appearanceSeed;
+        public int skinToneIndex;
+        public int hairColorIndex;
+        public int poseIndex;
+        public int outfitIndex;
+        public int headIndex;
+        public int propIndex;
     }
 
     [Serializable]
@@ -208,6 +218,8 @@ namespace ArthurianAutobattler
             if (src.pewSeatIndex > 0) dest.pewSeatIndex = src.pewSeatIndex;
             if (src.randomAvatar != null) dest.randomAvatar = src.randomAvatar;
             if (src.headSprite != null) dest.headSprite = src.headSprite;
+            if (src.appearance != null)
+                dest.appearance = CloneAppearance(src.appearance);
             if (src.IsFusedLegend)
                 dest.fusionIngredients = CardFusionSystem.CloneForFusionMemory(src)?.fusionIngredients;
             int grudge = GrudgeSaveManager.Instance != null
@@ -313,6 +325,7 @@ namespace ArthurianAutobattler
                 canAttackFromBack = r.canAttackFromBack,
                 victoryStars = Mathf.Max(0, r.victoryStars)
             };
+            WriteAppearance(s, r.appearance);
             if (depth < 6 && r.fusionIngredients != null && r.fusionIngredients.Count > 0)
             {
                 s.fusionIngredients = new List<WarbandMemberSave>(r.fusionIngredients.Count);
@@ -347,6 +360,7 @@ namespace ArthurianAutobattler
                 canAttackFromBack = s.canAttackFromBack,
                 victoryStars = Mathf.Max(0, s.victoryStars)
             };
+            r.appearance = ReadAppearance(s, r.unitType);
             if (depth < 6 && s.fusionIngredients != null && s.fusionIngredients.Count > 0)
             {
                 r.fusionIngredients = new List<RecruitInstance>(s.fusionIngredients.Count);
@@ -360,6 +374,55 @@ namespace ArthurianAutobattler
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
             r.RefreshBodyPostureFromTraits(grudge);
             return r;
+        }
+
+        static void WriteAppearance(WarbandMemberSave s, TownsfolkAppearance a)
+        {
+            if (s == null || a == null)
+            {
+                if (s != null) s.hasAppearance = false;
+                return;
+            }
+            s.hasAppearance = true;
+            s.appearanceSeed = a.seed;
+            s.skinToneIndex = a.skinToneIndex;
+            s.hairColorIndex = a.hairColorIndex;
+            s.poseIndex = a.poseIndex;
+            s.outfitIndex = a.outfitIndex;
+            s.headIndex = a.headIndex;
+            s.propIndex = a.propIndex;
+        }
+
+        static TownsfolkAppearance ReadAppearance(WarbandMemberSave s, UnitType tier)
+        {
+            if (s == null || !s.hasAppearance) return null;
+            return new TownsfolkAppearance
+            {
+                tier = tier,
+                seed = s.appearanceSeed,
+                skinToneIndex = s.skinToneIndex,
+                hairColorIndex = s.hairColorIndex,
+                poseIndex = s.poseIndex,
+                outfitIndex = s.outfitIndex,
+                headIndex = s.headIndex,
+                propIndex = s.propIndex
+            };
+        }
+
+        static TownsfolkAppearance CloneAppearance(TownsfolkAppearance a)
+        {
+            if (a == null) return null;
+            return new TownsfolkAppearance
+            {
+                tier = a.tier,
+                seed = a.seed,
+                skinToneIndex = a.skinToneIndex,
+                hairColorIndex = a.hairColorIndex,
+                poseIndex = a.poseIndex,
+                outfitIndex = a.outfitIndex,
+                headIndex = a.headIndex,
+                propIndex = a.propIndex
+            };
         }
     }
 }

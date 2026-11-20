@@ -702,6 +702,22 @@ namespace ArthurianAutobattler
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
             r.RefreshBodyPostureFromTraits(grudge);
+            // Restore modular look (indices survive JSON; sprites rebind from library).
+            var lib = rngGenerator.modularLibrary != null
+                ? rngGenerator.modularLibrary
+                : ModularSpriteLibrary.Load();
+            if (r.appearance == null)
+                r.appearance = TownsfolkAppearance.Generate(r.unitType, r.unitID, r.pewSeatIndex, lib);
+            else
+                r.appearance.BindSeatSalt(r.pewSeatIndex);
+            if (lib != null)
+            {
+                TownsfolkVisualApplier.SetLibrary(lib);
+                var pose = lib.GetPose(r.appearance.poseIndex);
+                var head = lib.GetHead(r.appearance.headIndex);
+                if (pose != null) r.bodySprite = pose;
+                if (head != null) r.headSprite = head;
+            }
             // Best-effort avatar from type pools (sprites are not stored in JSON).
             List<Sprite> pool = null;
             if (r.unitType == UnitType.Knight) pool = rngGenerator.knightAvatars;

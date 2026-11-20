@@ -24,7 +24,7 @@ namespace ArthurianAutobattler
             "the Red", "the Stout", "of the Hills", "the Unlucky", "the Loyal", "Blacktooth"
         };
 
-        [Header("Paper-Doll Pools (optional)")]
+        [Header("Paper-Doll Pools (optional / legacy)")]
         public List<Sprite> bodyEager;
         public List<Sprite> bodyUpright;
         public List<Sprite> bodySlouched;
@@ -32,6 +32,9 @@ namespace ArthurianAutobattler
         public Sprite moodGrudge;
         public Sprite moodLoyalist;
         public Sprite moodCoward;
+
+        [Header("Modular townsfolk (preferred)")]
+        public ModularSpriteLibrary modularLibrary;
 
         public List<RecruitInstance> GenerateNewRunTown()
         {
@@ -68,13 +71,14 @@ namespace ArthurianAutobattler
             float hpMult = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetBonusHealthMultiplier()
                 : 1f;
-            // Balance V2: Tier 1 intel is free by default (Scouting still unlocks current pool mid-run).
-            bool freeTier1 = true;
-            if (PerkDraftManager.Instance != null
-                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree))
-                freeTier1 = true;
+            // Tier 1 Scout is free but not auto-unlocked unless Royal Scouting Decree.
+            bool unlockTier1 = PerkDraftManager.Instance != null
+                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree);
 
             bool lustSiren = SomersetRunes.IsSinActive(SinRuneID.Lust) && Random.value < 0.25f;
+
+            var lib = modularLibrary != null ? modularLibrary : ModularSpriteLibrary.Load();
+            if (lib != null) TownsfolkVisualApplier.SetLibrary(lib);
 
             RecruitInstance r = new RecruitInstance
             {
@@ -83,8 +87,9 @@ namespace ArthurianAutobattler
                 unitType = type,
                 pewSeatIndex = pewSeat,
                 randomAvatar = (pool != null && pool.Count > 0) ? pool[Random.Range(0, pool.Count)] : null,
-                intelTierUnlocked = freeTier1 ? 1 : 0,
-                isSirenEnchantress = lustSiren
+                intelTierUnlocked = unlockTier1 ? 1 : 0,
+                isSirenEnchantress = lustSiren,
+                appearance = TownsfolkAppearance.Generate(type, persistentID, pewSeat, lib)
             };
 
             // Keep scout/dossier reveals across nights/waves until WipeAllSavedMemory.
@@ -175,16 +180,38 @@ namespace ArthurianAutobattler
 
         private void AssignPaperDollLayers(RecruitInstance r, int grudge)
         {
-            List<Sprite> bodyPool = bodyUpright;
-            if (r.bodyPosture == BodyPosture.EagerForward) bodyPool = bodyEager;
-            else if (r.bodyPosture == BodyPosture.SlouchedExit) bodyPool = bodySlouched;
-
-            if (bodyPool != null && bodyPool.Count > 0)
-                r.bodySprite = bodyPool[Random.Range(0, bodyPool.Count)];
-            if (headPool != null && headPool.Count > 0)
-                r.headSprite = headPool[Random.Range(0, headPool.Count)];
+            // Modular appearance is authoritative when library art exists; keep legacy
+            // body/head sprites as fallback for empty ModularSpriteLibrary slots.
+            var lib = modularLibrary != null ? modularLibrary : ModularSpriteLibrary.Load();
+            if (r.appearance == null)
+                r.appearance = TownsfolkAppearance.Generate(r.unitType, r.unitID, r.pewSeatIndex, lib);
             else
-                r.headSprite = r.randomAvatar;
+                r.appearance.BindSeatSalt(r.pewSeatIndex);
+
+            if (lib != null)
+            {
+                var pose = lib.GetPose(r.appearance.poseIndex);
+                var head = lib.GetHead(r.appearance.headIndex);
+                if (pose != null) r.bodySprite = pose;
+                if (head != null) r.headSprite = head;
+                if (r.randomAvatar == null) r.randomAvatar = head != null ? head : pose;
+            }
+
+            if (r.bodySprite == null)
+            {
+                List<Sprite> bodyPool = bodyUpright;
+                if (r.bodyPosture == BodyPosture.EagerForward) bodyPool = bodyEager;
+                else if (r.bodyPosture == BodyPosture.SlouchedExit) bodyPool = bodySlouched;
+                if (bodyPool != null && bodyPool.Count > 0)
+                    r.bodySprite = bodyPool[Random.Range(0, bodyPool.Count)];
+            }
+            if (r.headSprite == null)
+            {
+                if (headPool != null && headPool.Count > 0)
+                    r.headSprite = headPool[Random.Range(0, headPool.Count)];
+                else
+                    r.headSprite = r.randomAvatar;
+            }
 
             if (grudge > 0) r.moodOverlaySprite = moodGrudge;
             else if (r.primaryTrait == TraitTag.Loyalist) r.moodOverlaySprite = moodLoyalist;
