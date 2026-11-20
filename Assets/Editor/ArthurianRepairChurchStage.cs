@@ -1,6 +1,5 @@
 #if UNITY_EDITOR
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -8,77 +7,93 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Fixes CS0111 duplicate OpenModal/CloseFloatingModals/RefreshHUD in ChurchStageUIController
-/// caused by paste-merging downloads into an old file.
+/// Repairs CS0111 on ChurchStageUIController by installing:
+///   SomersetChurchUI.cs          — full logic (one copy of each method)
+///   ChurchStageUIController.cs   — tiny stub that only inherits
+/// and deleting any other ChurchStage*.cs junk copies.
 /// </summary>
 public static class ArthurianRepairChurchStage
 {
-    private const string RawUrl =
-        "https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/Assets/Scripts/UI/ChurchStageUIController.cs";
+    private const string RawRoot =
+        "https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/";
 
-    [MenuItem("Arthurian/Repair ChurchStageUIController (fix CS0111)", false, 3)]
+    [MenuItem("Arthurian/Repair Church UI (fix CS0111)", false, 3)]
     public static void Repair()
     {
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
-        string correctPath = Path.Combine(projectRoot, "Assets", "Scripts", "UI", "ChurchStageUIController.cs");
+        string uiDir = Path.Combine(projectRoot, "Assets", "Scripts", "UI");
+        Directory.CreateDirectory(uiDir);
 
-        // 1) Find every .cs that declares ChurchStageUIController
-        var hits = new List<string>();
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+
+        // Delete every ChurchStage*.cs except we'll rewrite the stub path
+        int deleted = 0;
         foreach (string path in Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories))
         {
+            string name = Path.GetFileName(path);
             string text;
             try { text = File.ReadAllText(path); }
             catch { continue; }
-            if (Regex.IsMatch(text, @"\bclass\s+ChurchStageUIController\b"))
-                hits.Add(path);
-        }
 
-        int deleted = 0;
-        foreach (string path in hits)
-        {
+            bool isChurchStageFile = name.StartsWith("ChurchStage", StringComparison.OrdinalIgnoreCase)
+                || Regex.IsMatch(text, @"\bclass\s+ChurchStageUIController\b");
+            bool isSomersetFile = name.Equals("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase);
+
+            // Keep nothing — we rewrite both targets below. Delete extras / broken merges.
             string norm = path.Replace('\\', '/');
-            bool isCorrect = norm.EndsWith("Assets/Scripts/UI/ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase);
-            if (isCorrect) continue;
-            try
+            bool isTargetStub = norm.EndsWith("Assets/Scripts/UI/ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase);
+            bool isTargetLogic = norm.EndsWith("Assets/Scripts/UI/SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase);
+
+            if (isSomersetFile || isChurchStageFile)
             {
-                File.Delete(path);
-                string meta = path + ".meta";
-                if (File.Exists(meta)) File.Delete(meta);
-                deleted++;
-                Debug.Log($"[DemonKnight] Deleted extra ChurchStageUIController at: {path}");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[DemonKnight] Could not delete {path}: {ex.Message}");
+                if (isTargetStub || isTargetLogic) continue; // overwrite in place next
+                try
+                {
+                    File.Delete(path);
+                    if (File.Exists(path + ".meta")) File.Delete(path + ".meta");
+                    deleted++;
+                    Debug.Log($"[DemonKnight] Deleted junk: {path}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError(ex.Message);
+                }
             }
         }
 
-        // 2) Always overwrite the correct path from GitHub (clean single copy)
-        Directory.CreateDirectory(Path.GetDirectoryName(correctPath)!);
         try
         {
-            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             using var wc = new WebClient();
             wc.Headers.Add("User-Agent", "DemonKnight-Unity-Repair");
-            string fresh = wc.DownloadString(RawUrl);
-            if (string.IsNullOrEmpty(fresh) || fresh.StartsWith("404"))
-                throw new Exception("Empty/404 from GitHub");
 
-            // Sanity: clean file must mention CloseFloatingModals exactly once
-            int closes = Regex.Matches(fresh, @"void\s+CloseFloatingModals").Count;
-            if (closes != 1)
-                throw new Exception($"GitHub file unexpected CloseFloatingModals count={closes}");
+            string logic = wc.DownloadString(RawRoot + "Assets/Scripts/UI/SomersetChurchUI.cs");
+            string stub = wc.DownloadString(RawRoot + "Assets/Scripts/UI/ChurchStageUIController.cs");
 
-            File.WriteAllText(correctPath, fresh);
-            Debug.Log($"[DemonKnight] Wrote clean ChurchStageUIController.cs ({fresh.Length} chars) → {correctPath}");
+            if (string.IsNullOrEmpty(logic) || logic.StartsWith("404"))
+                throw new Exception("Failed to download SomersetChurchUI.cs");
+            if (string.IsNullOrEmpty(stub) || stub.StartsWith("404"))
+                throw new Exception("Failed to download ChurchStageUIController.cs stub");
+
+            int opens = Regex.Matches(logic, @"void\s+OpenModal").Count;
+            if (opens != 1)
+                throw new Exception($"SomersetChurchUI.cs has OpenModal count={opens}, expected 1");
+
+            File.WriteAllText(Path.Combine(uiDir, "SomersetChurchUI.cs"), logic);
+            File.WriteAllText(Path.Combine(uiDir, "ChurchStageUIController.cs"), stub);
+
+            Debug.Log("[DemonKnight] Installed SomersetChurchUI.cs + thin ChurchStageUIController stub.");
         }
         catch (Exception ex)
         {
             EditorUtility.DisplayDialog(
                 "DemonKnight Repair",
-                "Could not download clean file from GitHub.\n\n" +
-                ex.Message + "\n\n" +
-                "Manually DELETE Assets/Scripts/UI/ChurchStageUIController.cs then download:\n" + RawUrl,
+                "Download failed: " + ex.Message + "\n\n" +
+                "Manual fix:\n" +
+                "1) Delete Assets/Scripts/UI/ChurchStageUIController.cs\n" +
+                "2) Download BOTH:\n" +
+                RawRoot + "Assets/Scripts/UI/SomersetChurchUI.cs\n" +
+                RawRoot + "Assets/Scripts/UI/ChurchStageUIController.cs\n" +
+                "into Assets/Scripts/UI/",
                 "OK");
             return;
         }
@@ -86,7 +101,8 @@ public static class ArthurianRepairChurchStage
         AssetDatabase.Refresh();
         EditorUtility.DisplayDialog(
             "DemonKnight Repair",
-            $"Repaired ChurchStageUIController.\nDeleted {deleted} extra copy(ies).\nOverwrote Scripts/UI/ChurchStageUIController.cs from GitHub.\n\nWait for compile.",
+            $"Church UI repaired.\nDeleted {deleted} junk file(s).\n" +
+            "Logic is now in SomersetChurchUI.cs.\nChurchStageUIController.cs is a tiny stub only.\n\nWait for compile.",
             "OK");
     }
 }

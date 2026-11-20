@@ -38,6 +38,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/TownRNGGenerator.cs",
         "Assets/Scripts/UI/ChurchPewLayout.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
+        "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
