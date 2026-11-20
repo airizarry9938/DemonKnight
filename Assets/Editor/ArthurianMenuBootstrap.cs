@@ -198,7 +198,7 @@ public static class ArthurianMenuBootstrap
             "Assets/Editor/BattleSpriteSheetSlicerWindow.cs",
             "Assets/Editor/CharacterCatalogSeeder.cs",
             "Assets/Editor/CharacterDatabaseEditor.cs",
-            "Assets/Editor/DemonKnightPackageVersion.cs",
+            // PackageVersion is NOT in this list — Install must not overwrite a newer Diagnose marker.
             "Assets/Scripts/Data/GameDataTypes.cs",
             "Assets/Scripts/Data/ModularSpriteLibrary.cs",
             "Assets/Scripts/Data/TownsfolkAppearance.cs",
