@@ -9,7 +9,7 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
 3. If Diagnose shows `cs1061-compat-api` / CompatApi lacks `ResolveLoop`: use the **hard fallback** below (never use jsDelivr `@main` — it lags).
-4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `fix-boss-dialog-cs0136`.
+4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `fix-fusion-serialize-intel-costs`.
    If Bootstrap / Force Delete+Sync menus are missing: overwrite `ArthurianSyncFromGitHub.cs` + `ArthurianMenuBootstrap.cs` from jsDelivr (pinned SHA), Refresh, then Bootstrap.
    Must include `Assets/Scripts/Combat/BattleBossDialogUI.cs` (CS0103 without it).
 5. Already have `ChurchBackground`? **Align Crowd Grid To Church Pews**. Brand-new only: **Build Complete Scene Hierarchy**.
@@ -52,7 +52,9 @@ After this PR merges, pin the **merge commit SHA** (or tip of `main`). Until the
 
 **Balance V2:** start 250g; Train Ranged = crossbow; Mordred persists; bosses 3–10+; new legends; survivor bounty +10; no death/loss +15 hire.
 
-**Floor (Sync tools that pin commits):** `572155d`
+**Intel:** Scout (Free, click to reveal HP/ATK) · Investigate **20g** · Full Report **30g** (was Dossier).
+
+**Floor (Sync tools that pin commits):** `d4c45c9` (prefer tip of `main` after merge)
 
 **Delete** then download Save-As (do not rely on overwrite):
 

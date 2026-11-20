@@ -68,11 +68,10 @@ namespace ArthurianAutobattler
             float hpMult = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetBonusHealthMultiplier()
                 : 1f;
-            // Balance V2: Tier 1 intel is free by default (Scouting still unlocks current pool mid-run).
-            bool freeTier1 = true;
-            if (PerkDraftManager.Instance != null
-                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree))
-                freeTier1 = true;
+            // Tier 1 Scout is free (0g) but NOT auto-unlocked — HP/ATK stay ??? until purchased.
+            // Royal Scouting Decree still unlocks Tier 1 on current + future townsfolk.
+            bool unlockTier1 = PerkDraftManager.Instance != null
+                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree);
 
             bool lustSiren = SomersetRunes.IsSinActive(SinRuneID.Lust) && Random.value < 0.25f;
 
@@ -83,7 +82,7 @@ namespace ArthurianAutobattler
                 unitType = type,
                 pewSeatIndex = pewSeat,
                 randomAvatar = (pool != null && pool.Count > 0) ? pool[Random.Range(0, pool.Count)] : null,
-                intelTierUnlocked = freeTier1 ? 1 : 0,
+                intelTierUnlocked = unlockTier1 ? 1 : 0,
                 isSirenEnchantress = lustSiren
             };
 

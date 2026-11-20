@@ -455,9 +455,28 @@ namespace ArthurianAutobattler
             if (hireButtonText != null)
                 hireButtonText.text = $"Recruit ({selectedRecruit.GetFinalHireCost(grudge, discount)}g)";
 
-            if (tier1RevealButton != null) tier1RevealButton.interactable = selectedRecruit.intelTierUnlocked < 1;
-            if (tier2RevealButton != null) tier2RevealButton.interactable = selectedRecruit.intelTierUnlocked < 2;
-            if (tier3RevealButton != null) tier3RevealButton.interactable = selectedRecruit.intelTierUnlocked < 3;
+            if (tier1RevealButton != null)
+            {
+                tier1RevealButton.interactable = selectedRecruit.intelTierUnlocked < 1;
+                SetButtonLabel(tier1RevealButton,
+                    selectedRecruit.intelTierUnlocked >= 1 ? "Scout done" : "Scout (Free)");
+            }
+            if (tier2RevealButton != null)
+            {
+                tier2RevealButton.interactable = selectedRecruit.intelTierUnlocked < 2;
+                SetButtonLabel(tier2RevealButton,
+                    selectedRecruit.intelTierUnlocked >= 2
+                        ? "Investigate done"
+                        : $"Investigate ({RecruitInstance.IntelTier2Cost}g)");
+            }
+            if (tier3RevealButton != null)
+            {
+                tier3RevealButton.interactable = selectedRecruit.intelTierUnlocked < 3;
+                SetButtonLabel(tier3RevealButton,
+                    selectedRecruit.intelTierUnlocked >= 3
+                        ? "Full Report done"
+                        : $"Full Report ({RecruitInstance.IntelTier3Cost}g)");
+            }
             if (hireRecruitButton != null) hireRecruitButton.interactable = true;
             if (trainTankButton != null) trainTankButton.interactable = playerGold >= 15;
             if (trainRangedButton != null) trainRangedButton.interactable = playerGold >= 15;
@@ -573,6 +592,13 @@ namespace ArthurianAutobattler
             if (rollDiceButton != null) rollDiceButton.interactable = diceGame.isPlaying;
             if (cashOutButton != null)
                 cashOutButton.interactable = diceGame.isPlaying && diceGame.currentPot > 0;
+        }
+
+        private static void SetButtonLabel(Button button, string label)
+        {
+            if (button == null) return;
+            var tmp = button.GetComponentInChildren<TextMeshProUGUI>();
+            if (tmp != null) tmp.text = label;
         }
 
         public void UpdateHUD()

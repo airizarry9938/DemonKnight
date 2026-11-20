@@ -126,10 +126,10 @@ namespace ArthurianAutobattler
         public const int KnightHireFloor = 110;
         public const int KnightHireCeil = 160;
 
-        /// <summary>Intel costs (Balance V2): T1 free, T2 15g, T3 35g.</summary>
+        /// <summary>Intel costs: T1 Scout free (still must click), Investigate 20g, Full Report 30g.</summary>
         public const int IntelTier1Cost = 0;
-        public const int IntelTier2Cost = 15;
-        public const int IntelTier3Cost = 35;
+        public const int IntelTier2Cost = 20;
+        public const int IntelTier3Cost = 30;
 
         public static int IntelCostForTier(int tier) => tier switch
         {
@@ -142,7 +142,11 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Pre-fusion ingredient snapshots (deep). Wave-end disband expands these back
         /// into pew seats so fused Legends never occupy seats or block return.
+        /// Must be NonSerialized — List&lt;RecruitInstance&gt; inside RecruitInstance is a Unity
+        /// serialization depth cycle (limit 10) via selected/recruitedParty/PaperDoll.
+        /// Persistence uses flattened WarbandAutosave fusionParts, not this field.
         /// </summary>
+        [System.NonSerialized]
         public List<RecruitInstance> fusionIngredients;
 
         public bool IsFusedLegend =>
@@ -299,13 +303,14 @@ namespace ArthurianAutobattler
             if (intelTierUnlocked >= 1)
                 info += $"HP: {maxHealth} | ATK: {attackDamage} | SPD: {attackSpeed:F1}/s\n";
             else
-                info += $"HP: ??? | ATK: ??? (Scout {IntelTier1Cost}g)\n";
+                info += $"HP: ??? | ATK: ??? (Scout — free)\n";
 
             // Hire add-ons / subtractions — same math as Recruit (Ng).
             info += $"<color=#FFE066>{hire.FormatDossierLines()}</color>\n";
 
-            // Battle-only perk / rune effects that dossier base stats omit.
-            info += FormatBattleBonusLines();
+            // Battle-only perk / rune effects — only after Scout so HP/ATK deltas do not leak.
+            if (intelTierUnlocked >= 1)
+                info += FormatBattleBonusLines();
 
             if (intelTierUnlocked >= 2)
                 info += $"<color=#FF5555>Rival: Hates {hatedTrait}</color>\n";
@@ -315,7 +320,7 @@ namespace ArthurianAutobattler
             if (intelTierUnlocked >= 3)
                 info += $"<color=#55FF55>Trait: {primaryTrait} | Loves: {lovedTrait}</color>";
             else
-                info += $"Full Potential: ??? (Dossier {IntelTier3Cost}g)";
+                info += $"Full Potential: ??? (Full Report {IntelTier3Cost}g)";
 
             return info;
         }

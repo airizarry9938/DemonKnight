@@ -242,11 +242,11 @@ public static class ArthurianSceneBuilder
             "Select a citizen on the right to inspect, train, mediate, or recruit.", 16, TextAlignmentOptions.TopLeft,
             new Vector2(-180f, -10f), new Vector2(520f, 120f));
 
-        townUI.tier1RevealButton = CreateButton(dossier.transform, "ScoutBtn", "Scout 10g",
+        townUI.tier1RevealButton = CreateButton(dossier.transform, "ScoutBtn", "Scout (Free)",
             new Vector2(280f, 90f), new Vector2(140f, 36f), new Color(0.25f, 0.28f, 0.35f));
-        townUI.tier2RevealButton = CreateButton(dossier.transform, "InvestigateBtn", "Investigate 50g",
+        townUI.tier2RevealButton = CreateButton(dossier.transform, "InvestigateBtn", "Investigate 20g",
             new Vector2(430f, 90f), new Vector2(160f, 36f), new Color(0.25f, 0.28f, 0.35f));
-        townUI.tier3RevealButton = CreateButton(dossier.transform, "DossierBtn", "Dossier 100g",
+        townUI.tier3RevealButton = CreateButton(dossier.transform, "FullReportBtn", "Full Report 30g",
             new Vector2(280f, 45f), new Vector2(140f, 36f), new Color(0.25f, 0.28f, 0.35f));
         townUI.hireRecruitButton = CreateButton(dossier.transform, "HireBtn", "Recruit",
             new Vector2(430f, 45f), new Vector2(160f, 36f), new Color(0.18f, 0.40f, 0.22f));
