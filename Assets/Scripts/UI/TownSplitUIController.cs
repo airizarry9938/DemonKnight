@@ -398,7 +398,7 @@ namespace ArthurianAutobattler
         {
             if (goldText != null) goldText.text = $"Royal Gold: {playerGold}g";
             if (partyCountText != null && GameLoopManager.Instance != null)
-                partyCountText.text = $"Warband: {GameLoopManager.Instance.recruitedParty.Count} Fighters";
+                partyCountText.text = $"Warband: {GameLoopManager.Instance.recruitedParty.Count}/52";
             if (tavernRoundButton != null) tavernRoundButton.interactable = playerGold >= 50;
 
             FindFirstObjectByType<LegendCodexUI>()?.RefreshCodexList();

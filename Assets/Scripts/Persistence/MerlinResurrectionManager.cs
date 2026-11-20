@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using TMPro;
 
 namespace ArthurianAutobattler
@@ -35,11 +36,56 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI rationsBankText;
         public TextMeshProUGUI runeStatusText;
 
+        private bool nextRunButtonWired;
+
         private void Awake()
         {
             if (Instance == null) Instance = this;
             LoadBankData();
             if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
+            WireNextRunButton();
+        }
+
+        private void Start()
+        {
+            WireNextRunButton();
+        }
+
+        /// <summary>
+        /// Persistent UnityEvent wiring can be missing on downloaded scenes — always
+        /// attach a runtime listener to the Next Run button under the bank panel.
+        /// </summary>
+        private void WireNextRunButton()
+        {
+            if (nextRunButtonWired) return;
+            if (legacyBankPanel == null)
+            {
+                var found = GameObject.Find("LegacyBankPanel");
+                if (found == null) found = GameObject.Find("BankPanel");
+                if (found != null) legacyBankPanel = found;
+            }
+            if (legacyBankPanel == null) return;
+
+            Transform next = legacyBankPanel.transform.Find("NextRun");
+            Button btn = next != null ? next.GetComponent<Button>() : null;
+            if (btn == null)
+            {
+                foreach (var b in legacyBankPanel.GetComponentsInChildren<Button>(true))
+                {
+                    string label = b.GetComponentInChildren<TextMeshProUGUI>()?.text ?? "";
+                    if (b.gameObject.name.IndexOf("NextRun", StringComparison.OrdinalIgnoreCase) >= 0
+                        || label.IndexOf("Next Timeline", StringComparison.OrdinalIgnoreCase) >= 0
+                        || label.IndexOf("Next Run", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        btn = b;
+                        break;
+                    }
+                }
+            }
+            if (btn == null) return;
+
+            btn.onClick.AddListener(StartNextTimelineRun);
+            nextRunButtonWired = true;
         }
 
         public void TriggerEndOfRunResurrection(int wavesCleared, bool defeatedNimue, string customReason = "")
@@ -89,6 +135,7 @@ namespace ArthurianAutobattler
             if (loreNarrativeText != null)
                 loreNarrativeText.text = $"You gained <b>+{earnedPoints} Arcane Legacy Points</b>. Upgrade the Royal Bank and stackable Runes.";
             if (legacyBankPanel != null) legacyBankPanel.SetActive(true);
+            WireNextRunButton();
             RefreshBankUI();
         }
 
@@ -119,9 +166,35 @@ namespace ArthurianAutobattler
             RefreshBankUI();
         }
 
+        /// <summary>
+        /// Begin the next night without relying on Build Settings. Soft-restarts the
+        /// GameLoop when present; only falls back to a scene reload if needed.
+        /// </summary>
         public void StartNextTimelineRun()
         {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
+            if (legacyBankPanel != null) legacyBankPanel.SetActive(false);
+
+            var loop = GameLoopManager.Instance ?? FindFirstObjectByType<GameLoopManager>();
+            if (loop != null)
+            {
+                loop.AdvanceNightAndRestart();
+                return;
+            }
+
+            var scene = SceneManager.GetActiveScene();
+            if (scene.buildIndex >= 0)
+            {
+                SceneManager.LoadScene(scene.buildIndex);
+                return;
+            }
+            if (!string.IsNullOrEmpty(scene.name))
+            {
+                SceneManager.LoadScene(scene.name);
+                return;
+            }
+
+            Debug.LogError("[DemonKnight] StartNextTimelineRun failed — no GameLoopManager and scene is not loadable.");
         }
 
         public int GetBonusStartingGold() => startingGoldBankLevel * 15;

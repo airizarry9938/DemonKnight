@@ -8,11 +8,11 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
-3. Top menu → **Arthurian → Diagnose Project**. It must say package `church-pews-52-seats`. If it says “old first build”, Unity is opened on the wrong folder or you need to pull / refresh Assets.
-4. Already have `ChurchBackground` on `TownCanvas`? Use **Arthurian → Align Crowd Grid To Church Pews** (keeps your scene).  
+3. Top menu → **Arthurian → Sync All Scripts From GitHub**, then **Arthurian → Diagnose Project**. It must say package `merlin-next-night-hud`. If it says “old first build”, Unity is opened on the wrong folder or you need to pull / refresh Assets.
+4. Already have `ChurchBackground` on `TownCanvas`? Use **Arthurian → Align Crowd Grid To Church Pews** (keeps your scene). Play Mode also auto-adds a **Night** label and re-spaces Codex / Warband / March on the top HUD.  
    Brand-new scene only: **Arthurian → Build Complete Scene Hierarchy** (this *replaces* the scene — feels like resetting to the first build).
 5. Optional: **Somerset → Asset & Dialogue Studio** to assign paper-doll sprites / dialogue.
-6. Assign art, press Play on `CamelotMain`. Nudge pews on `TownCanvas → ChurchPewLayout` if a row is off.
+6. Assign art, press Play on `CamelotMain`. After Merlin’s bank screen, **Enter Next Timeline** starts the next night in-place (no Build Settings required).
 
 ### Hotkeys (church stage)
 | Key | Action |

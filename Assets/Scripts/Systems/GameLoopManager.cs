@@ -28,12 +28,19 @@ namespace ArthurianAutobattler
         public List<RecruitInstance> recruitedParty = new List<RecruitInstance>();
         public List<RecruitInstance> currentTownPool = new List<RecruitInstance>();
         public GamePhase currentPhase;
+
+        [Header("Timeline")]
+        [Tooltip("Which night of the endless Merlin timeline the player is on.")]
+        public int currentNight = 1;
+
         private Coroutine seatPopulateRoutine;
+        private const string NightPrefsKey = "SomersetNight";
 
         private void Awake()
         {
             if (Instance == null) Instance = this;
             else Destroy(gameObject);
+            currentNight = Mathf.Max(1, PlayerPrefs.GetInt(NightPrefsKey, 1));
         }
 
         private void Start()
@@ -51,7 +58,10 @@ namespace ArthurianAutobattler
             SomersetRunes.SetGrudgeDeltaMultiplier(1f);
             SomersetRunes.ClearPact();
 
-            currentTownPool = rngGenerator.GenerateNewRunTown();
+            if (rngGenerator == null) rngGenerator = FindFirstObjectByType<TownRNGGenerator>();
+            currentTownPool = rngGenerator != null
+                ? rngGenerator.GenerateNewRunTown()
+                : new List<RecruitInstance>();
             int bonusGold = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetBonusStartingGold()
                 : 0;
@@ -60,7 +70,7 @@ namespace ArthurianAutobattler
             if (churchUI != null) churchUI.SyncGoldFromTownUI();
 
             int gold = townUI != null ? townUI.playerGold : 75 + bonusGold;
-            if (IsTownCompletelyPricedOut(gold))
+            if (currentTownPool.Count > 0 && IsTownCompletelyPricedOut(gold))
             {
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
                     0, false,
@@ -70,6 +80,46 @@ namespace ArthurianAutobattler
             }
 
             StartTownPhase();
+            RefreshNightHUD();
+        }
+
+        /// <summary>
+        /// Called from Merlin's "Enter Next Timeline" after a run ends. Advances the
+        /// night counter, resets battle/perk state, and returns to town recruit.
+        /// </summary>
+        public void AdvanceNightAndRestart()
+        {
+            currentNight = Mathf.Max(1, currentNight) + 1;
+            PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+            PlayerPrefs.Save();
+
+            if (battleEngine != null)
+            {
+                battleEngine.isBattling = false;
+                battleEngine.currentBattleNumber = 1;
+            }
+
+            if (PerkDraftManager.Instance != null)
+                PerkDraftManager.Instance.unlockedPerks.Clear();
+
+            // Fresh town phase length each night (perk drafts may have shortened it).
+            townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+
+            if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
+            if (townCanvasObj != null) townCanvasObj.SetActive(true);
+
+            InitializeNewRun();
+        }
+
+        public void RefreshNightHUD()
+        {
+            if (churchUI != null)
+                churchUI.SetNight(currentNight);
+            else
+            {
+                var church = FindFirstObjectByType<SomersetChurchUI>();
+                church?.SetNight(currentNight);
+            }
         }
 
         private bool IsTownCompletelyPricedOut(int availableGold)

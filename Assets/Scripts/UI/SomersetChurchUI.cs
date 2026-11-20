@@ -12,6 +12,7 @@ namespace ArthurianAutobattler
     public class SomersetChurchUI : MonoBehaviour
     {
         [Header("HUD")]
+        public TextMeshProUGUI nightText;
         public TextMeshProUGUI timerText;
         public TextMeshProUGUI goldText;
         public TextMeshProUGUI warbandCountText;
@@ -60,6 +61,7 @@ namespace ArthurianAutobattler
         private void Start()
         {
             AutoWireDossierFromTownUI();
+            EnsureTopHubLayout();
 
             goToWarButton?.onClick.AddListener(() => GameLoopManager.Instance?.StartBattlePhase());
             tavernDiceButton?.onClick.AddListener(() => OpenModal(diceModal));
@@ -74,6 +76,9 @@ namespace ArthurianAutobattler
                 RefreshWarbandPanel();
             });
             buyRoundButton?.onClick.AddListener(BuyTavernRound);
+
+            if (GameLoopManager.Instance != null)
+                SetNight(GameLoopManager.Instance.currentNight);
 
             tier1Button?.onClick.AddListener(() => UnlockIntel(1));
             tier2Button?.onClick.AddListener(() => UnlockIntel(2));
@@ -125,6 +130,165 @@ namespace ArthurianAutobattler
             if (timerText == null) timerText = town.timerText;
             if (goldText == null) goldText = town.goldText;
             if (warbandCountText == null) warbandCountText = town.partyCountText;
+        }
+
+        /// <summary>
+        /// Night label + even spacing for Codex / Warband info / March to War.
+        /// Safe to call on already-built scenes — repositions existing HUD children.
+        /// </summary>
+        public void EnsureTopHubLayout()
+        {
+            Transform hud = FindHudBar();
+            if (hud == null) return;
+
+            if (nightText == null)
+            {
+                var existing = hud.Find("NightText");
+                if (existing != null) nightText = existing.GetComponent<TextMeshProUGUI>();
+            }
+            if (nightText == null)
+                nightText = CreateHudLabel(hud, "NightText", "Night 1", new Vector2(-540f, 0f), new Vector2(130f, 40f), 22);
+
+            if (timerText == null)
+            {
+                var t = hud.Find("TimerText");
+                if (t != null) timerText = t.GetComponent<TextMeshProUGUI>();
+            }
+            if (goldText == null)
+            {
+                var g = hud.Find("GoldText");
+                if (g != null) goldText = g.GetComponent<TextMeshProUGUI>();
+            }
+
+            // Status cluster on the left.
+            SetHudRect(timerText != null ? timerText.rectTransform : null, new Vector2(-390f, 0f), new Vector2(200f, 40f));
+            SetHudRect(goldText != null ? goldText.rectTransform : null, new Vector2(-220f, 0f), new Vector2(150f, 40f));
+            SetHudRect(nightText != null ? nightText.rectTransform : null, new Vector2(-540f, 0f), new Vector2(130f, 40f));
+
+            // Codex / Warband / March evenly spaced across the right two-thirds.
+            const float trioLeft = -40f;
+            const float trioRight = 520f;
+            float Span(int i) => trioLeft + (trioRight - trioLeft) * (i / 2f);
+
+            Button codex = ResolveCodexButton(hud);
+            RectTransform warbandRt = ResolveWarbandInfo(hud);
+            Button march = goToWarButton;
+            if (march == null)
+            {
+                var m = hud.Find("GoToWarButton");
+                if (m != null) march = m.GetComponent<Button>();
+                goToWarButton = march;
+            }
+
+            SetHudRect(codex != null ? codex.transform as RectTransform : null, new Vector2(Span(0), 0f), new Vector2(140f, 44f));
+            SetHudRect(warbandRt, new Vector2(Span(1), 0f), new Vector2(180f, 44f));
+            SetHudRect(march != null ? march.transform as RectTransform : null, new Vector2(Span(2), 0f), new Vector2(190f, 48f));
+
+            if (codexButton == null) codexButton = codex;
+        }
+
+        public void SetNight(int night)
+        {
+            if (nightText == null)
+            {
+                var hud = FindHudBar();
+                if (hud != null)
+                {
+                    var existing = hud.Find("NightText");
+                    if (existing != null) nightText = existing.GetComponent<TextMeshProUGUI>();
+                }
+            }
+            if (nightText != null)
+                nightText.text = $"Night {Mathf.Max(1, night)}";
+        }
+
+        private Transform FindHudBar()
+        {
+            var loop = GameLoopManager.Instance;
+            if (loop != null && loop.townCanvasObj != null)
+            {
+                var hud = loop.townCanvasObj.transform.Find("HUD_Bar");
+                if (hud != null) return hud;
+            }
+            var town = Town;
+            if (town != null)
+            {
+                var hud = town.transform.Find("HUD_Bar");
+                if (hud != null) return hud;
+                if (town.transform.parent != null)
+                {
+                    hud = town.transform.parent.Find("HUD_Bar");
+                    if (hud != null) return hud;
+                }
+            }
+            var found = GameObject.Find("HUD_Bar");
+            return found != null ? found.transform : null;
+        }
+
+        private Button ResolveCodexButton(Transform hud)
+        {
+            if (codexButton != null) return codexButton;
+            var codexUi = FindFirstObjectByType<LegendCodexUI>();
+            if (codexUi != null && codexUi.toggleCodexButton != null)
+            {
+                codexButton = codexUi.toggleCodexButton;
+                return codexButton;
+            }
+            Transform t = hud.Find("CodexToggle") ?? hud.Find("CodexButton");
+            if (t != null)
+            {
+                codexButton = t.GetComponent<Button>();
+                return codexButton;
+            }
+            return null;
+        }
+
+        private RectTransform ResolveWarbandInfo(Transform hud)
+        {
+            if (warbandButton == null)
+            {
+                var wb = hud.Find("WarbandButton");
+                if (wb != null) warbandButton = wb.GetComponent<Button>();
+            }
+            if (warbandButton != null)
+            {
+                if (warbandCountText == null)
+                    warbandCountText = warbandButton.GetComponentInChildren<TextMeshProUGUI>();
+                return warbandButton.transform as RectTransform;
+            }
+
+            if (warbandCountText == null)
+            {
+                var party = hud.Find("PartyText");
+                if (party != null) warbandCountText = party.GetComponent<TextMeshProUGUI>();
+            }
+            return warbandCountText != null ? warbandCountText.rectTransform : null;
+        }
+
+        private TextMeshProUGUI CreateHudLabel(Transform hud, string name, string text, Vector2 pos, Vector2 size, float fontSize)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(hud, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+            var tmp = go.GetComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.fontSize = fontSize;
+            tmp.alignment = TextAlignmentOptions.Left;
+            tmp.color = new Color(0.92f, 0.88f, 0.78f);
+            if (timerText != null && timerText.font != null) tmp.font = timerText.font;
+            else if (goldText != null && goldText.font != null) tmp.font = goldText.font;
+            return tmp;
+        }
+
+        private static void SetHudRect(RectTransform rt, Vector2 pos, Vector2 size)
+        {
+            if (rt == null) return;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
         }
 
         public void HandleHotkeys()
@@ -498,6 +662,7 @@ namespace ArthurianAutobattler
         {
             var town = Town;
             var loop = GameLoopManager.Instance;
+            if (loop != null) SetNight(loop.currentNight);
             if (goldText != null && town != null) goldText.text = $"Royal Gold: {town.playerGold}g";
             if (warbandCountText != null && loop != null)
                 warbandCountText.text = $"Warband: {loop.recruitedParty.Count}/52";

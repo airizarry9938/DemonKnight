@@ -118,19 +118,28 @@ public static class ArthurianSceneBuilder
         townUI.townGridContainer = seatRt;
         townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
 
-        // Top HUD bar
+        // Top HUD bar — Night/Timer/Gold on the left; Codex / Warband / March evenly spaced.
         GameObject hud = CreatePanel(townCanvasObj.transform, "HUD_Bar",
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1200f, 72f),
             new Color(0.08f, 0.06f, 0.05f, 0.92f));
 
-        townUI.timerText = CreateTMP(hud.transform, "TimerText", "Horde Arrives: 07:00", 22, TextAlignmentOptions.Left,
-            new Vector2(-400f, 0f), new Vector2(320f, 48f));
-        townUI.goldText = CreateTMP(hud.transform, "GoldText", "Royal Gold: 75g", 22, TextAlignmentOptions.Center,
-            new Vector2(0f, 0f), new Vector2(280f, 48f));
-        townUI.partyCountText = CreateTMP(hud.transform, "PartyText", "Warband: 0 Fighters", 20, TextAlignmentOptions.Right,
-            new Vector2(360f, 0f), new Vector2(280f, 48f));
+        var nightHud = CreateTMP(hud.transform, "NightText", "Night 1", 22, TextAlignmentOptions.Left,
+            new Vector2(-540f, 0f), new Vector2(130f, 40f));
+        townUI.timerText = CreateTMP(hud.transform, "TimerText", "Horde Arrives: 07:00", 18, TextAlignmentOptions.Left,
+            new Vector2(-390f, 0f), new Vector2(200f, 40f));
+        townUI.goldText = CreateTMP(hud.transform, "GoldText", "Royal Gold: 75g", 18, TextAlignmentOptions.Center,
+            new Vector2(-220f, 0f), new Vector2(150f, 40f));
+
+        // Evenly space Codex / Warband info / March across the right two-thirds of the bar.
+        const float trioLeft = -40f;
+        const float trioRight = 520f;
+        float TrioX(int i) => trioLeft + (trioRight - trioLeft) * (i / 2f);
+
+        var warbandBtn = CreateButton(hud.transform, "WarbandButton", "Warband: 0/52",
+            new Vector2(TrioX(1), 0f), new Vector2(180f, 44f), new Color(0.22f, 0.28f, 0.22f));
+        townUI.partyCountText = warbandBtn.GetComponentInChildren<TextMeshProUGUI>();
         townUI.goToWarButton = CreateButton(hud.transform, "GoToWarButton", "MARCH TO WAR",
-            new Vector2(520f, 0f), new Vector2(180f, 48f), new Color(0.55f, 0.12f, 0.12f));
+            new Vector2(TrioX(2), 0f), new Vector2(190f, 48f), new Color(0.55f, 0.12f, 0.12f));
 
         // TOP-LEFT: Tavern Dice
         GameObject dicePanel = CreatePanel(townCanvasObj.transform, "Panel_TavernDice",
@@ -221,8 +230,28 @@ public static class ArthurianSceneBuilder
         codex.recipeListContainer = recipeList.transform;
         codex.recipeRowPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/CodexRecipeRow.prefab");
         codex.toggleCodexButton = CreateButton(hud.transform, "CodexToggle", "Codex",
-            new Vector2(-520f, 0f), new Vector2(110f, 44f), new Color(0.20f, 0.25f, 0.40f));
+            new Vector2(TrioX(0), 0f), new Vector2(140f, 44f), new Color(0.20f, 0.25f, 0.40f));
         SeedDefaultRecipes(codex);
+
+        // Warband formation modal (opened from the evenly-spaced Warband HUD button)
+        GameObject warbandPanel = CreatePanel(townCanvasObj.transform, "WarbandPanel",
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640f, 480f),
+            new Color(0.07f, 0.09f, 0.08f, 0.98f));
+        warbandPanel.SetActive(false);
+        CreateTMP(warbandPanel.transform, "WarbandTitle", "WARBAND FORMATION", 22, TextAlignmentOptions.Center,
+            new Vector2(0f, 200f), new Vector2(600f, 36f));
+        GameObject warbandList = new GameObject("WarbandList", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+        warbandList.transform.SetParent(warbandPanel.transform, false);
+        var warbandListRt = warbandList.GetComponent<RectTransform>();
+        warbandListRt.anchorMin = new Vector2(0.06f, 0.08f);
+        warbandListRt.anchorMax = new Vector2(0.94f, 0.82f);
+        warbandListRt.offsetMin = Vector2.zero;
+        warbandListRt.offsetMax = Vector2.zero;
+        var warbandVlg = warbandList.GetComponent<VerticalLayoutGroup>();
+        warbandVlg.spacing = 6f;
+        warbandVlg.childForceExpandHeight = false;
+        warbandVlg.childControlHeight = true;
+        warbandList.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // Perk Draft Modal
         GameObject perkPanel = CreatePanel(townCanvasObj.transform, "PerkDraftPanel",
@@ -309,13 +338,18 @@ public static class ArthurianSceneBuilder
         loop.townCanvasObj = townCanvasObj;
         loop.battlefieldArenaObj = arena;
 
+        churchUI.nightText = nightHud;
         churchUI.timerText = townUI.timerText;
         churchUI.goldText = townUI.goldText;
         churchUI.warbandCountText = townUI.partyCountText;
         churchUI.goToWarButton = townUI.goToWarButton;
+        churchUI.codexButton = codex.toggleCodexButton;
+        churchUI.warbandButton = warbandBtn;
         churchUI.buyRoundButton = townUI.tavernRoundButton;
         churchUI.diceModal = dicePanel;
         churchUI.codexModal = codexPanel;
+        churchUI.warbandModal = warbandPanel;
+        churchUI.warbandListContainer = warbandList.transform;
         churchUI.dossierModal = dossier;
         // Dossier content lives on the shared bottom panel (wired on townUI).
         churchUI.dossierDialogue = townUI.characterDialogueText;
