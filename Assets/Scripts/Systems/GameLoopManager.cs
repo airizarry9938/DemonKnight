@@ -147,19 +147,77 @@ namespace ArthurianAutobattler
             }
         }
 
-        /// <summary>Brand-new campaign (no autosave). Clears party and generates a fresh town.</summary>
+        /// <summary>
+        /// Brand-new campaign. Wipes leftover economy (autosave, grudges, Merlin bank,
+        /// perks, relics, sins, pacts) and starts at exactly <see cref="StartingGold"/> (200g).
+        /// </summary>
         public void InitializeFreshCampaign()
         {
+            ResetEconomyForNewGame();
             recruitedParty.Clear();
             WarbandAutosave.Clear();
             currentNight = 1;
             PlayerPrefs.SetInt(NightPrefsKey, 1);
             PlayerPrefs.Save();
-            BeginTownNight(keepSurvivors: false, restoreGoldFromSave: false, veterans: null);
+            BeginTownNight(
+                keepSurvivors: false,
+                restoreGoldFromSave: false,
+                veterans: null,
+                applyBankStartingBonus: false);
+
+            // Belt-and-suspenders: New Game purse is always exactly 200g.
+            ForceStartingGoldExact();
+            Debug.LogError(
+                $"[DemonKnight] New Game purse locked at {StartingGold}g (bank/perks/relics wiped).");
         }
 
         /// <summary>Legacy name — fresh start only (does not wipe an in-progress Merlin timeline).</summary>
         public void InitializeNewRun() => InitializeFreshCampaign();
+
+        /// <summary>
+        /// Wipe run + meta economy so New Game cannot inherit Merlin Treasury, Writ,
+        /// runes, perks, relics, sins, or autosaved gold.
+        /// </summary>
+        public void ResetEconomyForNewGame()
+        {
+            GrudgeSaveManager.Instance?.WipeAllSavedMemory();
+            WarbandAutosave.Clear();
+
+            MerlinResurrectionManager.Instance?.ResetBankForNewGame();
+            if (PerkDraftManager.Instance != null)
+                PerkDraftManager.Instance.unlockedPerks.Clear();
+            RelicManager.Instance?.ClearAllRelics();
+            SinRuneManager.Instance?.ClearAllSins();
+            SomersetRunes.ClearPact();
+            SomersetRunes.SetGrudgeDeltaMultiplier(1f);
+
+            rivalriesSuspendedThisWave = false;
+            tavernRoundHireDiscountActive = false;
+            disableTownTimer = false;
+            lastWaveWon = null;
+            mustDisbandPartyAfterCurrentWave = false;
+            townSecondsSpentThisPhase = 0f;
+            townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+
+            if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
+            if (battleEngine != null)
+            {
+                battleEngine.isBattling = false;
+                battleEngine.currentBattleNumber = 1;
+            }
+        }
+
+        /// <summary>Force HUD / town purse to exactly StartingGold (200).</summary>
+        public void ForceStartingGoldExact()
+        {
+            if (townUI == null) townUI = FindFirstObjectByType<TownSplitUIController>();
+            if (townUI != null) townUI.playerGold = StartingGold;
+            var church = ResolveChurchUI();
+            church?.SyncGoldFromTownUI();
+            church?.RefreshHUD();
+            townUI?.UpdateHUD();
+            AutosaveWarband(StartingGold);
+        }
 
         /// <summary>
         /// Called from Merlin's "Enter Next Timeline" after defeat/victory.
@@ -238,7 +296,8 @@ namespace ArthurianAutobattler
             bool keepSurvivors,
             bool restoreGoldFromSave,
             int savedGold = -1,
-            List<RecruitInstance> veterans = null)
+            List<RecruitInstance> veterans = null,
+            bool applyBankStartingBonus = true)
         {
             disableTownTimer = false;
             townSecondsSpentThisPhase = 0f;
@@ -277,20 +336,26 @@ namespace ArthurianAutobattler
                 currentTownPool.RemoveAll(p => p != null && partyIds.Contains(p.unitID));
             }
 
-            int bonusGold = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetBonusStartingGold()
-                : 0;
+            // Bank Treasury only applies to a true fresh start — never re-add onto autosaved gold
+            // (that compounded +15g×level every Merlin night / Continue).
+            int bonusGold = 0;
+            if (applyBankStartingBonus && MerlinResurrectionManager.Instance != null)
+                bonusGold = MerlinResurrectionManager.Instance.GetBonusStartingGold();
 
             if (townUI != null)
             {
                 if (restoreGoldFromSave && savedGold >= 0)
-                    townUI.playerGold = savedGold + bonusGold;
+                    townUI.playerGold = Mathf.Max(0, savedGold);
                 else
-                    townUI.playerGold = StartingGold + bonusGold;
+                    townUI.playerGold = StartingGold + Mathf.Max(0, bonusGold);
             }
             if (churchUI != null) churchUI.SyncGoldFromTownUI();
 
-            int gold = townUI != null ? townUI.playerGold : StartingGold + bonusGold;
+            int gold = townUI != null
+                ? townUI.playerGold
+                : (restoreGoldFromSave && savedGold >= 0
+                    ? Mathf.Max(0, savedGold)
+                    : StartingGold + Mathf.Max(0, bonusGold));
             if (currentTownPool.Count > 0 && IsTownCompletelyPricedOut(gold) && recruitedParty.Count == 0)
             {
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(

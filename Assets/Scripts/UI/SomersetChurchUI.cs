@@ -1652,7 +1652,13 @@ namespace ArthurianAutobattler
             if (Input.GetKeyDown(KeyCode.B)) BuyTavernRound();
         }
 
-        public void SyncGoldFromTownUI() { }
+        /// <summary>Push TownSplitUIController.playerGold into the HUD gold label.</summary>
+        public void SyncGoldFromTownUI()
+        {
+            var town = Town;
+            if (goldText != null && town != null)
+                goldText.text = $"Royal Gold: {town.playerGold}g";
+        }
 
         public void PopulatePews(List<RecruitInstance> town)
         {
