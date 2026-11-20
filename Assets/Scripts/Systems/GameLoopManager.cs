@@ -63,7 +63,7 @@ namespace ArthurianAutobattler
         private GamePhase previousPhase;
 
         /// <summary>Base purse for a fresh night / New Game (before bank rune bonus).</summary>
-        public const int StartingGold = 150;
+        public const int StartingGold = 200;
         public const int WaveVictoryGold = 200;
         public const int WaveLossGold = 50;
 

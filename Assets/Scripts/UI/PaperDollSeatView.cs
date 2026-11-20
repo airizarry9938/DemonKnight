@@ -62,14 +62,15 @@ namespace ArthurianAutobattler
                 else seatLabel.text = "";
             }
 
-            VictoryStarBadge.Apply(transform, recruit);
-
             if (seatButton == null) seatButton = GetComponent<Button>() ?? gameObject.AddComponent<Button>();
             seatButton.interactable = true;
             if (seatButton.targetGraphic == null && bodyLayer != null)
                 seatButton.targetGraphic = bodyLayer;
             seatButton.onClick.RemoveAllListeners();
             seatButton.onClick.AddListener(() => onClick?.Invoke(recruit));
+
+            // After layers + button so badge Canvas sorts above paper-doll images.
+            VictoryStarBadge.Apply(transform, recruit);
         }
 
         public void BindEmpty()

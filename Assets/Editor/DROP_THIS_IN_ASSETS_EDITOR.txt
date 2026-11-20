@@ -1,16 +1,12 @@
 STOP hand-copying random files.
 
 === PREFERRED ===
-1) Wait for Unity compile
+1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → victory-stars-hire
+4) Diagnose → stars-visible-hire-bands-gold200
 
-Never use jsDelivr @main. Pin commit SHA (PR tip / merge).
+If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
+from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-=== HARD FALLBACK ===
-Delete then Save-As CompatApi, PackageVersion, SomersetChurchUI, ArthurianSyncFromGitHub
-(+ GameDataTypes, GameLoopManager, WarbandAutosave, PaperDollSeatView, VictoryStarBadge)
-from jsDelivr @<SHA> — see ANDREW-VICTORY-STARS-HIRE.md
-
-No scene wipe.
+See ANDREW-STARS-VISIBLE-HIRE-BANDS-GOLD200.md

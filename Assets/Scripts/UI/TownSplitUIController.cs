@@ -12,7 +12,7 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI goldText;
         public TextMeshProUGUI partyCountText;
         public Button goToWarButton;
-        public int playerGold = 150;
+        public int playerGold = 200;
 
         [Header("Top-Left: Tavern Dice")]
         public TavernDiceMinigame diceGame;

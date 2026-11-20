@@ -63,7 +63,12 @@ public static class ArthurianMenuBootstrap
         string editorDir = Path.Combine(Application.dataPath, "Editor");
         string alignPath = Path.Combine(editorDir, "ArthurianAlignCrowdPews.cs");
         string builderPath = Path.Combine(editorDir, "ArthurianSceneBuilder.cs");
+        string syncPath = Path.Combine(editorDir, "ArthurianSyncFromGitHub.cs");
+        string menuBootPath = Path.Combine(editorDir, "ArthurianMenuBootstrap.cs");
         bool alignFileOnDisk = File.Exists(alignPath);
+        bool syncOnDisk = File.Exists(syncPath);
+        bool menuBootOnDisk = File.Exists(menuBootPath);
+        bool hasSyncType = TypeExists("ArthurianSyncFromGitHub");
         string builderStamp = File.Exists(builderPath)
             ? File.GetLastWriteTimeUtc(builderPath).ToString("u") + " UTC"
             : "MISSING";
@@ -74,6 +79,9 @@ public static class ArthurianMenuBootstrap
             "DemonKnight / Arthurian diagnose\n\n" +
             $"Package: {packageId} ({packageGit})\n" +
             $"Assets path:\n{Application.dataPath}\n" +
+            $"Sync menus on disk: {(syncOnDisk ? "YES" : "NO — Bootstrap/Force Sync MISSING")}\n" +
+            $"Sync menus compiled: {(hasSyncType ? "YES" : "NO")}\n" +
+            $"Diagnose host on disk: {(menuBootOnDisk ? "YES" : "NO")}\n" +
             $"Align script on disk: {(alignFileOnDisk ? "YES" : "NO — Unity never got the update")}\n" +
             $"Align menu compiled: {(hasAlignType ? "YES" : "NO")}\n" +
             $"ArthurianSceneBuilder.cs mtime: {builderStamp}\n\n" +
@@ -81,6 +89,14 @@ public static class ArthurianMenuBootstrap
             $"Gameplay scripts: {(hasGameplay ? "YES" : "NO")}\n" +
             $"Church pew layout: {(hasPews ? "YES" : "NO")}\n" +
             $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n\n";
+
+        if (!syncOnDisk || !hasSyncType)
+        {
+            msg +=
+                "SYNC MENUS MISSING.\n" +
+                "Overwrite Assets/Editor/ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs from jsDelivr (pinned SHA),\n" +
+                "then Assets → Refresh. See ANDREW-SYNC-KEEP-EDITOR-MENUS.md.\n\n";
+        }
 
         if (!alignFileOnDisk)
         {
@@ -148,9 +164,9 @@ public static class ArthurianMenuBootstrap
             "DemonKnight Setup",
             "1) Confirm Assets/Scripts/UI/SomersetPewLayout.cs exists.\n" +
             "2) Wait for compile (bottom-right spinner).\n" +
-            "3) Arthurian → Diagnose Project (must show setnight-sync-cachebust).\n" +
-            "   If Sync leaves CS1061 SetNight: Arthurian → Force Re-Sync Night/HUD Fix\n" +
-            "   or overwrite GameLoopManager.cs from jsDelivr (see README hard fallback).\n" +
+            "3) Arthurian → Diagnose Project (must show stars-visible-hire-bands-gold200).\n" +
+            "   If Bootstrap / Force Delete+Sync missing: overwrite ArthurianSyncFromGitHub.cs\n" +
+            "   + ArthurianMenuBootstrap.cs from jsDelivr (pinned SHA) — see README.\n" +
             "4) If you already added ChurchBackground: Arthurian → Align Crowd Grid To Church Pews.\n" +
             "5) Only use Build Complete Scene Hierarchy for a brand-new scene.\n\n" +
             "Project Assets path:\n" + Application.dataPath,
