@@ -229,6 +229,15 @@ namespace ArthurianAutobattler
 
         public bool IsAlive => currentHealth > 0;
 
+        /// <summary>
+        /// Battalion FRONT: Tank or Unassigned. BACK is Ranged only.
+        /// Demons must kill/clear FRONT before they can hit BACK.
+        /// </summary>
+        public bool IsFrontRow => assignedRole != CombatRole.BacklineRanged;
+
+        /// <summary>Battalion BACK: trained Ranged formation.</summary>
+        public bool IsBackRow => assignedRole == CombatRole.BacklineRanged;
+
         public void ResetAttackCooldown()
         {
             float effectiveAPS = isHexed ? attacksPerSecond * 0.5f : attacksPerSecond;
