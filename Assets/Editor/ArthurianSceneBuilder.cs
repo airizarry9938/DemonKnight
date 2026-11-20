@@ -155,7 +155,8 @@ public static class ArthurianSceneBuilder
         townUI.townGridContainer = seatRt;
         townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
 
-        // Top HUD bar — full-bleed strip; EnsureTopHubLayout redistributes children at runtime.
+        // Top HUD bar — full-bleed strip. Play preserves these RectTransforms unless
+        // SomersetChurchUI.forceEqualHudSlots is enabled (legacy equal-slot auto layout).
         GameObject hud = CreatePanel(townCanvasObj.transform, "HUD_Bar",
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -6f), new Vector2(0f, 72f),
             new Color(0.08f, 0.06f, 0.05f, 0.92f));
