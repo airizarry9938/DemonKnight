@@ -200,6 +200,11 @@ namespace ArthurianAutobattler
                 case UnitType.SirGawain: return f.CanFuseGawain(p);
                 case UnitType.Mordred: return f.CanFuseMordred(p);
                 case UnitType.SirGalahad: return f.CanFuseGalahad(p);
+                case UnitType.SirTristan: return f.CanFuseTristan(p);
+                case UnitType.SirPercival: return f.CanFusePercival(p);
+                case UnitType.SirKay: return f.CanFuseKay(p);
+                case UnitType.SirBedivere: return f.CanFuseBedivere(p);
+                case UnitType.Guinevere: return f.CanFuseGuinevere(p);
                 default: return false;
             }
         }
@@ -227,6 +232,11 @@ namespace ArthurianAutobattler
                 case UnitType.SirGawain: ok = f.FuseGawain(p); break;
                 case UnitType.Mordred: ok = f.FuseMordred(p); break;
                 case UnitType.SirGalahad: ok = f.FuseGalahad(p); break;
+                case UnitType.SirTristan: ok = f.FuseTristan(p); break;
+                case UnitType.SirPercival: ok = f.FusePercival(p); break;
+                case UnitType.SirKay: ok = f.FuseKay(p); break;
+                case UnitType.SirBedivere: ok = f.FuseBedivere(p); break;
+                case UnitType.Guinevere: ok = f.FuseGuinevere(p); break;
             }
 
             if (ok)

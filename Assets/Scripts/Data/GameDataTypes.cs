@@ -11,8 +11,10 @@ namespace ArthurianAutobattler
         Peasant, Warrior, Knight,
         Priest, Captain,
         KingArthur, Merlin, SirLancelot, MorganLeFay, LadyOfTheLake, SirGawain, Mordred, SirGalahad,
+        SirTristan, SirPercival, SirKay, SirBedivere, Guinevere,
         DemonImp, DemonHellhound, DemonDreadLord, SirenEnchantress,
-        BossBlackKnight, BossVortigern, BossGreenKnight, BossAccolon, BossNimue
+        BossBlackKnight, BossVortigern, BossGreenKnight, BossAccolon,
+        BossMeleagant, BossKingLot, BossQuestingBeast, BossNimue
     }
 
     public enum TraitTag { None, Noble, Outlaw, Drunkard, Zealot, Coward, Loyalist }
@@ -104,18 +106,38 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Wave victories while this soul marched (and returned to a pew). Stacks.
-        /// Each star → −5g hire (stacks with win −10 / loss +15 grudge deltas).
+        /// Each star → −5g hire (stacks with win −10 grudge; Balance V2 removed loss/death +15).
         /// </summary>
         public int victoryStars;
+
+        /// <summary>
+        /// Train Ranged equips a crossbow — melee types may attack from BACK (no NO REACH).
+        /// </summary>
+        public bool canAttackFromBack;
 
         /// <summary>Hire discount gold per victory star.</summary>
         public const int VictoryStarHireDiscount = 5;
 
-        /// <summary>Peasant hire band floor — Loyalist / Crown / Tavern must not push below this.</summary>
+        /// <summary>Balance V2 hire bands.</summary>
         public const int PeasantHireFloor = 10;
-        public const int PeasantHireCeil = 20;
-        public const int WarriorHireFloor = 50;
-        public const int KnightHireFloor = 200;
+        public const int PeasantHireCeil = 15;
+        public const int WarriorHireFloor = 35;
+        public const int WarriorHireCeil = 55;
+        public const int KnightHireFloor = 110;
+        public const int KnightHireCeil = 160;
+
+        /// <summary>Intel costs (Balance V2): T1 free, T2 15g, T3 35g.</summary>
+        public const int IntelTier1Cost = 0;
+        public const int IntelTier2Cost = 15;
+        public const int IntelTier3Cost = 35;
+
+        public static int IntelCostForTier(int tier) => tier switch
+        {
+            1 => IntelTier1Cost,
+            2 => IntelTier2Cost,
+            3 => IntelTier3Cost,
+            _ => 0
+        };
 
         /// <summary>
         /// Pre-fusion ingredient snapshots (deep). Wave-end disband expands these back
@@ -196,7 +218,8 @@ namespace ArthurianAutobattler
             return t == UnitType.KingArthur || t == UnitType.Merlin || t == UnitType.SirLancelot
                    || t == UnitType.MorganLeFay || t == UnitType.LadyOfTheLake || t == UnitType.SirGawain
                    || t == UnitType.Mordred || t == UnitType.SirGalahad || t == UnitType.Priest
-                   || t == UnitType.Captain;
+                   || t == UnitType.Captain || t == UnitType.SirTristan || t == UnitType.SirPercival
+                   || t == UnitType.SirKay || t == UnitType.SirBedivere || t == UnitType.Guinevere;
         }
 
         public void TrainRole(CombatRole newRole)
@@ -206,12 +229,15 @@ namespace ArthurianAutobattler
             if (newRole == CombatRole.FrontlineTank)
                 maxHealth = Mathf.RoundToInt(maxHealth * 1.25f);
             else if (newRole == CombatRole.BacklineRanged)
+            {
                 attackDamage = Mathf.RoundToInt(attackDamage * 1.20f);
+                // Crossbow / bow kit — melee may fire from BACK (no NO REACH after Train Ranged).
+                canAttackFromBack = true;
+            }
         }
 
         /// <summary>
-        /// Unit types that can fight from BACK (Ranged row). Melee types in BACK cannot attack —
-        /// formation vs unit type is a taught lesson (Warriors/Knights belong FRONT).
+        /// Naturally ranged / caster types that fight from BACK without a crossbow kit.
         /// </summary>
         public static bool IsRangedUnitType(UnitType t) => t switch
         {
@@ -220,13 +246,19 @@ namespace ArthurianAutobattler
             UnitType.Merlin => true,
             UnitType.MorganLeFay => true,
             UnitType.LadyOfTheLake => true,
+            UnitType.SirTristan => true,
+            UnitType.Guinevere => true,
             UnitType.SirenEnchantress => true,
             _ => false
         };
 
-        /// <summary>True when this recruit is in BACK but is a melee type (will not attack).</summary>
+        /// <summary>Can fight from BACK: native ranged OR Train Ranged crossbow kit.</summary>
+        public bool CanFightFromBackRow =>
+            canAttackFromBack || IsRangedUnitType(unitType);
+
+        /// <summary>True when BACK without ranged kit (should not happen after Train Ranged).</summary>
         public bool IsMeleeStuckInBackRow =>
-            assignedRole == CombatRole.BacklineRanged && !IsRangedUnitType(unitType);
+            assignedRole == CombatRole.BacklineRanged && !CanFightFromBackRow;
 
         public void RefreshBodyPostureFromTraits(int grudgePenalty)
         {
@@ -253,7 +285,9 @@ namespace ArthurianAutobattler
 
             string info = $"<b>{characterName}</b> ({unitType}) | Pew {PewIndex + 1}/12 (seat {pewSeatIndex}) | Role: <b>{assignedRole}</b>\n";
             if (IsMeleeStuckInBackRow)
-                info += "<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Train Tank / FRONT.</color>\n";
+                info += "<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Train Ranged (crossbow) or Tank.</color>\n";
+            else if (assignedRole == CombatRole.BacklineRanged && canAttackFromBack && !IsRangedUnitType(unitType))
+                info += "<color=#B8E986>Crossbow kit — can attack from BACK</color>\n";
             if (isSirenEnchantress)
             {
                 info += "<color=#FF69B4>Siren Enchantress</color>";
@@ -265,7 +299,7 @@ namespace ArthurianAutobattler
             if (intelTierUnlocked >= 1)
                 info += $"HP: {maxHealth} | ATK: {attackDamage} | SPD: {attackSpeed:F1}/s\n";
             else
-                info += "HP: ??? | ATK: ??? (Pay 10g to Scout)\n";
+                info += $"HP: ??? | ATK: ??? (Scout {IntelTier1Cost}g)\n";
 
             // Hire add-ons / subtractions — same math as Recruit (Ng).
             info += $"<color=#FFE066>{hire.FormatDossierLines()}</color>\n";
@@ -276,12 +310,12 @@ namespace ArthurianAutobattler
             if (intelTierUnlocked >= 2)
                 info += $"<color=#FF5555>Rival: Hates {hatedTrait}</color>\n";
             else
-                info += "Disadvantages: ??? (Pay 50g to Investigate)\n";
+                info += $"Disadvantages: ??? (Investigate {IntelTier2Cost}g)\n";
 
             if (intelTierUnlocked >= 3)
                 info += $"<color=#55FF55>Trait: {primaryTrait} | Loves: {lovedTrait}</color>";
             else
-                info += "Full Potential: ??? (Pay 100g for Dossier)";
+                info += $"Full Potential: ??? (Dossier {IntelTier3Cost}g)";
 
             return info;
         }
@@ -389,6 +423,8 @@ namespace ArthurianAutobattler
         public float charmedTimer = 0f;
         public bool cannotBeHealed = false;
         public float maxHpDrainPerSecond = 0f;
+        /// <summary>Train Ranged crossbow — allows melee to fire from BACK.</summary>
+        public bool canAttackFromBack;
 
         public bool IsAlive => currentHealth > 0;
 
@@ -401,15 +437,18 @@ namespace ArthurianAutobattler
         /// <summary>Battalion BACK: trained Ranged formation.</summary>
         public bool IsBackRow => assignedRole == CombatRole.BacklineRanged;
 
+        public bool CanFightFromBackRow =>
+            canAttackFromBack || RecruitInstance.IsRangedUnitType(unitType);
+
         /// <summary>
-        /// BACK row only fires for ranged unit types. Melee in BACK wastes the slot (no attack).
+        /// BACK row fires for ranged types or crossbow-equipped melee.
         /// </summary>
         public bool CanAttackFromCurrentRow =>
-            isDemon || IsFrontRow || RecruitInstance.IsRangedUnitType(unitType);
+            isDemon || IsFrontRow || CanFightFromBackRow;
 
-        /// <summary>Melee unit parked in BACK — cannot reach the horde.</summary>
+        /// <summary>Melee in BACK without crossbow — cannot reach.</summary>
         public bool IsMeleeStuckInBackRow =>
-            !isDemon && IsBackRow && !RecruitInstance.IsRangedUnitType(unitType);
+            !isDemon && IsBackRow && !CanFightFromBackRow;
 
         public void ResetAttackCooldown()
         {
@@ -483,10 +522,12 @@ namespace ArthurianAutobattler
         public static void ApplyBattleModifiers(List<RecruitInstance> party)
         {
             bool arthurPresent = false;
+            bool guineverePresent = false;
             int peasantCount = 0;
             foreach (var member in party)
             {
                 if (member.unitType == UnitType.KingArthur) arthurPresent = true;
+                if (member.unitType == UnitType.Guinevere) guineverePresent = true;
                 if (member.unitType == UnitType.Peasant) peasantCount++;
             }
 
@@ -505,6 +546,14 @@ namespace ArthurianAutobattler
 
                 if (jealousy && !RecruitInstance.IsLegendUnit(unit.unitType))
                     unit.attackDamage = Mathf.Max(1, unit.attackDamage - 3);
+
+                // Guinevere: +15% ATK aura to Loyalist / Noble allies (not herself).
+                if (guineverePresent
+                    && unit.unitType != UnitType.Guinevere
+                    && (unit.primaryTrait == TraitTag.Loyalist || unit.primaryTrait == TraitTag.Noble))
+                {
+                    unit.attackDamage = Mathf.Max(1, Mathf.RoundToInt(unit.attackDamage * 1.15f));
+                }
 
                 foreach (var ally in party)
                 {

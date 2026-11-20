@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "46c6d91";
+    private const string FallbackCommitSha = "2f69878";
 
-    private const string ExpectedPackageId = "autobattle-boss-dialog-video-bg";
+    private const string ExpectedPackageId = "balance-v2-arthurian-expansion";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -512,6 +512,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("balance-v2-arthurian-expansion")
                    || body.Contains("autobattle-boss-dialog-video-bg")
                    || body.Contains("back-row-melee-no-attack")
                    || body.Contains("perk-rune-bonus-math")
@@ -538,6 +539,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("balance-v2-arthurian-expansion")
                     || body.Contains("autobattle-boss-dialog-video-bg")
                     || body.Contains("back-row-melee-no-attack")
                     || body.Contains("perk-rune-bonus-math")

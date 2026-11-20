@@ -68,8 +68,11 @@ namespace ArthurianAutobattler
             float hpMult = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetBonusHealthMultiplier()
                 : 1f;
-            bool freeTier1 = PerkDraftManager.Instance != null
-                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree);
+            // Balance V2: Tier 1 intel is free by default (Scouting still unlocks current pool mid-run).
+            bool freeTier1 = true;
+            if (PerkDraftManager.Instance != null
+                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree))
+                freeTier1 = true;
 
             bool lustSiren = SomersetRunes.IsSinActive(SinRuneID.Lust) && Random.value < 0.25f;
 
@@ -96,38 +99,38 @@ namespace ArthurianAutobattler
             {
                 case UnitType.Knight:
                 {
-                    // HP 75–104, ATK 10–15 → hire 200–400 (higher stats → higher within band).
-                    int hpLo = 75, hpHi = 105;
-                    int atkLo = 10, atkHi = 16;
+                    // Balance V2: HP 115–145, ATK 14–19 → hire 110–160.
+                    int hpLo = 115, hpHi = 146;
+                    int atkLo = 14, atkHi = 20;
                     r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
                     r.attackDamage = Random.Range(atkLo, atkHi);
-                    r.attackSpeed = Random.Range(1.5f, 2.0f);
+                    r.attackSpeed = Random.Range(1.6f, 2.0f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
                         hpLo, hpHi - 1, atkLo, atkHi - 1,
-                        RecruitInstance.KnightHireFloor, 400);
+                        RecruitInstance.KnightHireFloor, RecruitInstance.KnightHireCeil);
                     break;
                 }
                 case UnitType.Warrior:
                 {
-                    // HP 32–51, ATK 5–8 → hire 50–100.
-                    int hpLo = 32, hpHi = 52;
-                    int atkLo = 5, atkHi = 9;
+                    // Balance V2: HP 45–65, ATK 7–10 → hire 35–55.
+                    int hpLo = 45, hpHi = 66;
+                    int atkLo = 7, atkHi = 11;
                     r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
                     r.attackDamage = Random.Range(atkLo, atkHi);
-                    r.attackSpeed = Random.Range(1.2f, 1.6f);
+                    r.attackSpeed = Random.Range(1.3f, 1.6f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
                         hpLo, hpHi - 1, atkLo, atkHi - 1,
-                        RecruitInstance.WarriorHireFloor, 100);
+                        RecruitInstance.WarriorHireFloor, RecruitInstance.WarriorHireCeil);
                     break;
                 }
                 case UnitType.Peasant:
                 {
-                    // HP 10–21, ATK 1–3 → hire 10–20 (never below floor even before Loyalist).
-                    int hpLo = 10, hpHi = 22;
-                    int atkLo = 1, atkHi = 4;
+                    // Balance V2: HP 14–22, ATK 2–3 → hire 10–15.
+                    int hpLo = 14, hpHi = 23;
+                    int atkLo = 2, atkHi = 4;
                     r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
                     r.attackDamage = Random.Range(atkLo, atkHi);
-                    r.attackSpeed = Random.Range(1.0f, 1.3f);
+                    r.attackSpeed = Random.Range(1.1f, 1.3f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
                         hpLo, hpHi - 1, atkLo, atkHi - 1,
                         RecruitInstance.PeasantHireFloor, RecruitInstance.PeasantHireCeil);
@@ -139,6 +142,10 @@ namespace ArthurianAutobattler
             r.baseHireCost = Mathf.Max(r.baseHireCost, RecruitInstance.HireFloorFor(type));
             if (type == UnitType.Peasant)
                 r.baseHireCost = Mathf.Clamp(r.baseHireCost, RecruitInstance.PeasantHireFloor, RecruitInstance.PeasantHireCeil);
+            else if (type == UnitType.Warrior)
+                r.baseHireCost = Mathf.Clamp(r.baseHireCost, RecruitInstance.WarriorHireFloor, RecruitInstance.WarriorHireCeil);
+            else if (type == UnitType.Knight)
+                r.baseHireCost = Mathf.Clamp(r.baseHireCost, RecruitInstance.KnightHireFloor, RecruitInstance.KnightHireCeil);
 
             r.primaryTrait = RollPrimaryTrait();
             r.hatedTrait = RollSecondaryTrait(r.primaryTrait);
@@ -153,8 +160,7 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Map HP+ATK quality into a hire band. Higher combat stats → higher cost within
-        /// Peasant 10–20 / Warrior 50–100 / Knight 200–400.
+        /// Map HP+ATK quality into a hire band (55% HP + 45% ATK).
         /// </summary>
         private static int HireCostFromStats(
             float hp, int atk,

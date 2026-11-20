@@ -8,7 +8,7 @@ namespace ArthurianAutobattler
     {
         public DemonHordeGenerator hordeGenerator;
         public int currentBattleNumber = 1;
-        public int finalBossWave = 6;
+        public int finalBossWave = 10;
         public bool isBattling = false;
         public int frontlineSize = 6;
 
@@ -45,7 +45,8 @@ namespace ArthurianAutobattler
                     attackSpeed = r.attackSpeed,
                     primaryTrait = r.primaryTrait,
                     hatedTrait = r.hatedTrait,
-                    lovedTrait = r.lovedTrait
+                    lovedTrait = r.lovedTrait,
+                    canAttackFromBack = r.canAttackFromBack
                 };
                 copy.isSirenEnchantress = r.isSirenEnchantress;
                 combatRoster.Add(copy);
@@ -84,6 +85,7 @@ namespace ArthurianAutobattler
                     currentHealth = r.maxHealth,
                     attackDamage = atk,
                     attacksPerSecond = aps,
+                    canAttackFromBack = r.canAttackFromBack,
                     cannotBeHealed = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight),
                     maxHpDrainPerSecond = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight)
                         ? r.maxHealth * 0.05f : 0f
@@ -96,10 +98,18 @@ namespace ArthurianAutobattler
             ApplyEndlessHourglassPressure(demonArmy);
             SpawnLustSirensIntoHorde(demonArmy);
 
-            if (currentBattleNumber >= 2)
+            // Balance V2: bosses start wave 3+.
+            if (currentBattleNumber >= 3)
             {
                 float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
-                demonArmy.Insert(0, hordeGenerator.SpawnCorruptedLegendBoss(currentBattleNumber, mult));
+                var boss = hordeGenerator.SpawnCorruptedLegendBoss(currentBattleNumber, mult);
+                demonArmy.Insert(0, boss);
+                // King Lot: summons 2 Frenzied Imps on spawn.
+                if (boss.unitType == UnitType.BossKingLot)
+                {
+                    demonArmy.Insert(1, DemonHordeGenerator.MakeImp(9001, mult));
+                    demonArmy.Insert(2, DemonHordeGenerator.MakeImp(9002, mult));
+                }
             }
 
             foreach (var d in demonArmy) d.ResetAttackCooldown();
@@ -116,22 +126,42 @@ namespace ArthurianAutobattler
 
         private void ApplyUsurpationStarterLegends(List<RecruitInstance> roster)
         {
-            if (currentBattleNumber != 1) return;
             if (!SomersetRunes.IsPact(DemonicPactID.Usurpation)) return;
-            if (roster.Any(u => u.unitType == UnitType.Mordred)) return;
+            // Scale 70% at wave 1 → 100% by wave 4 (Balance V2).
+            float scale = Mathf.Lerp(0.70f, 1f, Mathf.Clamp01((currentBattleNumber - 1) / 3f));
 
-            roster.Add(new RecruitInstance
+            if (currentBattleNumber == 1 && !roster.Any(u => u.unitType == UnitType.Mordred))
             {
-                unitID = "pact_mordred", characterName = "Mordred (Pact)", unitType = UnitType.Mordred,
-                maxHealth = 240, attackDamage = 34, attackSpeed = 1.8f, primaryTrait = TraitTag.Outlaw,
-                assignedRole = CombatRole.FrontlineTank, intelTierUnlocked = 3
-            });
-            roster.Add(new RecruitInstance
+                roster.Add(new RecruitInstance
+                {
+                    unitID = "pact_mordred", characterName = "Mordred (Pact)", unitType = UnitType.Mordred,
+                    maxHealth = Mathf.RoundToInt(260 * scale), attackDamage = Mathf.RoundToInt(36 * scale),
+                    attackSpeed = 1.8f, primaryTrait = TraitTag.Outlaw,
+                    assignedRole = CombatRole.FrontlineTank, intelTierUnlocked = 3
+                });
+            }
+            if (currentBattleNumber == 1 && !roster.Any(u => u.unitType == UnitType.MorganLeFay && u.unitID == "pact_morgan"))
             {
-                unitID = "pact_morgan", characterName = "Morgan le Fay (Pact)", unitType = UnitType.MorganLeFay,
-                maxHealth = 165, attackDamage = 22, attackSpeed = 1.5f, primaryTrait = TraitTag.Outlaw,
-                assignedRole = CombatRole.BacklineRanged, intelTierUnlocked = 3
-            });
+                roster.Add(new RecruitInstance
+                {
+                    unitID = "pact_morgan", characterName = "Morgan le Fay (Pact)", unitType = UnitType.MorganLeFay,
+                    maxHealth = Mathf.RoundToInt(175 * scale), attackDamage = Mathf.RoundToInt(24 * scale),
+                    attackSpeed = 1.5f, primaryTrait = TraitTag.Outlaw,
+                    assignedRole = CombatRole.BacklineRanged, intelTierUnlocked = 3,
+                    canAttackFromBack = true
+                });
+            }
+
+            // Persist pact Mordred into hired party so he survives wave disband.
+            var loop = GameLoopManager.Instance;
+            if (loop?.recruitedParty != null
+                && currentBattleNumber == 1
+                && !loop.recruitedParty.Any(u => u != null && u.unitType == UnitType.Mordred))
+            {
+                var m = roster.FirstOrDefault(u => u.unitType == UnitType.Mordred);
+                if (m != null)
+                    loop.recruitedParty.Add(CardFusionSystem.CloneForFusionMemory(m));
+            }
         }
 
         private void ApplyEndlessHourglassPressure(List<CombatUnit> horde)
@@ -349,6 +379,17 @@ namespace ArthurianAutobattler
             return living[Random.Range(0, living.Count)];
         }
 
+        /// <summary>Meleagant prioritizes BACK-row (ranged) targets when any remain.</summary>
+        private static CombatUnit PickMeleagantTarget(List<CombatUnit> enemies)
+        {
+            if (enemies == null || enemies.Count == 0) return null;
+            var living = enemies.Where(e => e != null && e.IsAlive).ToList();
+            if (living.Count == 0) return null;
+            var back = living.Where(e => e.IsBackRow).ToList();
+            if (back.Count > 0) return back[Random.Range(0, back.Count)];
+            return living[Random.Range(0, living.Count)];
+        }
+
         private bool ProcessSideActions(List<CombatUnit> attackers, List<CombatUnit> defenders, float dt)
         {
             bool anyStrike = false;
@@ -467,6 +508,12 @@ namespace ArthurianAutobattler
                     DealDamage(attacker, morTarget, isBoss ? dmg + 15 : dmg);
                     break;
                 }
+                case UnitType.BossMeleagant:
+                {
+                    var melTarget = PickMeleagantTarget(enemies);
+                    if (melTarget != null) DealDamage(attacker, melTarget, dmg);
+                    break;
+                }
                 case UnitType.BossAccolon:
                 {
                     var accTarget = PickRandomTarget(enemies);
@@ -514,9 +561,11 @@ namespace ArthurianAutobattler
                 }
                 default:
                 {
-                    // Backline Ranged: snipe weakest among legal targets (already front-gated for demons).
+                    // Backline Ranged / crossbow: snipe weakest among legal targets.
                     CombatUnit target;
-                    if (!attacker.isDemon && attacker.assignedRole == CombatRole.BacklineRanged)
+                    if (attacker.unitType == UnitType.BossMeleagant)
+                        target = PickMeleagantTarget(enemies);
+                    else if (!attacker.isDemon && attacker.assignedRole == CombatRole.BacklineRanged)
                     {
                         target = enemies.Where(e => e != null && e.IsAlive)
                             .OrderBy(e => e.currentHealth).FirstOrDefault();
@@ -553,6 +602,15 @@ namespace ArthurianAutobattler
             BattlefieldVisualizer.Instance?.TriggerAttackVisual(attacker, target);
             if (finalDamage > 0)
                 BattlefieldVisualizer.Instance?.SpawnPopup(target, $"-{finalDamage}", Color.red);
+
+            // Questing Beast: fear / grudge on hit (living humans only).
+            if (attacker.unitType == UnitType.BossQuestingBeast
+                && target != null && !target.isDemon && !string.IsNullOrEmpty(target.unitID)
+                && finalDamage > 0)
+            {
+                GrudgeSaveManager.Instance?.ModifyGrudgeStaging(target.unitID, 5);
+                BattlefieldVisualizer.Instance?.SpawnPopup(target, "FEAR!", new Color(0.7f, 0.45f, 0.9f));
+            }
 
             if (target.currentHealth <= 0) HandleUnitDeath(target);
             return finalDamage;
@@ -595,10 +653,19 @@ namespace ArthurianAutobattler
             BattlefieldVisualizer.Instance?.ClearAllActors();
             BattlefieldVisualizer.Instance?.StopBattleVideo();
             int goldEarned = playerWon ? DemonKnightCompatApi.WaveVictoryGold : DemonKnightCompatApi.WaveLossGold;
+            // Balance V2: +10g per surviving marcher.
+            int survivors = playerArmy.Count(u => u != null && !u.isDemon && u.IsAlive);
+            int bounty = survivors * DemonKnightCompatApi.SurvivorBountyGold;
+            goldEarned += bounty;
+            // Arthur's Taxation: +15g per wave win while perk owned.
+            if (playerWon
+                && PerkDraftManager.Instance != null
+                && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.ArthursTaxation))
+                goldEarned += PerkDraftManager.TaxationPerWaveWin;
 
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
 
-            // Hire-price memory: army members who DIED get the death penalty.
+            // Hire-price memory: Balance V2 death penalty is +0 (call kept for compatibility).
             var deadIds = new HashSet<string>();
             if (GrudgeSaveManager.Instance != null)
             {
@@ -635,16 +702,18 @@ namespace ArthurianAutobattler
             ForceWaveDisband(loop, deadIds, playerWon);
             loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             int partyNow = loop?.recruitedParty?.Count ?? -1;
-            Debug.LogError($"[DemonKnight] === END BATTLE DISBAND DONE party={partyNow} ===");
-            if (partyNow > 0)
-                Debug.LogError("[DemonKnight] !!! DISBAND FAILED — party still hired after ForceWaveDisband !!!");
+            int nonMordred = loop?.recruitedParty?.Count(r => r != null && r.unitType != UnitType.Mordred) ?? 0;
+            Debug.LogError($"[DemonKnight] === END BATTLE DISBAND DONE party={partyNow} (non-Mordred={nonMordred}) ===");
+            if (nonMordred > 0)
+                Debug.LogError("[DemonKnight] !!! DISBAND FAILED — non-Mordred still hired after ForceWaveDisband !!!");
 
-            // Award gold on every wave outcome (win 200 / loss 50).
+            // Award gold: win 200 / loss 100 + survivor bounty (+ Taxation if applicable).
             var uiGold = FindFirstObjectByType<TownSplitUIController>();
             if (uiGold != null)
             {
                 uiGold.playerGold += goldEarned;
-                Debug.LogError($"[DemonKnight] Wave gold +{goldEarned}g (won={playerWon}) → purse {uiGold.playerGold}g.");
+                Debug.LogError(
+                    $"[DemonKnight] Wave gold +{goldEarned}g (won={playerWon}, survivors={survivors}, bounty={bounty}) → purse {uiGold.playerGold}g.");
             }
 
             // Lust: hired Sirens drain 15g per wave (count from the march, before disband).
@@ -685,9 +754,10 @@ namespace ArthurianAutobattler
                     if (loop.townCanvasObj != null) loop.townCanvasObj.SetActive(true);
                     if (loop.battlefieldArenaObj != null) loop.battlefieldArenaObj.SetActive(false);
                     loop.currentPhase = GamePhase.Rewards;
-                    if (loop.recruitedParty != null && loop.recruitedParty.Count > 0)
+                    if (loop.recruitedParty != null
+                        && loop.recruitedParty.Any(r => r != null && r.unitType != UnitType.Mordred))
                     {
-                        Debug.LogError("[DemonKnight] Party still hired before perk draft — forcing again.");
+                        Debug.LogError("[DemonKnight] Non-Mordred still hired before perk draft — forcing again.");
                         ForceWaveDisband(loop, deadIds, true);
                         DemonKnightCompatApi.SetMustDisband(loop, true);
                     }
@@ -724,16 +794,21 @@ namespace ArthurianAutobattler
             if (loop.recruitedParty == null)
                 loop.recruitedParty = new List<RecruitInstance>();
 
-            if (loop.recruitedParty.Count > 0)
+            // Balance V2: Mordred may remain hired — only clear non-Mordred leftovers.
+            if (loop.recruitedParty.Count > 0
+                && loop.recruitedParty.Any(r => r != null && r.unitType != UnitType.Mordred))
             {
                 Debug.LogError(
                     $"[DemonKnight] NUCLEAR CLEAR — unfuse + DisbandPartyAfterMarch still needed.");
-                // Prefer real disband (unfuse + win/loss hire) over dumping fused products into pews.
                 DemonKnightCompatApi.EnsureDisbandedAfterWave(loop, deadIds, waveWon);
-                if (loop.recruitedParty != null && loop.recruitedParty.Count > 0)
+                if (loop.recruitedParty != null
+                    && loop.recruitedParty.Any(r => r != null && r.unitType != UnitType.Mordred))
                 {
-                    var leaves = CardFusionSystem.UnfusePartyToOriginals(loop.recruitedParty);
+                    var mordred = loop.recruitedParty.FindAll(r => r != null && r.unitType == UnitType.Mordred);
+                    var leaves = CardFusionSystem.UnfusePartyToOriginals(
+                        loop.recruitedParty.FindAll(r => r != null && r.unitType != UnitType.Mordred));
                     loop.recruitedParty.Clear();
+                    foreach (var m in mordred) loop.recruitedParty.Add(m);
                     if (loop.currentTownPool == null)
                         loop.currentTownPool = new List<RecruitInstance>();
                     foreach (var r in leaves)

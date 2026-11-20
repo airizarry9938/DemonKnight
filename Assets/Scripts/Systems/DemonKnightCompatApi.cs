@@ -15,7 +15,8 @@ namespace ArthurianAutobattler
     public static class DemonKnightCompatApi
     {
         public const int WaveVictoryGold = 200;
-        public const int WaveLossGold = 50;
+        public const int WaveLossGold = 100;
+        public const int SurvivorBountyGold = 10;
 
         const BindingFlags InstancePublic =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;

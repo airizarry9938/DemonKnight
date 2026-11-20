@@ -301,7 +301,7 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            // Full wipe: bank runes, sin runes, relics, perks, pacts, autosave → 200g.
+            // Full wipe: bank runes, sin runes, relics, perks, pacts, autosave → StartingGold.
             DemonKnightCompatApi.SetMustDisband(loop, false);
             loop.recruitedParty?.Clear();
             loop.InitializeFreshCampaign();

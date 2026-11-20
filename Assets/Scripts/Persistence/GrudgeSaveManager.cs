@@ -32,16 +32,13 @@ namespace ArthurianAutobattler
         /// <summary>Demonic Pacts set this to 2 to double staged grudge deltas.</summary>
         public float grudgeDeltaMultiplier = 1f;
 
-        /// <summary>Hire-price bump when an army recruit dies in battle (next recruitment).</summary>
-        public const int ArmyDeathHirePenalty = 15;
+        /// <summary>Balance V2: death no longer inflates hire (+0).</summary>
+        public const int ArmyDeathHirePenalty = 0;
 
-        /// <summary>
-        /// Living marcher after a WAVE LOSS — higher rehire cost when returned to pews.
-        /// Dead marchers already pay <see cref="ArmyDeathHirePenalty"/> via RecordArmyDeath.
-        /// </summary>
-        public const int MarchDisbandHirePenalty = 15;
+        /// <summary>Balance V2: wave loss no longer inflates hire (+0). Win still −10.</summary>
+        public const int MarchDisbandHirePenalty = 0;
 
-        /// <summary>Alias — wave loss living returnee hire bump.</summary>
+        /// <summary>Alias — wave loss living returnee hire bump (disabled in Balance V2).</summary>
         public const int MarchLossHirePenalty = MarchDisbandHirePenalty;
 
         /// <summary>Living marcher after a WAVE WIN — hire discount when returned to pews (negative staging).</summary>
@@ -80,10 +77,10 @@ namespace ArthurianAutobattler
             // Living recruits: no hire-price change from win/loss alone.
         }
 
-        /// <summary>Army recruit died in battle → +hire cost next time they can be recruited.</summary>
+        /// <summary>Army recruit died — Balance V2 applies no hire inflation (kept for call sites).</summary>
         public void RecordArmyDeath(string unitID)
         {
-            if (string.IsNullOrEmpty(unitID)) return;
+            if (string.IsNullOrEmpty(unitID) || ArmyDeathHirePenalty == 0) return;
             ModifyGrudgeStaging(unitID, ArmyDeathHirePenalty);
         }
 

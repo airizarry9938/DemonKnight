@@ -56,28 +56,31 @@ namespace ArthurianAutobattler
         public bool rivalriesSuspendedThisWave;
 
         /// <summary>
-        /// Buy Tavern Round (50g) → −10g hire for every recruit until this wave ends.
+        /// Buy Tavern Round (30g) → −10g hire for every recruit until this wave ends.
         /// Cleared on <see cref="EnsureDisbandedAfterWave"/> / new night.
         /// </summary>
         public bool tavernRoundHireDiscountActive;
 
-        /// <summary>Gold cost to Mediate (wave-scoped rivalry cancel).</summary>
-        public const int MediateCostGold = 100;
+        /// <summary>Gold cost to Mediate (wave-scoped rivalry cancel). Balance V2: 50g.</summary>
+        public const int MediateCostGold = 50;
 
-        /// <summary>Gold cost to Buy Tavern Round.</summary>
-        public const int TavernRoundCostGold = 50;
+        /// <summary>Gold cost to Buy Tavern Round. Balance V2: 30g.</summary>
+        public const int TavernRoundCostGold = 30;
 
         /// <summary>Hire discount for all units after Buy Tavern Round (this wave).</summary>
         public const int TavernRoundHireDiscount = 10;
+
+        /// <summary>Balance V2: +10g per living marcher at wave end.</summary>
+        public const int SurvivorBountyGold = 10;
 
         private Coroutine seatPopulateRoutine;
         private const string NightPrefsKey = "SomersetNight";
         private GamePhase previousPhase;
 
-        /// <summary>Base purse for a fresh night / New Game (before bank rune bonus).</summary>
-        public const int StartingGold = 200;
+        /// <summary>Base purse for a fresh night / New Game (before bank rune bonus). Balance V2: 250g.</summary>
+        public const int StartingGold = 250;
         public const int WaveVictoryGold = 200;
-        public const int WaveLossGold = 50;
+        public const int WaveLossGold = 100;
 
         public static GameLoopManager Resolve()
         {
@@ -149,7 +152,7 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Brand-new campaign. Wipes leftover economy (autosave, grudges, Merlin bank,
-        /// perks, relics, sins, pacts) and starts at exactly <see cref="StartingGold"/> (200g).
+        /// perks, relics, sins, pacts) and starts at exactly <see cref="StartingGold"/> (250g).
         /// </summary>
         public void InitializeFreshCampaign()
         {
@@ -165,7 +168,7 @@ namespace ArthurianAutobattler
                 veterans: null,
                 applyBankStartingBonus: false);
 
-            // Belt-and-suspenders: New Game purse is always exactly 200g.
+            // Belt-and-suspenders: New Game purse is always exactly StartingGold.
             ForceStartingGoldExact();
             Debug.LogError(
                 $"[DemonKnight] New Game purse locked at {StartingGold}g (bank/perks/relics wiped).");
@@ -284,7 +287,7 @@ namespace ArthurianAutobattler
                 + $"Jealousy={jealousy} Lust={lust} Pact={pact} timerOff={disableTownTimer}");
         }
 
-        /// <summary>Force HUD / town purse to exactly StartingGold (200).</summary>
+        /// <summary>Force HUD / town purse to exactly StartingGold (250).</summary>
         public void ForceStartingGoldExact()
         {
             if (townUI == null) townUI = FindFirstObjectByType<TownSplitUIController>();
@@ -481,14 +484,29 @@ namespace ArthurianAutobattler
             var fusionLeafDead = new HashSet<string>();
             CollectFusionLeafDeaths(combatDead, fusionLeafDead);
 
+            // Balance V2: Mordred persists in the warband until killed (never pews).
+            var mordredKeepers = new List<RecruitInstance>();
+            for (int i = recruitedParty.Count - 1; i >= 0; i--)
+            {
+                var r = recruitedParty[i];
+                if (r == null || r.unitType != UnitType.Mordred) continue;
+                bool dead = !string.IsNullOrEmpty(r.unitID) && combatDead.Contains(r.unitID);
+                if (!dead)
+                    mordredKeepers.Add(r);
+                recruitedParty.RemoveAt(i);
+            }
+
             // Fused Legends → original pre-fusion pew units (recursive). Product discarded.
             var returning = CardFusionSystem.UnfusePartyToOriginals(recruitedParty);
             recruitedParty.Clear();
+            // Mordred stays hired across waves.
+            foreach (var m in mordredKeepers)
+                recruitedParty.Add(m);
 
             if (currentTownPool == null)
                 currentTownPool = new List<RecruitInstance>();
 
-            // Living returnees: win −10 / loss +15 (GrudgeSaveManager constants).
+            // Living returnees: win −10 / loss +0 (Balance V2 removed loss inflation).
             int livingDelta = won
                 ? GrudgeSaveManager.MarchWinHireDiscount
                 : GrudgeSaveManager.MarchLossHirePenalty;
@@ -517,7 +535,7 @@ namespace ArthurianAutobattler
 
             mustDisbandPartyAfterCurrentWave = false;
             Debug.Log(
-                $"[DemonKnight] WAVE disband ({(won ? "WIN −10 hire" : "LOSS +15 hire")}): party {before} → pews += {returned} (unfused, full stats).");
+                $"[DemonKnight] WAVE disband ({(won ? "WIN −10 hire" : "LOSS +0 hire")}; Mordred kept={mordredKeepers.Count}): party {before} → pews += {returned}, hired={recruitedParty.Count}.");
             RefreshTownAfterDisband();
         }
 
@@ -556,17 +574,17 @@ namespace ArthurianAutobattler
 
             if (diedInCombat)
             {
-                // EndBattle already applied ArmyDeathHirePenalty (+15) for this unitID.
+                // Balance V2: death hire inflation removed (RecordArmyDeath is +0).
             }
             else if (diedAsFusionLeaf)
             {
-                // Fused product died; leaf was not separately tagged — +15 death hire.
                 GrudgeSaveManager.Instance?.RecordArmyDeath(r.unitID);
             }
             else
             {
-                // Living original: win → −10 hire, loss → +15 hire (stacks with star −5 each).
-                GrudgeSaveManager.Instance?.ModifyGrudgeStaging(r.unitID, livingDelta);
+                // Living: win → −10 hire, loss → +0 (Balance V2).
+                if (livingDelta != 0)
+                    GrudgeSaveManager.Instance?.ModifyGrudgeStaging(r.unitID, livingDelta);
             }
 
             int grudge = GrudgeSaveManager.Instance != null

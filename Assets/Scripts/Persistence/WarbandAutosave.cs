@@ -29,6 +29,8 @@ namespace ArthurianAutobattler
         public int pewSeatIndex;
         public BodyPosture bodyPosture;
         public bool isSirenEnchantress;
+        /// <summary>Train Ranged crossbow — can attack from BACK.</summary>
+        public bool canAttackFromBack;
         /// <summary>Wave-victory experience stars (−5g hire each). Run-scoped via autosave.</summary>
         public int victoryStars;
         /// <summary>Pre-fusion ingredients (run-scoped). Wave-end expands these back to pews.</summary>
@@ -40,7 +42,7 @@ namespace ArthurianAutobattler
     {
         public int night = 1;
         public int battleNumber = 1;
-        public int playerGold = 200;
+        public int playerGold = 250;
         /// <summary>Currently hired party (usually empty after post-March disband).</summary>
         public List<WarbandMemberSave> survivors = new List<WarbandMemberSave>();
         /// <summary>Town veterans with kept stats/upgrades/intel for rehire next night.</summary>
@@ -201,6 +203,7 @@ namespace ArthurianAutobattler
             dest.intelTierUnlocked = Mathf.Max(dest.intelTierUnlocked, src.intelTierUnlocked, 3);
             dest.bodyPosture = src.bodyPosture;
             dest.isSirenEnchantress = src.isSirenEnchantress;
+            dest.canAttackFromBack = src.canAttackFromBack || dest.canAttackFromBack;
             dest.victoryStars = Mathf.Max(dest.victoryStars, src.victoryStars);
             if (src.pewSeatIndex > 0) dest.pewSeatIndex = src.pewSeatIndex;
             if (src.randomAvatar != null) dest.randomAvatar = src.randomAvatar;
@@ -307,6 +310,7 @@ namespace ArthurianAutobattler
                 pewSeatIndex = r.pewSeatIndex,
                 bodyPosture = r.bodyPosture,
                 isSirenEnchantress = r.isSirenEnchantress,
+                canAttackFromBack = r.canAttackFromBack,
                 victoryStars = Mathf.Max(0, r.victoryStars)
             };
             if (depth < 6 && r.fusionIngredients != null && r.fusionIngredients.Count > 0)
@@ -340,6 +344,7 @@ namespace ArthurianAutobattler
                 pewSeatIndex = s.pewSeatIndex,
                 bodyPosture = s.bodyPosture,
                 isSirenEnchantress = s.isSirenEnchantress,
+                canAttackFromBack = s.canAttackFromBack,
                 victoryStars = Mathf.Max(0, s.victoryStars)
             };
             if (depth < 6 && s.fusionIngredients != null && s.fusionIngredients.Count > 0)

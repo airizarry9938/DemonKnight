@@ -101,7 +101,8 @@ namespace ArthurianAutobattler
                 attackSpeed = best.attackSpeed,
                 primaryTrait = best.primaryTrait,
                 pewSeatIndex = best.pewSeatIndex,
-                intelTierUnlocked = 3
+                intelTierUnlocked = 3,
+                canAttackFromBack = best.canAttackFromBack
             });
         }
     }

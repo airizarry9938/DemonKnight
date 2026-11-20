@@ -287,7 +287,7 @@ namespace ArthurianAutobattler
         {
             if (selectedRecruit == null || selectedRecruit.intelTierUnlocked >= tier) return;
 
-            int cost = tier == 1 ? 10 : (tier == 2 ? 50 : 100);
+            int cost = RecruitInstance.IntelCostForTier(tier);
             if (playerGold < cost)
             {
                 characterDialogueText.text = "<color=yellow>Not enough gold!</color>";
