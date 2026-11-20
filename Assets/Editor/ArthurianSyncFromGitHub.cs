@@ -23,7 +23,7 @@ public static class ArthurianSyncFromGitHub
     // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
     private const string FallbackCommitSha = "d4c45c9";
 
-    private const string ExpectedPackageId = "end-run-remove-perks-runes";
+    private const string ExpectedPackageId = "art-tools-under-arthurian";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -531,6 +531,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("art-tools-under-arthurian")
                    || body.Contains("end-run-remove-perks-runes")
                    || body.Contains("character-registry-battle-sprites")
                    || body.Contains("modular-townsfolk-appearance")
@@ -564,6 +565,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("art-tools-under-arthurian")
                     || body.Contains("end-run-remove-perks-runes")
                     || body.Contains("character-registry-battle-sprites")
                     || body.Contains("modular-townsfolk-appearance")

@@ -25,7 +25,9 @@ public class ModularSpriteSheetImporterWindow : EditorWindow
     bool pointFilter = true;
     Vector2 scroll;
 
+    // Top-level DemonKnight + Arthurian (Andrew already has Arthurian/Somerset menus).
     [MenuItem("DemonKnight/Modular Sprite Sheet Importer")]
+    [MenuItem("Arthurian/Art Tools/Modular Sprite Sheet Importer", false, 40)]
     public static void Open()
     {
         var win = GetWindow<ModularSpriteSheetImporterWindow>("Modular Sprite Importer");

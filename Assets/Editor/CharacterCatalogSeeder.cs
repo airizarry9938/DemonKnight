@@ -15,6 +15,7 @@ public static class CharacterCatalogSeeder
     const string Root = "Assets/Data/Characters";
 
     [MenuItem("DemonKnight/Characters/Seed Default Character Definitions")]
+    [MenuItem("Arthurian/Art Tools/Seed Default Character Definitions", false, 42)]
     public static void SeedAll()
     {
         EnsureFolder(Root + "/Legends");

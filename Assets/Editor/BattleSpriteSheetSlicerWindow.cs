@@ -23,6 +23,7 @@ public class BattleSpriteSheetSlicerWindow : EditorWindow
     Vector2 scroll;
 
     [MenuItem("DemonKnight/Battle Sprite Sheet Slicer")]
+    [MenuItem("Arthurian/Art Tools/Battle Sprite Sheet Slicer", false, 41)]
     public static void Open()
     {
         var win = GetWindow<BattleSpriteSheetSlicerWindow>("Battle Sprite Slicer");

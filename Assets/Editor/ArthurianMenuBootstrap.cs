@@ -37,6 +37,8 @@ public static class ArthurianMenuBootstrap
         bool hasPews = TypeExists("ArthurianAutobattler.SomersetPewLayout");
         bool hasBuilder = TypeExists("ArthurianSceneBuilder");
         bool hasAlignType = TypeExists("ArthurianAlignCrowdPews");
+        bool hasModularImporter = TypeExists("ModularSpriteSheetImporterWindow");
+        bool hasBattleSlicer = TypeExists("BattleSpriteSheetSlicerWindow");
 
         string packageId = "(no version stamp — old first build)";
         string packageGit = "?";
@@ -65,9 +67,13 @@ public static class ArthurianMenuBootstrap
         string builderPath = Path.Combine(editorDir, "ArthurianSceneBuilder.cs");
         string syncPath = Path.Combine(editorDir, "ArthurianSyncFromGitHub.cs");
         string menuBootPath = Path.Combine(editorDir, "ArthurianMenuBootstrap.cs");
+        string modularImporterPath = Path.Combine(editorDir, "ModularSpriteSheetImporterWindow.cs");
+        string battleSlicerPath = Path.Combine(editorDir, "BattleSpriteSheetSlicerWindow.cs");
         bool alignFileOnDisk = File.Exists(alignPath);
         bool syncOnDisk = File.Exists(syncPath);
         bool menuBootOnDisk = File.Exists(menuBootPath);
+        bool modularImporterOnDisk = File.Exists(modularImporterPath);
+        bool battleSlicerOnDisk = File.Exists(battleSlicerPath);
         bool hasSyncType = TypeExists("ArthurianSyncFromGitHub");
         string builderStamp = File.Exists(builderPath)
             ? File.GetLastWriteTimeUtc(builderPath).ToString("u") + " UTC"
@@ -84,6 +90,10 @@ public static class ArthurianMenuBootstrap
             $"Diagnose host on disk: {(menuBootOnDisk ? "YES" : "NO")}\n" +
             $"Align script on disk: {(alignFileOnDisk ? "YES" : "NO — Unity never got the update")}\n" +
             $"Align menu compiled: {(hasAlignType ? "YES" : "NO")}\n" +
+            $"Art importer on disk: {(modularImporterOnDisk ? "YES" : "NO")}\n" +
+            $"Art importer compiled: {(hasModularImporter ? "YES" : "NO")}\n" +
+            $"Battle slicer on disk: {(battleSlicerOnDisk ? "YES" : "NO")}\n" +
+            $"Battle slicer compiled: {(hasBattleSlicer ? "YES" : "NO")}\n" +
             $"ArthurianSceneBuilder.cs mtime: {builderStamp}\n\n" +
             $"TextMeshPro loaded: {(hasTmp ? "YES" : "NO")}\n" +
             $"Gameplay scripts: {(hasGameplay ? "YES" : "NO")}\n" +
@@ -130,13 +140,23 @@ public static class ArthurianMenuBootstrap
                 "• Arthurian → Align Crowd Grid To Church Pews\n" +
                 "• Arthurian → Build Complete Scene Hierarchy";
         }
+        else if (!modularImporterOnDisk || !hasModularImporter || !battleSlicerOnDisk || !hasBattleSlicer)
+        {
+            msg +=
+                "ART TOOLS MISSING OR NOT COMPILED.\n" +
+                "Run Arthurian → Force Delete+Sync ALL Scripts, wait for compile,\n" +
+                "then use Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
+                "(also listed under DemonKnight if that top menu appears).\n";
+        }
         else
         {
             msg +=
                 "Package looks current.\n" +
-                "• Already have ChurchBackground? → Arthurian → Align Crowd Grid To Church Pews\n" +
-                "• Need a fresh scene? → Arthurian → Build Complete Scene Hierarchy\n" +
-                "(Full Build replaces the scene — that feels like “defaulting to first build.”)";
+                "• Art sheets? → Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
+                "• Battle sheets? → Arthurian → Art Tools → Battle Sprite Sheet Slicer\n" +
+                "• Characters? → Arthurian → Art Tools → Seed / Auto-Collect\n" +
+                "• ChurchBackground? → Arthurian → Align Crowd Grid To Church Pews\n" +
+                "• Fresh scene? → Arthurian → Build Complete Scene Hierarchy\n";
         }
 
         Debug.Log(msg);
@@ -164,8 +184,8 @@ public static class ArthurianMenuBootstrap
             "DemonKnight Setup",
             "1) Confirm Assets/Scripts/UI/SomersetPewLayout.cs exists.\n" +
             "2) Wait for compile (bottom-right spinner).\n" +
-            "3) Arthurian → Diagnose Project (must show end-run-remove-perks-runes).\n" +
-            "   Perks/runes offline; Camelot abandon → End Run → Main Menu.\n" +
+            "3) Arthurian → Diagnose Project (must show art-tools-under-arthurian).\n" +
+            "   Art importers: Arthurian → Art Tools (also DemonKnight if present).\n" +
             "   If Bootstrap / Force Delete+Sync missing: overwrite ArthurianSyncFromGitHub.cs\n" +
             "   + ArthurianMenuBootstrap.cs from jsDelivr (pinned SHA) — see README.\n" +
             "4) If you already added ChurchBackground: Arthurian → Align Crowd Grid To Church Pews.\n" +
