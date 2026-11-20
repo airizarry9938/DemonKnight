@@ -669,14 +669,19 @@ public static class ArthurianSceneBuilder
         {
             new CodexRecipeEntry { heroName = "Town Priest", resultingType = UnitType.Priest, ingredientFormula = "2 Peasants", combatPerkSummary = "Heals lowest ally, else weak attack" },
             new CodexRecipeEntry { heroName = "Vanguard Captain", resultingType = UnitType.Captain, ingredientFormula = "2 Warriors", combatPerkSummary = "+0.25 APS to whole army" },
+            new CodexRecipeEntry { heroName = "Sir Kay", resultingType = UnitType.SirKay, ingredientFormula = "1 Warrior + 2 Peasants", combatPerkSummary = "Early bridge tank" },
+            new CodexRecipeEntry { heroName = "Sir Bedivere", resultingType = UnitType.SirBedivere, ingredientFormula = "1 Knight + 1 Warrior", combatPerkSummary = "Loyalist frontline" },
+            new CodexRecipeEntry { heroName = "Sir Percival", resultingType = UnitType.SirPercival, ingredientFormula = "1 Zealot Knight + 1 Peasant", combatPerkSummary = "Zealot tank" },
+            new CodexRecipeEntry { heroName = "Sir Tristan", resultingType = UnitType.SirTristan, ingredientFormula = "1 Knight + 1 Peasant (Outlaw/Noble)", combatPerkSummary = "Bow — attacks from BACK" },
+            new CodexRecipeEntry { heroName = "Guinevere", resultingType = UnitType.Guinevere, ingredientFormula = "1 Noble + 1 Priest", combatPerkSummary = "+15% ATK aura to Loyalist/Noble allies" },
             new CodexRecipeEntry { heroName = "King Arthur", resultingType = UnitType.KingArthur, ingredientFormula = "2 Knights + 1 Captain", combatPerkSummary = "Cleaves 2 foes; blocks Nimue seduction" },
-            new CodexRecipeEntry { heroName = "Merlin", resultingType = UnitType.Merlin, ingredientFormula = "3 Priests + 2 Warriors + 2 Knights", combatPerkSummary = "Hits all enemies" },
-            new CodexRecipeEntry { heroName = "Sir Lancelot", resultingType = UnitType.SirLancelot, ingredientFormula = "3 Knights (incl. 1 Noble)", combatPerkSummary = "+5 ATK per fallen ally" },
-            new CodexRecipeEntry { heroName = "Morgan le Fay", resultingType = UnitType.MorganLeFay, ingredientFormula = "2 Priests + 2 Outlaws", combatPerkSummary = "Hexes targets (halve APS)" },
-            new CodexRecipeEntry { heroName = "Lady of the Lake", resultingType = UnitType.LadyOfTheLake, ingredientFormula = "3 Priests + 1 Captain", combatPerkSummary = "Shields 3 weakest (+45)" },
-            new CodexRecipeEntry { heroName = "Sir Gawain", resultingType = UnitType.SirGawain, ingredientFormula = "2 Warriors + 2 Knights", combatPerkSummary = "Double damage for first 8s" },
-            new CodexRecipeEntry { heroName = "Mordred", resultingType = UnitType.Mordred, ingredientFormula = "2 Knights + 2 Outlaws", combatPerkSummary = "+15 vs bosses; demoralizes Nobles & Loyalists (−3 ATK)" },
-            new CodexRecipeEntry { heroName = "Sir Galahad", resultingType = UnitType.SirGalahad, ingredientFormula = "2 Zealot/Loyalist Knights + 1 Priest", combatPerkSummary = "Lifesteal to allies; blocks seduction" },
+            new CodexRecipeEntry { heroName = "Merlin", resultingType = UnitType.Merlin, ingredientFormula = "2 Priests + 1 Knight", combatPerkSummary = "Hits all enemies" },
+            new CodexRecipeEntry { heroName = "Sir Lancelot", resultingType = UnitType.SirLancelot, ingredientFormula = "2 Knights (incl. 1 Noble) + 1 Warrior", combatPerkSummary = "+5 ATK per fallen ally" },
+            new CodexRecipeEntry { heroName = "Morgan le Fay", resultingType = UnitType.MorganLeFay, ingredientFormula = "2 Priests + 1 Outlaw", combatPerkSummary = "Hexes targets (halve APS)" },
+            new CodexRecipeEntry { heroName = "Lady of the Lake", resultingType = UnitType.LadyOfTheLake, ingredientFormula = "2 Priests + 1 Captain", combatPerkSummary = "Shields / Chalice synergy" },
+            new CodexRecipeEntry { heroName = "Sir Gawain", resultingType = UnitType.SirGawain, ingredientFormula = "2 Warriors + 1 Knight", combatPerkSummary = "Double damage for first 8s" },
+            new CodexRecipeEntry { heroName = "Mordred", resultingType = UnitType.Mordred, ingredientFormula = "2 Knights + 1 Outlaw", combatPerkSummary = "+15 vs bosses; demoralizes Nobles & Loyalists; persists until killed" },
+            new CodexRecipeEntry { heroName = "Sir Galahad", resultingType = UnitType.SirGalahad, ingredientFormula = "1 Zealot/Loyalist Knight + 1 Priest + 1 Warrior", combatPerkSummary = "Lifesteal to allies; blocks seduction" },
         };
         EditorUtility.SetDirty(codex);
     }

@@ -4,10 +4,9 @@ STOP hand-copying random files.
 1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → autobattle-boss-dialog-video-bg
+4) Diagnose → balance-v2-arthurian-expansion
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-Video clip drop: Assets/Art/Backgrounds/BattlefieldLoop.mp4
-See ANDREW-AUTOBATTLE-BOSS-DIALOG-VIDEO-BG.md
+See ANDREW-BALANCE-V2-ARTHURIAN.md

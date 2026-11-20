@@ -35,6 +35,11 @@ namespace ArthurianAutobattler
 
         public HashSet<RunPerkID> unlockedPerks = new HashSet<RunPerkID>();
 
+        /// <summary>Balance V2 Taxation: immediate gold on pick.</summary>
+        public const int TaxationImmediateGold = 75;
+        /// <summary>Balance V2 Taxation: bonus gold on each wave win while owned.</summary>
+        public const int TaxationPerWaveWin = 15;
+
         private readonly List<RunPerkOption> allPerks = new List<RunPerkOption>
         {
             new RunPerkOption
@@ -47,7 +52,7 @@ namespace ArthurianAutobattler
             {
                 perkID = RunPerkID.ArthursTaxation,
                 title = "Arthur's Taxation",
-                description = "Immediately gain +40 Royal Gold."
+                description = "Immediately gain +75 Royal Gold, then +15g on every wave win."
             },
             new RunPerkOption
             {
@@ -341,7 +346,7 @@ namespace ArthurianAutobattler
             if (chosen.perkID == RunPerkID.ArthursTaxation)
             {
                 var ui = FindFirstObjectByType<TownSplitUIController>();
-                if (ui != null) ui.playerGold += 40;
+                if (ui != null) ui.playerGold += TaxationImmediateGold;
             }
 
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();

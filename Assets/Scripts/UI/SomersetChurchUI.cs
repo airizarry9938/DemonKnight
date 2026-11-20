@@ -1903,7 +1903,7 @@ namespace ArthurianAutobattler
         private void UnlockIntel(int tier)
         {
             if (selected == null || Town == null) return;
-            int cost = tier == 1 ? 10 : (tier == 2 ? 50 : 100);
+            int cost = RecruitInstance.IntelCostForTier(tier);
             if (Town.playerGold < cost || selected.intelTierUnlocked >= tier) return;
             Town.playerGold -= cost;
             selected.intelTierUnlocked = tier;
@@ -2496,8 +2496,10 @@ namespace ArthurianAutobattler
                     : "FRONT (unassigned)";
             string numBit = unitNum > 0 ? $"#{unitNum}  " : "";
             string reachWarn = m.IsMeleeStuckInBackRow
-                ? "\n<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack (move to FRONT / Tank)</color>"
-                : "";
+                ? "\n<color=#FF6644><b>NO REACH</b> — Train Ranged (crossbow) or move to FRONT</color>"
+                : (m.assignedRole == CombatRole.BacklineRanged && m.canAttackFromBack && !RecruitInstance.IsRangedUnitType(m.unitType)
+                    ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
+                    : "");
 
             return $"<b>{numBit}{m.characterName}</b>  ({m.unitType})  ·  {m.assignedRole} → <b>{row}</b>{reachWarn}\n"
                    + $"HP {m.maxHealth}  |  ATK {m.attackDamage}  |  SPD {m.attackSpeed:F1}/s\n"

@@ -184,6 +184,12 @@ namespace ArthurianAutobattler
                     return "\"Strike true, Camelot. My head returns — does yours?\"";
                 case UnitType.BossAccolon:
                     return "\"Excalibur's twin thirsts. Bleed for Morgan's favor.\"";
+                case UnitType.BossMeleagant:
+                    return "\"Your backline belongs to me. Guinevere waits — and so do your archers.\"";
+                case UnitType.BossKingLot:
+                    return "\"Lothian answers with steel and swarm. Imps! To the churchyard!\"";
+                case UnitType.BossQuestingBeast:
+                    return "\"*A howl that curdles hire-ledgers.* The Beast remembers every wound.\"";
                 case UnitType.BossNimue:
                     return "\"Thorns for the faithful. Come closer, little knights — the lake remembers.\"";
                 default:
