@@ -40,7 +40,7 @@ namespace ArthurianAutobattler
     {
         public int night = 1;
         public int battleNumber = 1;
-        public int playerGold = 150;
+        public int playerGold = 200;
         /// <summary>Currently hired party (usually empty after post-March disband).</summary>
         public List<WarbandMemberSave> survivors = new List<WarbandMemberSave>();
         /// <summary>Town veterans with kept stats/upgrades/intel for rehire next night.</summary>
