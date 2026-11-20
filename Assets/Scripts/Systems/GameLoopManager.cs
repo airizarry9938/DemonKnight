@@ -113,12 +113,23 @@ namespace ArthurianAutobattler
 
         public void RefreshNightHUD()
         {
-            if (churchUI != null)
-                churchUI.SetNight(currentNight);
-            else
+            // Prefer ChurchStageUIController — it always defines SetNight (even if a
+            // partial Sync left SomersetChurchUI without the night API).
+            var church = churchUI != null
+                ? churchUI
+                : FindFirstObjectByType<ChurchStageUIController>();
+            if (church != null)
             {
-                var church = FindFirstObjectByType<SomersetChurchUI>();
-                church?.SetNight(currentNight);
+                church.SetNight(currentNight);
+                return;
+            }
+
+            // Last resort: write the NightText TMP by name so Play Mode still works.
+            var nightGo = GameObject.Find("NightText");
+            if (nightGo != null)
+            {
+                var tmp = nightGo.GetComponent<TMPro.TextMeshProUGUI>();
+                if (tmp != null) tmp.text = $"Night {Mathf.Max(1, currentNight)}";
             }
         }
 

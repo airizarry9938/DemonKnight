@@ -19,14 +19,15 @@ public static class ArthurianRepairChurchStage
     private static readonly (string rel, string check)[] Required =
     {
         ("Assets/Scripts/UI/SomersetPewLayout.cs", @"class\s+SomersetPewLayout"),
-        ("Assets/Scripts/UI/SomersetChurchUI.cs", @"class\s+SomersetChurchUI"),
+        ("Assets/Scripts/UI/SomersetChurchUI.cs", @"void\s+SetNight\s*\(\s*int"),
         ("Assets/Scripts/UI/ChurchPewLayout.cs", @"class\s+ChurchPewLayout\s*:\s*SomersetPewLayout"),
-        ("Assets/Scripts/UI/ChurchStageUIController.cs", @"class\s+ChurchStageUIController\s*:\s*SomersetChurchUI"),
+        ("Assets/Scripts/UI/ChurchStageUIController.cs", @"void\s+SetNight\s*\(\s*int"),
         ("Assets/Scripts/Data/SomersetRunes.cs", @"class\s+SomersetRunes"),
         ("Assets/Scripts/Data/GameDataTypes.cs", @"class\s+RecruitInstance"),
         ("Assets/Scripts/UI/PaperDollSeatView.cs", @"class\s+PaperDollSeatView"),
         ("Assets/Scripts/UI/TownSplitUIController.cs", @"class\s+TownSplitUIController"),
-        ("Assets/Scripts/Systems/GameLoopManager.cs", @"class\s+GameLoopManager"),
+        ("Assets/Scripts/Systems/GameLoopManager.cs", @"void\s+RefreshNightHUD"),
+        ("Assets/Scripts/Persistence/MerlinResurrectionManager.cs", @"void\s+StartNextTimelineRun"),
     };
 
     [MenuItem("Arthurian/Repair Church UI (fix CS0111/CS0263)", false, 3)]
