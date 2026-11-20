@@ -148,7 +148,11 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Pre-fusion ingredient snapshots (deep). Wave-end disband expands these back
         /// into pew seats so fused Legends never occupy seats or block return.
+        /// Must be NonSerialized — List&lt;RecruitInstance&gt; inside RecruitInstance is a Unity
+        /// serialization depth cycle (limit 10) via selected/recruitedParty/PaperDoll.
+        /// Persistence uses flattened WarbandAutosave fusionParts, not this field.
         /// </summary>
+        [System.NonSerialized]
         public List<RecruitInstance> fusionIngredients;
 
         public bool IsFusedLegend =>
