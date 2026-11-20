@@ -9,7 +9,7 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
 3. If Diagnose shows `cs1061-compat-api` / CompatApi lacks `ResolveLoop`: use the **hard fallback** below (never use jsDelivr `@main` — it lags).
-4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `peasant-hire-floor-10`.
+4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `new-game-wipe-runes-perks`.
    If Bootstrap / Force Delete+Sync menus are missing: overwrite `ArthurianSyncFromGitHub.cs` + `ArthurianMenuBootstrap.cs` from jsDelivr (pinned SHA), Refresh, then Bootstrap.
 5. Already have `ChurchBackground`? **Align Crowd Grid To Church Pews**. Brand-new only: **Build Complete Scene Hierarchy**.
 6. Place HUD icons on `HUD_Bar` (Play keeps them; Codex = **Legends**). Menu/Esc sits far-left; authored positions preserved (`forceEqualHudSlots` off).
@@ -31,7 +31,7 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 
 **Buy Tavern Round (50g):** −10g hire for **all** units until the wave ends. HUD night label shows **Night N · Wave M (Boss/Horde)**.
 
-**New Game:** always **200g** — wipes Merlin bank / runes / perks / relics / sins / autosave so Treasury cannot inflate the purse. Continue restores saved gold only (no bank re-add).
+**New Game:** always **200g**; wipes **all** bank runes, sin runes, relics, run perks, and pacts (every scene manager + PlayerPrefs). Modifiers accumulate only during the run. Continue restores saved gold only (no bank re-add).
 
 **Peasant hire floor:** final hire never below **10g** after Loyalist / Crown / Tavern (Warrior ≥50, Knight ≥200).
 
@@ -39,7 +39,7 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 
 After this PR merges, pin the **merge commit SHA** (or tip of `main`). Until then, use the PR branch tip SHA from the Sync steps doc, or floor:
 
-**Floor (Sync tools that pin commits):** `c88285c`
+**Floor (Sync tools that pin commits):** `9234117`
 
 **Delete** then download Save-As (do not rely on overwrite):
 

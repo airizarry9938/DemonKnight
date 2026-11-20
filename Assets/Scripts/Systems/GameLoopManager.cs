@@ -176,18 +176,58 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Wipe run + meta economy so New Game cannot inherit Merlin Treasury, Writ,
-        /// runes, perks, relics, sins, or autosaved gold.
+        /// bank runes, sin runes, relics, perks, pacts, or autosaved gold.
+        /// Clears <b>every</b> scene manager copy (not only Instance) so Inspector defaults
+        /// / duplicate components cannot keep modifiers alive.
         /// </summary>
         public void ResetEconomyForNewGame()
         {
             GrudgeSaveManager.Instance?.WipeAllSavedMemory();
             WarbandAutosave.Clear();
 
-            MerlinResurrectionManager.Instance?.ResetBankForNewGame();
-            if (PerkDraftManager.Instance != null)
-                PerkDraftManager.Instance.unlockedPerks.Clear();
-            RelicManager.Instance?.ClearAllRelics();
-            SinRuneManager.Instance?.ClearAllSins();
+            // PlayerPrefs first — survives even if MerlinResurrectionManager is missing.
+            MerlinResurrectionManager.WipeBankPlayerPrefs();
+
+            var merlins = FindObjectsByType<MerlinResurrectionManager>(FindObjectsSortMode.None);
+            if (merlins != null)
+            {
+                foreach (var m in merlins)
+                    m?.ResetBankForNewGame();
+            }
+
+            var perks = FindObjectsByType<PerkDraftManager>(FindObjectsSortMode.None);
+            if (perks != null)
+            {
+                foreach (var p in perks)
+                {
+                    if (p == null) continue;
+                    p.unlockedPerks ??= new HashSet<RunPerkID>();
+                    p.unlockedPerks.Clear();
+                    if (p.perkDraftPanel != null) p.perkDraftPanel.SetActive(false);
+                }
+            }
+
+            var relics = FindObjectsByType<RelicManager>(FindObjectsSortMode.None);
+            if (relics != null)
+            {
+                foreach (var r in relics)
+                    r?.ClearAllRelics();
+            }
+
+            var sins = FindObjectsByType<SinRuneManager>(FindObjectsSortMode.None);
+            if (sins != null)
+            {
+                foreach (var s in sins)
+                    s?.ClearAllSins();
+            }
+
+            var pacts = FindObjectsByType<DemonicPactManager>(FindObjectsSortMode.None);
+            if (pacts != null)
+            {
+                foreach (var d in pacts)
+                    d?.ClearPact();
+            }
+
             SomersetRunes.ClearPact();
             SomersetRunes.SetGrudgeDeltaMultiplier(1f);
 
@@ -205,6 +245,43 @@ namespace ArthurianAutobattler
                 battleEngine.isBattling = false;
                 battleEngine.currentBattleNumber = 1;
             }
+
+            LogNewGameModifierAudit();
+        }
+
+        /// <summary>Console proof that New Game left runes/perks/relics/sins/pacts disabled.</summary>
+        public void LogNewGameModifierAudit()
+        {
+            var merlin = MerlinResurrectionManager.Instance
+                         ?? FindFirstObjectByType<MerlinResurrectionManager>();
+            int gossip = SomersetRunes.GetRank(BankRuneID.Gossip);
+            int gambler = SomersetRunes.GetRank(BankRuneID.Gambler);
+            int blood = SomersetRunes.GetRank(BankRuneID.BloodOath);
+            int crown = SomersetRunes.GetRank(BankRuneID.PeasantsCrown);
+            int writ = merlin != null ? merlin.GetGlobalCostDiscount() : 0;
+            int treasury = merlin != null ? merlin.GetBonusStartingGold() : 0;
+            int perkCount = PerkDraftManager.Instance != null
+                ? PerkDraftManager.Instance.unlockedPerks.Count : 0;
+            int relicCount = RelicManager.Instance != null
+                ? RelicManager.Instance.ownedRelics.Count : 0;
+            bool jealousy = SomersetRunes.IsSinActive(SinRuneID.Jealousy);
+            bool lust = SomersetRunes.IsSinActive(SinRuneID.Lust);
+            var pact = SomersetRunes.GetActivePact();
+
+            bool clean = treasury == 0 && writ == 0
+                         && gossip == 0 && gambler == 0 && blood == 0 && crown == 0
+                         && perkCount == 0 && relicCount == 0
+                         && !jealousy && !lust
+                         && pact == DemonicPactID.None
+                         && !disableTownTimer
+                         && (merlin == null || merlin.IsFullyClearedForNewGame());
+
+            Debug.LogError(
+                $"[DemonKnight] New Game modifier audit: clean={clean} | "
+                + $"Treasury+{treasury}g Writ-{writ}g | "
+                + $"Runes G{gossip}/Gm{gambler}/B{blood}/C{crown} | "
+                + $"perks={perkCount} relics={relicCount} | "
+                + $"Jealousy={jealousy} Lust={lust} Pact={pact} timerOff={disableTownTimer}");
         }
 
         /// <summary>Force HUD / town purse to exactly StartingGold (200).</summary>
