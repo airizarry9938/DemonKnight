@@ -245,8 +245,9 @@ namespace ArthurianAutobattler
             // Visuals: every living party member / hero / demon / boss (HP bars + color blocks).
             BattlefieldVisualizer.Instance?.SyncFrontlineVisuals(allHumans, allDemons, spriteLookup);
 
-            var aliveHumans = allHumans.Take(frontlineSize).ToList();
-            var aliveDemons = allDemons.Take(frontlineSize).ToList();
+            // Acting slots: fill FRONT (Tank/Unassigned) first, then BACK (Ranged).
+            var actingHumans = SelectActingUnitsByFormation(allHumans, frontlineSize);
+            var actingDemons = allDemons.Take(frontlineSize).ToList();
 
             if (allHumans.Count == 0 || allDemons.Count == 0)
             {
@@ -254,10 +255,14 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            bool struck = ProcessSideActions(aliveHumans, aliveDemons, dt);
-            aliveDemons = demonArmy.Where(u => u.IsAlive).Take(frontlineSize).ToList();
-            if (aliveDemons.Count > 0)
-                struck |= ProcessSideActions(aliveDemons, GetValidTargetsForDemons(aliveHumans), dt);
+            // Humans attack demons (no formation on horde).
+            bool struck = ProcessSideActions(actingHumans, actingDemons, dt);
+            actingDemons = demonArmy.Where(u => u.IsAlive).Take(frontlineSize).ToList();
+            if (actingDemons.Count > 0)
+            {
+                // Demons MUST target FRONT before BACK — pass all living humans into the filter.
+                struck |= ProcessSideActions(actingDemons, GetFrontRowTargets(allHumans), dt);
+            }
             if (struck && attackResolvePause > 0f)
                 _postAttackPauseTimer = attackResolvePause;
         }
@@ -268,7 +273,9 @@ namespace ArthurianAutobattler
                             || playerArmy.Any(u => u.IsAlive && u.isSirenEnchantress);
             if (!anySiren) return;
 
-            foreach (var u in playerArmy.Where(u => u.IsAlive && CombatUnit.IsMaleFrontlineCharmable(u.unitType)))
+            // Sirens charm the FRONT row first (same formation gate as attacks).
+            foreach (var u in playerArmy.Where(u =>
+                         u.IsAlive && u.IsFrontRow && CombatUnit.IsMaleFrontlineCharmable(u.unitType)))
             {
                 if (CombatUnit.IsImmuneToSirenCharm(u.unitType)) continue;
                 if (u.charmedTimer > 0f) continue;
@@ -280,10 +287,49 @@ namespace ArthurianAutobattler
             }
         }
 
-        private List<CombatUnit> GetValidTargetsForDemons(List<CombatUnit> aliveHumans)
+        /// <summary>
+        /// FRONT-row first (Tank + Unassigned). BACK (Ranged) is only legal once every
+        /// front-row ally is down — so formation actually tanks hits in AutoBattle.
+        /// </summary>
+        private static List<CombatUnit> GetFrontRowTargets(List<CombatUnit> aliveHumans)
         {
-            var tanks = aliveHumans.Where(u => u.assignedRole == CombatRole.FrontlineTank).ToList();
-            return tanks.Count > 0 ? tanks : aliveHumans;
+            if (aliveHumans == null || aliveHumans.Count == 0)
+                return new List<CombatUnit>();
+
+            var living = aliveHumans.Where(u => u != null && u.IsAlive).ToList();
+            var front = living.Where(u => u.IsFrontRow).ToList();
+            if (front.Count > 0) return front;
+            // Front wiped — backline can finally be hit.
+            return living.Where(u => u.IsBackRow).ToList();
+        }
+
+        /// <summary>Prefer FRONT actors, then fill remaining slots with BACK (Ranged).</summary>
+        private static List<CombatUnit> SelectActingUnitsByFormation(List<CombatUnit> alive, int cap)
+        {
+            var result = new List<CombatUnit>();
+            if (alive == null || cap <= 0) return result;
+            foreach (var u in alive)
+            {
+                if (u == null || !u.IsAlive || !u.IsFrontRow) continue;
+                result.Add(u);
+                if (result.Count >= cap) return result;
+            }
+            foreach (var u in alive)
+            {
+                if (u == null || !u.IsAlive || !u.IsBackRow) continue;
+                result.Add(u);
+                if (result.Count >= cap) return result;
+            }
+            return result;
+        }
+
+        /// <summary>Pick one living target from a list that is already front-preferred (or any pool).</summary>
+        private static CombatUnit PickRandomTarget(List<CombatUnit> enemies)
+        {
+            if (enemies == null || enemies.Count == 0) return null;
+            var living = enemies.Where(e => e != null && e.IsAlive).ToList();
+            if (living.Count == 0) return null;
+            return living[Random.Range(0, living.Count)];
         }
 
         private bool ProcessSideActions(List<CombatUnit> attackers, List<CombatUnit> defenders, float dt)
@@ -311,6 +357,8 @@ namespace ArthurianAutobattler
             int dmg = attacker.attackDamage;
             if (attacker.unitType == UnitType.SirGawain && attacker.battleElapsed <= 8.0f) dmg *= 2;
 
+            // When demons strike, `enemies` is already FRONT-only (until front is wiped).
+            // When humans strike demons, pick among the living demon pool as given.
             switch (attacker.unitType)
             {
                 case UnitType.Priest:
@@ -330,9 +378,10 @@ namespace ArthurianAutobattler
                             BattlefieldVisualizer.Instance?.SpawnPopup(injured, $"+{dmg}", Color.green);
                         }
                     }
-                    else if (enemies.Count > 0)
+                    else
                     {
-                        DealDamage(attacker, enemies[Random.Range(0, enemies.Count)], Mathf.Max(1, dmg / 2));
+                        var t = PickRandomTarget(enemies);
+                        if (t != null) DealDamage(attacker, t, Mathf.Max(1, dmg / 2));
                     }
                     break;
                 }
@@ -350,23 +399,25 @@ namespace ArthurianAutobattler
                             BattlefieldVisualizer.Instance?.SpawnPopup(injured, $"+{dmg}", Color.green);
                         }
                     }
-                    else if (enemies.Count > 0)
+                    else
                     {
-                        DealDamage(attacker, enemies[Random.Range(0, enemies.Count)], dmg);
+                        var t = PickRandomTarget(enemies);
+                        if (t != null) DealDamage(attacker, t, dmg);
                     }
                     break;
                 }
                 case UnitType.KingArthur:
-                    foreach (var t in enemies.OrderBy(_ => Random.value).Take(2))
+                    foreach (var t in enemies.Where(e => e != null && e.IsAlive).OrderBy(_ => Random.value).Take(2))
                         DealDamage(attacker, t, dmg);
                     break;
                 case UnitType.Merlin:
-                    foreach (var t in enemies)
+                    foreach (var t in enemies.Where(e => e != null && e.IsAlive))
                         DealDamage(attacker, t, dmg);
                     break;
                 case UnitType.MorganLeFay:
                 {
-                    var hexTarget = enemies[Random.Range(0, enemies.Count)];
+                    var hexTarget = PickRandomTarget(enemies);
+                    if (hexTarget == null) break;
                     hexTarget.isHexed = true;
                     BattlefieldVisualizer.Instance?.SpawnPopup(hexTarget, "HEXED!", new Color(0.75f, 0.2f, 1f));
                     DealDamage(attacker, hexTarget, dmg);
@@ -374,7 +425,8 @@ namespace ArthurianAutobattler
                 }
                 case UnitType.SirGalahad:
                 {
-                    var galTarget = enemies[Random.Range(0, enemies.Count)];
+                    var galTarget = PickRandomTarget(enemies);
+                    if (galTarget == null) break;
                     int dealt = DealDamage(attacker, galTarget, dmg);
                     int heal = Mathf.Max(1, Mathf.RoundToInt(dealt * 0.25f));
                     foreach (var ally in allies.Where(a => a != attacker && a.IsAlive))
@@ -383,14 +435,16 @@ namespace ArthurianAutobattler
                 }
                 case UnitType.Mordred:
                 {
-                    var morTarget = enemies[Random.Range(0, enemies.Count)];
+                    var morTarget = PickRandomTarget(enemies);
+                    if (morTarget == null) break;
                     bool isBoss = morTarget.unitType.ToString().StartsWith("Boss");
                     DealDamage(attacker, morTarget, isBoss ? dmg + 15 : dmg);
                     break;
                 }
                 case UnitType.BossAccolon:
                 {
-                    var accTarget = enemies[Random.Range(0, enemies.Count)];
+                    var accTarget = PickRandomTarget(enemies);
+                    if (accTarget == null) break;
                     int accDealt = DealDamage(attacker, accTarget, dmg);
                     if (!attacker.isHexed)
                         attacker.currentHealth = Mathf.Min(attacker.maxHealth, attacker.currentHealth + Mathf.RoundToInt(accDealt * 0.30f));
@@ -398,12 +452,13 @@ namespace ArthurianAutobattler
                 }
                 case UnitType.BossNimue:
                 {
-                    DealDamage(attacker, enemies[Random.Range(0, enemies.Count)], dmg);
+                    var nimTarget = PickRandomTarget(enemies);
+                    if (nimTarget != null) DealDamage(attacker, nimTarget, dmg);
 
                     if (Random.value < 0.35f)
                     {
                         var strongest = enemies
-                            .Where(e => e.IsAlive && e.petrifiedTimer <= 0f)
+                            .Where(e => e != null && e.IsAlive && e.petrifiedTimer <= 0f)
                             .OrderByDescending(e => e.attackDamage)
                             .FirstOrDefault();
                         if (strongest != null)
@@ -417,8 +472,10 @@ namespace ArthurianAutobattler
                         a.unitType == UnitType.KingArthur || a.unitType == UnitType.SirGalahad);
                     if (!immune && Random.value < 0.20f)
                     {
-                        var traitor = enemies.FirstOrDefault(e =>
-                            e.IsAlive && (e.primaryTrait == TraitTag.Coward || e.primaryTrait == TraitTag.Outlaw));
+                        // Seduction can pull from the full living player army (not only front targets).
+                        var traitor = playerArmy.FirstOrDefault(e =>
+                            e != null && e.IsAlive && !e.isDemon
+                            && (e.primaryTrait == TraitTag.Coward || e.primaryTrait == TraitTag.Outlaw));
                         if (traitor != null)
                         {
                             traitor.isDemon = true;
@@ -431,10 +488,18 @@ namespace ArthurianAutobattler
                 }
                 default:
                 {
-                    CombatUnit target = (!attacker.isDemon && attacker.assignedRole == CombatRole.BacklineRanged)
-                        ? enemies.OrderBy(e => e.currentHealth).First()
-                        : enemies[Random.Range(0, enemies.Count)];
-                    DealDamage(attacker, target, dmg);
+                    // Backline Ranged: snipe weakest among legal targets (already front-gated for demons).
+                    CombatUnit target;
+                    if (!attacker.isDemon && attacker.assignedRole == CombatRole.BacklineRanged)
+                    {
+                        target = enemies.Where(e => e != null && e.IsAlive)
+                            .OrderBy(e => e.currentHealth).FirstOrDefault();
+                    }
+                    else
+                    {
+                        target = PickRandomTarget(enemies);
+                    }
+                    if (target != null) DealDamage(attacker, target, dmg);
                     break;
                 }
             }

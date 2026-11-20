@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "warband-formation-diagram";
-    public const string GitHint = "battalion-front-back-unit-boxes";
-    public const string BuiltUtc = "2026-11-20T17:35:00Z";
+    public const string Id = "autobattle-frontline-targeting";
+    public const string GitHint = "front-takes-hits-before-back";
+    public const string BuiltUtc = "2026-11-20T18:05:00Z";
 }
 #endif
