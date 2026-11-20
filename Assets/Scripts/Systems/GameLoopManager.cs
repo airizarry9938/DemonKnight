@@ -299,35 +299,54 @@ namespace ArthurianAutobattler
             AutosaveWarband(StartingGold);
         }
 
+        /// <summary>Blocks nested AdvanceNight when Merlin Next Timeline fires twice in one click.</summary>
+        private bool advancingNight;
+
         /// <summary>
         /// Called from Merlin's "Enter Next Timeline" after defeat/victory.
         /// Autosaves surviving warband, advances night, restores them into the next town phase.
         /// </summary>
         public void AdvanceNightAndRestart()
         {
-            currentNight = Mathf.Max(1, currentNight) + 1;
-            PlayerPrefs.SetInt(NightPrefsKey, currentNight);
-            PlayerPrefs.Save();
-
-            // Capture survivors AFTER night bump — automatic, no Save menu.
-            int gold = townUI != null ? townUI.playerGold : StartingGold;
-            AutosaveWarband(gold);
-
-            if (battleEngine != null)
+            if (advancingNight)
             {
-                battleEngine.isBattling = false;
-                battleEngine.currentBattleNumber = 1;
+                Debug.LogWarning(
+                    $"[DemonKnight] AdvanceNightAndRestart ignored — already advancing (would skip to Night {currentNight + 1}).");
+                return;
             }
+            advancingNight = true;
+            try
+            {
+                int from = Mathf.Max(1, currentNight);
+                currentNight = from + 1;
+                PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+                PlayerPrefs.Save();
+                Debug.Log($"[DemonKnight] Night advance {from} → {currentNight}");
 
-            if (PerkDraftManager.Instance != null)
-                PerkDraftManager.Instance.unlockedPerks.Clear();
+                // Capture survivors AFTER night bump — automatic, no Save menu.
+                int gold = townUI != null ? townUI.playerGold : StartingGold;
+                AutosaveWarband(gold);
 
-            townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+                if (battleEngine != null)
+                {
+                    battleEngine.isBattling = false;
+                    battleEngine.currentBattleNumber = 1;
+                }
 
-            if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
-            if (townCanvasObj != null) townCanvasObj.SetActive(true);
+                if (PerkDraftManager.Instance != null)
+                    PerkDraftManager.Instance.unlockedPerks.Clear();
 
-            ContinueTimelineFromAutosave();
+                townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+
+                if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
+                if (townCanvasObj != null) townCanvasObj.SetActive(true);
+
+                ContinueTimelineFromAutosave();
+            }
+            finally
+            {
+                advancingNight = false;
+            }
         }
 
         /// <summary>

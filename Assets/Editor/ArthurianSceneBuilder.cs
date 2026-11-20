@@ -430,11 +430,12 @@ public static class ArthurianSceneBuilder
         var nextRun = CreateButton(bankPanel.transform, "NextRun", "Enter Next Timeline",
             new Vector2(0f, -100f), new Vector2(260f, 44f), new Color(0.35f, 0.15f, 0.40f));
 
-        // Persist listeners so they survive scene save / Play Mode.
+        // Persist bank upgrade listeners. Next Timeline is wired at runtime by
+        // MerlinResurrectionManager.WireNextRunButton (clears onClick first) — a persistent
+        // listener here previously stacked with the runtime one and advanced night twice.
         UnityEventTools.AddPersistentListener(upgradeGold.onClick, merlin.UpgradeStartingGold);
         UnityEventTools.AddPersistentListener(upgradeDiscount.onClick, merlin.UpgradeRecruitmentDiscount);
         UnityEventTools.AddPersistentListener(upgradeRations.onClick, merlin.UpgradeSupplyRations);
-        UnityEventTools.AddPersistentListener(nextRun.onClick, merlin.StartNextTimelineRun);
 
         merlin.resurrectionCanvas = resCanvasObj;
         merlin.loreNarrativeText = lore;

@@ -4,12 +4,12 @@ STOP hand-copying random files.
 1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → fix-boss-dialog-cs0136
+4) Diagnose → fix-night-double-advance
 
-MUST land: Assets/Scripts/Combat/BattleBossDialogUI.cs
-(Sync ScriptPaths + AtomicCritical — fixes CS0103)
+Fix: Merlin "Enter Next Timeline" was advancing night twice
+(scene persistent listener + runtime AddListener). Night 1 → Night 3.
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-See ANDREW-FIX-BOSS-DIALOG-CS0136.md
+See ANDREW-FIX-NIGHT-DOUBLE-ADVANCE.md
