@@ -63,8 +63,15 @@ public static class ArthurianFixMisplacedScripts
         Add("SinRuneManager.cs", "Scripts/Systems/SinRuneManager.cs");
 
         Add("GameDataTypes.cs", "Scripts/Data/GameDataTypes.cs");
+        Add("CharacterDefinition.cs", "Scripts/Data/Characters/CharacterDefinition.cs");
+        Add("CharacterDatabase.cs", "Scripts/Data/Characters/CharacterDatabase.cs");
+        Add("TownsfolkAppearance.cs", "Scripts/Data/TownsfolkAppearance.cs");
+        Add("ModularSpriteLibrary.cs", "Scripts/Data/ModularSpriteLibrary.cs");
         Add("SomersetRunes.cs", "Scripts/Data/SomersetRunes.cs");
         Add("SomersetVisualDatabase.cs", "Scripts/Data/SomersetVisualDatabase.cs");
+        Add("WaveBossHudView.cs", "Scripts/UI/WaveBossHudView.cs");
+        Add("TownsfolkPortraitView.cs", "Scripts/UI/TownsfolkPortraitView.cs");
+        Add("TownsfolkVisualApplier.cs", "Scripts/UI/TownsfolkVisualApplier.cs");
 
         Add("GrudgeSaveManager.cs", "Scripts/Persistence/GrudgeSaveManager.cs");
         Add("MerlinResurrectionManager.cs", "Scripts/Persistence/MerlinResurrectionManager.cs");

@@ -24,11 +24,16 @@ namespace ArthurianAutobattler
         public GameObject recipeRowPrefab;
         public List<CodexRecipeEntry> allRecipes = new List<CodexRecipeEntry>();
 
+        [Header("Fusion preview (runtime)")]
+        public Transform fusionPreviewRoot;
+        public Image fusionPreviewPortrait;
+        public TextMeshProUGUI fusionPreviewStats;
+        public TextMeshProUGUI fusionPreviewPassive;
+
         private void Start()
         {
             if (codexPanel != null) codexPanel.SetActive(false);
 
-            // Toggle open/close via church (same as Dice/Warband). Do NOT only OpenModal.
             toggleCodexButton?.onClick.RemoveAllListeners();
             toggleCodexButton?.onClick.AddListener(OpenViaChurchOrToggle);
         }
@@ -65,7 +70,6 @@ namespace ArthurianAutobattler
             }
             if (recipeListContainer == null) return;
 
-            // Ensure RecipeList sits in a scroll viewport (Legends options overflow).
             if (codexPanel != null)
                 DemonKnightCompatApi.EnsureCodexScrollViewport(codexPanel.transform);
             DemonKnightCompatApi.ApplyTwoColumnCodexLayout(recipeListContainer);
@@ -76,7 +80,9 @@ namespace ArthurianAutobattler
                 ? GameLoopManager.Instance.recruitedParty
                 : new List<RecruitInstance>();
 
-            // If prefab missing, build a readable text+button row so options aren't cramped.
+            EnsureRecipesFromDatabase();
+            RefreshFusionPreview(party);
+
             foreach (var entry in allRecipes)
             {
                 GameObject row;
@@ -85,7 +91,6 @@ namespace ArthurianAutobattler
                 else
                     row = BuildFallbackRow(recipeListContainer);
 
-                // Prefer a tall readable cell (two-column grid).
                 var le = row.GetComponent<LayoutElement>();
                 if (le == null) le = row.AddComponent<LayoutElement>();
                 le.minHeight = 110f;
@@ -95,7 +100,25 @@ namespace ArthurianAutobattler
 
                 TextMeshProUGUI[] texts = row.GetComponentsInChildren<TextMeshProUGUI>();
                 Button fuseBtn = row.GetComponentInChildren<Button>();
+                Image[] images = row.GetComponentsInChildren<Image>();
                 bool ready = CheckRecipeReady(entry.resultingType, party);
+
+                // Portrait: prefer first Image that isn't the row background / button.
+                if (entry.heroPortrait != null && images != null)
+                {
+                    foreach (var img in images)
+                    {
+                        if (img == null) continue;
+                        if (fuseBtn != null && img.gameObject == fuseBtn.gameObject) continue;
+                        if (img.gameObject == row) continue;
+                        if (img.GetComponentInParent<Button>() == fuseBtn && img.transform.parent == fuseBtn.transform)
+                            continue;
+                        img.sprite = entry.heroPortrait;
+                        img.preserveAspect = true;
+                        img.color = ready ? Color.white : new Color(1f, 1f, 1f, 0.55f);
+                        break;
+                    }
+                }
 
                 if (texts.Length >= 1)
                 {
@@ -119,6 +142,15 @@ namespace ArthurianAutobattler
                     texts[2].textWrappingMode = TextWrappingModes.Normal;
                 }
 
+                // Highlight ready cards.
+                var bg = row.GetComponent<Image>();
+                if (bg != null)
+                {
+                    bg.color = ready
+                        ? new Color(0.16f, 0.28f, 0.18f, 0.98f)
+                        : new Color(0.12f, 0.14f, 0.18f, 0.95f);
+                }
+
                 if (fuseBtn != null)
                 {
                     UnitType type = entry.resultingType;
@@ -126,9 +158,131 @@ namespace ArthurianAutobattler
                     var label = fuseBtn.GetComponentInChildren<TextMeshProUGUI>();
                     if (label != null) label.text = ready ? "Fuse" : "Locked";
                     fuseBtn.onClick.RemoveAllListeners();
-                    // Always fuse against the live recruitedParty list (exact ingredient subtract).
                     fuseBtn.onClick.AddListener(() => ExecuteFusion(type));
                 }
+            }
+        }
+
+        /// <summary>
+        /// When pew party matches a fusion recipe, show that CharacterDefinition's
+        /// portrait, resulting stats, and passive before confirm.
+        /// </summary>
+        void RefreshFusionPreview(List<RecruitInstance> party)
+        {
+            var db = CharacterDatabase.Load();
+            CharacterDefinition ready = null;
+            if (db?.legends != null)
+            {
+                foreach (var def in db.legends)
+                {
+                    if (def != null && def.HasFusionRecipe && db.CanFuse(def, party))
+                    {
+                        ready = def;
+                        break;
+                    }
+                }
+            }
+
+            EnsureFusionPreviewWidgets();
+            if (fusionPreviewRoot == null) return;
+
+            if (ready == null)
+            {
+                fusionPreviewRoot.gameObject.SetActive(false);
+                return;
+            }
+
+            fusionPreviewRoot.gameObject.SetActive(true);
+            Sprite sp = ready.portraitSprite != null ? ready.portraitSprite : ready.battleSprite;
+            if (fusionPreviewPortrait != null)
+            {
+                fusionPreviewPortrait.sprite = sp;
+                fusionPreviewPortrait.enabled = sp != null;
+                fusionPreviewPortrait.preserveAspect = true;
+            }
+            if (fusionPreviewStats != null)
+            {
+                fusionPreviewStats.text =
+                    $"<b>{ready.displayName}</b>\nHP {ready.baseHP} · ATK {ready.baseATK} · APS {ready.baseAPS:F1}\n" +
+                    $"Recipe: {ready.FormatRecipeLine()}";
+            }
+            if (fusionPreviewPassive != null)
+            {
+                fusionPreviewPassive.text = string.IsNullOrWhiteSpace(ready.passiveDescription)
+                    ? ready.passiveType.ToString()
+                    : ready.passiveDescription;
+            }
+        }
+
+        void EnsureFusionPreviewWidgets()
+        {
+            if (codexPanel == null) return;
+            if (fusionPreviewRoot != null) return;
+
+            var go = new GameObject("FusionPreview", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(codexPanel.transform, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -8f);
+            rt.sizeDelta = new Vector2(-24f, 96f);
+            go.GetComponent<Image>().color = new Color(0.14f, 0.22f, 0.16f, 0.95f);
+            fusionPreviewRoot = go.transform;
+
+            var portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
+            portraitGo.transform.SetParent(go.transform, false);
+            var prt = portraitGo.GetComponent<RectTransform>();
+            prt.anchorMin = new Vector2(0f, 0.5f);
+            prt.anchorMax = new Vector2(0f, 0.5f);
+            prt.pivot = new Vector2(0f, 0.5f);
+            prt.anchoredPosition = new Vector2(12f, 0f);
+            prt.sizeDelta = new Vector2(72f, 72f);
+            fusionPreviewPortrait = portraitGo.GetComponent<Image>();
+            fusionPreviewPortrait.preserveAspect = true;
+
+            var statsGo = new GameObject("Stats", typeof(RectTransform), typeof(TextMeshProUGUI));
+            statsGo.transform.SetParent(go.transform, false);
+            var srt = statsGo.GetComponent<RectTransform>();
+            srt.anchorMin = new Vector2(0f, 0.35f);
+            srt.anchorMax = new Vector2(1f, 1f);
+            srt.offsetMin = new Vector2(96f, 4f);
+            srt.offsetMax = new Vector2(-12f, -6f);
+            fusionPreviewStats = statsGo.GetComponent<TextMeshProUGUI>();
+            fusionPreviewStats.fontSize = 16f;
+            fusionPreviewStats.color = new Color(0.95f, 0.92f, 0.82f);
+
+            var passGo = new GameObject("Passive", typeof(RectTransform), typeof(TextMeshProUGUI));
+            passGo.transform.SetParent(go.transform, false);
+            var prt2 = passGo.GetComponent<RectTransform>();
+            prt2.anchorMin = new Vector2(0f, 0f);
+            prt2.anchorMax = new Vector2(1f, 0.4f);
+            prt2.offsetMin = new Vector2(96f, 6f);
+            prt2.offsetMax = new Vector2(-12f, -2f);
+            fusionPreviewPassive = passGo.GetComponent<TextMeshProUGUI>();
+            fusionPreviewPassive.fontSize = 15f;
+            fusionPreviewPassive.color = new Color(0.75f, 0.9f, 0.75f);
+        }
+
+        void EnsureRecipesFromDatabase()
+        {
+            var db = CharacterDatabase.Load();
+            if (db?.legends == null || db.legends.Count == 0) return;
+
+            allRecipes = new List<CodexRecipeEntry>();
+            foreach (var def in db.legends)
+            {
+                if (def == null || !def.HasFusionRecipe) continue;
+                allRecipes.Add(new CodexRecipeEntry
+                {
+                    heroName = string.IsNullOrEmpty(def.displayName) ? def.unitType.ToString() : def.displayName,
+                    heroPortrait = def.portraitSprite != null ? def.portraitSprite : def.battleSprite,
+                    ingredientFormula = def.FormatRecipeLine(),
+                    combatPerkSummary = string.IsNullOrWhiteSpace(def.passiveDescription)
+                        ? def.passiveType.ToString()
+                        : def.passiveDescription,
+                    resultingType = def.unitType
+                });
             }
         }
 
@@ -139,6 +293,16 @@ namespace ArthurianAutobattler
             go.GetComponent<Image>().color = new Color(0.12f, 0.14f, 0.18f, 0.95f);
             go.GetComponent<LayoutElement>().preferredHeight = 110f;
 
+            var portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
+            portraitGo.transform.SetParent(go.transform, false);
+            var prt = portraitGo.GetComponent<RectTransform>();
+            prt.anchorMin = new Vector2(0f, 0.5f);
+            prt.anchorMax = new Vector2(0f, 0.5f);
+            prt.pivot = new Vector2(0f, 0.5f);
+            prt.anchoredPosition = new Vector2(10f, 0f);
+            prt.sizeDelta = new Vector2(64f, 64f);
+            portraitGo.GetComponent<Image>().color = new Color(0.2f, 0.22f, 0.28f);
+
             void MakeLabel(string name, Vector2 anchorMin, Vector2 anchorMax)
             {
                 var tGo = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -146,7 +310,7 @@ namespace ArthurianAutobattler
                 var rt = tGo.GetComponent<RectTransform>();
                 rt.anchorMin = anchorMin;
                 rt.anchorMax = anchorMax;
-                rt.offsetMin = new Vector2(12f, 4f);
+                rt.offsetMin = new Vector2(84f, 4f);
                 rt.offsetMax = new Vector2(-120f, -4f);
                 var tmp = tGo.GetComponent<TextMeshProUGUI>();
                 tmp.fontSize = 20f;
@@ -187,26 +351,7 @@ namespace ArthurianAutobattler
         {
             var f = CardFusionSystem.Instance;
             if (f == null) return false;
-
-            switch (t)
-            {
-                case UnitType.Priest: return f.CanFusePriest(p);
-                case UnitType.Captain: return f.CanFuseCaptain(p);
-                case UnitType.KingArthur: return f.CanFuseKingArthur(p);
-                case UnitType.Merlin: return f.CanFuseMerlin(p);
-                case UnitType.SirLancelot: return f.CanFuseLancelot(p);
-                case UnitType.MorganLeFay: return f.CanFuseMorganLeFay(p);
-                case UnitType.LadyOfTheLake: return f.CanFuseLadyOfTheLake(p);
-                case UnitType.SirGawain: return f.CanFuseGawain(p);
-                case UnitType.Mordred: return f.CanFuseMordred(p);
-                case UnitType.SirGalahad: return f.CanFuseGalahad(p);
-                case UnitType.SirTristan: return f.CanFuseTristan(p);
-                case UnitType.SirPercival: return f.CanFusePercival(p);
-                case UnitType.SirKay: return f.CanFuseKay(p);
-                case UnitType.SirBedivere: return f.CanFuseBedivere(p);
-                case UnitType.Guinevere: return f.CanFuseGuinevere(p);
-                default: return false;
-            }
+            return f.CanFuseType(t, p);
         }
 
         private void ExecuteFusion(UnitType t)
@@ -215,29 +360,9 @@ namespace ArthurianAutobattler
             var loop = GameLoopManager.Instance;
             if (f == null || loop == null) return;
 
-            // Live party reference — Fuse* removes exact distinct ingredients then adds product.
             List<RecruitInstance> p = loop.recruitedParty;
             int before = p.Count;
-
-            bool ok = false;
-            switch (t)
-            {
-                case UnitType.Priest: ok = f.FusePriest(p); break;
-                case UnitType.Captain: ok = f.FuseCaptain(p); break;
-                case UnitType.KingArthur: ok = f.FuseKingArthur(p); break;
-                case UnitType.Merlin: ok = f.FuseMerlin(p); break;
-                case UnitType.SirLancelot: ok = f.FuseLancelot(p); break;
-                case UnitType.MorganLeFay: ok = f.FuseMorganLeFay(p); break;
-                case UnitType.LadyOfTheLake: ok = f.FuseLadyOfTheLake(p); break;
-                case UnitType.SirGawain: ok = f.FuseGawain(p); break;
-                case UnitType.Mordred: ok = f.FuseMordred(p); break;
-                case UnitType.SirGalahad: ok = f.FuseGalahad(p); break;
-                case UnitType.SirTristan: ok = f.FuseTristan(p); break;
-                case UnitType.SirPercival: ok = f.FusePercival(p); break;
-                case UnitType.SirKay: ok = f.FuseKay(p); break;
-                case UnitType.SirBedivere: ok = f.FuseBedivere(p); break;
-                case UnitType.Guinevere: ok = f.FuseGuinevere(p); break;
-            }
+            bool ok = f.FuseType(t, p);
 
             if (ok)
             {

@@ -358,7 +358,10 @@ namespace ArthurianAutobattler
                 Sprite art = humanSprites != null && humanSprites.ContainsKey(u.unitID)
                     ? humanSprites[u.unitID]
                     : null;
-                actor.Initialize(u, art, CalculateSlotPosition(true, i), false);
+                if (art == null)
+                    art = ResolveBattleSprite(u.unitType);
+                float scale = ResolveVisualScale(u.unitType);
+                actor.Initialize(u, art, CalculateSlotPosition(true, i), false, scale);
                 activeActors[u.unitID] = actor;
             }
 
@@ -369,9 +372,24 @@ namespace ArthurianAutobattler
                 if (activeActors.ContainsKey(d.unitID)) continue;
 
                 UnitVisualActor actor = SpawnActor();
-                actor.Initialize(d, GetDemonSprite(d.unitType), CalculateSlotPosition(false, i), true);
+                Sprite art = ResolveBattleSprite(d.unitType) ?? GetDemonSprite(d.unitType);
+                float scale = ResolveVisualScale(d.unitType);
+                // Enemies / bosses face left (flipX = true).
+                actor.Initialize(d, art, CalculateSlotPosition(false, i), true, scale);
                 activeActors[d.unitID] = actor;
             }
+        }
+
+        static Sprite ResolveBattleSprite(UnitType type)
+        {
+            var db = CharacterDatabase.Load();
+            return db != null ? db.GetBattleSprite(type) : null;
+        }
+
+        static float ResolveVisualScale(UnitType type)
+        {
+            var db = CharacterDatabase.Load();
+            return db != null ? db.GetVisualScale(type) : 1f;
         }
 
         private UnitVisualActor SpawnActor()

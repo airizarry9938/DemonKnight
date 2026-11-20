@@ -320,8 +320,8 @@ public class ModularSpriteSheetImporterWindow : EditorWindow
                 {
                     name = Path.GetFileNameWithoutExtension(assetPath) + "_" + index,
                     rect = new Rect(col * cellW, y, cellW, cellH),
-                    alignment = (int)SpriteAlignment.BottomCenter,
-                    pivot = new Vector2(0.5f, 0.12f)
+                    alignment = (int)SpriteAlignment.Custom,
+                    pivot = new Vector2(0.5f, 0.0f)
                 });
                 index++;
             }

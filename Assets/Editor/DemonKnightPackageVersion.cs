@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "modular-townsfolk-appearance";
-    public const string GitHint = "TownsfolkAppearance-ModularSpriteLibrary-importer-dossier-sync";
-    public const string BuiltUtc = "2026-11-20T19:29:54Z";
+    public const string Id = "character-registry-battle-sprites";
+    public const string GitHint = "CharacterDefinition-Database-BattleSlicer-WaveBossHud-FusionPreview";
+    public const string BuiltUtc = "2026-11-20T20:05:00Z";
 }
 #endif

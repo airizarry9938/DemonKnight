@@ -36,144 +36,194 @@ namespace ArthurianAutobattler
             if (Instance == null) Instance = this;
         }
 
-        public bool CanFusePriest(List<RecruitInstance> p) => CountType(p, UnitType.Peasant) >= 2;
-        public bool CanFuseCaptain(List<RecruitInstance> p) => CountType(p, UnitType.Warrior) >= 2;
+        /// <summary>Data-driven fuse check — prefers CharacterDatabase recipes.</summary>
+        public bool CanFuseDefinition(CharacterDefinition def, List<RecruitInstance> p)
+        {
+            var db = CharacterDatabase.Load();
+            if (db != null && def != null && def.HasFusionRecipe)
+                return db.CanFuse(def, p);
+            return false;
+        }
 
-        public bool CanFuseKingArthur(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Knight) >= 2
-            && CountType(p, UnitType.Captain) >= 1
-            && !HasType(p, UnitType.KingArthur);
+        public bool FuseDefinition(CharacterDefinition def, List<RecruitInstance> p)
+        {
+            var db = CharacterDatabase.Load();
+            if (db == null || def == null || !def.HasFusionRecipe) return false;
+            // Apply inspector sprites as fallback when definition sprites are empty.
+            if (def.portraitSprite == null)
+                def.portraitSprite = LegacySpriteFor(def.unitType);
+            return db.TryFuse(def, p, out _);
+        }
 
-        // Balance V2: 2 Priests + 1 Knight
-        public bool CanFuseMerlin(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Priest) >= 2
-            && CountType(p, UnitType.Knight) >= 1
-            && !HasType(p, UnitType.Merlin);
+        public bool CanFuseType(UnitType type, List<RecruitInstance> p)
+        {
+            var db = CharacterDatabase.Load();
+            var def = db?.GetByUnitType(type);
+            if (def != null && def.HasFusionRecipe)
+                return db.CanFuse(def, p);
+            return CanFuseLegacy(type, p);
+        }
 
-        // Balance V2: 2 Knights (incl. 1 Noble) + 1 Warrior
-        public bool CanFuseLancelot(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Knight) >= 2
-            && CountType(p, UnitType.Warrior) >= 1
-            && p != null && p.Any(u => u != null && u.unitType == UnitType.Knight && u.primaryTrait == TraitTag.Noble)
-            && !HasType(p, UnitType.SirLancelot);
+        public bool FuseType(UnitType type, List<RecruitInstance> p)
+        {
+            var db = CharacterDatabase.Load();
+            var def = db?.GetByUnitType(type);
+            if (def != null && def.HasFusionRecipe)
+            {
+                if (def.portraitSprite == null)
+                    def.portraitSprite = LegacySpriteFor(type);
+                if (def.battleSprite == null && def.portraitSprite != null)
+                    def.battleSprite = def.portraitSprite;
+                return db.TryFuse(def, p, out _);
+            }
+            return FuseLegacy(type, p);
+        }
 
-        // Balance V2: 2 Priests + 1 Outlaw
-        public bool CanFuseMorganLeFay(List<RecruitInstance> p) =>
-            CanPickDistinct(p,
-                r => r.unitType == UnitType.Priest,
-                2,
-                r => r.primaryTrait == TraitTag.Outlaw,
-                1)
-            && !HasType(p, UnitType.MorganLeFay);
+        public bool CanFusePriest(List<RecruitInstance> p) => CanFuseType(UnitType.Priest, p);
+        public bool CanFuseCaptain(List<RecruitInstance> p) => CanFuseType(UnitType.Captain, p);
+        public bool CanFuseKingArthur(List<RecruitInstance> p) => CanFuseType(UnitType.KingArthur, p);
+        public bool CanFuseMerlin(List<RecruitInstance> p) => CanFuseType(UnitType.Merlin, p);
+        public bool CanFuseLancelot(List<RecruitInstance> p) => CanFuseType(UnitType.SirLancelot, p);
+        public bool CanFuseMorganLeFay(List<RecruitInstance> p) => CanFuseType(UnitType.MorganLeFay, p);
+        public bool CanFuseLadyOfTheLake(List<RecruitInstance> p) => CanFuseType(UnitType.LadyOfTheLake, p);
+        public bool CanFuseGawain(List<RecruitInstance> p) => CanFuseType(UnitType.SirGawain, p);
+        public bool CanFuseMordred(List<RecruitInstance> p) => CanFuseType(UnitType.Mordred, p);
+        public bool CanFuseGalahad(List<RecruitInstance> p) => CanFuseType(UnitType.SirGalahad, p);
+        public bool CanFuseTristan(List<RecruitInstance> p) => CanFuseType(UnitType.SirTristan, p);
+        public bool CanFusePercival(List<RecruitInstance> p) => CanFuseType(UnitType.SirPercival, p);
+        public bool CanFuseKay(List<RecruitInstance> p) => CanFuseType(UnitType.SirKay, p);
+        public bool CanFuseBedivere(List<RecruitInstance> p) => CanFuseType(UnitType.SirBedivere, p);
+        public bool CanFuseGuinevere(List<RecruitInstance> p) => CanFuseType(UnitType.Guinevere, p);
 
-        // Balance V2: 2 Priests + 1 Captain
-        public bool CanFuseLadyOfTheLake(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Priest) >= 2
-            && CountType(p, UnitType.Captain) >= 1
-            && !HasType(p, UnitType.LadyOfTheLake);
+        public bool FusePriest(List<RecruitInstance> p) => FuseType(UnitType.Priest, p);
+        public bool FuseCaptain(List<RecruitInstance> p) => FuseType(UnitType.Captain, p);
+        public bool FuseKingArthur(List<RecruitInstance> p) => FuseType(UnitType.KingArthur, p);
+        public bool FuseMerlin(List<RecruitInstance> p) => FuseType(UnitType.Merlin, p);
+        public bool FuseLancelot(List<RecruitInstance> p) => FuseType(UnitType.SirLancelot, p);
+        public bool FuseMorganLeFay(List<RecruitInstance> p) => FuseType(UnitType.MorganLeFay, p);
+        public bool FuseLadyOfTheLake(List<RecruitInstance> p) => FuseType(UnitType.LadyOfTheLake, p);
+        public bool FuseGawain(List<RecruitInstance> p) => FuseType(UnitType.SirGawain, p);
+        public bool FuseMordred(List<RecruitInstance> p) => FuseType(UnitType.Mordred, p);
+        public bool FuseGalahad(List<RecruitInstance> p) => FuseType(UnitType.SirGalahad, p);
+        public bool FuseTristan(List<RecruitInstance> p) => FuseType(UnitType.SirTristan, p);
+        public bool FusePercival(List<RecruitInstance> p) => FuseType(UnitType.SirPercival, p);
+        public bool FuseKay(List<RecruitInstance> p) => FuseType(UnitType.SirKay, p);
+        public bool FuseBedivere(List<RecruitInstance> p) => FuseType(UnitType.SirBedivere, p);
+        public bool FuseGuinevere(List<RecruitInstance> p) => FuseType(UnitType.Guinevere, p);
 
-        // Balance V2: 2 Warriors + 1 Knight
-        public bool CanFuseGawain(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Warrior) >= 2
-            && CountType(p, UnitType.Knight) >= 1
-            && !HasType(p, UnitType.SirGawain);
+        Sprite LegacySpriteFor(UnitType type) => type switch
+        {
+            UnitType.Priest => priestSprite,
+            UnitType.Captain => captainSprite,
+            UnitType.KingArthur => kingArthurSprite,
+            UnitType.Merlin => merlinSprite,
+            UnitType.SirLancelot => lancelotSprite,
+            UnitType.MorganLeFay => morganSprite,
+            UnitType.LadyOfTheLake => ladyOfLakeSprite,
+            UnitType.SirGawain => gawainSprite,
+            UnitType.Mordred => mordredSprite,
+            UnitType.SirGalahad => galahadSprite,
+            UnitType.SirTristan => tristanSprite,
+            UnitType.SirPercival => percivalSprite,
+            UnitType.SirKay => kaySprite,
+            UnitType.SirBedivere => bedivereSprite,
+            UnitType.Guinevere => guinevereSprite,
+            _ => null
+        };
 
-        // Balance V2: 2 Knights + 1 Outlaw
-        public bool CanFuseMordred(List<RecruitInstance> p) =>
-            CanPickDistinct(p,
-                r => r.unitType == UnitType.Knight,
-                2,
-                r => r.primaryTrait == TraitTag.Outlaw,
-                1)
-            && !HasType(p, UnitType.Mordred);
+        bool CanFuseLegacy(UnitType type, List<RecruitInstance> p) => type switch
+        {
+            UnitType.Priest => CountType(p, UnitType.Peasant) >= 2,
+            UnitType.Captain => CountType(p, UnitType.Warrior) >= 2,
+            UnitType.KingArthur => CountType(p, UnitType.Knight) >= 2
+                                  && CountType(p, UnitType.Captain) >= 1
+                                  && !HasType(p, UnitType.KingArthur),
+            UnitType.Merlin => CountType(p, UnitType.Priest) >= 2
+                               && CountType(p, UnitType.Knight) >= 1
+                               && !HasType(p, UnitType.Merlin),
+            UnitType.SirLancelot => CountType(p, UnitType.Knight) >= 2
+                                    && CountType(p, UnitType.Warrior) >= 1
+                                    && p != null && p.Any(u => u != null && u.unitType == UnitType.Knight && u.primaryTrait == TraitTag.Noble)
+                                    && !HasType(p, UnitType.SirLancelot),
+            UnitType.MorganLeFay => CanPickDistinct(p, r => r.unitType == UnitType.Priest, 2, r => r.primaryTrait == TraitTag.Outlaw, 1)
+                                    && !HasType(p, UnitType.MorganLeFay),
+            UnitType.LadyOfTheLake => CountType(p, UnitType.Priest) >= 2
+                                      && CountType(p, UnitType.Captain) >= 1
+                                      && !HasType(p, UnitType.LadyOfTheLake),
+            UnitType.SirGawain => CountType(p, UnitType.Warrior) >= 2
+                                  && CountType(p, UnitType.Knight) >= 1
+                                  && !HasType(p, UnitType.SirGawain),
+            UnitType.Mordred => CanPickDistinct(p, r => r.unitType == UnitType.Knight, 2, r => r.primaryTrait == TraitTag.Outlaw, 1)
+                                && !HasType(p, UnitType.Mordred),
+            UnitType.SirGalahad => CountWhere(p, r => r.unitType == UnitType.Knight
+                                                     && (r.primaryTrait == TraitTag.Zealot || r.primaryTrait == TraitTag.Loyalist)) >= 1
+                                   && CountType(p, UnitType.Priest) >= 1
+                                   && CountType(p, UnitType.Warrior) >= 1
+                                   && !HasType(p, UnitType.SirGalahad),
+            UnitType.SirTristan => CountType(p, UnitType.Knight) >= 1
+                                   && CountWhere(p, r => r.unitType == UnitType.Peasant
+                                                         && (r.primaryTrait == TraitTag.Outlaw || r.primaryTrait == TraitTag.Noble)) >= 1
+                                   && !HasType(p, UnitType.SirTristan),
+            UnitType.SirPercival => CountWhere(p, r => r.unitType == UnitType.Knight && r.primaryTrait == TraitTag.Zealot) >= 1
+                                    && CountType(p, UnitType.Peasant) >= 1
+                                    && !HasType(p, UnitType.SirPercival),
+            UnitType.SirKay => CountType(p, UnitType.Warrior) >= 1
+                               && CountType(p, UnitType.Peasant) >= 2
+                               && !HasType(p, UnitType.SirKay),
+            UnitType.SirBedivere => CountType(p, UnitType.Knight) >= 1
+                                    && CountType(p, UnitType.Warrior) >= 1
+                                    && !HasType(p, UnitType.SirBedivere),
+            UnitType.Guinevere => CountWhere(p, r => r.primaryTrait == TraitTag.Noble) >= 1
+                                  && CountType(p, UnitType.Priest) >= 1
+                                  && !HasType(p, UnitType.Guinevere),
+            _ => false
+        };
 
-        // Balance V2: 1 Zealot/Loyalist Knight + 1 Priest + 1 Warrior
-        public bool CanFuseGalahad(List<RecruitInstance> p) =>
-            CountWhere(p, r => r.unitType == UnitType.Knight
-                               && (r.primaryTrait == TraitTag.Zealot || r.primaryTrait == TraitTag.Loyalist)) >= 1
-            && CountType(p, UnitType.Priest) >= 1
-            && CountType(p, UnitType.Warrior) >= 1
-            && !HasType(p, UnitType.SirGalahad);
-
-        public bool CanFuseTristan(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Knight) >= 1
-            && CountWhere(p, r => r.unitType == UnitType.Peasant
-                                  && (r.primaryTrait == TraitTag.Outlaw || r.primaryTrait == TraitTag.Noble)) >= 1
-            && !HasType(p, UnitType.SirTristan);
-
-        public bool CanFusePercival(List<RecruitInstance> p) =>
-            CountWhere(p, r => r.unitType == UnitType.Knight && r.primaryTrait == TraitTag.Zealot) >= 1
-            && CountType(p, UnitType.Peasant) >= 1
-            && !HasType(p, UnitType.SirPercival);
-
-        public bool CanFuseKay(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Warrior) >= 1
-            && CountType(p, UnitType.Peasant) >= 2
-            && !HasType(p, UnitType.SirKay);
-
-        public bool CanFuseBedivere(List<RecruitInstance> p) =>
-            CountType(p, UnitType.Knight) >= 1
-            && CountType(p, UnitType.Warrior) >= 1
-            && !HasType(p, UnitType.SirBedivere);
-
-        public bool CanFuseGuinevere(List<RecruitInstance> p) =>
-            CountWhere(p, r => r.primaryTrait == TraitTag.Noble) >= 1
-            && CountType(p, UnitType.Priest) >= 1
-            && !HasType(p, UnitType.Guinevere);
-
-        public bool FusePriest(List<RecruitInstance> p) =>
-            TryFuse(p, CanFusePriest, () => CreateHero("unit_priest", "Town Priest", UnitType.Priest, priestSprite, 40, 9, 1.4f, TraitTag.Zealot, CombatRole.BacklineRanged),
-                new IngredientPick(r => r.unitType == UnitType.Peasant, 2));
-
-        public bool FuseCaptain(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseCaptain, () => CreateHero("unit_captain", "Vanguard Captain", UnitType.Captain, captainSprite, 110, 16, 1.6f, TraitTag.Noble, CombatRole.FrontlineTank),
-                new IngredientPick(r => r.unitType == UnitType.Warrior, 2));
-
-        public bool FuseKingArthur(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseKingArthur, () => CreateHero("hero_arthur", "King Arthur", UnitType.KingArthur, kingArthurSprite, 290, 34, 1.9f, TraitTag.Loyalist, CombatRole.FrontlineTank),
+        bool FuseLegacy(UnitType type, List<RecruitInstance> p) => type switch
+        {
+            UnitType.Priest => TryFuse(p, x => CanFuseLegacy(UnitType.Priest, x),
+                () => CreateHero("unit_priest", "Town Priest", UnitType.Priest, priestSprite, 40, 9, 1.4f, TraitTag.Zealot, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.unitType == UnitType.Peasant, 2)),
+            UnitType.Captain => TryFuse(p, x => CanFuseLegacy(UnitType.Captain, x),
+                () => CreateHero("unit_captain", "Vanguard Captain", UnitType.Captain, captainSprite, 110, 16, 1.6f, TraitTag.Noble, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.unitType == UnitType.Warrior, 2)),
+            UnitType.KingArthur => TryFuse(p, x => CanFuseLegacy(UnitType.KingArthur, x),
+                () => CreateHero("hero_arthur", "King Arthur", UnitType.KingArthur, kingArthurSprite, 290, 34, 1.9f, TraitTag.Loyalist, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight, 2),
-                new IngredientPick(r => r.unitType == UnitType.Captain, 1));
-
-        public bool FuseMerlin(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseMerlin, () => CreateHero("hero_merlin", "Merlin the Archmage", UnitType.Merlin, merlinSprite, 195, 30, 1.5f, TraitTag.Zealot, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.unitType == UnitType.Captain, 1)),
+            UnitType.Merlin => TryFuse(p, x => CanFuseLegacy(UnitType.Merlin, x),
+                () => CreateHero("hero_merlin", "Merlin the Archmage", UnitType.Merlin, merlinSprite, 195, 30, 1.5f, TraitTag.Zealot, CombatRole.BacklineRanged),
                 new IngredientPick(r => r.unitType == UnitType.Priest, 2),
-                new IngredientPick(r => r.unitType == UnitType.Knight, 1));
-
-        public bool FuseLancelot(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseLancelot, () => CreateHero("hero_lancelot", "Sir Lancelot", UnitType.SirLancelot, lancelotSprite, 240, 29, 2.0f, TraitTag.Noble, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.unitType == UnitType.Knight, 1)),
+            UnitType.SirLancelot => TryFuse(p, x => CanFuseLegacy(UnitType.SirLancelot, x),
+                () => CreateHero("hero_lancelot", "Sir Lancelot", UnitType.SirLancelot, lancelotSprite, 240, 29, 2.0f, TraitTag.Noble, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight && r.primaryTrait == TraitTag.Noble, 1),
                 new IngredientPick(r => r.unitType == UnitType.Knight, 1),
-                new IngredientPick(r => r.unitType == UnitType.Warrior, 1));
-
-        public bool FuseMorganLeFay(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseMorganLeFay, () => CreateHero("hero_morgan", "Morgan le Fay", UnitType.MorganLeFay, morganSprite, 175, 24, 1.5f, TraitTag.Outlaw, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.unitType == UnitType.Warrior, 1)),
+            UnitType.MorganLeFay => TryFuse(p, x => CanFuseLegacy(UnitType.MorganLeFay, x),
+                () => CreateHero("hero_morgan", "Morgan le Fay", UnitType.MorganLeFay, morganSprite, 175, 24, 1.5f, TraitTag.Outlaw, CombatRole.BacklineRanged),
                 new IngredientPick(r => r.unitType == UnitType.Priest, 2),
-                new IngredientPick(r => r.primaryTrait == TraitTag.Outlaw, 1));
-
-        public bool FuseLadyOfTheLake(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseLadyOfTheLake, () => CreateHero("hero_lady_lake", "Lady of the Lake", UnitType.LadyOfTheLake, ladyOfLakeSprite, 210, 18, 1.4f, TraitTag.Zealot, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.primaryTrait == TraitTag.Outlaw, 1)),
+            UnitType.LadyOfTheLake => TryFuse(p, x => CanFuseLegacy(UnitType.LadyOfTheLake, x),
+                () => CreateHero("hero_lady_lake", "Lady of the Lake", UnitType.LadyOfTheLake, ladyOfLakeSprite, 210, 18, 1.4f, TraitTag.Zealot, CombatRole.BacklineRanged),
                 new IngredientPick(r => r.unitType == UnitType.Priest, 2),
-                new IngredientPick(r => r.unitType == UnitType.Captain, 1));
-
-        public bool FuseGawain(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseGawain, () => CreateHero("hero_gawain", "Sir Gawain", UnitType.SirGawain, gawainSprite, 245, 26, 1.6f, TraitTag.Loyalist, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.unitType == UnitType.Captain, 1)),
+            UnitType.SirGawain => TryFuse(p, x => CanFuseLegacy(UnitType.SirGawain, x),
+                () => CreateHero("hero_gawain", "Sir Gawain", UnitType.SirGawain, gawainSprite, 245, 26, 1.6f, TraitTag.Loyalist, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Warrior, 2),
-                new IngredientPick(r => r.unitType == UnitType.Knight, 1));
-
-        public bool FuseMordred(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseMordred, () => CreateHero("hero_mordred", "Mordred", UnitType.Mordred, mordredSprite, 260, 36, 1.8f, TraitTag.Outlaw, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.unitType == UnitType.Knight, 1)),
+            UnitType.Mordred => TryFuse(p, x => CanFuseLegacy(UnitType.Mordred, x),
+                () => CreateHero("hero_mordred", "Mordred", UnitType.Mordred, mordredSprite, 260, 36, 1.8f, TraitTag.Outlaw, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight, 2),
-                new IngredientPick(r => r.primaryTrait == TraitTag.Outlaw, 1));
-
-        public bool FuseGalahad(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseGalahad, () => CreateHero("hero_galahad", "Sir Galahad", UnitType.SirGalahad, galahadSprite, 270, 27, 1.7f, TraitTag.Loyalist, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.primaryTrait == TraitTag.Outlaw, 1)),
+            UnitType.SirGalahad => TryFuse(p, x => CanFuseLegacy(UnitType.SirGalahad, x),
+                () => CreateHero("hero_galahad", "Sir Galahad", UnitType.SirGalahad, galahadSprite, 270, 27, 1.7f, TraitTag.Loyalist, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight
                                         && (r.primaryTrait == TraitTag.Zealot || r.primaryTrait == TraitTag.Loyalist), 1),
                 new IngredientPick(r => r.unitType == UnitType.Priest, 1),
-                new IngredientPick(r => r.unitType == UnitType.Warrior, 1));
-
-        public bool FuseTristan(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseTristan, () =>
+                new IngredientPick(r => r.unitType == UnitType.Warrior, 1)),
+            UnitType.SirTristan => TryFuse(p, x => CanFuseLegacy(UnitType.SirTristan, x),
+                () =>
                 {
                     var h = CreateHero("hero_tristan", "Sir Tristan", UnitType.SirTristan, tristanSprite, 185, 23, 1.8f, TraitTag.Noble, CombatRole.BacklineRanged);
                     h.canAttackFromBack = true;
@@ -181,27 +231,25 @@ namespace ArthurianAutobattler
                 },
                 new IngredientPick(r => r.unitType == UnitType.Knight, 1),
                 new IngredientPick(r => r.unitType == UnitType.Peasant
-                                        && (r.primaryTrait == TraitTag.Outlaw || r.primaryTrait == TraitTag.Noble), 1));
-
-        public bool FusePercival(List<RecruitInstance> p) =>
-            TryFuse(p, CanFusePercival, () => CreateHero("hero_percival", "Sir Percival", UnitType.SirPercival, percivalSprite, 200, 22, 1.6f, TraitTag.Zealot, CombatRole.FrontlineTank),
+                                        && (r.primaryTrait == TraitTag.Outlaw || r.primaryTrait == TraitTag.Noble), 1)),
+            UnitType.SirPercival => TryFuse(p, x => CanFuseLegacy(UnitType.SirPercival, x),
+                () => CreateHero("hero_percival", "Sir Percival", UnitType.SirPercival, percivalSprite, 200, 22, 1.6f, TraitTag.Zealot, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight && r.primaryTrait == TraitTag.Zealot, 1),
-                new IngredientPick(r => r.unitType == UnitType.Peasant, 1));
-
-        public bool FuseKay(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseKay, () => CreateHero("hero_kay", "Sir Kay", UnitType.SirKay, kaySprite, 135, 17, 1.5f, TraitTag.Loyalist, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.unitType == UnitType.Peasant, 1)),
+            UnitType.SirKay => TryFuse(p, x => CanFuseLegacy(UnitType.SirKay, x),
+                () => CreateHero("hero_kay", "Sir Kay", UnitType.SirKay, kaySprite, 135, 17, 1.5f, TraitTag.Loyalist, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Warrior, 1),
-                new IngredientPick(r => r.unitType == UnitType.Peasant, 2));
-
-        public bool FuseBedivere(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseBedivere, () => CreateHero("hero_bedivere", "Sir Bedivere", UnitType.SirBedivere, bedivereSprite, 190, 21, 1.7f, TraitTag.Loyalist, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.unitType == UnitType.Peasant, 2)),
+            UnitType.SirBedivere => TryFuse(p, x => CanFuseLegacy(UnitType.SirBedivere, x),
+                () => CreateHero("hero_bedivere", "Sir Bedivere", UnitType.SirBedivere, bedivereSprite, 190, 21, 1.7f, TraitTag.Loyalist, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight, 1),
-                new IngredientPick(r => r.unitType == UnitType.Warrior, 1));
-
-        public bool FuseGuinevere(List<RecruitInstance> p) =>
-            TryFuse(p, CanFuseGuinevere, () => CreateHero("hero_guinevere", "Guinevere", UnitType.Guinevere, guinevereSprite, 140, 12, 1.4f, TraitTag.Noble, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.unitType == UnitType.Warrior, 1)),
+            UnitType.Guinevere => TryFuse(p, x => CanFuseLegacy(UnitType.Guinevere, x),
+                () => CreateHero("hero_guinevere", "Guinevere", UnitType.Guinevere, guinevereSprite, 140, 12, 1.4f, TraitTag.Noble, CombatRole.BacklineRanged),
                 new IngredientPick(r => r.primaryTrait == TraitTag.Noble, 1),
-                new IngredientPick(r => r.unitType == UnitType.Priest, 1));
+                new IngredientPick(r => r.unitType == UnitType.Priest, 1)),
+            _ => false
+        };
 
         private readonly struct IngredientPick
         {
@@ -309,8 +357,9 @@ namespace ArthurianAutobattler
                     ExpandFusionRecursive(ing, into);
                 return;
             }
-            // Mordred is Legend/fuse-only — never a pew leaf (Usurpation or stray product).
-            if (r.unitType == UnitType.Mordred)
+            // Persist-across-waves legends (Mordred) never expand into pew leaves.
+            var db = CharacterDatabase.Load();
+            if (db != null ? db.PersistsAcrossWaves(r.unitType) : r.unitType == UnitType.Mordred)
                 return;
             into.Add(r);
         }

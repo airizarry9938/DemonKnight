@@ -1295,6 +1295,9 @@ namespace ArthurianAutobattler
             if (nightText.fontSize > 18f) nightText.fontSize = 18f;
             nightText.enableWordWrapping = false;
             nightText.overflowMode = TextOverflowModes.Overflow;
+
+            var bossHud = WaveBossHudView.EnsureNearNightText(nightText);
+            bossHud?.Refresh(wave);
         }
 
         private Transform FindHudBar()

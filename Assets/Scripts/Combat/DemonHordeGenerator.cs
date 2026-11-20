@@ -29,68 +29,71 @@ namespace ArthurianAutobattler
 
         private CombatUnit PickChaoticDemon(int budget, int battleNum, float mult, int idx)
         {
+            var db = CharacterDatabase.Load();
             float chaosRoll = Random.value;
 
-            if (budget >= 18 && battleNum >= 2 && chaosRoll < 0.40f)
+            CharacterDefinition dread = db?.GetByUnitType(UnitType.DemonDreadLord);
+            CharacterDefinition hound = db?.GetByUnitType(UnitType.DemonHellhound);
+            CharacterDefinition imp = db?.GetByUnitType(UnitType.DemonImp);
+
+            int dreadCost = dread != null ? Mathf.Max(1, dread.powerCost) : 18;
+            int houndCost = hound != null ? Mathf.Max(1, hound.powerCost) : 7;
+
+            if (budget >= dreadCost && battleNum >= 2 && chaosRoll < 0.40f)
             {
-                return new CombatUnit
-                {
-                    unitID = $"demon_lord_{idx}",
-                    unitName = "Feral Dread Lord",
-                    unitType = UnitType.DemonDreadLord,
-                    isDemon = true,
-                    isUnorganized = true,
-                    powerValue = 18,
-                    maxHealth = Mathf.RoundToInt(185 * mult),
-                    currentHealth = Mathf.RoundToInt(185 * mult),
-                    attackDamage = Mathf.RoundToInt(26 * mult),
-                    attacksPerSecond = Random.Range(0.9f, 1.8f)
-                };
+                if (dread != null) return dread.CreateCombatUnit(mult, idx);
+                return LegacyDemon("demon_lord_", "Feral Dread Lord", UnitType.DemonDreadLord, 18, 185, 26, mult, idx);
             }
 
-            if (budget >= 7 && chaosRoll < 0.75f)
+            if (budget >= houndCost && chaosRoll < 0.75f)
             {
-                return new CombatUnit
-                {
-                    unitID = $"demon_hound_{idx}",
-                    unitName = "Rabid Hellhound",
-                    unitType = UnitType.DemonHellhound,
-                    isDemon = true,
-                    isUnorganized = true,
-                    powerValue = 7,
-                    maxHealth = Mathf.RoundToInt(65 * mult),
-                    currentHealth = Mathf.RoundToInt(65 * mult),
-                    attackDamage = Mathf.RoundToInt(12 * mult),
-                    attacksPerSecond = Random.Range(1.3f, 2.0f)
-                };
+                if (hound != null) return hound.CreateCombatUnit(mult, idx);
+                return LegacyDemon("demon_hound_", "Rabid Hellhound", UnitType.DemonHellhound, 7, 65, 12, mult, idx);
             }
 
+            if (imp != null) return imp.CreateCombatUnit(mult, idx);
             return MakeImp(idx, mult);
         }
 
         public static CombatUnit MakeImp(int idx, float mult)
         {
+            var db = CharacterDatabase.Load();
+            var imp = db?.GetByUnitType(UnitType.DemonImp);
+            if (imp != null) return imp.CreateCombatUnit(mult, idx);
+            return LegacyDemon("demon_imp_", "Frenzied Imp", UnitType.DemonImp, 3, 22, 6, mult, idx);
+        }
+
+        static CombatUnit LegacyDemon(
+            string idPrefix, string name, UnitType type, int power, int hp, int atk, float mult, int idx)
+        {
+            int h = Mathf.RoundToInt(hp * mult);
+            int a = Mathf.RoundToInt(atk * mult);
             return new CombatUnit
             {
-                unitID = $"demon_imp_{idx}",
-                unitName = "Frenzied Imp",
-                unitType = UnitType.DemonImp,
+                unitID = $"{idPrefix}{idx}",
+                unitName = name,
+                unitType = type,
                 isDemon = true,
                 isUnorganized = true,
-                powerValue = 3,
-                maxHealth = Mathf.RoundToInt(22 * mult),
-                currentHealth = Mathf.RoundToInt(22 * mult),
-                attackDamage = Mathf.RoundToInt(6 * mult),
-                attacksPerSecond = Random.Range(1.5f, 2.0f)
+                powerValue = power,
+                maxHealth = h,
+                currentHealth = h,
+                attackDamage = a,
+                attacksPerSecond = Random.Range(1.2f, 2.0f)
             };
         }
 
         /// <summary>
-        /// Balance V2 boss roster — no boss on waves 1–2; wave 3+ schedule.
-        /// Base stats × mult (wave 10+ Nimue scales further via mult).
+        /// Balance V2 boss roster — no boss on waves 1–2; wave 3+ from CharacterDatabase.
         /// </summary>
         public CombatUnit SpawnCorruptedLegendBoss(int battleNumber, float mult)
         {
+            var db = CharacterDatabase.Load();
+            var def = db?.GetBossForWave(battleNumber);
+            if (def != null)
+                return def.CreateCombatUnit(mult);
+
+            // Legacy fallback if CharacterDatabase not seeded yet.
             switch (battleNumber)
             {
                 case 3:
@@ -115,7 +118,6 @@ namespace ArthurianAutobattler
                     return Boss("boss_questing_beast", "The Questing Beast", UnitType.BossQuestingBeast,
                         52, 600, 50, 1.9f, mult);
                 default:
-                    // Wave 10+: Nimue (scales with mult).
                     return Boss("boss_nimue", "Nimue, Queen of Thorns", UnitType.BossNimue,
                         55, 720, 55, 1.6f, mult);
             }

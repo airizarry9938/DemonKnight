@@ -36,6 +36,9 @@ namespace ArthurianAutobattler
         [Header("Modular townsfolk (preferred)")]
         public ModularSpriteLibrary modularLibrary;
 
+        [Header("Character registry (optional troop portrait overrides)")]
+        public CharacterDatabase characterDatabase;
+
         public List<RecruitInstance> GenerateNewRunTown()
         {
             // Persistent unitIDs for grudge memory; pew seats are shuffled each run.
@@ -91,6 +94,15 @@ namespace ArthurianAutobattler
                 isSirenEnchantress = lustSiren,
                 appearance = TownsfolkAppearance.Generate(type, persistentID, pewSeat, lib)
             };
+
+            // Optional CharacterDefinition portrait when avatar pool is empty.
+            if (r.randomAvatar == null)
+            {
+                var db = characterDatabase != null ? characterDatabase : CharacterDatabase.Load();
+                var troopDef = db?.GetByUnitType(type);
+                if (troopDef != null)
+                    r.randomAvatar = troopDef.portraitSprite != null ? troopDef.portraitSprite : troopDef.battleSprite;
+            }
 
             // Keep scout/dossier reveals across nights/waves until WipeAllSavedMemory.
             if (GrudgeSaveManager.Instance != null)
