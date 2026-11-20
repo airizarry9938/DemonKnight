@@ -43,6 +43,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
+        "Assets/Editor/ArthurianRepairChurchStage.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianSceneBuilder.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
