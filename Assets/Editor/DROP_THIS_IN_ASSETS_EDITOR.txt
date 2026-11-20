@@ -4,9 +4,9 @@ STOP hand-copying random files.
 1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → new-game-gold-200
+4) Diagnose → peasant-hire-floor-10
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-See ANDREW-NEW-GAME-GOLD-200.md
+See ANDREW-PEASANT-HIRE-FLOOR-10.md

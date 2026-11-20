@@ -103,7 +103,8 @@ namespace ArthurianAutobattler
                     r.attackDamage = Random.Range(atkLo, atkHi);
                     r.attackSpeed = Random.Range(1.5f, 2.0f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
-                        hpLo, hpHi - 1, atkLo, atkHi - 1, 200, 400);
+                        hpLo, hpHi - 1, atkLo, atkHi - 1,
+                        RecruitInstance.KnightHireFloor, 400);
                     break;
                 }
                 case UnitType.Warrior:
@@ -115,22 +116,29 @@ namespace ArthurianAutobattler
                     r.attackDamage = Random.Range(atkLo, atkHi);
                     r.attackSpeed = Random.Range(1.2f, 1.6f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
-                        hpLo, hpHi - 1, atkLo, atkHi - 1, 50, 100);
+                        hpLo, hpHi - 1, atkLo, atkHi - 1,
+                        RecruitInstance.WarriorHireFloor, 100);
                     break;
                 }
                 case UnitType.Peasant:
                 {
-                    // HP 10–21, ATK 1–3 → hire 10–20.
+                    // HP 10–21, ATK 1–3 → hire 10–20 (never below floor even before Loyalist).
                     int hpLo = 10, hpHi = 22;
                     int atkLo = 1, atkHi = 4;
                     r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
                     r.attackDamage = Random.Range(atkLo, atkHi);
                     r.attackSpeed = Random.Range(1.0f, 1.3f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
-                        hpLo, hpHi - 1, atkLo, atkHi - 1, 10, 20);
+                        hpLo, hpHi - 1, atkLo, atkHi - 1,
+                        RecruitInstance.PeasantHireFloor, RecruitInstance.PeasantHireCeil);
                     break;
                 }
             }
+
+            // Hard clamp rolled base into band (defensive).
+            r.baseHireCost = Mathf.Max(r.baseHireCost, RecruitInstance.HireFloorFor(type));
+            if (type == UnitType.Peasant)
+                r.baseHireCost = Mathf.Clamp(r.baseHireCost, RecruitInstance.PeasantHireFloor, RecruitInstance.PeasantHireCeil);
 
             r.primaryTrait = RollPrimaryTrait();
             r.hatedTrait = RollSecondaryTrait(r.primaryTrait);
