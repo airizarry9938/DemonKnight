@@ -35,16 +35,32 @@ namespace ArthurianAutobattler
 
         public List<RecruitInstance> GenerateNewRunTown()
         {
-            // Persistent pew seats 0–51: knights 0–11, warriors 12–26, peasants 27–51.
+            // Persistent unitIDs for grudge memory; pew seats are shuffled each run.
             List<RecruitInstance> townList = new List<RecruitInstance>();
             for (int i = 0; i < 12; i++) townList.Add(CreateRandomRecruit($"knight_{i}", UnitType.Knight, knightAvatars, i));
             for (int i = 0; i < 15; i++) townList.Add(CreateRandomRecruit($"warrior_{i}", UnitType.Warrior, warriorAvatars, 12 + i));
             for (int i = 0; i < 25; i++) townList.Add(CreateRandomRecruit($"peasant_{i}", UnitType.Peasant, peasantAvatars, 27 + i));
 
-            // Visual shuffle of display order is handled by pew index sort in Church UI.
-            // Keep unitID/pewSeatIndex stable; only cosmetic traits re-rolled above.
+            ShufflePewSeats(townList);
             townList.Sort((a, b) => a.pewSeatIndex.CompareTo(b.pewSeatIndex));
             return townList;
+        }
+
+        /// <summary>Assign seats 0–51 in a fresh random order every run.</summary>
+        private static void ShufflePewSeats(List<RecruitInstance> townList)
+        {
+            int n = townList.Count;
+            var seats = new int[n];
+            for (int i = 0; i < n; i++) seats[i] = i;
+
+            for (int i = n - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (seats[i], seats[j]) = (seats[j], seats[i]);
+            }
+
+            for (int i = 0; i < n; i++)
+                townList[i].pewSeatIndex = seats[i];
         }
 
         private RecruitInstance CreateRandomRecruit(string persistentID, UnitType type, List<Sprite> pool, int pewSeat)
