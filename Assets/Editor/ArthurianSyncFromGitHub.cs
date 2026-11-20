@@ -23,7 +23,7 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrMain = "https://cdn.jsdelivr.net/gh/" + Repo + "@main/";
 
     // Marker that must appear in DemonKnightPackageVersion.cs after a good sync.
-    private const string ExpectedPackageId = "cs1061-compat-api";
+    private const string ExpectedPackageId = "hud-preserve-authored";
 
     // Every runtime script the church/pew package needs (relative to repo root).
     private static readonly string[] ScriptPaths =

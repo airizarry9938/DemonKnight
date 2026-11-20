@@ -24,6 +24,10 @@ namespace ArthurianAutobattler
         public Button buyRoundButton;
         public Button menuButton;
 
+        [Header("HUD Layout")]
+        [Tooltip("Off (default): Play keeps editor-authored HUD_Bar / button RectTransforms. On: legacy equal-slot auto layout overwrites positions.")]
+        public bool forceEqualHudSlots = false;
+
         [Header("Church Stage")]
         public Image churchBackgroundImage;
         public SomersetPewLayout pewLayout;
@@ -803,13 +807,14 @@ namespace ArthurianAutobattler
             if (tavernDiceButton == null) return;
 
             // Keep under HUD_Bar if something reparented it into the modal.
+            // worldPositionStays=true so editor placement is not zeroed by SetParent.
             Transform hud = FindHudBar();
             if (hud != null && tavernDiceButton.transform.parent != hud)
             {
                 if (diceModal != null && tavernDiceButton.transform.IsChildOf(diceModal.transform))
-                    tavernDiceButton.transform.SetParent(hud, false);
+                    tavernDiceButton.transform.SetParent(hud, true);
                 else if (!IsUnderHudBar(tavernDiceButton.transform))
-                    tavernDiceButton.transform.SetParent(hud, false);
+                    tavernDiceButton.transform.SetParent(hud, true);
             }
 
             if (!tavernDiceButton.gameObject.activeSelf)
@@ -1039,8 +1044,9 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Stretch HUD full-width and place Night | Timer | Gold | Dice | Codex |
-        /// Warband | March in equal slots across the bar (no overlap).
+        /// Wire HUD controls for Play. By default preserves editor-authored RectTransforms
+        /// (Andrew can move HUD icons in the Inspector and Play keeps them).
+        /// Set <see cref="forceEqualHudSlots"/> to restore the legacy equal-slot strip.
         /// </summary>
         public void EnsureTopHubLayout()
         {
@@ -1062,9 +1068,7 @@ namespace ArthurianAutobattler
             RewireMarchButton();
             EnsureMenuHudButton(hud);
 
-            StretchHudBar(hud as RectTransform);
-
-            // Kill prior layout groups — uneven flexible widths caused visual bunching.
+            // Kill auto layout groups so they cannot fight authored positions.
             var oldLayout = hud.GetComponent<HorizontalLayoutGroup>();
             if (oldLayout != null) Object.Destroy(oldLayout);
             var fitter = hud.GetComponent<ContentSizeFitter>();
@@ -1075,7 +1079,7 @@ namespace ArthurianAutobattler
                 var existing = hud.Find("NightText");
                 if (existing != null) nightText = existing.GetComponent<TextMeshProUGUI>();
             }
-            if (nightText == null)
+            if (nightText == null && forceEqualHudSlots)
                 nightText = CreateHudLabel(hud, "NightText", "Night 1", Vector2.zero, new Vector2(110f, 40f), 24);
 
             if (timerText == null)
@@ -1092,7 +1096,6 @@ namespace ArthurianAutobattler
             Button codex = ResolveCodexButton(hud);
             if (codexButton == null) codexButton = codex;
 
-            // Dice HUD slot is mandatory in the equal-width row.
             ResolveDiceHudButton();
             if (tavernDiceButton == null)
             {
@@ -1101,9 +1104,8 @@ namespace ArthurianAutobattler
             }
             EnsureDiceHudButtonVisible();
 
-            RectTransform warbandRt = ResolveWarbandInfo(hud);
+            ResolveWarbandInfo(hud);
             RewireMarchButton();
-            Button march = goToWarButton;
 
             var party = hud.Find("PartyText");
             if (party != null && warbandButton != null && party != warbandButton.transform)
@@ -1111,12 +1113,33 @@ namespace ArthurianAutobattler
 
             EnsureMenuHudButton(hud);
 
-            // Equal-width strip left → right. Menu (Esc) last.
+            // Labels only — do not move RectTransforms unless legacy equal-slot mode is on.
+            ApplyHudButtonLabel(tavernDiceButton, "Dice");
+            ApplyHudButtonLabel(codexButton, "Legends");
+            ApplyHudButtonLabel(goToWarButton, "MARCH TO WAR");
+
+            if (!forceEqualHudSlots)
+            {
+                Debug.Log("[DemonKnight] HUD layout preserved (editor RectTransforms). Codex label=Legends.");
+                return;
+            }
+
+            ApplyLegacyEqualHudSlots(hud, codex);
+        }
+
+        /// <summary>Legacy: stretch bar + equal-width Night|Timer|Gold|Dice|Legends|Warband|March|Esc.</summary>
+        private void ApplyLegacyEqualHudSlots(Transform hud, Button codex)
+        {
+            StretchHudBar(hud as RectTransform);
+
+            RectTransform warbandRt = ResolveWarbandInfo(hud);
+            Button march = goToWarButton;
+
             var slots = new List<RectTransform>(9);
             if (nightText != null) slots.Add(nightText.rectTransform);
             if (timerText != null) slots.Add(timerText.rectTransform);
             if (goldText != null) slots.Add(goldText.rectTransform);
-            slots.Add(tavernDiceButton.transform as RectTransform);
+            if (tavernDiceButton != null) slots.Add(tavernDiceButton.transform as RectTransform);
             if (codex != null) slots.Add(codex.transform as RectTransform);
             if (warbandRt != null) slots.Add(warbandRt);
             if (march != null) slots.Add(march.transform as RectTransform);
@@ -1152,7 +1175,6 @@ namespace ArthurianAutobattler
                 float x = startX + i * (slotW + gap);
                 SetHudRect(rt, new Vector2(x, 0f), new Vector2(slotW, height));
 
-                // Larger HUD type — auto-size within equal slots.
                 var tmp = rt.GetComponent<TextMeshProUGUI>()
                           ?? rt.GetComponentInChildren<TextMeshProUGUI>();
                 if (tmp != null)
@@ -1166,7 +1188,6 @@ namespace ArthurianAutobattler
                 }
             }
 
-            // Orphans under HUD stay out of the way — never deactivate DiceButton.
             for (int i = 0; i < hud.childCount; i++)
             {
                 var child = hud.GetChild(i) as RectTransform;
@@ -1177,6 +1198,7 @@ namespace ArthurianAutobattler
 
             EnsureDiceHudButtonVisible();
             ApplyHudButtonLabel(tavernDiceButton, "Dice");
+            ApplyHudButtonLabel(codexButton, "Legends");
         }
 
         private static void StretchHudBar(RectTransform hudRt)
