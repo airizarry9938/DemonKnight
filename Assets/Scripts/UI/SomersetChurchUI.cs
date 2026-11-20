@@ -71,6 +71,8 @@ namespace ArthurianAutobattler
         private float nextDicePanelRescan;
         private bool diceToggleWireLogged;
         private bool warbandToggleWireLogged;
+        /// <summary>Re-entrancy lock — Town + Church used to both fire Hire on one click.</summary>
+        private bool hireInProgress;
 
         private void Awake()
         {
@@ -129,6 +131,7 @@ namespace ArthurianAutobattler
             RewireWarbandToggleButton();
             RewireLegendsToggleButton();
             RewireMarchButton();
+            RewireDossierActionButtons();
             if (!diceModalUserOpen)
             {
                 ForceNamedTavernDicePanelsInactive();
@@ -139,6 +142,7 @@ namespace ArthurianAutobattler
             RewireWarbandToggleButton();
             RewireLegendsToggleButton();
             RewireMarchButton();
+            RewireDossierActionButtons();
             if (!diceModalUserOpen)
             {
                 ForceNamedTavernDicePanelsInactive();
@@ -216,20 +220,64 @@ namespace ArthurianAutobattler
             RewireMarchButton();
             // Dice / Warband / Legends are wired in Rewire*ToggleButton (toggle open/close).
             RewireLegendsToggleButton();
-            buyRoundButton?.onClick.AddListener(BuyTavernRound);
-
-            tier1Button?.onClick.AddListener(() => UnlockIntel(1));
-            tier2Button?.onClick.AddListener(() => UnlockIntel(2));
-            tier3Button?.onClick.AddListener(() => UnlockIntel(3));
-            trainTankButton?.onClick.AddListener(() => Train(CombatRole.FrontlineTank));
-            trainRangedButton?.onClick.AddListener(() => Train(CombatRole.BacklineRanged));
-            mediateButton?.onClick.AddListener(Mediate);
-            hireButton?.onClick.AddListener(HireSelected);
+            // Dossier actions share TownSplit buttons — replace events so Town + Inspector
+            // cannot stack a second Hire/Train listener (double gold / double party add).
+            RewireDossierActionButtons();
 
             if (modalCloseButtons != null)
             {
                 foreach (var b in modalCloseButtons)
                     b?.onClick.AddListener(CloseFloatingModals);
+            }
+        }
+
+        /// <summary>
+        /// Single owner for Recruit / Train / Mediate / Intel / Tavern Round.
+        /// Replaces ButtonClickedEvent (RemoveAllListeners leaves Inspector persistent).
+        /// </summary>
+        public void RewireDossierActionButtons()
+        {
+            AutoWireDossierFromTownUI();
+
+            if (buyRoundButton != null)
+            {
+                buyRoundButton.onClick = new Button.ButtonClickedEvent();
+                buyRoundButton.onClick.AddListener(BuyTavernRound);
+            }
+            if (tier1Button != null)
+            {
+                tier1Button.onClick = new Button.ButtonClickedEvent();
+                tier1Button.onClick.AddListener(() => UnlockIntel(1));
+            }
+            if (tier2Button != null)
+            {
+                tier2Button.onClick = new Button.ButtonClickedEvent();
+                tier2Button.onClick.AddListener(() => UnlockIntel(2));
+            }
+            if (tier3Button != null)
+            {
+                tier3Button.onClick = new Button.ButtonClickedEvent();
+                tier3Button.onClick.AddListener(() => UnlockIntel(3));
+            }
+            if (trainTankButton != null)
+            {
+                trainTankButton.onClick = new Button.ButtonClickedEvent();
+                trainTankButton.onClick.AddListener(() => Train(CombatRole.FrontlineTank));
+            }
+            if (trainRangedButton != null)
+            {
+                trainRangedButton.onClick = new Button.ButtonClickedEvent();
+                trainRangedButton.onClick.AddListener(() => Train(CombatRole.BacklineRanged));
+            }
+            if (mediateButton != null)
+            {
+                mediateButton.onClick = new Button.ButtonClickedEvent();
+                mediateButton.onClick.AddListener(Mediate);
+            }
+            if (hireButton != null)
+            {
+                hireButton.onClick = new Button.ButtonClickedEvent();
+                hireButton.onClick.AddListener(HireSelected);
             }
         }
 
@@ -1859,38 +1907,73 @@ namespace ArthurianAutobattler
             RefreshHUD();
         }
 
-        private void HireSelected()
+        /// <summary>One click → one hire / one payment. Idempotent if already in party.</summary>
+        public void HireSelected()
         {
-            if (selected == null || Town == null || GameLoopManager.Instance == null) return;
+            if (hireInProgress) return;
+            if (Town == null || GameLoopManager.Instance == null) return;
+            if (selected == null)
+            {
+                // Town may own selection if pew click routed there first.
+                selected = Town.PeekSelectedRecruit();
+            }
+            if (selected == null) return;
+
+            var party = GameLoopManager.Instance.recruitedParty;
+            if (party == null)
+            {
+                party = new List<RecruitInstance>();
+                GameLoopManager.Instance.recruitedParty = party;
+            }
+
+            // Already hired this run-wave (double listener / double click).
+            if (party.Contains(selected)
+                || (!string.IsNullOrEmpty(selected.unitID)
+                    && party.Exists(m => m != null && m.unitID == selected.unitID)))
+            {
+                Debug.Log("[DemonKnight] Hire ignored — already in warband.");
+                return;
+            }
+
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selected.unitID) : 0;
             int discount = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
             int cost = selected.GetFinalHireCost(grudge, discount);
             if (Town.playerGold < cost) return;
-            if (!PartySynergyEvaluator.CanJoinParty(selected, GameLoopManager.Instance.recruitedParty, out string reason))
+            if (!PartySynergyEvaluator.CanJoinParty(selected, party, out string reason))
             {
                 if (dossierDialogue != null) dossierDialogue.text = $"<color=red>{reason}</color>";
                 return;
             }
 
-            if (selected.assignedRole == CombatRole.Unassigned)
-                selected.assignedRole = selected.unitType == UnitType.Peasant
-                    ? CombatRole.BacklineRanged : CombatRole.FrontlineTank;
+            hireInProgress = true;
+            try
+            {
+                if (selected.assignedRole == CombatRole.Unassigned)
+                    selected.assignedRole = selected.unitType == UnitType.Peasant
+                        ? CombatRole.BacklineRanged : CombatRole.FrontlineTank;
 
-            Town.playerGold -= cost;
-            // Recruited members always keep full stats visible (in warband and if they die back to pews).
-            selected.intelTierUnlocked = Mathf.Max(selected.intelTierUnlocked, 3);
-            GrudgeSaveManager.Instance?.RememberIntel(selected.unitID, selected.intelTierUnlocked);
-            GameLoopManager.Instance.recruitedParty.Add(selected);
-            GameLoopManager.Instance.currentTownPool.Remove(selected);
-            DemonKnightCompatApi.AutosaveWarband(GameLoopManager.Instance, Town.playerGold);
-            PopulatePews(GameLoopManager.Instance.currentTownPool);
-            CloseAllModals();
-            RefreshHUD();
-            UpdateWarbandHudLabel();
-            if (warbandModal != null && warbandModal.activeSelf)
-                RefreshWarbandPanel();
+                Town.playerGold -= cost;
+                // Recruited members always keep full stats visible (warband + pew return).
+                selected.intelTierUnlocked = Mathf.Max(selected.intelTierUnlocked, 3);
+                GrudgeSaveManager.Instance?.RememberIntel(selected.unitID, selected.intelTierUnlocked);
+                party.Add(selected);
+                GameLoopManager.Instance.currentTownPool?.Remove(selected);
+                Town.NotifyHiredFromChurch(selected);
+                DemonKnightCompatApi.AutosaveWarband(GameLoopManager.Instance, Town.playerGold);
+                PopulatePews(GameLoopManager.Instance.currentTownPool);
+                CloseAllModals();
+                RefreshHUD();
+                UpdateWarbandHudLabel();
+                if (warbandModal != null && warbandModal.activeSelf)
+                    RefreshWarbandPanel();
+                Debug.Log($"[DemonKnight] Hired {selected.characterName} for {cost}g (party={party.Count}).");
+            }
+            finally
+            {
+                hireInProgress = false;
+            }
         }
 
         private void BuyTavernRound()

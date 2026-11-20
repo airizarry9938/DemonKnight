@@ -307,7 +307,30 @@ namespace ArthurianAutobattler
 
         public void AttemptHireSelected()
         {
-            if (selectedRecruit == null) return;
+            // Prefer single church path (one click = one hire / one payment).
+            var church = FindFirstObjectByType<SomersetChurchUI>()
+                         ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
+            if (church != null)
+            {
+                church.HireSelected();
+                return;
+            }
+
+            if (selectedRecruit == null || GameLoopManager.Instance == null) return;
+
+            var party = GameLoopManager.Instance.recruitedParty;
+            if (party == null)
+            {
+                party = new List<RecruitInstance>();
+                GameLoopManager.Instance.recruitedParty = party;
+            }
+            if (party.Contains(selectedRecruit)
+                || (!string.IsNullOrEmpty(selectedRecruit.unitID)
+                    && party.Exists(m => m != null && m.unitID == selectedRecruit.unitID)))
+            {
+                Debug.Log("[DemonKnight] Town hire ignored — already in warband.");
+                return;
+            }
 
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
@@ -319,13 +342,15 @@ namespace ArthurianAutobattler
 
             if (playerGold < finalCost)
             {
-                characterDialogueText.text = "<color=red>Your purse is too light.</color>";
+                if (characterDialogueText != null)
+                    characterDialogueText.text = "<color=red>Your purse is too light.</color>";
                 return;
             }
 
-            if (!PartySynergyEvaluator.CanJoinParty(selectedRecruit, GameLoopManager.Instance.recruitedParty, out string refusal))
+            if (!PartySynergyEvaluator.CanJoinParty(selectedRecruit, party, out string refusal))
             {
-                characterDialogueText.text = $"<color=red>{refusal}</color>";
+                if (characterDialogueText != null)
+                    characterDialogueText.text = $"<color=red>{refusal}</color>";
                 return;
             }
 
@@ -337,18 +362,17 @@ namespace ArthurianAutobattler
             }
 
             playerGold -= finalCost;
-            // Recruited members always keep full stats visible.
             selectedRecruit.intelTierUnlocked = Mathf.Max(selectedRecruit.intelTierUnlocked, 3);
             GrudgeSaveManager.Instance?.RememberIntel(selectedRecruit.unitID, selectedRecruit.intelTierUnlocked);
-            GameLoopManager.Instance.recruitedParty.Add(selectedRecruit);
+            party.Add(selectedRecruit);
             activeTownPool.Remove(selectedRecruit);
-            if (GameLoopManager.Instance.currentTownPool != null)
-                GameLoopManager.Instance.currentTownPool.Remove(selectedRecruit);
+            GameLoopManager.Instance.currentTownPool?.Remove(selectedRecruit);
             DemonKnightCompatApi.AutosaveWarband(GameLoopManager.Instance, playerGold);
-            Destroy(selectedButtonObj);
+            if (selectedButtonObj != null) Destroy(selectedButtonObj);
             UpdateHUD();
             ClearBottomDossier();
-            characterDialogueText.text = "<color=green>Agreed. I will march with your warband.</color>";
+            if (characterDialogueText != null)
+                characterDialogueText.text = "<color=green>Agreed. I will march with your warband.</color>";
         }
 
         public void TrainSelectedRole(CombatRole role)
@@ -432,6 +456,20 @@ namespace ArthurianAutobattler
             if (mediateRivalryButton != null) mediateRivalryButton.interactable = false;
         }
 
+        /// <summary>Church HireSelected reads selection when pew click landed here first.</summary>
+        public RecruitInstance PeekSelectedRecruit() => selectedRecruit;
+
+        /// <summary>Church completed a hire — drop town-side selection / pool ref.</summary>
+        public void NotifyHiredFromChurch(RecruitInstance hired)
+        {
+            if (hired != null)
+                activeTownPool.Remove(hired);
+            if (selectedRecruit == hired || (hired != null && selectedRecruit != null
+                                             && selectedRecruit.unitID == hired.unitID))
+                ClearBottomDossier();
+            UpdateHUD();
+        }
+
         private void SetupButtons()
         {
             // Prefer church RewireMarchButton (clears persistent Inspector listeners).
@@ -445,14 +483,24 @@ namespace ArthurianAutobattler
                 goToWarButton.onClick.AddListener(() =>
                     DemonKnightCompatApi.ResolveLoop()?.StartBattlePhase());
             }
-            tier1RevealButton?.onClick.AddListener(() => UnlockIntelTier(1));
-            tier2RevealButton?.onClick.AddListener(() => UnlockIntelTier(2));
-            tier3RevealButton?.onClick.AddListener(() => UnlockIntelTier(3));
-            hireRecruitButton?.onClick.AddListener(AttemptHireSelected);
-            trainTankButton?.onClick.AddListener(() => TrainSelectedRole(CombatRole.FrontlineTank));
-            trainRangedButton?.onClick.AddListener(() => TrainSelectedRole(CombatRole.BacklineRanged));
-            mediateRivalryButton?.onClick.AddListener(MediateSelectedRecruit);
-            tavernRoundButton?.onClick.AddListener(BuyTavernRound);
+
+            // Church owns dossier Hire/Train/Mediate/Intel/Tavern — avoid double-fire (2× gold).
+            if (church != null)
+            {
+                DemonKnightCompatApi.ChurchRewireDossierActions(church);
+                // Dice still owned here when no church wire; church hides panels.
+            }
+            else
+            {
+                tier1RevealButton?.onClick.AddListener(() => UnlockIntelTier(1));
+                tier2RevealButton?.onClick.AddListener(() => UnlockIntelTier(2));
+                tier3RevealButton?.onClick.AddListener(() => UnlockIntelTier(3));
+                hireRecruitButton?.onClick.AddListener(AttemptHireSelected);
+                trainTankButton?.onClick.AddListener(() => TrainSelectedRole(CombatRole.FrontlineTank));
+                trainRangedButton?.onClick.AddListener(() => TrainSelectedRole(CombatRole.BacklineRanged));
+                mediateRivalryButton?.onClick.AddListener(MediateSelectedRecruit);
+                tavernRoundButton?.onClick.AddListener(BuyTavernRound);
+            }
 
             startDiceButton?.onClick.AddListener(() =>
             {

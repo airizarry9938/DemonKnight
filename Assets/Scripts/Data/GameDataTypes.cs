@@ -53,6 +53,15 @@ namespace ArthurianAutobattler
         public Sprite moodOverlaySprite;
         public bool isSirenEnchantress = false;
 
+        /// <summary>
+        /// Pre-fusion ingredient snapshots (deep). Wave-end disband expands these back
+        /// into pew seats so fused Legends never occupy seats or block return.
+        /// </summary>
+        public List<RecruitInstance> fusionIngredients;
+
+        public bool IsFusedLegend =>
+            fusionIngredients != null && fusionIngredients.Count > 0;
+
         public int GetFinalHireCost(int grudgePenalty, int globalDiscount = 0)
         {
             int effectiveGrudge = grudgePenalty;

@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "hud-esc-legends-warband-pace";
-    public const string GitHint = "menu-far-left-esc-toggle-legends-warband-slow-combat";
-    public const string BuiltUtc = "2026-11-20T15:20:00Z";
+    public const string Id = "hire-once-unfuse-disband";
+    public const string GitHint = "double-hire-fix-wave-unfuse-winloss-hire";
+    public const string BuiltUtc = "2026-11-20T15:45:00Z";
 }
 #endif
