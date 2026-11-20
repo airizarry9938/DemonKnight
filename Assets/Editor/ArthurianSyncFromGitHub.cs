@@ -20,10 +20,10 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "572155d";
+    // Floor: tip of main after #22 (CS0136 + BattleBossDialogUI on ScriptPaths). Prefer ResolveMainSha after merge.
+    private const string FallbackCommitSha = "d4c45c9";
 
-    private const string ExpectedPackageId = "fix-boss-dialog-cs0136";
+    private const string ExpectedPackageId = "harden-sync-boss-dialog-always";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -37,6 +37,18 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
+        // Compile-critical: never leave a delete gap that causes CS0103 mid-sync.
+        "Assets/Scripts/Combat/BattleBossDialogUI.cs",
+    };
+
+    /// <summary>
+    /// Hardcoded paths that MUST land even when an older in-memory ScriptPaths array
+    /// (first Sync after package add) never iterated them. Pre + post Sync ensure.
+    /// </summary>
+    private static readonly string[] MustAlwaysLandScripts =
+    {
+        "Assets/Scripts/Combat/BattleBossDialogUI.cs",
+        "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
     };
 
     private static readonly string[] ScriptPaths =
@@ -46,12 +58,13 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
+        // Boss dialog BEFORE AutoBattlerEngine so CS0103 cannot appear mid-list.
+        "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
         "Assets/Scripts/Combat/AutoBattlerEngine.cs",
         "Assets/Scripts/Combat/BattlefieldVisualizer.cs",
-        "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         "Assets/Scripts/Combat/DemonHordeGenerator.cs",
         "Assets/Scripts/Combat/FloatingCombatText.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
@@ -110,6 +123,7 @@ public static class ArthurianSyncFromGitHub
                 "Download and REPLACE all DemonKnight scripts from GitHub?\n\n" +
                 "• Uses commit-pinned jsDelivr (never stale @main)\n" +
                 "• Deletes each .cs then rewrites (Windows-safe)\n" +
+                "• Always lands BattleBossDialogUI.cs (MustAlwaysLand)\n" +
                 "• Does NOT touch scenes or art\n" +
                 "• Diagnose must show: " + ExpectedPackageId,
                 "Sync Now", "Cancel"))
@@ -123,8 +137,8 @@ public static class ArthurianSyncFromGitHub
     {
         if (!EditorUtility.DisplayDialog(
                 "DemonKnight FORCE Sync",
-                "DELETE listed DemonKnight .cs (except Editor menu hosts), then re-download from a pinned GitHub commit.\n\n" +
-                "Menu hosts (Sync / Bootstrap / Diagnose / PackageVersion) are NEVER bulk-deleted — they are replaced in place.\n" +
+                "DELETE listed DemonKnight .cs (except Editor menu hosts + BattleBossDialogUI), then re-download from a pinned GitHub commit.\n\n" +
+                "Menu hosts (Sync / Bootstrap / Diagnose / PackageVersion) and BattleBossDialogUI are NEVER bulk-deleted — they are replaced in place.\n" +
                 "Scenes/art are NOT deleted.\nDiagnose → " + ExpectedPackageId,
                 "Delete + Sync", "Cancel"))
             return;
@@ -133,20 +147,21 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// Chicken-egg fix: overwrite Sync + MenuBootstrap + PackageVersion + CompatApi from a pinned
-    /// commit without requiring ExpectedPackageId to already match.
+    /// Chicken-egg fix: overwrite Sync + MenuBootstrap + PackageVersion + CompatApi + boss dialog
+    /// from a pinned commit without requiring ExpectedPackageId to already match.
     /// </summary>
     [MenuItem("Arthurian/Bootstrap CompatApi + Sync Tools (pinned)", false, 2)]
     public static void BootstrapCompatAndSyncTools()
     {
         if (!EditorUtility.DisplayDialog(
                 "DemonKnight Bootstrap",
-                "Overwrite Sync menu hosts + CompatApi from pinned commit " + FallbackCommitSha + " (or tip of main):\n\n" +
+                "Overwrite Sync menu hosts + CompatApi + BattleBossDialogUI from pinned commit " + FallbackCommitSha + " (or tip of main):\n\n" +
                 "• ArthurianSyncFromGitHub.cs (Bootstrap / Force Delete+Sync menus)\n" +
                 "• ArthurianMenuBootstrap.cs (Diagnose menu)\n" +
                 "• DemonKnightPackageVersion.cs\n" +
-                "• DemonKnightCompatApi.cs\n\n" +
-                "Use when menus are missing OR Diagnose shows cs1061-compat-api.",
+                "• DemonKnightCompatApi.cs\n" +
+                "• BattleBossDialogUI.cs (CS0103 guard)\n\n" +
+                "Use when menus are missing OR Diagnose shows cs1061-compat-api / CS0103 BattleBossDialogUI.",
                 "Bootstrap Now", "Cancel"))
             return;
 
@@ -159,6 +174,7 @@ public static class ArthurianSyncFromGitHub
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
+            "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         };
 
         var errors = new List<string>();
@@ -202,6 +218,47 @@ public static class ArthurianSyncFromGitHub
     [MenuItem("Arthurian/Force Re-Sync Night/HUD Fix", false, 3)]
     public static void ForceResyncNightFix() => ForceDeleteSyncAll();
 
+    /// <summary>
+    /// One-shot: always download BattleBossDialogUI.cs (CS0103 fix) without full Sync.
+    /// </summary>
+    [MenuItem("Arthurian/Force Download BattleBossDialogUI.cs", false, 4)]
+    public static void ForceDownloadBattleBossDialogUI()
+    {
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        string sha = ResolveMainSha() ?? FallbackCommitSha;
+        string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        const string rel = "Assets/Scripts/Combat/BattleBossDialogUI.cs";
+        try
+        {
+            EditorUtility.DisplayProgressBar("DemonKnight", "Downloading " + rel, 0.5f);
+            string body = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
+            if (!body.Contains("ShowForBoss") || !body.Contains("IsBlockingCombat"))
+                throw new Exception("body failed BattleBossDialogUI sanity check");
+            string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+            WriteReplacing(dest, body, deleteFirst: false);
+            VerifyOnDisk(rel, dest);
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog(
+                "DemonKnight",
+                $"Wrote {rel}\nvia {source} @ {sha}\n\nWait for compile — CS0103 BattleBossDialogUI should clear.",
+                "OK");
+            Debug.Log($"[DemonKnight] Force-downloaded {rel} via {source} @ {sha}");
+        }
+        catch (Exception ex)
+        {
+            EditorUtility.DisplayDialog(
+                "DemonKnight — download failed",
+                rel + ":\n" + ex.Message + "\n\nManual Save-As:\n"
+                + JsDelivrBase + sha + "/" + rel,
+                "OK");
+            Debug.LogError($"[DemonKnight] Force download FAILED {rel}: {ex.Message}");
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+    }
+
     public static void RunSync(bool showDialog, bool deleteFirst = true, bool preDeleteAll = false)
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
@@ -219,11 +276,14 @@ public static class ArthurianSyncFromGitHub
                 EditorUtility.DisplayProgressBar("DemonKnight Sync", "Deleting local script copies…", 0f);
                 foreach (string rel in ScriptPaths)
                 {
-                    // NEVER wipe menu hosts first — that is what made Bootstrap/Force Sync disappear.
+                    // NEVER wipe menu hosts / compile-critical first.
                     if (NeverBulkDeleteEditorMenus.Contains(rel)) continue;
                     TryDeleteFile(Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar)));
                 }
             }
+
+            // Pre-pass: land MustAlwaysLand even if this Sync binary's ScriptPaths is stale.
+            EnsureMustAlwaysLandScripts(projectRoot, sha, errors, okFiles, label: "pre");
 
             for (int i = 0; i < ScriptPaths.Length; i++)
             {
@@ -234,11 +294,11 @@ public static class ArthurianSyncFromGitHub
                 {
                     string text = DownloadPinned(rel, sha, out string source, relaxPackageId: false);
                     ValidateCritical(rel, text);
-                    // Menu hosts: in-place replace only (no delete-first gap).
-                    bool protectMenu = NeverBulkDeleteEditorMenus.Contains(rel);
-                    WriteReplacing(dest, text, deleteFirst: deleteFirst && !protectMenu);
+                    // Protected paths: in-place replace only (no delete-first gap).
+                    bool protect = NeverBulkDeleteEditorMenus.Contains(rel);
+                    WriteReplacing(dest, text, deleteFirst: deleteFirst && !protect);
                     VerifyOnDisk(rel, dest);
-                    okFiles.Add(rel);
+                    if (!okFiles.Contains(rel)) okFiles.Add(rel);
                     Debug.Log($"[DemonKnight] Synced {rel} via {source}");
                 }
                 catch (Exception ex)
@@ -250,6 +310,8 @@ public static class ArthurianSyncFromGitHub
 
             // If a mid-pass failure still left a menu host missing, restore it now.
             EnsureEditorMenuHostsPresent(projectRoot, sha, errors, okFiles);
+            // Post-pass: guarantee BattleBossDialogUI on disk after every Sync.
+            EnsureMustAlwaysLandScripts(projectRoot, sha, errors, okFiles, label: "post");
         }
         finally
         {
@@ -265,6 +327,15 @@ public static class ArthurianSyncFromGitHub
             if (!okFiles.Contains(rel))
                 missingCritical.Add(rel);
         }
+        // Hard fail if boss dialog still missing on disk after MustAlwaysLand.
+        string bossDialogDest = Path.Combine(
+            projectRoot,
+            "Assets/Scripts/Combat/BattleBossDialogUI.cs".Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(bossDialogDest))
+        {
+            if (!missingCritical.Contains("Assets/Scripts/Combat/BattleBossDialogUI.cs"))
+                missingCritical.Add("Assets/Scripts/Combat/BattleBossDialogUI.cs");
+        }
 
         string msg = $"Synced {okFiles.Count}/{ScriptPaths.Length} files @ {sha}.";
         if (errors.Count > 0)
@@ -273,11 +344,14 @@ public static class ArthurianSyncFromGitHub
         {
             msg += "\n\nINCOMPLETE — critical files missing:\n" + string.Join("\n", missingCritical)
                    + "\n\nTry: Arthurian → Bootstrap CompatApi + Sync Tools, then Force Delete+Sync again.\n"
-                   + "Or overwrite from jsDelivr @" + sha + " (see README).";
+                   + "Or: Arthurian → Force Download BattleBossDialogUI.cs\n"
+                   + "Or Save-As from jsDelivr @" + sha + ":\n"
+                   + JsDelivrBase + sha + "/Assets/Scripts/Combat/BattleBossDialogUI.cs";
         }
         else
         {
             msg += $"\n\nWait for compile. Diagnose must show `{ExpectedPackageId}`.\n"
+                   + "BattleBossDialogUI.cs on disk: YES.\n"
                    + "Arthurian menus kept: Bootstrap / Force Delete+Sync / Diagnose.\n"
                    + "Do NOT rebuild the scene.";
         }
@@ -361,6 +435,9 @@ public static class ArthurianSyncFromGitHub
     {
         foreach (string rel in NeverBulkDeleteEditorMenus)
         {
+            // BattleBossDialogUI is handled by EnsureMustAlwaysLandScripts (always rewrite).
+            if (rel.EndsWith("BattleBossDialogUI.cs", StringComparison.OrdinalIgnoreCase))
+                continue;
             string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
             if (File.Exists(dest) && okFiles.Contains(rel)) continue;
             try
@@ -375,6 +452,54 @@ public static class ArthurianSyncFromGitHub
             {
                 errors.Add($"{rel} (menu restore): {ex.Message}");
                 Debug.LogError($"[DemonKnight] Could not restore menu host {rel}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Always (re)download MustAlwaysLand scripts. Covers the chicken-egg where the first
+    /// Sync after adding a path still iterates the OLD in-memory ScriptPaths array.
+    /// </summary>
+    private static void EnsureMustAlwaysLandScripts(
+        string projectRoot,
+        string sha,
+        List<string> errors,
+        List<string> okFiles,
+        string label)
+    {
+        foreach (string rel in MustAlwaysLandScripts)
+        {
+            string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+            // Skip rewrite only when already ok AND file exists with valid body.
+            if (okFiles.Contains(rel) && File.Exists(dest))
+            {
+                try
+                {
+                    string disk = File.ReadAllText(dest);
+                    if (PassesCriticalCheck(rel, disk, relaxPackageId: true))
+                        continue;
+                }
+                catch { /* fall through to re-download */ }
+            }
+
+            try
+            {
+                string text = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
+                ValidateCritical(rel, text);
+                WriteReplacing(dest, text, deleteFirst: false);
+                VerifyOnDisk(rel, dest);
+                if (!okFiles.Contains(rel)) okFiles.Add(rel);
+                // Clear a prior failure for this rel if MustAlwaysLand succeeded.
+                errors.RemoveAll(e => e.StartsWith(rel + ":", StringComparison.OrdinalIgnoreCase)
+                                      || e.StartsWith(rel + " (", StringComparison.OrdinalIgnoreCase));
+                Debug.LogWarning($"[DemonKnight] MustAlwaysLand ({label}) {rel} via {source} @ {sha}");
+            }
+            catch (Exception ex)
+            {
+                string entry = $"{rel} (MustAlwaysLand {label}): {ex.Message}";
+                if (!errors.Exists(e => e.StartsWith(rel, StringComparison.OrdinalIgnoreCase)))
+                    errors.Add(entry);
+                Debug.LogError($"[DemonKnight] MustAlwaysLand FAILED {rel}: {ex.Message}");
             }
         }
     }
@@ -465,6 +590,8 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
         {
+            // ShowBossDialog / IsBossDialogBlocking land with this package; do not require
+            // them yet so Sync can roll forward from an older main tip mid-PR.
             return body.Contains("ResolveLoop")
                    && body.Contains("AutosaveWarband")
                    && body.Contains("ChurchRewireMarch")
@@ -486,10 +613,11 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("AutoBattlerEngine.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // Must reference BattleBossDialogUI (CS0103 if that file is missing from Sync).
+            // Soft-bridge via CompatApi (no hard BattleBossDialogUI type → no CS0103).
+            // waveBoss = CS0136 fix (no shadowed local `boss`).
             return body.Contains("DemonKnightCompatApi")
-                   && body.Contains("BattleBossDialogUI")
-                   && body.Contains("waveBoss"); // CS0136 fix: no shadowed local `boss`
+                   && body.Contains("waveBoss")
+                   && (body.Contains("ShowBossDialog") || body.Contains("BattleBossDialogUI"));
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase)
@@ -519,6 +647,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("harden-sync-boss-dialog-always")
                    || body.Contains("fix-boss-dialog-cs0136")
                    || body.Contains("balance-v2-arthurian-expansion")
                    || body.Contains("autobattle-boss-dialog-video-bg")
@@ -545,8 +674,9 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("DownloadPinned") || body.Contains("BootstrapCompatAndSyncTools")
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
-            // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
+            // Must keep NeverBulkDelete + MustAlwaysLand so Force Sync cannot wipe menus / boss dialog.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("harden-sync-boss-dialog-always")
                     || body.Contains("fix-boss-dialog-cs0136")
                     || body.Contains("balance-v2-arthurian-expansion")
                     || body.Contains("autobattle-boss-dialog-video-bg")
@@ -561,6 +691,7 @@ public static class ArthurianSyncFromGitHub
                     || body.Contains("stars-visible-hire-bands-gold200")
                     || body.Contains("sync-keep-editor-menus") || body.Contains("victory-stars-hire"))
                    && body.Contains("NeverBulkDeleteEditorMenus")
+                   && body.Contains("MustAlwaysLandScripts")
                    && body.Contains("ForceDeleteSyncAll")
                    && body.Contains("BootstrapCompatAndSyncTools");
         }

@@ -157,6 +157,85 @@ namespace ArthurianAutobattler
                 Debug.LogWarning("[DemonKnight] ApplyVideoBackground missing — Sync BattlefieldVisualizer.cs.");
         }
 
+        /// <summary>
+        /// Soft bridge to BattleBossDialogUI — AutoBattlerEngine compiles even when that
+        /// file is missing from disk (CS0103). Reflection no-ops until Sync lands it.
+        /// </summary>
+        public static bool IsBossUnitType(UnitType t)
+        {
+            Type type = FindBossDialogType();
+            if (type != null)
+            {
+                try
+                {
+                    var m = type.GetMethod("IsBossType", StaticPublic, null, new[] { typeof(UnitType) }, null);
+                    if (m != null) return (bool)m.Invoke(null, new object[] { t });
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[DemonKnight] IsBossType invoke failed: " + ex.Message);
+                }
+            }
+            return t.ToString().StartsWith("Boss", StringComparison.Ordinal);
+        }
+
+        public static void ShowBossDialog(CombatUnit boss)
+        {
+            if (boss == null || !IsBossUnitType(boss.unitType)) return;
+            Type type = FindBossDialogType();
+            if (type == null)
+            {
+                Debug.LogWarning(
+                    "[DemonKnight] BattleBossDialogUI missing — Sync or Arthurian → Force Download BattleBossDialogUI.cs");
+                return;
+            }
+            if (!TryInvokeStatic(type, "ShowForBoss", boss))
+                Debug.LogWarning("[DemonKnight] ShowForBoss missing — Sync BattleBossDialogUI.cs.");
+        }
+
+        public static void HideBossDialog()
+        {
+            Type type = FindBossDialogType();
+            if (type == null) return;
+            TryInvokeStatic(type, "Hide");
+        }
+
+        public static bool IsBossDialogBlocking
+        {
+            get
+            {
+                Type type = FindBossDialogType();
+                if (type == null) return false;
+                try
+                {
+                    var p = type.GetProperty("IsBlockingCombat", StaticPublic);
+                    if (p != null) return (bool)p.GetValue(null);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[DemonKnight] IsBlockingCombat read failed: " + ex.Message);
+                }
+                return false;
+            }
+        }
+
+        static Type FindBossDialogType()
+        {
+            Type direct = Type.GetType("ArthurianAutobattler.BattleBossDialogUI")
+                          ?? Type.GetType("ArthurianAutobattler.BattleBossDialogUI, Assembly-CSharp");
+            if (direct != null) return direct;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var t = asm.GetType("ArthurianAutobattler.BattleBossDialogUI", throwOnError: false);
+                    if (t != null) return t;
+                }
+                catch { /* ignore dynamic/ReflectionOnly assemblies */ }
+            }
+            return null;
+        }
+
         static Component FindChurch()
         {
             return (Component)UnityEngine.Object.FindFirstObjectByType<SomersetChurchUI>()

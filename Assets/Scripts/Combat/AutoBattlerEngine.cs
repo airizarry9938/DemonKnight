@@ -117,12 +117,12 @@ namespace ArthurianAutobattler
             isBattling = true;
 
             // Boss waves: bottom-of-frame dialog before steel flies.
-            // Requires Assets/Scripts/Combat/BattleBossDialogUI.cs (on Sync ScriptPaths).
-            var dialogBoss = demonArmy.FirstOrDefault(d => d != null && BattleBossDialogUI.IsBossType(d.unitType));
+            // Soft-bridge via CompatApi — no hard type ref (CS0103-safe if file missing).
+            var dialogBoss = demonArmy.FirstOrDefault(d => d != null && DemonKnightCompatApi.IsBossUnitType(d.unitType));
             if (dialogBoss != null)
-                BattleBossDialogUI.ShowForBoss(dialogBoss);
+                DemonKnightCompatApi.ShowBossDialog(dialogBoss);
             else
-                BattleBossDialogUI.Hide();
+                DemonKnightCompatApi.HideBossDialog();
         }
 
         private void ApplyUsurpationStarterLegends(List<RecruitInstance> roster)
@@ -252,7 +252,7 @@ namespace ArthurianAutobattler
             if (!isBattling) return;
 
             // Hold combat while the boss intro dialog is across the bottom of the frame.
-            if (BattleBossDialogUI.IsBlockingCombat)
+            if (DemonKnightCompatApi.IsBossDialogBlocking)
             {
                 BattlefieldVisualizer.Instance?.SyncFrontlineVisuals(
                     playerArmy.Where(u => u.IsAlive).ToList(),
@@ -650,7 +650,7 @@ namespace ArthurianAutobattler
         private void EndBattle(bool playerWon)
         {
             isBattling = false;
-            BattleBossDialogUI.Hide();
+            DemonKnightCompatApi.HideBossDialog();
             BattlefieldVisualizer.Instance?.ClearAllActors();
             BattlefieldVisualizer.Instance?.StopBattleVideo();
             int goldEarned = playerWon ? DemonKnightCompatApi.WaveVictoryGold : DemonKnightCompatApi.WaveLossGold;
