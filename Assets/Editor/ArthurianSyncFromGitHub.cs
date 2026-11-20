@@ -20,7 +20,8 @@ public static class ArthurianSyncFromGitHub
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    private const string FallbackCommitSha = "e437be1";
+    // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
+    private const string FallbackCommitSha = "09b685b";
 
     private const string ExpectedPackageId = "stars-visible-hire-bands-gold200";
 
