@@ -169,7 +169,7 @@ public static class ArthurianSceneBuilder
             Vector2.zero, new Vector2(100f, 40f));
         townUI.timerText = CreateTMP(hud.transform, "TimerText", "Horde Arrives: 07:00", 16, TextAlignmentOptions.Center,
             Vector2.zero, new Vector2(200f, 40f));
-        townUI.goldText = CreateTMP(hud.transform, "GoldText", "Royal Gold: 150g", 16, TextAlignmentOptions.Center,
+        townUI.goldText = CreateTMP(hud.transform, "GoldText", "Royal Gold: 200g", 16, TextAlignmentOptions.Center,
             Vector2.zero, new Vector2(150f, 40f));
 
         var diceHudBtn = CreateButton(hud.transform, "DiceButton", "Dice",
