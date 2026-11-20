@@ -134,19 +134,28 @@ public static class ArthurianMenuBootstrap
     {
         if (!EditorUtility.DisplayDialog(
                 "Install Art Importers",
-                "Download Modular + Battle sprite importer scripts from GitHub pin "
-                + ArtToolsPinSha + " into Assets/Editor/?\n\n"
-                + "Needed because Force Sync still follows main until Art Tools merge.",
+                "Download Art Tools Editor scripts AND their runtime data scripts from pin "
+                + ArtToolsPinSha + "?\n\n"
+                + "Fixes CS0246 (CharacterDefinition / ModularSpriteLibrary missing).",
                 "Download", "Cancel"))
             return;
 
         string[] rels =
         {
+            // Editor tools
             "Assets/Editor/ModularSpriteSheetImporterWindow.cs",
             "Assets/Editor/BattleSpriteSheetSlicerWindow.cs",
             "Assets/Editor/CharacterCatalogSeeder.cs",
             "Assets/Editor/CharacterDatabaseEditor.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
+            "Assets/Editor/ArthurianMenuBootstrap.cs",
+            // Runtime data the Editor tools reference (CS0246 without these)
+            "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+            "Assets/Scripts/Data/TownsfolkAppearance.cs",
+            "Assets/Scripts/Data/Characters/CharacterDefinition.cs",
+            "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
+            "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
+            "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         };
 
         int ok = 0;

@@ -24,7 +24,7 @@ public static class ArthurianSyncFromGitHub
     // Updated when shipping Sync packages (main tip alone is still older merges).
     private const string FallbackCommitSha = "f454360";
 
-    private const string ExpectedPackageId = "art-tools-install-menu";
+    private const string ExpectedPackageId = "art-tools-runtime-deps";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -534,6 +534,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("art-tools-runtime-deps")
                    || body.Contains("art-tools-install-menu")
                    || body.Contains("art-tools-under-arthurian")
                    || body.Contains("end-run-remove-perks-runes")
@@ -569,6 +570,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("art-tools-runtime-deps")
                     || body.Contains("art-tools-install-menu")
                     || body.Contains("art-tools-under-arthurian")
                     || body.Contains("end-run-remove-perks-runes")
