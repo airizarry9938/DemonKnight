@@ -209,6 +209,25 @@ namespace ArthurianAutobattler
                 attackDamage = Mathf.RoundToInt(attackDamage * 1.20f);
         }
 
+        /// <summary>
+        /// Unit types that can fight from BACK (Ranged row). Melee types in BACK cannot attack —
+        /// formation vs unit type is a taught lesson (Warriors/Knights belong FRONT).
+        /// </summary>
+        public static bool IsRangedUnitType(UnitType t) => t switch
+        {
+            UnitType.Peasant => true,
+            UnitType.Priest => true,
+            UnitType.Merlin => true,
+            UnitType.MorganLeFay => true,
+            UnitType.LadyOfTheLake => true,
+            UnitType.SirenEnchantress => true,
+            _ => false
+        };
+
+        /// <summary>True when this recruit is in BACK but is a melee type (will not attack).</summary>
+        public bool IsMeleeStuckInBackRow =>
+            assignedRole == CombatRole.BacklineRanged && !IsRangedUnitType(unitType);
+
         public void RefreshBodyPostureFromTraits(int grudgePenalty)
         {
             if (primaryTrait == TraitTag.Loyalist)
@@ -233,6 +252,8 @@ namespace ArthurianAutobattler
             var hire = ComputeHireBreakdown(grudgePenalty, globalDiscount);
 
             string info = $"<b>{characterName}</b> ({unitType}) | Pew {PewIndex + 1}/12 (seat {pewSeatIndex}) | Role: <b>{assignedRole}</b>\n";
+            if (IsMeleeStuckInBackRow)
+                info += "<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Train Tank / FRONT.</color>\n";
             if (isSirenEnchantress)
             {
                 info += "<color=#FF69B4>Siren Enchantress</color>";
@@ -379,6 +400,16 @@ namespace ArthurianAutobattler
 
         /// <summary>Battalion BACK: trained Ranged formation.</summary>
         public bool IsBackRow => assignedRole == CombatRole.BacklineRanged;
+
+        /// <summary>
+        /// BACK row only fires for ranged unit types. Melee in BACK wastes the slot (no attack).
+        /// </summary>
+        public bool CanAttackFromCurrentRow =>
+            isDemon || IsFrontRow || RecruitInstance.IsRangedUnitType(unitType);
+
+        /// <summary>Melee unit parked in BACK — cannot reach the horde.</summary>
+        public bool IsMeleeStuckInBackRow =>
+            !isDemon && IsBackRow && !RecruitInstance.IsRangedUnitType(unitType);
 
         public void ResetAttackCooldown()
         {

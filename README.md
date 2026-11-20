@@ -9,7 +9,7 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
 3. If Diagnose shows `cs1061-compat-api` / CompatApi lacks `ResolveLoop`: use the **hard fallback** below (never use jsDelivr `@main` — it lags).
-4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `perk-rune-bonus-math`.
+4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `back-row-melee-no-attack`.
    If Bootstrap / Force Delete+Sync menus are missing: overwrite `ArthurianSyncFromGitHub.cs` + `ArthurianMenuBootstrap.cs` from jsDelivr (pinned SHA), Refresh, then Bootstrap.
 5. Already have `ChurchBackground`? **Align Crowd Grid To Church Pews**. Brand-new only: **Build Complete Scene Hierarchy**.
 6. Place HUD icons on `HUD_Bar` (Play keeps them; Codex = **Legends**). Menu/Esc sits far-left; authored positions preserved (`forceEqualHudSlots` off).
@@ -45,7 +45,9 @@ After this PR merges, pin the **merge commit SHA** (or tip of `main`). Until the
 
 **Perk / rune hire math:** dossier Hire line lists every add-on/subtraction (Writ, Crown, Blood-Oath, Jealousy, ★, Tavern, Loyalist ÷2, floor) from the same breakdown as Recruit (Ng).
 
-**Floor (Sync tools that pin commits):** `52343f1`
+**Formation vs type:** melee (Warrior/Knight/melee legends) in **BACK** cannot attack — only ranged types (Peasant, Priest, Merlin, Morgan, Lady) fight from BACK. Warband shows **NO REACH**.
+
+**Floor (Sync tools that pin commits):** `bb760f6`
 
 **Delete** then download Save-As (do not rely on overwrite):
 

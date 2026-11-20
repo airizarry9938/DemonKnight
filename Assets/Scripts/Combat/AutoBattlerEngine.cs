@@ -344,6 +344,15 @@ namespace ArthurianAutobattler
                 attacker.attackTimer -= dt;
                 if (attacker.attackTimer <= 0f)
                 {
+                    // Melee in BACK cannot reach — teach formation vs unit type.
+                    if (attacker.IsMeleeStuckInBackRow)
+                    {
+                        BattlefieldVisualizer.Instance?.SpawnPopup(
+                            attacker, "NO REACH!", new Color(1f, 0.55f, 0.2f));
+                        attacker.ResetAttackCooldown();
+                        continue;
+                    }
+
                     ExecuteUnitAction(attacker, attackers, defenders);
                     attacker.ResetAttackCooldown();
                     anyStrike = true;
