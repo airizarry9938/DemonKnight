@@ -62,6 +62,12 @@ namespace ArthurianAutobattler
         /// <summary>Hire discount gold per victory star.</summary>
         public const int VictoryStarHireDiscount = 5;
 
+        /// <summary>Peasant hire band floor — Loyalist / Crown / Tavern must not push below this.</summary>
+        public const int PeasantHireFloor = 10;
+        public const int PeasantHireCeil = 20;
+        public const int WarriorHireFloor = 50;
+        public const int KnightHireFloor = 200;
+
         /// <summary>
         /// Pre-fusion ingredient snapshots (deep). Wave-end disband expands these back
         /// into pew seats so fused Legends never occupy seats or block return.
@@ -108,8 +114,22 @@ namespace ArthurianAutobattler
             int cost = Mathf.Max(1,
                 baseHireCost + effectiveGrudge - globalDiscount - peasantCut + jealousyTax - starDiscount - tavernCut);
             if (primaryTrait == TraitTag.Loyalist) cost = Mathf.Max(1, cost / 2);
+
+            // Tier floors after ALL modifiers so Loyalist half-price / Crown / Writ / Tavern
+            // cannot show Peasants under 10g (or Warriors/Knights under their band floors)
+            // on New Game fresh townsfolk.
+            cost = Mathf.Max(cost, HireFloorFor(unitType));
             return cost;
         }
+
+        /// <summary>Minimum displayed/paid hire after modifiers (matches initial hire bands).</summary>
+        public static int HireFloorFor(UnitType type) => type switch
+        {
+            UnitType.Peasant => PeasantHireFloor,
+            UnitType.Warrior => WarriorHireFloor,
+            UnitType.Knight => KnightHireFloor,
+            _ => 1
+        };
 
         public static bool IsLegendUnit(UnitType t)
         {
