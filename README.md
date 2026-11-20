@@ -8,22 +8,22 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 
 1. Clone https://github.com/airizarry9938/DemonKnight and open **that folder** in Unity Hub (Unity 6 / 6000.x).
 2. Import TMP Essentials if prompted. Wait for compile.
-3. Top menu → **Arthurian → Force Delete+Sync ALL Scripts** (preferred if you ever saw CS1061 after Sync), wait for compile, then **Arthurian → Diagnose Project**. It must say package `sync-complete-replace`.
-4. Already have `ChurchBackground` on `TownCanvas`? Use **Arthurian → Align Crowd Grid To Church Pews** (keeps your scene).  
-   Brand-new scene only: **Arthurian → Build Complete Scene Hierarchy** (this *replaces* the scene).
-5. Place HUD icons in the Editor on `HUD_Bar`. **Play keeps those RectTransforms** (Codex label shows **Legends**). Only enable `forceEqualHudSlots` on `SomersetChurchUI` if you want the old equal-slot auto layout.
-6. Optional: **Somerset → Asset & Dialogue Studio** for paper-doll sprites / dialogue.
-7. Press Play on `CamelotMain`. After Merlin’s bank screen, **Enter Next Timeline** starts the next night in-place.
+3. If Diagnose shows `cs1061-compat-api` / CompatApi lacks `ResolveLoop`: use the **hard fallback** below (jsDelivr `@main` is stale).
+4. **Arthurian → Bootstrap CompatApi + Sync Tools (pinned)** → **Force Delete+Sync ALL Scripts**. Diagnose → `sync-pin-jsdelivr`.
+5. Already have `ChurchBackground`? **Align Crowd Grid To Church Pews**. Brand-new only: **Build Complete Scene Hierarchy**.
+6. Place HUD icons on `HUD_Bar` (Play keeps them; Codex = **Legends**).
+7. Press Play on `CamelotMain`.
 
-### After merging Sync / CS1061 fix (`sync-complete-replace`)
+### Hard fallback (jsDelivr `@main` lags — pin commit `ba26256`)
 
-**Do not** replace the whole project folder. **Do not** rebuild the scene (keeps your HUD).
+**Delete** then download Save-As (do not rely on overwrite):
 
-1. In Unity: **Arthurian → Force Delete+Sync ALL Scripts** → confirm.
-2. Wait for compile (Console should be clean of CS1061/CS0117).
-3. **Arthurian → Diagnose Project** → package `sync-complete-replace`.
-4. If Sync dialog says **INCOMPLETE**, run Force Delete+Sync again (CDN blip). Prefer `git pull` in the repo folder when possible.
-5. Play — HUD positions stay; March / Dice / Legends wired.
+- https://cdn.jsdelivr.net/gh/airizarry9938/DemonKnight@ba26256/Assets/Scripts/Systems/DemonKnightCompatApi.cs → `Assets/Scripts/Systems/DemonKnightCompatApi.cs`
+- https://cdn.jsdelivr.net/gh/airizarry9938/DemonKnight@ba26256/Assets/Editor/DemonKnightPackageVersion.cs → `Assets/Editor/DemonKnightPackageVersion.cs`
+- https://cdn.jsdelivr.net/gh/airizarry9938/DemonKnight@ba26256/Assets/Scripts/UI/SomersetChurchUI.cs → `Assets/Scripts/UI/SomersetChurchUI.cs`
+- https://cdn.jsdelivr.net/gh/airizarry9938/DemonKnight@ba26256/Assets/Editor/ArthurianSyncFromGitHub.cs → `Assets/Editor/ArthurianSyncFromGitHub.cs`
+
+Then Unity compile → Bootstrap → Force Delete+Sync. **Do not** rebuild scene / replace whole project folder.
 
 ### Hotkeys (church stage)
 | Key | Action |
