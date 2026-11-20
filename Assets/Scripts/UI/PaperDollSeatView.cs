@@ -62,6 +62,8 @@ namespace ArthurianAutobattler
                 else seatLabel.text = "";
             }
 
+            VictoryStarBadge.Apply(transform, recruit);
+
             if (seatButton == null) seatButton = GetComponent<Button>() ?? gameObject.AddComponent<Button>();
             seatButton.interactable = true;
             if (seatButton.targetGraphic == null && bodyLayer != null)
@@ -83,6 +85,7 @@ namespace ArthurianAutobattler
             if (headLayer != null) headLayer.enabled = false;
             if (moodLayer != null) moodLayer.enabled = false;
             if (seatLabel != null) seatLabel.text = "";
+            VictoryStarBadge.Clear(transform);
             if (seatButton != null)
             {
                 seatButton.onClick.RemoveAllListeners();

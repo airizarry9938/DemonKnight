@@ -54,6 +54,15 @@ namespace ArthurianAutobattler
         public bool isSirenEnchantress = false;
 
         /// <summary>
+        /// Wave victories while this soul marched (and returned to a pew). Stacks.
+        /// Each star → −5g hire (stacks with win −10 / loss +15 grudge deltas).
+        /// </summary>
+        public int victoryStars;
+
+        /// <summary>Hire discount gold per victory star.</summary>
+        public const int VictoryStarHireDiscount = 5;
+
+        /// <summary>
         /// Pre-fusion ingredient snapshots (deep). Wave-end disband expands these back
         /// into pew seats so fused Legends never occupy seats or block return.
         /// </summary>
@@ -89,7 +98,9 @@ namespace ArthurianAutobattler
                 jealousyTax = legendCount * 10;
             }
 
-            int cost = Mathf.Max(1, baseHireCost + effectiveGrudge - globalDiscount - peasantCut + jealousyTax);
+            int starDiscount = Mathf.Max(0, victoryStars) * VictoryStarHireDiscount;
+            int cost = Mathf.Max(1,
+                baseHireCost + effectiveGrudge - globalDiscount - peasantCut + jealousyTax - starDiscount);
             if (primaryTrait == TraitTag.Loyalist) cost = Mathf.Max(1, cost / 2);
             return cost;
         }
@@ -126,6 +137,11 @@ namespace ArthurianAutobattler
         {
             string info = $"<b>{characterName}</b> ({unitType}) | Pew {PewIndex + 1}/12 (seat {pewSeatIndex}) | Role: <b>{assignedRole}</b>\n";
             if (isSirenEnchantress) info += "<color=#FF69B4>Siren Enchantress</color>\n";
+            if (victoryStars > 0)
+            {
+                info +=
+                    $"<color=#FFD700>★ Experienced ×{victoryStars}</color> (−{victoryStars * VictoryStarHireDiscount}g hire)\n";
+            }
 
             if (intelTierUnlocked >= 1)
                 info += $"HP: {maxHealth} | ATK: {attackDamage} | SPD: {attackSpeed:F1}/s\n";

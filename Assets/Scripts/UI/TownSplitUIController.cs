@@ -229,6 +229,8 @@ namespace ArthurianAutobattler
                 img.color = new Color(0.12f, 0.10f, 0.09f, 0.40f);
             }
 
+            VictoryStarBadge.Apply(btnObj.transform, recruit);
+
             Button btn = btnObj.GetComponent<Button>();
             if (btn != null)
             {

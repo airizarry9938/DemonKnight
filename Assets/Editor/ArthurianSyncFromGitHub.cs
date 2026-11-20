@@ -21,9 +21,9 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>Known-good commit that contains ResolveLoop CompatApi (PR #3). Bootstrap floor.</summary>
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    private const string FallbackCommitSha = "a54cab9";
+    private const string FallbackCommitSha = "7dace7c";
 
-    private const string ExpectedPackageId = "mediate-mordred-wave-rules";
+    private const string ExpectedPackageId = "victory-stars-hire";
 
     private static readonly string[] ScriptPaths =
     {
@@ -57,6 +57,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
+        "Assets/Scripts/UI/VictoryStarBadge.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
@@ -446,6 +447,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("victory-stars-hire")
                    || body.Contains("mediate-mordred-wave-rules")
                    || body.Contains("hire-once-unfuse-disband")
                    || body.Contains("hud-esc-legends-warband-pace")
@@ -459,7 +461,7 @@ public static class ArthurianSyncFromGitHub
                 return body.Contains("DownloadPinned") || body.Contains("BootstrapCompatAndSyncTools")
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             return body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
-                   || body.Contains("mediate-mordred-wave-rules");
+                   || body.Contains("victory-stars-hire");
         }
 
         return true;

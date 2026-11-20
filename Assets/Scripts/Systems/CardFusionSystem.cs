@@ -269,7 +269,8 @@ namespace ArthurianAutobattler
                 bodySprite = src.bodySprite,
                 headSprite = src.headSprite,
                 moodOverlaySprite = src.moodOverlaySprite,
-                isSirenEnchantress = src.isSirenEnchantress
+                isSirenEnchantress = src.isSirenEnchantress,
+                victoryStars = src.victoryStars
             };
             if (src.fusionIngredients != null && src.fusionIngredients.Count > 0)
             {
