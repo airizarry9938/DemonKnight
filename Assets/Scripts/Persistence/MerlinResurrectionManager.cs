@@ -217,6 +217,7 @@ namespace ArthurianAutobattler
         /// <summary>
         /// New Game wipe — clears Merlin bank / runes / legacy points so start gold is exactly
         /// <see cref="GameLoopManager.StartingGold"/> with no leftover meta economy.
+        /// PlayerPrefs are always zeroed (even when called as a static-style wipe).
         /// </summary>
         public void ResetBankForNewGame()
         {
@@ -228,10 +229,38 @@ namespace ArthurianAutobattler
             gamblerRuneRank = 0;
             bloodOathRuneRank = 0;
             peasantsCrownRuneRank = 0;
+            WipeBankPlayerPrefs();
             SaveBankData();
+            if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
+            if (legacyBankPanel != null) legacyBankPanel.SetActive(false);
             RefreshBankUI();
             Debug.LogError("[DemonKnight] Merlin bank wiped for New Game (Treasury/Writ/Rations/Runes = 0).");
         }
+
+        /// <summary>Delete Merlin bank PlayerPrefs keys so a missing Instance cannot resurrect ranks.</summary>
+        public static void WipeBankPlayerPrefs()
+        {
+            PlayerPrefs.DeleteKey("LegacyPoints");
+            PlayerPrefs.DeleteKey("BankGoldLvl");
+            PlayerPrefs.DeleteKey("BankDiscountLvl");
+            PlayerPrefs.DeleteKey("BankRationsLvl");
+            PlayerPrefs.DeleteKey("RuneGossip");
+            PlayerPrefs.DeleteKey("RuneGambler");
+            PlayerPrefs.DeleteKey("RuneBloodOath");
+            PlayerPrefs.DeleteKey("RunePeasantCrown");
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>True when every bank/rune level is zero (New Game clean slate).</summary>
+        public bool IsFullyClearedForNewGame() =>
+            unspentLegacyPoints == 0
+            && startingGoldBankLevel == 0
+            && recruitmentDiscountLevel == 0
+            && startingSupplyRationsLevel == 0
+            && gossipRuneRank == 0
+            && gamblerRuneRank == 0
+            && bloodOathRuneRank == 0
+            && peasantsCrownRuneRank == 0;
 
         public int GetRuneRank(BankRuneID id)
         {

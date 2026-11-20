@@ -27,6 +27,11 @@ namespace ArthurianAutobattler
                 c.a = 0f;
                 chapelTintOverlay.color = c;
             }
+            // Endless Hourglass / Silver Tongue side effects must not survive New Game.
+            if (GrudgeSaveManager.Instance != null)
+                GrudgeSaveManager.Instance.grudgeDeltaMultiplier = 1f;
+            if (GameLoopManager.Instance != null)
+                GameLoopManager.Instance.disableTownTimer = false;
         }
 
         public bool TryAcceptPact(DemonicPactID pact, TownSplitUIController townUI)

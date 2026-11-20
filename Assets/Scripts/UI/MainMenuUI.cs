@@ -301,14 +301,15 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            // InitializeFreshCampaign wipes bank/perks/relics/autosave and locks purse at 200g.
+            // Full wipe: bank runes, sin runes, relics, perks, pacts, autosave → 200g.
             DemonKnightCompatApi.SetMustDisband(loop, false);
             loop.recruitedParty?.Clear();
             loop.InitializeFreshCampaign();
             HideMenu();
-            SetStatus($"New Game — Royal Gold {GameLoopManager.StartingGold}g (clean slate).");
+            SetStatus(
+                $"New Game — {GameLoopManager.StartingGold}g; runes/perks/relics/sins/pacts off.");
             Debug.LogError(
-                $"[DemonKnight] === MAIN MENU NEW GAME — economy wiped, gold={GameLoopManager.StartingGold}g ===");
+                $"[DemonKnight] === MAIN MENU NEW GAME — all modifiers wiped, gold={GameLoopManager.StartingGold}g ===");
         }
 
         private void OnContinue()

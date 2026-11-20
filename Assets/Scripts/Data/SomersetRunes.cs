@@ -90,8 +90,18 @@ namespace ArthurianAutobattler
 
         public static void ClearPact()
         {
+            // Prefer live Instance; also clear every DemonicPactManager in the scene.
             object instance = GetManagerInstance("ArthurianAutobattler.DemonicPactManager");
             instance?.GetType().GetMethod("ClearPact", Type.EmptyTypes)?.Invoke(instance, null);
+            try
+            {
+                var found = UnityEngine.Object.FindObjectsByType<DemonicPactManager>(
+                    FindObjectsSortMode.None);
+                if (found == null) return;
+                foreach (var d in found)
+                    d?.ClearPact();
+            }
+            catch { /* type missing in partial Sync */ }
         }
 
         public static void SetGrudgeDeltaMultiplier(float value)
