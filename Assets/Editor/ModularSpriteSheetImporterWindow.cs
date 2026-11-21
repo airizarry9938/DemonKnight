@@ -329,7 +329,9 @@ public class ModularSpriteSheetImporterWindow : EditorWindow
                 index++;
             }
         }
+#pragma warning disable CS0618 // TextureImporter.spritesheet — still the reliable multi-slice write path in U6
         importer.spritesheet = metas.ToArray();
+#pragma warning restore CS0618
         EditorUtility.SetDirty(importer);
         importer.SaveAndReimport();
     }
