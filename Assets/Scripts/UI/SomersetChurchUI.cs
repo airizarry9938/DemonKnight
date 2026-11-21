@@ -44,6 +44,7 @@ namespace ArthurianAutobattler
 
         [Header("Dossier")]
         public Image dossierPortrait;
+        public TownsfolkPortraitView dossierModularPortrait;
         public TextMeshProUGUI dossierDialogue;
         public TextMeshProUGUI dossierStats;
         public TextMeshProUGUI gossipText;
@@ -1294,6 +1295,9 @@ namespace ArthurianAutobattler
             if (nightText.fontSize > 18f) nightText.fontSize = 18f;
             nightText.enableWordWrapping = false;
             nightText.overflowMode = TextOverflowModes.Overflow;
+
+            var bossHud = WaveBossHudView.EnsureNearNightText(nightText);
+            bossHud?.Refresh(wave);
         }
 
         private Transform FindHudBar()
@@ -1721,7 +1725,13 @@ namespace ArthurianAutobattler
 
                 var rt = go.GetComponent<RectTransform>();
                 if (rt == null) rt = go.AddComponent<RectTransform>();
-                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
+                float jitterX = 0f;
+                if (recruit?.appearance != null)
+                {
+                    recruit.appearance.BindSeatSalt(seatIndex);
+                    jitterX = recruit.appearance.PewJitterX;
+                }
+                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize, jitterX);
 
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
@@ -1812,22 +1822,7 @@ namespace ArthurianAutobattler
             int discount = MerlinResurrectionManager.Instance != null
                 ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
 
-            if (dossierPortrait != null)
-            {
-                dossierPortrait.enabled = true;
-                Sprite portrait = selected.headSprite != null ? selected.headSprite : selected.randomAvatar;
-                dossierPortrait.sprite = portrait;
-                if (portrait == null)
-                    dossierPortrait.color = selected.unitType switch
-                    {
-                        UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 1f),
-                        UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 1f),
-                        UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 1f),
-                        _ => new Color(0.45f, 0.40f, 0.35f, 1f)
-                    };
-                else
-                    dossierPortrait.color = Color.white;
-            }
+            ApplyDossierPortrait(selected);
 
             if (dossierDialogue != null)
                 dossierDialogue.text = selected.FormatHireDialogue(grudge, discount);
@@ -1862,7 +1857,12 @@ namespace ArthurianAutobattler
             }
             if (hireButton != null) hireButton.interactable = true;
             if (trainTankButton != null) trainTankButton.interactable = Town != null && Town.playerGold >= 15;
-            if (trainRangedButton != null) trainRangedButton.interactable = Town != null && Town.playerGold >= 15;
+            if (trainRangedButton != null)
+            {
+                // Warriors may move BACK via formation, but cannot Train Ranged / crossbow.
+                bool warriorBlocked = selected != null && !selected.AllowsTrainRangedKit;
+                trainRangedButton.interactable = Town != null && Town.playerGold >= 15 && !warriorBlocked;
+            }
             int mediateCost = GameLoopManager.MediateCostGold;
             if (mediateButton != null)
             {
@@ -1872,6 +1872,30 @@ namespace ArthurianAutobattler
                         ? "Mediated ✓"
                         : $"Mediate ({mediateCost}g)");
             }
+        }
+
+        /// <summary>Stack Body/Outfit/Head/Prop from the same TownsfolkAppearance as the pew seat.</summary>
+        private void ApplyDossierPortrait(RecruitInstance recruit)
+        {
+            if (dossierModularPortrait == null)
+                dossierModularPortrait = TownsfolkPortraitView.EnsureOn(
+                    dossierPortrait,
+                    dossierPortrait != null ? dossierPortrait.transform.parent : transform);
+
+            if (dossierModularPortrait != null)
+            {
+                dossierModularPortrait.Apply(recruit);
+                return;
+            }
+
+            // Last resort: legacy single-image portrait.
+            if (dossierPortrait == null) return;
+            dossierPortrait.enabled = true;
+            Sprite portrait = recruit.headSprite != null ? recruit.headSprite : recruit.randomAvatar;
+            dossierPortrait.sprite = portrait;
+            dossierPortrait.color = portrait != null
+                ? Color.white
+                : TownsfolkVisualApplier.PlaceholderColor(recruit.unitType);
         }
 
         private string BuildGossip(RecruitInstance center)
@@ -1934,6 +1958,14 @@ namespace ArthurianAutobattler
         private void Train(CombatRole role)
         {
             if (selected == null || Town == null || Town.playerGold < 15) return;
+            if (role == CombatRole.BacklineRanged && !selected.AllowsTrainRangedKit)
+            {
+                if (dossierDialogue != null)
+                    dossierDialogue.text =
+                        "<color=#FF6644>Warriors cannot Train Ranged.</color> Move them to BACK in the warband — they keep NO REACH there.";
+                RefreshDossier();
+                return;
+            }
             Town.playerGold -= 15;
             selected.TrainRole(role);
             RefreshDossier();
@@ -2204,7 +2236,7 @@ namespace ArthurianAutobattler
             bool anyMeleeBack = party != null && party.Exists(r => r != null && r.IsMeleeStuckInBackRow);
             string captionText = anyMeleeBack
                 ? "BATTALION — Melee in BACK cannot attack!"
-                : "BATTALION — Front faces the horde · BACK = ranged only";
+                : "BATTALION — Front faces the horde · BACK fires ranged (Warriors keep NO REACH)";
             var caption = MakeFormationLabel(formationDiagramRoot, "Caption",
                 captionText,
                 new Vector2(0.5f, 0.92f), 14f,
@@ -2467,8 +2499,9 @@ namespace ArthurianAutobattler
                         var captured = m;
                         buttons[0].onClick.RemoveAllListeners();
                         buttons[1].onClick.RemoveAllListeners();
-                        buttons[0].onClick.AddListener(() => { captured.TrainRole(CombatRole.FrontlineTank); RefreshWarbandPanel(); });
-                        buttons[1].onClick.AddListener(() => { captured.TrainRole(CombatRole.BacklineRanged); RefreshWarbandPanel(); });
+                        // Formation seats only — no Train Ranged kit / canAttackFromBack.
+                        buttons[0].onClick.AddListener(() => { captured.SetFormationRole(CombatRole.FrontlineTank); RefreshWarbandPanel(); });
+                        buttons[1].onClick.AddListener(() => { captured.SetFormationRole(CombatRole.BacklineRanged); RefreshWarbandPanel(); });
                     }
                 }
                 else
@@ -2515,8 +2548,11 @@ namespace ArthurianAutobattler
                     : "FRONT (unassigned)";
             string numBit = unitNum > 0 ? $"#{unitNum}  " : "";
             string reachWarn = m.IsMeleeStuckInBackRow
-                ? "\n<color=#FF6644><b>NO REACH</b> — Train Ranged (crossbow) or move to FRONT</color>"
-                : (m.assignedRole == CombatRole.BacklineRanged && m.canAttackFromBack && !RecruitInstance.IsRangedUnitType(m.unitType)
+                ? (m.unitType == UnitType.Warrior
+                    ? "\n<color=#FF6644><b>NO REACH</b> — Warriors cannot Train Ranged. Move to FRONT</color>"
+                    : "\n<color=#FF6644><b>NO REACH</b> — Train Ranged (crossbow) or move to FRONT</color>")
+                : (m.assignedRole == CombatRole.BacklineRanged && m.canAttackFromBack
+                   && m.unitType != UnitType.Warrior && !RecruitInstance.IsRangedUnitType(m.unitType)
                     ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
                     : "");
 
@@ -2609,12 +2645,13 @@ namespace ArthurianAutobattler
                 var captured = member;
                 btnGo.GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    captured.TrainRole(role);
+                    // Warband FRONT/BACK = formation seats only (Warriors may sit BACK with NO REACH).
+                    captured.SetFormationRole(role);
                     RefreshWarbandPanel();
                 });
             }
-            MakeTrain("TrainTank", "Tank", CombatRole.FrontlineTank, 22f);
-            MakeTrain("TrainRanged", "Ranged", CombatRole.BacklineRanged, -22f);
+            MakeTrain("TrainTank", "FRONT", CombatRole.FrontlineTank, 22f);
+            MakeTrain("TrainRanged", "BACK", CombatRole.BacklineRanged, -22f);
         }
 
         public void OpenModal(GameObject modal)

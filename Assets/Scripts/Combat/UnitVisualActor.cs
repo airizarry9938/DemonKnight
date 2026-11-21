@@ -21,11 +21,13 @@ namespace ArthurianAutobattler
         private Vector3 homePosition;
         private Image healthFill;
 
-        public void Initialize(CombatUnit unit, Sprite artwork, Vector3 spawnPos, bool flipX)
+        public void Initialize(CombatUnit unit, Sprite artwork, Vector3 spawnPos, bool flipX, float visualScale = 1f)
         {
             boundUnit = unit;
             homePosition = spawnPos;
             transform.position = spawnPos;
+            float scale = Mathf.Max(0.1f, visualScale);
+            transform.localScale = new Vector3(scale, scale, 1f);
 
             EnsureVisualChrome(unit, flipX);
 
@@ -34,7 +36,6 @@ namespace ArthurianAutobattler
                 spriteRenderer.sprite = artwork;
                 spriteRenderer.flipX = flipX;
                 spriteRenderer.enabled = artwork != null;
-                spriteRenderer.sortingOrder = 5;
             }
 
             if (blockRenderer != null)
@@ -43,8 +44,9 @@ namespace ArthurianAutobattler
                 blockRenderer.enabled = artwork == null;
                 blockRenderer.color = ColorForUnit(unit);
                 blockRenderer.flipX = flipX;
-                blockRenderer.sortingOrder = 4;
             }
+
+            ApplyYSorting();
 
             if (healthBar != null && unit != null)
             {
@@ -61,6 +63,7 @@ namespace ArthurianAutobattler
         private void Update()
         {
             if (boundUnit == null) return;
+            ApplyYSorting();
             if (healthBar != null)
             {
                 healthBar.maxValue = Mathf.Max(1, boundUnit.maxHealth);
@@ -75,6 +78,16 @@ namespace ArthurianAutobattler
             }
             RefreshHpText();
             if (!boundUnit.IsAlive) Destroy(gameObject, 0.25f);
+        }
+
+        /// <summary>
+        /// Front units (lower Y) draw above back units so isometric rows overlap naturally.
+        /// </summary>
+        public void ApplyYSorting()
+        {
+            int order = Mathf.RoundToInt(-transform.position.y * 100f);
+            if (spriteRenderer != null) spriteRenderer.sortingOrder = order;
+            if (blockRenderer != null) blockRenderer.sortingOrder = order - 1;
         }
 
         private void RefreshHpText()

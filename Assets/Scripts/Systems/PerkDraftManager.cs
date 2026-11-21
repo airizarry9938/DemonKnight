@@ -82,66 +82,18 @@ namespace ArthurianAutobattler
 
         public void OpenPerkDraft() => OpenPerkDraft(0, 0);
 
-        /// <summary>Wave win → show victory banner on the perk panel, then offer picks.</summary>
+        /// <summary>
+        /// Perks removed pending redesign — always skip the draft and return to town.
+        /// </summary>
         public void OpenPerkDraft(int waveCleared, int goldEarned)
         {
-            EnsurePanelWired();
-
-            // Wave win → rewards: party must already be back in pews (per-wave disband).
             var loopEarly = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             DemonKnightCompatApi.EnsureDisbandedAfterWave(loopEarly, null, true);
-
-            if (perkDraftPanel == null
-                || choiceButtons == null || choiceButtons.Length == 0
-                || choiceTitleTexts == null || choiceDescTexts == null)
-            {
-                Debug.LogWarning("[DemonKnight] Perk draft UI missing — skipping to town.");
-                FallbackToTown();
-                return;
-            }
-
-            // Parent TownCanvas may have been off during battle.
-            if (perkDraftPanel.transform.root != null)
-                perkDraftPanel.transform.root.gameObject.SetActive(true);
-            var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
-            if (loop != null && loop.townCanvasObj != null)
-                loop.townCanvasObj.SetActive(true);
-
-            perkDraftPanel.SetActive(true);
-            perkDraftPanel.transform.SetAsLastSibling();
-
-            ShowVictoryBanner(waveCleared, goldEarned);
-
-            List<RunPerkOption> pool = new List<RunPerkOption>(allPerks);
-            int slots = Mathf.Min(choiceButtons.Length, choiceTitleTexts.Length, choiceDescTexts.Length);
-            for (int i = 0; i < slots; i++)
-            {
-                if (choiceButtons[i] == null || choiceTitleTexts[i] == null || choiceDescTexts[i] == null)
-                    continue;
-                if (pool.Count == 0) break;
-                int idx = UnityEngine.Random.Range(0, pool.Count);
-                RunPerkOption offered = pool[idx];
-                pool.RemoveAt(idx);
-
-                choiceTitleTexts[i].text = offered.title;
-                if (choiceTitleTexts[i].fontSize < 24f) choiceTitleTexts[i].fontSize = 24f;
-                choiceDescTexts[i].text = offered.description;
-                if (choiceDescTexts[i].fontSize < 18f) choiceDescTexts[i].fontSize = 18f;
-                choiceButtons[i].onClick.RemoveAllListeners();
-                RunPerkOption captured = offered;
-                choiceButtons[i].onClick.AddListener(() => SelectPerk(captured));
-                choiceButtons[i].interactable = true;
-                var btnLabel = choiceButtons[i].GetComponentInChildren<TextMeshProUGUI>();
-                if (btnLabel != null && btnLabel.fontSize < 22f) btnLabel.fontSize = 22f;
-            }
-
-            var panelTitle = perkDraftPanel.transform.Find("PerkTitle")?.GetComponent<TextMeshProUGUI>();
-            if (panelTitle != null)
-            {
-                if (panelTitle.fontSize < 34f) panelTitle.fontSize = 34f;
-                if (waveCleared > 0)
-                    panelTitle.text = "VICTORY — Choose a Perk";
-            }
+            if (perkDraftPanel != null) perkDraftPanel.SetActive(false);
+            unlockedPerks?.Clear();
+            Debug.LogWarning(
+                $"[DemonKnight] Perk draft disabled (wave {waveCleared}, +{goldEarned}g) — returning to town.");
+            FallbackToTown();
         }
 
         private void ShowVictoryBanner(int waveCleared, int goldEarned)

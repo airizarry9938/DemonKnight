@@ -12,8 +12,12 @@ namespace ArthurianAutobattler
     /// </summary>
     public static class SomersetRunes
     {
+        /// <summary>Perks/runes disabled pending redesign — all bank rune ranks read as 0.</summary>
+        public static bool RunesEnabled => false;
+
         public static int GetRank(BankRuneID id)
         {
+            if (!RunesEnabled) return 0;
             var merlin = MerlinResurrectionManager.Instance;
             if (merlin == null) return 0;
 
@@ -41,6 +45,8 @@ namespace ArthurianAutobattler
 
         public static bool IsSinActive(SinRuneID id)
         {
+            // Sin runes gated with bank runes until the redesign lands.
+            if (!RunesEnabled) return false;
             object instance = GetManagerInstance("ArthurianAutobattler.SinRuneManager");
             if (instance == null) return false;
             MethodInfo isActive = instance.GetType().GetMethod("IsActive", new[] { typeof(SinRuneID) });

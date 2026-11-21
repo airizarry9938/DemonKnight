@@ -46,7 +46,8 @@ namespace ArthurianAutobattler
                     primaryTrait = r.primaryTrait,
                     hatedTrait = r.hatedTrait,
                     lovedTrait = r.lovedTrait,
-                    canAttackFromBack = r.canAttackFromBack
+                    // Warriors never fight from BACK — strip stale kits from older saves.
+                    canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior
                 };
                 copy.isSirenEnchantress = r.isSirenEnchantress;
                 combatRoster.Add(copy);
@@ -85,7 +86,7 @@ namespace ArthurianAutobattler
                     currentHealth = r.maxHealth,
                     attackDamage = atk,
                     attacksPerSecond = aps,
-                    canAttackFromBack = r.canAttackFromBack,
+                    canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior,
                     cannotBeHealed = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight),
                     maxHpDrainPerSecond = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight)
                         ? r.maxHealth * 0.05f : 0f
@@ -744,37 +745,30 @@ namespace ArthurianAutobattler
             }
             else
             {
+                // Perks/runes removed pending redesign — skip perk draft, return to church.
                 SomersetRunes.TryAwardRelicForWave(currentBattleNumber);
                 int clearedWave = currentBattleNumber;
                 currentBattleNumber++;
-                // Gold already awarded above.
 
                 loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
                 if (loop != null)
                 {
                     if (loop.townCanvasObj != null) loop.townCanvasObj.SetActive(true);
                     if (loop.battlefieldArenaObj != null) loop.battlefieldArenaObj.SetActive(false);
-                    loop.currentPhase = GamePhase.Rewards;
                     if (loop.recruitedParty != null
                         && loop.recruitedParty.Any(r => r != null && r.unitType != UnitType.Mordred))
                     {
-                        Debug.LogError("[DemonKnight] Non-Mordred still hired before perk draft — forcing again.");
                         ForceWaveDisband(loop, deadIds, true);
                         DemonKnightCompatApi.SetMustDisband(loop, true);
                     }
                 }
 
-                var perks = PerkDraftManager.Instance ?? FindFirstObjectByType<PerkDraftManager>();
-                if (perks != null)
-                {
-                    Debug.LogError($"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Party must be 0 → perk draft.");
-                    perks.OpenPerkDraft(clearedWave, goldEarned);
-                }
-                else
-                {
-                    Debug.LogWarning("[DemonKnight] PerkDraftManager missing — returning to town without perk pick.");
-                    loop?.StartTownPhase();
-                }
+                Debug.LogError(
+                    $"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Perks disabled — returning to town.");
+                var perkUi = PerkDraftManager.Instance ?? FindFirstObjectByType<PerkDraftManager>();
+                if (perkUi != null && perkUi.perkDraftPanel != null)
+                    perkUi.perkDraftPanel.SetActive(false);
+                loop?.StartTownPhase();
             }
         }
 

@@ -1,16 +1,18 @@
 STOP hand-copying random files.
 
-=== PREFERRED ===
+=== PREFERRED (one path) ===
 1) Compile
-2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
+2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)   [only if Sync menus missing]
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → fix-fusion-serialize-intel-costs
+4) Diagnose → force-sync-main-landed
 
-Fixes in this package:
-- Serialization depth cycle (fusionIngredients / WarbandMemberSave) broken
-- Investigate 20g · Full Report 30g · Scout free (stats hidden until clicked)
+This landed main tip includes:
+- Flat fusionParts autosave (no Serialization depth cycle)
+- Investigate 20g · Full Report 30g · Scout free
+- Night HUD 1→2→3 (no skip-by-2)
+- Warriors cannot Train Ranged (BACK = NO REACH); Knights can
+- Modular townsfolk + Art Tools whitelist
+- Character registry / battle sprites / End Run
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
-
-See ANDREW-FIX-FUSION-SERIALIZE-INTEL.md

@@ -105,13 +105,20 @@ namespace ArthurianAutobattler
         public bool isSirenEnchantress = false;
 
         /// <summary>
+        /// Modular pew/dossier look (deterministic seed). When set, PaperDoll + portrait
+        /// resolve through ModularSpriteLibrary instead of randomAvatar alone.
+        /// </summary>
+        public TownsfolkAppearance appearance;
+
+        /// <summary>
         /// Wave victories while this soul marched (and returned to a pew). Stacks.
         /// Each star → −5g hire (stacks with win −10 grudge; Balance V2 removed loss/death +15).
         /// </summary>
         public int victoryStars;
 
         /// <summary>
-        /// Train Ranged equips a crossbow — melee types may attack from BACK (no NO REACH).
+        /// Train Ranged equips a crossbow — Knights (and other non-Warrior melee) may
+        /// attack from BACK (no NO REACH). Warriors never receive this kit.
         /// </summary>
         public bool canAttackFromBack;
 
@@ -226,18 +233,52 @@ namespace ArthurianAutobattler
                    || t == UnitType.SirKay || t == UnitType.SirBedivere || t == UnitType.Guinevere;
         }
 
+        /// <summary>
+        /// Warriors may sit in BACK (formation) but cannot Train Ranged / gain a crossbow.
+        /// Knights and other non-Warrior types still may.
+        /// </summary>
+        public static bool CanTrainRangedKit(UnitType t) => t != UnitType.Warrior;
+
+        /// <summary>True when this recruit may buy Train Ranged (crossbow kit).</summary>
+        public bool AllowsTrainRangedKit => CanTrainRangedKit(unitType);
+
+        /// <summary>
+        /// Formation only — move FRONT/BACK without kit, gold, or stat training.
+        /// Warriors may use this to sit in BACK (they keep NO REACH without a kit).
+        /// </summary>
+        public void SetFormationRole(CombatRole newRole)
+        {
+            if (newRole == CombatRole.Unassigned) return;
+            assignedRole = newRole;
+            // Strip illegal Warrior crossbow kits from older saves / UI paths.
+            if (unitType == UnitType.Warrior)
+                canAttackFromBack = false;
+        }
+
+        /// <summary>
+        /// Paid training: Tank HP boost, or Train Ranged crossbow (+ATK, canAttackFromBack).
+        /// Warriors are blocked from the ranged kit — use SetFormationRole to move them BACK.
+        /// </summary>
         public void TrainRole(CombatRole newRole)
         {
+            if (newRole == CombatRole.BacklineRanged)
+            {
+                if (!CanTrainRangedKit(unitType)) return;
+                // Already BACK with kit — nothing to spend.
+                if (assignedRole == CombatRole.BacklineRanged && canAttackFromBack) return;
+                assignedRole = CombatRole.BacklineRanged;
+                if (!canAttackFromBack)
+                {
+                    attackDamage = Mathf.RoundToInt(attackDamage * 1.20f);
+                    canAttackFromBack = true;
+                }
+                return;
+            }
+
             if (assignedRole == newRole) return;
             assignedRole = newRole;
             if (newRole == CombatRole.FrontlineTank)
                 maxHealth = Mathf.RoundToInt(maxHealth * 1.25f);
-            else if (newRole == CombatRole.BacklineRanged)
-            {
-                attackDamage = Mathf.RoundToInt(attackDamage * 1.20f);
-                // Crossbow / bow kit — melee may fire from BACK (no NO REACH after Train Ranged).
-                canAttackFromBack = true;
-            }
         }
 
         /// <summary>
@@ -256,11 +297,11 @@ namespace ArthurianAutobattler
             _ => false
         };
 
-        /// <summary>Can fight from BACK: native ranged OR Train Ranged crossbow kit.</summary>
+        /// <summary>Can fight from BACK: native ranged OR Train Ranged crossbow kit (never Warriors).</summary>
         public bool CanFightFromBackRow =>
-            canAttackFromBack || IsRangedUnitType(unitType);
+            (canAttackFromBack && unitType != UnitType.Warrior) || IsRangedUnitType(unitType);
 
-        /// <summary>True when BACK without ranged kit (should not happen after Train Ranged).</summary>
+        /// <summary>True when BACK without ranged kit — intentional for Warriors in BACK.</summary>
         public bool IsMeleeStuckInBackRow =>
             assignedRole == CombatRole.BacklineRanged && !CanFightFromBackRow;
 
@@ -289,8 +330,13 @@ namespace ArthurianAutobattler
 
             string info = $"<b>{characterName}</b> ({unitType}) | Pew {PewIndex + 1}/12 (seat {pewSeatIndex}) | Role: <b>{assignedRole}</b>\n";
             if (IsMeleeStuckInBackRow)
-                info += "<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Train Ranged (crossbow) or Tank.</color>\n";
-            else if (assignedRole == CombatRole.BacklineRanged && canAttackFromBack && !IsRangedUnitType(unitType))
+            {
+                info += unitType == UnitType.Warrior
+                    ? "<color=#FF6644><b>NO REACH</b> — Warriors cannot Train Ranged. Move to FRONT to attack.</color>\n"
+                    : "<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Train Ranged (crossbow) or move to FRONT.</color>\n";
+            }
+            else if (assignedRole == CombatRole.BacklineRanged && canAttackFromBack
+                     && unitType != UnitType.Warrior && !IsRangedUnitType(unitType))
                 info += "<color=#B8E986>Crossbow kit — can attack from BACK</color>\n";
             if (isSirenEnchantress)
             {
@@ -443,15 +489,16 @@ namespace ArthurianAutobattler
         public bool IsBackRow => assignedRole == CombatRole.BacklineRanged;
 
         public bool CanFightFromBackRow =>
-            canAttackFromBack || RecruitInstance.IsRangedUnitType(unitType);
+            (canAttackFromBack && unitType != UnitType.Warrior)
+            || RecruitInstance.IsRangedUnitType(unitType);
 
         /// <summary>
-        /// BACK row fires for ranged types or crossbow-equipped melee.
+        /// BACK row fires for ranged types or crossbow-equipped melee (not Warriors).
         /// </summary>
         public bool CanAttackFromCurrentRow =>
             isDemon || IsFrontRow || CanFightFromBackRow;
 
-        /// <summary>Melee in BACK without crossbow — cannot reach.</summary>
+        /// <summary>Melee in BACK without crossbow — cannot reach (Warriors always if BACK).</summary>
         public bool IsMeleeStuckInBackRow =>
             !isDemon && IsBackRow && !CanFightFromBackRow;
 

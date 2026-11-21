@@ -299,35 +299,54 @@ namespace ArthurianAutobattler
             AutosaveWarband(StartingGold);
         }
 
+        /// <summary>Blocks nested AdvanceNight when Merlin Next Timeline fires twice in one click.</summary>
+        private bool advancingNight;
+
         /// <summary>
         /// Called from Merlin's "Enter Next Timeline" after defeat/victory.
         /// Autosaves surviving warband, advances night, restores them into the next town phase.
         /// </summary>
         public void AdvanceNightAndRestart()
         {
-            currentNight = Mathf.Max(1, currentNight) + 1;
-            PlayerPrefs.SetInt(NightPrefsKey, currentNight);
-            PlayerPrefs.Save();
-
-            // Capture survivors AFTER night bump — automatic, no Save menu.
-            int gold = townUI != null ? townUI.playerGold : StartingGold;
-            AutosaveWarband(gold);
-
-            if (battleEngine != null)
+            if (advancingNight)
             {
-                battleEngine.isBattling = false;
-                battleEngine.currentBattleNumber = 1;
+                Debug.LogWarning(
+                    $"[DemonKnight] AdvanceNightAndRestart ignored — already advancing (would skip to Night {currentNight + 1}).");
+                return;
             }
+            advancingNight = true;
+            try
+            {
+                int from = Mathf.Max(1, currentNight);
+                currentNight = from + 1;
+                PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+                PlayerPrefs.Save();
+                Debug.Log($"[DemonKnight] Night advance {from} → {currentNight}");
 
-            if (PerkDraftManager.Instance != null)
-                PerkDraftManager.Instance.unlockedPerks.Clear();
+                // Capture survivors AFTER night bump — automatic, no Save menu.
+                int gold = townUI != null ? townUI.playerGold : StartingGold;
+                AutosaveWarband(gold);
 
-            townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+                if (battleEngine != null)
+                {
+                    battleEngine.isBattling = false;
+                    battleEngine.currentBattleNumber = 1;
+                }
 
-            if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
-            if (townCanvasObj != null) townCanvasObj.SetActive(true);
+                if (PerkDraftManager.Instance != null)
+                    PerkDraftManager.Instance.unlockedPerks.Clear();
 
-            ContinueTimelineFromAutosave();
+                townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+
+                if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
+                if (townCanvasObj != null) townCanvasObj.SetActive(true);
+
+                ContinueTimelineFromAutosave();
+            }
+            finally
+            {
+                advancingNight = false;
+            }
         }
 
         /// <summary>
@@ -484,23 +503,22 @@ namespace ArthurianAutobattler
             var fusionLeafDead = new HashSet<string>();
             CollectFusionLeafDeaths(combatDead, fusionLeafDead);
 
-            // Balance V2: Mordred persists in the warband until killed (never pews).
-            var mordredKeepers = new List<RecruitInstance>();
+            // Persist-across-waves legends (Mordred by default) stay hired until killed.
+            var persistKeepers = new List<RecruitInstance>();
             for (int i = recruitedParty.Count - 1; i >= 0; i--)
             {
                 var r = recruitedParty[i];
-                if (r == null || r.unitType != UnitType.Mordred) continue;
+                if (r == null || !UnitPersistsAcrossWaves(r.unitType)) continue;
                 bool dead = !string.IsNullOrEmpty(r.unitID) && combatDead.Contains(r.unitID);
                 if (!dead)
-                    mordredKeepers.Add(r);
+                    persistKeepers.Add(r);
                 recruitedParty.RemoveAt(i);
             }
 
             // Fused Legends → original pre-fusion pew units (recursive). Product discarded.
             var returning = CardFusionSystem.UnfusePartyToOriginals(recruitedParty);
             recruitedParty.Clear();
-            // Mordred stays hired across waves.
-            foreach (var m in mordredKeepers)
+            foreach (var m in persistKeepers)
                 recruitedParty.Add(m);
 
             if (currentTownPool == null)
@@ -535,8 +553,15 @@ namespace ArthurianAutobattler
 
             mustDisbandPartyAfterCurrentWave = false;
             Debug.Log(
-                $"[DemonKnight] WAVE disband ({(won ? "WIN −10 hire" : "LOSS +0 hire")}; Mordred kept={mordredKeepers.Count}): party {before} → pews += {returned}, hired={recruitedParty.Count}.");
+                $"[DemonKnight] WAVE disband ({(won ? "WIN −10 hire" : "LOSS +0 hire")}; persist kept={persistKeepers.Count}): party {before} → pews += {returned}, hired={recruitedParty.Count}.");
             RefreshTownAfterDisband();
+        }
+
+        public static bool UnitPersistsAcrossWaves(UnitType type)
+        {
+            var db = CharacterDatabase.Load();
+            if (db != null) return db.PersistsAcrossWaves(type);
+            return type == UnitType.Mordred;
         }
 
         private void ReturnOneToPew(
@@ -549,10 +574,10 @@ namespace ArthurianAutobattler
             ref int returned)
         {
             if (r == null) return;
-            // Mordred is fuse/Legend only — never seats in pews (must fuse again next run).
-            if (r.unitType == UnitType.Mordred)
+            // Persist legends are fuse-only — never seat in pews.
+            if (UnitPersistsAcrossWaves(r.unitType))
             {
-                Debug.Log("[DemonKnight] Mordred discarded on disband — never returns to a pew.");
+                Debug.Log($"[DemonKnight] {r.characterName} discarded on disband — never returns to a pew.");
                 return;
             }
             if (!string.IsNullOrEmpty(r.unitID) && !seenIds.Add(r.unitID))
@@ -666,8 +691,8 @@ namespace ArthurianAutobattler
             mustDisbandPartyAfterCurrentWave = false;
             rivalriesSuspendedThisWave = false;
             tavernRoundHireDiscountActive = false;
-            // Mordred never belongs in pews (fuse/Legend only).
-            currentTownPool?.RemoveAll(r => r != null && r.unitType == UnitType.Mordred);
+            // Persist legends never belong in pews (fuse/Legend only).
+            currentTownPool?.RemoveAll(r => r != null && UnitPersistsAcrossWaves(r.unitType));
             AutosaveWarband();
             RefreshTownAfterDisband();
 
@@ -683,7 +708,7 @@ namespace ArthurianAutobattler
             if (townUI == null) townUI = FindFirstObjectByType<TownSplitUIController>();
             if (currentTownPool != null)
             {
-                currentTownPool.RemoveAll(r => r != null && r.unitType == UnitType.Mordred);
+                currentTownPool.RemoveAll(r => r != null && UnitPersistsAcrossWaves(r.unitType));
                 if (church != null && church.pewSeatLayer != null)
                     church.PopulatePews(currentTownPool);
                 else
@@ -702,6 +727,22 @@ namespace ArthurianAutobattler
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
             r.RefreshBodyPostureFromTraits(grudge);
+            // Restore modular look (indices survive JSON; sprites rebind from library).
+            var lib = rngGenerator.modularLibrary != null
+                ? rngGenerator.modularLibrary
+                : ModularSpriteLibrary.Load();
+            if (r.appearance == null)
+                r.appearance = TownsfolkAppearance.Generate(r.unitType, r.unitID, r.pewSeatIndex, lib);
+            else
+                r.appearance.BindSeatSalt(r.pewSeatIndex);
+            if (lib != null)
+            {
+                TownsfolkVisualApplier.SetLibrary(lib);
+                var pose = lib.GetPose(r.appearance.poseIndex);
+                var head = lib.GetHead(r.appearance.headIndex);
+                if (pose != null) r.bodySprite = pose;
+                if (head != null) r.headSprite = head;
+            }
             // Best-effort avatar from type pools (sprites are not stored in JSON).
             List<Sprite> pool = null;
             if (r.unitType == UnitType.Knight) pool = rngGenerator.knightAvatars;
@@ -737,19 +778,37 @@ namespace ArthurianAutobattler
             return $"Night {night} · {DescribeWave(wave)}";
         }
 
-        /// <summary>Wave number + boss/horde type for HUD.</summary>
+        /// <summary>Wave number + boss/horde type for HUD (CharacterDatabase schedule).</summary>
         public static string DescribeWave(int wave)
         {
             wave = Mathf.Max(1, wave);
+            var db = CharacterDatabase.Load();
+            if (db != null) return db.DescribeWave(wave);
+            // Legacy fallback aligned with DemonHordeGenerator (boss from wave 3).
             return wave switch
             {
                 1 => "Wave 1 (Horde)",
-                2 => "Wave 2 (Black Knight)",
-                3 => "Wave 3 (Vortigern)",
-                4 => "Wave 4 (Green Knight)",
-                5 => "Wave 5 (Accolon)",
-                _ => $"Wave {wave} (Nimue)"
+                2 => "Wave 2 (Horde)",
+                3 => "Wave 3: The Black Knight",
+                4 => "Wave 4: Vortigern, Usurper King",
+                5 => "Wave 5: The Green Knight",
+                6 => "Wave 6: Accolon of Gaul",
+                7 => "Wave 7: Sir Meleagant",
+                8 => "Wave 8: King Lot of Lothian",
+                9 => "Wave 9: The Questing Beast",
+                _ => $"Wave {wave}: Nimue, Queen of Thorns"
             };
+        }
+
+        /// <summary>Upcoming/active wave boss definition (null on horde-only waves).</summary>
+        public static CharacterDefinition GetWaveBossDefinition(int wave = -1)
+        {
+            if (wave < 0)
+            {
+                var loop = Instance;
+                wave = loop != null ? loop.CurrentWaveNumber() : 1;
+            }
+            return CharacterDatabase.Load()?.GetBossForWave(wave);
         }
 
         private static void ApplyNightLabel(string label)
@@ -765,7 +824,12 @@ namespace ArthurianAutobattler
             if (nightTf == null) return;
 
             var tmp = nightTf.GetComponent<TMPro.TextMeshProUGUI>();
-            if (tmp != null) tmp.text = label;
+            if (tmp != null)
+            {
+                tmp.text = label;
+                var bossHud = WaveBossHudView.EnsureNearNightText(tmp);
+                bossHud?.Refresh(CurrentWaveNumber());
+            }
         }
 
         private bool IsTownCompletelyPricedOut(int availableGold)

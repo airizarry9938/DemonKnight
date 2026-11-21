@@ -19,10 +19,13 @@ public static class ArthurianSyncFromGitHub
     private const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
-    /// <summary>Package tip pin — Force Sync prefers this over main until this PR merges.</summary>
-    private const string FallbackCommitSha = "9ffdea2";
+    /// <summary>
+    /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
+    /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
+    /// </summary>
+    private const string FallbackCommitSha = "a1d641b96c5931de0b42fcdd6bef10692a90df9b";
 
-    private const string ExpectedPackageId = "fix-fusion-serialize-flat-autosave";
+    private const string ExpectedPackageId = "force-sync-main-landed";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -55,6 +58,10 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/FloatingCombatText.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/Data/TownsfolkAppearance.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+        "Assets/Scripts/Data/Characters/CharacterDefinition.cs",
+        "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
         "Assets/Scripts/Data/SomersetRunes.cs",
         "Assets/Scripts/Data/SomersetVisualDatabase.cs",
         "Assets/Scripts/Persistence/GrudgeSaveManager.cs",
@@ -72,6 +79,9 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
+        "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
+        "Assets/Scripts/UI/TownsfolkPortraitView.cs",
+        "Assets/Scripts/UI/WaveBossHudView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
@@ -80,6 +90,11 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianRepairChurchStage.cs",
         "Assets/Editor/ArthurianSceneBuilder.cs",
         "Assets/Editor/SomersetAssetStudioWindow.cs",
+        "Assets/Editor/ArthurianModularSpriteSheetImporterWindow.cs",
+        "Assets/Editor/ArthurianBattleSpriteSheetSlicerWindow.cs",
+        "Assets/Editor/ArthurianCharacterDatabaseEditor.cs",
+        "Assets/Editor/ArthurianCharacterCatalogSeeder.cs",
+        "Assets/Data/Characters/README.md",
     };
 
     private static readonly string[] AtomicCritical =
@@ -150,8 +165,8 @@ public static class ArthurianSyncFromGitHub
             return;
 
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        // Prefer package pin — tip-of-main still lacks NonSerialized/flat fusionParts until merge.
-        string sha = FallbackCommitSha;
+        // Prefer tip of main (landed stack); pin is emergency fallback only.
+        string sha = ResolveMainSha() ?? FallbackCommitSha;
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
         string[] bootstrap =
         {
@@ -205,9 +220,9 @@ public static class ArthurianSyncFromGitHub
     public static void RunSync(bool showDialog, bool deleteFirst = true, bool preDeleteAll = false)
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        // Prefer package pin — tip-of-main still lacks NonSerialized/flat fusionParts until merge.
-        string sha = FallbackCommitSha;
-        Debug.Log($"[DemonKnight] Sync pinning downloads to commit {sha}");
+        // Prefer tip of main so Downloads Unity Force Sync tracks GitHub without raw overwrites.
+        string sha = ResolveMainSha() ?? FallbackCommitSha;
+        Debug.Log($"[DemonKnight] Sync pinning downloads to commit {sha} (force-sync-main-landed; main tip preferred)");
 
         var errors = new List<string>();
         var okFiles = new List<string>();
@@ -520,6 +535,16 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("warrior-no-train-ranged-night-seq")
+                   || body.Contains("pew-generate-appearance-if-null")
+                   || body.Contains("art-tools-runtime-deps")
+                   || body.Contains("art-tools-install-menu")
+                   || body.Contains("art-tools-under-arthurian")
+                   || body.Contains("end-run-remove-perks-runes")
+                   || body.Contains("character-registry-battle-sprites")
+                   || body.Contains("modular-townsfolk-appearance")
+                   || body.Contains("fix-night-double-advance")
+                   || body.Contains("fix-fusion-serialize-flat-autosave")
                    || body.Contains("fix-fusion-serialize-intel-costs")
                    || body.Contains("fix-boss-dialog-cs0136")
                    || body.Contains("balance-v2-arthurian-expansion")
@@ -549,6 +574,16 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("warrior-no-train-ranged-night-seq")
+                    || body.Contains("pew-generate-appearance-if-null")
+                    || body.Contains("art-tools-runtime-deps")
+                    || body.Contains("art-tools-install-menu")
+                    || body.Contains("art-tools-under-arthurian")
+                    || body.Contains("end-run-remove-perks-runes")
+                    || body.Contains("character-registry-battle-sprites")
+                    || body.Contains("modular-townsfolk-appearance")
+                    || body.Contains("fix-night-double-advance")
+                    || body.Contains("fix-fusion-serialize-flat-autosave")
                     || body.Contains("fix-fusion-serialize-intel-costs")
                     || body.Contains("fix-boss-dialog-cs0136")
                     || body.Contains("balance-v2-arthurian-expansion")
