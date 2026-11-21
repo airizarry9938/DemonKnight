@@ -15,6 +15,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 {
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
+    const string SplicedRootFolder = "Assets/Art/Spliced";
     const string CharactersFolder = "Assets/Resources/Characters";
     const string StageProfilePath = "Assets/Resources/StageLayoutProfile.asset";
 
@@ -42,6 +43,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
     float clipFps = 6f;
     bool clipLoop = true;
     string sliceOutputFolder = DefaultSliceFolder;
+    string targetExportFolder = SplicedRootFolder + "/Pose";
+    SheetCategory lastExportCategory = SheetCategory.Pose;
 
     // Interactive Manual Box Splicer (default crop tool)
     CropToolMode cropTool = CropToolMode.ManualBox;
@@ -85,6 +88,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
     Vector2 stagePan;
     float stageZoom = 28f;
     Vector2 parallaxScroll;
+    Vector2 paletteScroll;
+    readonly List<Sprite> splicedPalette = new List<Sprite>();
+    readonly List<CharacterDefinition> characterPalette = new List<CharacterDefinition>();
+    Sprite paletteSelectedSprite;
+    CharacterDefinition paletteSelectedCharacter;
+    double lastPaletteRefresh;
 
     [MenuItem("Arthurian/Art & Stage Architect", false, 35)]
     public static void Open()
@@ -104,6 +113,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             stageProfile = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(StageProfilePath)
                            ?? StageLayoutProfile.Load();
         stageProfile?.EnsureSlotCounts();
+        SyncDefaultExportFolder();
         EditorApplication.update += OnEditorUpdate;
     }
 
@@ -156,10 +166,15 @@ public class ArthurianArtArchitectWindow : EditorWindow
             MessageType.Info);
 
         sheetTexture = (Texture2D)EditorGUILayout.ObjectField("Sprite Sheet", sheetTexture, typeof(Texture2D), false);
+        EditorGUI.BeginChangeCheck();
         sheetCategory = (SheetCategory)EditorGUILayout.EnumPopup("Category", sheetCategory);
+        if (EditorGUI.EndChangeCheck() || string.IsNullOrEmpty(targetExportFolder))
+            SyncDefaultExportFolder();
         targetLibrary = (ModularSpriteLibrary)EditorGUILayout.ObjectField(
             "ModularSpriteLibrary", targetLibrary, typeof(ModularSpriteLibrary), false);
-        sliceOutputFolder = EditorGUILayout.TextField("Slice Output Folder", sliceOutputFolder);
+        targetExportFolder = EditorGUILayout.TextField("Target Export Folder", targetExportFolder);
+        EditorGUILayout.LabelField($"Default: {SplicedRootFolder}/{sheetCategory}", EditorStyles.miniLabel);
+        sliceOutputFolder = EditorGUILayout.TextField("Working Slice Folder", sliceOutputFolder);
         keyColor = EditorGUILayout.ColorField("Key Color", keyColor);
         keyTolerance = EditorGUILayout.Slider("Key Tolerance", keyTolerance, 0f, 64f);
 
@@ -194,10 +209,16 @@ public class ArthurianArtArchitectWindow : EditorWindow
         clipLoop = EditorGUILayout.Toggle("Loop", clipLoop);
 
         int selectedCount = CountSelectedFrames();
+        EditorGUILayout.BeginHorizontal();
+        EditorGUI.BeginDisabledGroup(selectedCount == 0);
+        if (GUILayout.Button($"Save Splices to Folder ({selectedCount})", GUILayout.Height(36)))
+            SaveSplicesToFolder();
+        EditorGUI.EndDisabledGroup();
         EditorGUI.BeginDisabledGroup(selectedCount == 0 || targetLibrary == null);
         if (GUILayout.Button($"Create Animation Clip ({selectedCount} frames) → Register Library", GUILayout.Height(36)))
             CreateAndRegisterClip();
         EditorGUI.EndDisabledGroup();
+        EditorGUILayout.EndHorizontal();
 
         if (targetLibrary != null && targetLibrary.animClips != null && targetLibrary.animClips.Count > 0)
         {
@@ -873,6 +894,243 @@ public class ArthurianArtArchitectWindow : EditorWindow
         return n;
     }
 
+    void SyncDefaultExportFolder()
+    {
+        string expectedPrev = $"{SplicedRootFolder}/{lastExportCategory}";
+        string expectedNow = $"{SplicedRootFolder}/{sheetCategory}";
+        string cur = (targetExportFolder ?? "").Replace('\\', '/').TrimEnd('/');
+        if (string.IsNullOrEmpty(cur) || cur == expectedPrev || IsCategoryExportFolder(cur)
+            || cur == SplicedRootFolder)
+            targetExportFolder = expectedNow;
+        lastExportCategory = sheetCategory;
+    }
+
+    static bool IsCategoryExportFolder(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+        string n = path.Replace('\\', '/').TrimEnd('/');
+        foreach (SheetCategory c in (SheetCategory[])Enum.GetValues(typeof(SheetCategory)))
+            if (string.Equals(n, $"{SplicedRootFolder}/{c}", StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
+    }
+
+    void SaveSplicesToFolder()
+    {
+        SyncDefaultExportFolder();
+        string folder = string.IsNullOrWhiteSpace(targetExportFolder)
+            ? $"{SplicedRootFolder}/{sheetCategory}"
+            : targetExportFolder.Replace('\\', '/').TrimEnd('/');
+        EnsureFolder(folder);
+
+        var frames = new List<Sprite>();
+        for (int i = 0; i < croppedFrames.Count; i++)
+        {
+            if (i < frameSelected.Count && frameSelected[i] && croppedFrames[i] != null)
+                frames.Add(croppedFrames[i]);
+        }
+        if (frames.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Save Splices", "Select at least one cropped frame first.", "OK");
+            return;
+        }
+
+        var saved = new List<Sprite>();
+        string baseName = sheetTexture != null ? sheetTexture.name : "splice";
+        for (int i = 0; i < frames.Count; i++)
+        {
+            Sprite src = frames[i];
+            string assetPath = $"{folder}/{baseName}_{sheetCategory}_{i:00}.png";
+            Sprite written = WriteSpritePngPointBottomCenter(src, assetPath);
+            if (written != null) saved.Add(written);
+        }
+
+        if (saved.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Save Splices", "Failed to write PNGs (readable texture?).", "OK");
+            return;
+        }
+
+        // Refresh croppedFrames to the exported Point/Bottom-Center sprites.
+        croppedFrames.Clear();
+        frameSelected.Clear();
+        foreach (var sp in saved)
+        {
+            croppedFrames.Add(sp);
+            frameSelected.Add(true);
+        }
+
+        RegisterSpritesIntoLibrary(saved);
+        RefreshSplicedPalette(force: true);
+        Debug.Log($"[DemonKnight] Saved {saved.Count} splices → {folder} + ModularSpriteLibrary");
+        EditorUtility.DisplayDialog(
+            "Save Splices to Folder",
+            $"Wrote {saved.Count} PNG(s) (Point / Sprite / Bottom-Center)\n→ {folder}\nRegistered into ModularSpriteLibrary.",
+            "OK");
+    }
+
+    Sprite WriteSpritePngPointBottomCenter(Sprite src, string assetPath)
+    {
+        if (src == null || src.texture == null) return null;
+        Texture2D readable = ExtractSpriteTexture(src);
+        if (readable == null) return null;
+        File.WriteAllBytes(assetPath, readable.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(readable);
+        AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+        ConfigureSingleSpritePointBottomCenter(assetPath);
+        AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+        return AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+    }
+
+    static Texture2D ExtractSpriteTexture(Sprite src)
+    {
+        if (src == null || src.texture == null) return null;
+        Rect tr = src.textureRect;
+        int x = Mathf.FloorToInt(tr.x);
+        int y = Mathf.FloorToInt(tr.y);
+        int w = Mathf.Max(1, Mathf.FloorToInt(tr.width));
+        int h = Mathf.Max(1, Mathf.FloorToInt(tr.height));
+        string path = AssetDatabase.GetAssetPath(src.texture);
+        Texture2D full = null;
+        bool madeCopy = false;
+        if (src.texture.isReadable)
+            full = src.texture;
+        else
+        {
+            full = LoadReadableCopy(src.texture, path);
+            madeCopy = full != null;
+            if (full == null) return null;
+        }
+        try
+        {
+            Color[] pixels = full.GetPixels(x, y, w, h);
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+        finally
+        {
+            if (madeCopy && full != null)
+                UnityEngine.Object.DestroyImmediate(full);
+        }
+    }
+
+    static void ConfigureSingleSpritePointBottomCenter(string assetPath)
+    {
+        var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+        if (importer == null) return;
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Single;
+        importer.spritePivot = new Vector2(0.5f, 0f);
+        importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = false;
+        importer.filterMode = FilterMode.Point;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.isReadable = true;
+        var settings = new TextureImporterSettings();
+        importer.ReadTextureSettings(settings);
+        settings.spriteAlignment = (int)SpriteAlignment.BottomCenter;
+        settings.spritePivot = new Vector2(0.5f, 0f);
+        importer.SetTextureSettings(settings);
+        importer.SaveAndReimport();
+    }
+
+    void RegisterSpritesIntoLibrary(List<Sprite> sprites)
+    {
+        if (sprites == null || sprites.Count == 0) return;
+        EnsureLibraryAsset();
+        if (targetLibrary == null) return;
+        Undo.RecordObject(targetLibrary, "Register Spliced Sprites");
+        foreach (var sp in sprites)
+            AssignStaticAppend(sheetCategory, sp);
+
+        string name = string.IsNullOrWhiteSpace(clipName) ? SpriteAnimClip.Idle : clipName.Trim();
+        var clip = new SpriteAnimClip
+        {
+            clipName = name,
+            framesPerSecond = Mathf.Max(0.1f, clipFps),
+            loop = clipLoop,
+            frames = new List<Sprite>(sprites)
+        };
+        targetLibrary.RegisterAnimClip(sheetCategory.ToString(), clip);
+        EditorUtility.SetDirty(targetLibrary);
+        AssetDatabase.SaveAssets();
+        SyncLibraryToResources();
+    }
+
+    void AssignStaticAppend(SheetCategory cat, Sprite sp)
+    {
+        if (sp == null || targetLibrary == null) return;
+        targetLibrary.EnsureSizedArrays();
+        switch (cat)
+        {
+            case SheetCategory.Pose:
+                targetLibrary.basePoses = AppendSprite(targetLibrary.basePoses, sp);
+                break;
+            case SheetCategory.Outfit:
+                targetLibrary.outfits = AppendSprite(targetLibrary.outfits, sp);
+                break;
+            case SheetCategory.Head:
+            {
+                var list = new List<Sprite>();
+                var hair = new List<bool>();
+                if (targetLibrary.heads != null)
+                {
+                    for (int i = 0; i < targetLibrary.heads.Length; i++)
+                    {
+                        if (targetLibrary.heads[i]?.sprite != null)
+                        {
+                            list.Add(targetLibrary.heads[i].sprite);
+                            hair.Add(targetLibrary.heads[i].isHair);
+                        }
+                    }
+                }
+                list.Add(sp);
+                hair.Add(true);
+                targetLibrary.AssignHeadsFromSprites(list, hair);
+                break;
+            }
+            case SheetCategory.Weapon:
+            {
+                // props[0] stays empty (no weapon); append after.
+                var list = new List<Sprite> { null };
+                if (targetLibrary.props != null)
+                {
+                    for (int i = 1; i < targetLibrary.props.Length; i++)
+                    {
+                        if (targetLibrary.props[i] == null) continue;
+                        if (targetLibrary.props[i] == sp) return;
+                        list.Add(targetLibrary.props[i]);
+                    }
+                }
+                list.Add(sp);
+                targetLibrary.props = list.ToArray();
+                break;
+            }
+            case SheetCategory.EnemyBoss:
+                // No dedicated array — clip registration covers EnemyBoss.
+                break;
+        }
+    }
+
+    static Sprite[] AppendSprite(Sprite[] arr, Sprite sp)
+    {
+        if (sp == null) return arr;
+        var list = new List<Sprite>();
+        if (arr != null)
+        {
+            foreach (var s in arr)
+            {
+                if (s == null) continue;
+                if (s == sp) return arr; // already present
+                list.Add(s);
+            }
+        }
+        list.Add(sp);
+        return list.ToArray();
+    }
+
     void CreateAndRegisterClip()
     {
         EnsureLibraryAsset();
@@ -1111,6 +1369,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         DrawSlotInspector();
         EditorGUILayout.EndHorizontal();
 
+        EditorGUILayout.Space(6);
+        DrawSplicedAndCharacterPalette();
+
         EditorGUILayout.Space(8);
         DrawParallaxAndFxDrawer();
     }
@@ -1148,8 +1409,24 @@ public class ArthurianArtArchitectWindow : EditorWindow
             float size = 18f * Mathf.Clamp(s.scale.x, 0.5f, 1.5f);
             Rect handle = new Rect(screen.x - size * 0.5f, screen.y - size * 0.5f, size, size);
             bool sel = i == selectedSlot;
+
+            // Live preview sprite behind the numbered handle
+            Sprite preview = ResolveSlotPreviewSprite(s);
+            if (preview != null)
+            {
+                float pw = size * 2.2f * Mathf.Max(0.5f, s.aspectMultiplier.x);
+                float ph = size * 2.8f * Mathf.Max(0.5f, s.aspectMultiplier.y);
+                Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.85f, pw, ph);
+                DrawSprite(pr, preview, Color.white);
+            }
+
             EditorGUI.DrawRect(handle, sel ? new Color(1f, 0.85f, 0.25f, 0.95f) : new Color(0.35f, 0.65f, 0.95f, 0.85f));
             GUI.Label(handle, i.ToString("00"), EditorStyles.centeredGreyMiniLabel);
+            if (!string.IsNullOrEmpty(s.assignedCharacterId))
+            {
+                var idRect = new Rect(handle.x - 8f, handle.yMax, handle.width + 16f, 12f);
+                GUI.Label(idRect, s.assignedCharacterId, EditorStyles.miniLabel);
+            }
 
             if (e.type == EventType.MouseDown && e.button == 0 && handle.Contains(e.mousePosition))
             {
@@ -1202,7 +1479,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     void DrawSlotInspector()
     {
         var slots = ActiveSlots();
-        EditorGUILayout.BeginVertical(GUILayout.Width(260));
+        EditorGUILayout.BeginVertical(GUILayout.Width(280));
         EditorGUILayout.LabelField("Slot Inspector", EditorStyles.boldLabel);
         if (slots == null || selectedSlot < 0 || selectedSlot >= slots.Count)
         {
@@ -1218,6 +1495,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         s.scale = EditorGUILayout.Vector2Field("Scale", s.scale);
         s.aspectMultiplier = EditorGUILayout.Vector2Field("Aspect Multiplier", s.aspectMultiplier);
         s.sortingOrder = EditorGUILayout.IntField("Sorting Order", s.sortingOrder);
+        s.previewOrOverrideSprite = (Sprite)EditorGUILayout.ObjectField(
+            "Preview / Override Sprite", s.previewOrOverrideSprite, typeof(Sprite), false);
+        s.assignedCharacterId = EditorGUILayout.TextField("Assigned Character Id", s.assignedCharacterId ?? "");
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Slot Stat Upgrades", EditorStyles.miniBoldLabel);
         s.bonusHP = EditorGUILayout.IntField("Bonus HP", s.bonusHP);
@@ -1228,12 +1508,232 @@ public class ArthurianArtArchitectWindow : EditorWindow
             Undo.RecordObject(stageProfile, "Edit Stage Slot");
             EditorUtility.SetDirty(stageProfile);
         }
+
+        EditorGUILayout.Space(4);
+        EditorGUI.BeginDisabledGroup(paletteSelectedSprite == null && paletteSelectedCharacter == null);
+        if (GUILayout.Button("Assign Palette Selection → Slot", GUILayout.Height(26)))
+            AssignPaletteToSelectedSlot();
+        EditorGUI.EndDisabledGroup();
+        EditorGUI.BeginDisabledGroup(ResolveSlotPreviewSprite(s) == null && paletteSelectedSprite == null);
+        if (GUILayout.Button("Quick Add to Parallax Layer", GUILayout.Height(26)))
+            QuickAddPreviewToParallax(ResolveSlotPreviewSprite(s) ?? paletteSelectedSprite);
+        EditorGUI.EndDisabledGroup();
+
+        if (GUILayout.Button("Clear Slot Preview / Character"))
+        {
+            Undo.RecordObject(stageProfile, "Clear Slot Preview");
+            s.previewOrOverrideSprite = null;
+            s.assignedCharacterId = "";
+            EditorUtility.SetDirty(stageProfile);
+        }
         if (GUILayout.Button("Save StageLayoutProfile"))
         {
             EditorUtility.SetDirty(stageProfile);
             AssetDatabase.SaveAssets();
         }
         EditorGUILayout.EndVertical();
+    }
+
+    Sprite ResolveSlotPreviewSprite(SlotTransformConfig s)
+    {
+        if (s == null) return null;
+        if (s.previewOrOverrideSprite != null) return s.previewOrOverrideSprite;
+        if (string.IsNullOrEmpty(s.assignedCharacterId)) return null;
+        RefreshCharacterPaletteIfNeeded();
+        for (int i = 0; i < characterPalette.Count; i++)
+        {
+            var c = characterPalette[i];
+            if (c != null && c.characterId == s.assignedCharacterId)
+                return c.portraitSprite != null ? c.portraitSprite : c.battleSprite;
+        }
+        return null;
+    }
+
+    void DrawSplicedAndCharacterPalette()
+    {
+        RefreshSplicedPalette();
+        RefreshCharacterPaletteIfNeeded();
+
+        EditorGUILayout.LabelField("Spliced Art + Character Palette", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            $"Sprites from {SplicedRootFolder}/… and CharacterDefinitions from {CharactersFolder}. " +
+            "Click a tile, then Assign to the selected slot (live handle preview). Quick Add → parallax layer.",
+            MessageType.None);
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Refresh Palette", GUILayout.Width(120)))
+        {
+            RefreshSplicedPalette(force: true);
+            RefreshCharacterPaletteIfNeeded(force: true);
+        }
+        if (paletteSelectedSprite != null)
+            EditorGUILayout.LabelField($"Sprite: {paletteSelectedSprite.name}", EditorStyles.miniLabel);
+        else if (paletteSelectedCharacter != null)
+            EditorGUILayout.LabelField($"Character: {paletteSelectedCharacter.characterId}", EditorStyles.miniLabel);
+        else
+            EditorGUILayout.LabelField("Nothing selected", EditorStyles.miniLabel);
+        EditorGUILayout.EndHorizontal();
+
+        paletteScroll = EditorGUILayout.BeginScrollView(paletteScroll, GUILayout.Height(120));
+        const float thumb = 48f;
+        int cols = Mathf.Max(1, Mathf.FloorToInt((position.width - 40f) / (thumb + 6f)));
+        EditorGUILayout.LabelField($"Spliced ({splicedPalette.Count})", EditorStyles.miniBoldLabel);
+        DrawSpritePaletteRow(splicedPalette, cols, thumb);
+        EditorGUILayout.LabelField($"Characters ({characterPalette.Count})", EditorStyles.miniBoldLabel);
+        DrawCharacterPaletteRow(cols, thumb);
+        EditorGUILayout.EndScrollView();
+    }
+
+    void DrawSpritePaletteRow(List<Sprite> sprites, int cols, float thumb)
+    {
+        if (sprites == null || sprites.Count == 0)
+        {
+            EditorGUILayout.LabelField("  (empty)", EditorStyles.miniLabel);
+            return;
+        }
+        EditorGUILayout.BeginHorizontal();
+        for (int i = 0; i < sprites.Count; i++)
+        {
+            if (i > 0 && i % cols == 0)
+            {
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.BeginHorizontal();
+            }
+            var sp = sprites[i];
+            Rect r = GUILayoutUtility.GetRect(thumb, thumb, GUILayout.Width(thumb), GUILayout.Height(thumb));
+            if (sp != null) DrawSprite(r, sp, Color.white);
+            else EditorGUI.DrawRect(r, new Color(0.2f, 0.2f, 0.2f));
+            bool sel = sp != null && sp == paletteSelectedSprite;
+            if (sel) DrawRectOutline(r, new Color(1f, 0.85f, 0.2f), 2f);
+            if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition))
+            {
+                paletteSelectedSprite = sp;
+                paletteSelectedCharacter = null;
+                Event.current.Use();
+                Repaint();
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+    }
+
+    void DrawCharacterPaletteRow(int cols, float thumb)
+    {
+        if (characterPalette.Count == 0)
+        {
+            EditorGUILayout.LabelField("  (no CharacterDefinitions yet)", EditorStyles.miniLabel);
+            return;
+        }
+        EditorGUILayout.BeginHorizontal();
+        for (int i = 0; i < characterPalette.Count; i++)
+        {
+            if (i > 0 && i % cols == 0)
+            {
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.BeginHorizontal();
+            }
+            var def = characterPalette[i];
+            Sprite sp = def != null ? (def.portraitSprite ?? def.battleSprite) : null;
+            Rect r = GUILayoutUtility.GetRect(thumb, thumb, GUILayout.Width(thumb), GUILayout.Height(thumb));
+            if (sp != null) DrawSprite(r, sp, Color.white);
+            else EditorGUI.DrawRect(r, new Color(0.25f, 0.22f, 0.18f));
+            bool sel = def != null && def == paletteSelectedCharacter;
+            if (sel) DrawRectOutline(r, new Color(1f, 0.85f, 0.2f), 2f);
+            GUI.Label(new Rect(r.x, r.yMax - 12f, r.width, 12f),
+                def != null ? Truncate(def.characterId, 8) : "?", EditorStyles.miniLabel);
+            if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition))
+            {
+                paletteSelectedCharacter = def;
+                paletteSelectedSprite = sp;
+                Event.current.Use();
+                Repaint();
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+    }
+
+    static string Truncate(string s, int max)
+    {
+        if (string.IsNullOrEmpty(s) || s.Length <= max) return s ?? "";
+        return s.Substring(0, max - 1) + "…";
+    }
+
+    void AssignPaletteToSelectedSlot()
+    {
+        var slots = ActiveSlots();
+        if (slots == null || selectedSlot < 0 || selectedSlot >= slots.Count) return;
+        var s = slots[selectedSlot];
+        Undo.RecordObject(stageProfile, "Assign Palette To Slot");
+        if (paletteSelectedCharacter != null)
+        {
+            s.assignedCharacterId = paletteSelectedCharacter.characterId;
+            s.previewOrOverrideSprite = paletteSelectedCharacter.portraitSprite
+                                        ?? paletteSelectedCharacter.battleSprite
+                                        ?? paletteSelectedSprite;
+        }
+        else if (paletteSelectedSprite != null)
+        {
+            s.previewOrOverrideSprite = paletteSelectedSprite;
+        }
+        EditorUtility.SetDirty(stageProfile);
+        Repaint();
+    }
+
+    void QuickAddPreviewToParallax(Sprite sp)
+    {
+        if (stageProfile == null || sp == null) return;
+        stageProfile.parallaxLayers ??= new List<StageParallaxLayer>();
+        Undo.RecordObject(stageProfile, "Quick Add Parallax Layer");
+        stageProfile.parallaxLayers.Add(new StageParallaxLayer
+        {
+            layerName = sp.name,
+            layerSprite = sp,
+            sortingOrder = stageProfile.parallaxLayers.Count,
+            layerTint = Color.white,
+            swayFrequency = 1f,
+            scrollSpeed = new Vector2(0.05f, 0f),
+            swayAmplitude = new Vector2(0f, 0.02f)
+        });
+        EditorUtility.SetDirty(stageProfile);
+        Debug.Log($"[DemonKnight] Quick-added parallax layer '{sp.name}'");
+        Repaint();
+    }
+
+    void RefreshSplicedPalette(bool force = false)
+    {
+        if (!force && EditorApplication.timeSinceStartup - lastPaletteRefresh < 2.0) return;
+        lastPaletteRefresh = EditorApplication.timeSinceStartup;
+        splicedPalette.Clear();
+        if (!AssetDatabase.IsValidFolder(SplicedRootFolder))
+        {
+            EnsureFolder(SplicedRootFolder);
+            return;
+        }
+        string[] guids = AssetDatabase.FindAssets("t:Sprite", new[] { SplicedRootFolder });
+        var seen = new HashSet<string>();
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (!seen.Add(path)) continue;
+            var sp = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sp != null) splicedPalette.Add(sp);
+        }
+        splicedPalette.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+    }
+
+    void RefreshCharacterPaletteIfNeeded(bool force = false)
+    {
+        if (!force && characterPalette.Count > 0 && EditorApplication.timeSinceStartup - lastPaletteRefresh < 2.0)
+            return;
+        characterPalette.Clear();
+        if (!AssetDatabase.IsValidFolder(CharactersFolder)) return;
+        string[] guids = AssetDatabase.FindAssets("t:CharacterDefinition", new[] { CharactersFolder });
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var def = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(path);
+            if (def != null) characterPalette.Add(def);
+        }
+        characterPalette.Sort((a, b) => string.CompareOrdinal(a.characterId, b.characterId));
     }
 
     void AutoArrangeOverflowFormation()

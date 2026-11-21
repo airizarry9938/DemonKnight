@@ -894,6 +894,10 @@ namespace ArthurianAutobattler
         public int bonusHP;
         public int bonusATK;
         public int bonusSPD;
+        /// <summary>Editor/runtime preview sprite override for this numbered handle.</summary>
+        public Sprite previewOrOverrideSprite;
+        /// <summary>Optional CharacterDefinition.characterId pinned to this slot.</summary>
+        public string assignedCharacterId;
     }
 
     [Serializable]

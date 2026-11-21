@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "53baf246a17a8c82023c45889ec7e36fcef4c133";
 
-    private const string ExpectedPackageId = "manual-box-splicer-tab1";
+    private const string ExpectedPackageId = "export-spliced-slot-palette";
 
     /// <summary>Menu hosts that must always overwrite from tip/main — never skip-self, never Fallback pin.</summary>
     public static readonly string[] SyncHostForceOverwritePaths =
@@ -1060,6 +1060,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class SpriteAnimClip")
                    && body.Contains("class StageLayoutProfile")
                    && body.Contains("class ModularSpriteLibrary")
+                   && body.Contains("previewOrOverrideSprite")
+                   && body.Contains("assignedCharacterId")
                    && body.Contains("ChurchPewCount = 52");
         }
 
@@ -1081,6 +1083,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("Sheet Splicer")
                    && body.Contains("Manual Box Crop")
                    && body.Contains("Slice Manual Boxes")
+                   && body.Contains("Save Splices to Folder")
+                   && body.Contains("Target Export Folder")
+                   && body.Contains("Quick Add to Parallax Layer")
+                   && body.Contains("previewOrOverrideSprite")
                    && body.Contains("Paper-Doll")
                    && body.Contains("Auto-Arrange 52 Overflow Formation")
                    && body.Contains("RegisterAnimClip")
