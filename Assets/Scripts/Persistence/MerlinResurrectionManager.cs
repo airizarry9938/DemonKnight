@@ -181,29 +181,72 @@ namespace ArthurianAutobattler
         void HideRuneUpgradeUi()
         {
             EnsureLegacyBankPanel();
+            PerkDraftManager.SuppressAllPerkUi();
             if (legacyBankPanel == null) return;
+
+            // Keep only Next Timeline + End Run. Hide rune upgrades AND meta bank
+            // (+Gold / +Writ / +Rations) while perks/runes are offline.
             foreach (var b in legacyBankPanel.GetComponentsInChildren<Button>(true))
             {
-                if (b == null || b == endRunButton) continue;
+                if (b == null) continue;
                 string n = b.gameObject.name ?? "";
                 string label = b.GetComponentInChildren<TextMeshProUGUI>()?.text ?? "";
-                bool isRune = n.IndexOf("Rune", StringComparison.OrdinalIgnoreCase) >= 0
-                              || n.IndexOf("Gossip", StringComparison.OrdinalIgnoreCase) >= 0
-                              || n.IndexOf("Gambler", StringComparison.OrdinalIgnoreCase) >= 0
-                              || n.IndexOf("Blood", StringComparison.OrdinalIgnoreCase) >= 0
-                              || n.IndexOf("Crown", StringComparison.OrdinalIgnoreCase) >= 0
-                              || label.IndexOf("Gossip", StringComparison.OrdinalIgnoreCase) >= 0
-                              || label.IndexOf("Gambler", StringComparison.OrdinalIgnoreCase) >= 0
-                              || label.IndexOf("Blood-Oath", StringComparison.OrdinalIgnoreCase) >= 0
-                              || label.IndexOf("Blood Oath", StringComparison.OrdinalIgnoreCase) >= 0
-                              || label.IndexOf("Crown", StringComparison.OrdinalIgnoreCase) >= 0
-                              || label.IndexOf("Upgrade Rune", StringComparison.OrdinalIgnoreCase) >= 0;
-                if (isRune) b.gameObject.SetActive(false);
+                bool keep =
+                    n.IndexOf("NextRun", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("EndRun", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Next Timeline", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Next Run", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Next Night", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("End Run", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Abandon", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Main Menu", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (keep) continue;
+
+                bool hide =
+                    n.IndexOf("Rune", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Gossip", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Gambler", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Blood", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Crown", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Upgrade", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Gold", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Writ", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Discount", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Ration", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Gossip", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Gambler", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Blood", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Crown", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("+Gold", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("+Writ", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("+Ration", StringComparison.OrdinalIgnoreCase) >= 0
+                    || label.IndexOf("Upgrade", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (hide) b.gameObject.SetActive(false);
             }
+
+            // Hide bank level labels so the panel isn't a perk/rune shop.
+            foreach (var tmp in legacyBankPanel.GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                if (tmp == null) continue;
+                string n = tmp.gameObject.name ?? "";
+                if (n.IndexOf("GoldBank", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("DiscountBank", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("RationsBank", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Rune", StringComparison.OrdinalIgnoreCase) >= 0)
+                    tmp.gameObject.SetActive(false);
+            }
+
             if (runeStatusText != null)
             {
-                runeStatusText.text = "Runes & perks are offline while we redesign them.\nUse <b>End Run</b> to return to the Main Menu.";
+                runeStatusText.text =
+                    "Runes & perks are offline while we redesign them.\n"
+                    + "Press <b>Enter Next Timeline</b> for the next night, or <b>End Run</b> for the Main Menu.";
                 runeStatusText.gameObject.SetActive(true);
+            }
+            else if (pointsAvailableText != null)
+            {
+                pointsAvailableText.text =
+                    "Perks & runes offline — End Run → Main Menu, or Enter Next Timeline.";
             }
         }
 

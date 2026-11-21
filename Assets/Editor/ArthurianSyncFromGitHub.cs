@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "4b7db572f2956726439fc8987dcc88d5e7b68376";
 
-    private const string ExpectedPackageId = "legends-columns-wider";
+    private const string ExpectedPackageId = "hide-perks-runes-ui";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -548,6 +548,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("hide-perks-runes-ui")
                    || body.Contains("legends-columns-wider")
                    || body.Contains("force-sync-main-landed")
                    || body.Contains("fix-wavebosshud-cs0103")

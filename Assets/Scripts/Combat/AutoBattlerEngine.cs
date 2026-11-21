@@ -765,9 +765,7 @@ namespace ArthurianAutobattler
 
                 Debug.LogError(
                     $"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Perks disabled — returning to town.");
-                var perkUi = PerkDraftManager.Instance ?? FindFirstObjectByType<PerkDraftManager>();
-                if (perkUi != null && perkUi.perkDraftPanel != null)
-                    perkUi.perkDraftPanel.SetActive(false);
+                PerkDraftManager.SuppressAllPerkUi();
                 loop?.StartTownPhase();
             }
         }

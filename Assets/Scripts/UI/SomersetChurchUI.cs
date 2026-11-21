@@ -106,6 +106,8 @@ namespace ArthurianAutobattler
             WireHudButtonsOnce();
             RewireDiceToggleButton();
             RewireWarbandToggleButton();
+            // Perks/runes offline — kill any scene PerkDraftPanel left active after Sync.
+            PerkDraftManager.SuppressAllPerkUi();
             MainMenuUI.EnsureExists();
             StartCoroutine(RelayoutHudNextFrame());
 
@@ -135,6 +137,7 @@ namespace ArthurianAutobattler
             RewireLegendsToggleButton();
             RewireMarchButton();
             RewireDossierActionButtons();
+            PerkDraftManager.SuppressAllPerkUi();
             if (!diceModalUserOpen)
             {
                 ForceNamedTavernDicePanelsInactive();

@@ -198,6 +198,7 @@ namespace ArthurianAutobattler
                     m?.ResetBankForNewGame();
             }
 
+            PerkDraftManager.SuppressAllPerkUi();
             var perks = FindObjectsByType<PerkDraftManager>(FindObjectsSortMode.None);
             if (perks != null)
             {

@@ -77,7 +77,52 @@ namespace ArthurianAutobattler
         private void Awake()
         {
             if (Instance == null) Instance = this;
-            if (perkDraftPanel != null) perkDraftPanel.SetActive(false);
+            unlockedPerks ??= new HashSet<RunPerkID>();
+            unlockedPerks.Clear();
+            SuppressAllPerkUi();
+        }
+
+        private void OnEnable() => SuppressAllPerkUi();
+
+        private void Start() => SuppressAllPerkUi();
+
+        /// <summary>
+        /// Perks offline till further notice — hide every PerkDraftPanel / choice card /
+        /// HUD perk button even when the manager reference is null (Downloads scenes).
+        /// </summary>
+        public static void SuppressAllPerkUi()
+        {
+            foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+            {
+                if (t == null || !t.gameObject.scene.IsValid()) continue;
+                string n = t.gameObject.name ?? "";
+                bool underPerkParent = t.parent != null
+                    && (t.parent.name ?? "").IndexOf("Perk", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool isPerk =
+                    n.Equals("PerkDraftPanel", StringComparison.OrdinalIgnoreCase)
+                    || n.StartsWith("PerkChoice_", StringComparison.OrdinalIgnoreCase)
+                    || n.Equals("PerkTitle", StringComparison.OrdinalIgnoreCase)
+                    || (n.Equals("VictoryBanner", StringComparison.OrdinalIgnoreCase) && underPerkParent)
+                    || n.IndexOf("PerkDraft", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.Equals("PerkButton", StringComparison.OrdinalIgnoreCase)
+                    || n.Equals("PerksButton", StringComparison.OrdinalIgnoreCase)
+                    || n.Equals("PerksToggle", StringComparison.OrdinalIgnoreCase)
+                    || n.Equals("OpenPerks", StringComparison.OrdinalIgnoreCase);
+                if (!isPerk) continue;
+                if (t.gameObject.activeSelf)
+                    t.gameObject.SetActive(false);
+            }
+
+            var managers = UnityEngine.Object.FindObjectsByType<PerkDraftManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (managers == null) return;
+            foreach (var p in managers)
+            {
+                if (p == null) continue;
+                p.unlockedPerks ??= new HashSet<RunPerkID>();
+                p.unlockedPerks.Clear();
+                if (p.perkDraftPanel != null)
+                    p.perkDraftPanel.SetActive(false);
+            }
         }
 
         public void OpenPerkDraft() => OpenPerkDraft(0, 0);
@@ -87,9 +132,9 @@ namespace ArthurianAutobattler
         /// </summary>
         public void OpenPerkDraft(int waveCleared, int goldEarned)
         {
+            SuppressAllPerkUi();
             var loopEarly = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             DemonKnightCompatApi.EnsureDisbandedAfterWave(loopEarly, null, true);
-            if (perkDraftPanel != null) perkDraftPanel.SetActive(false);
             unlockedPerks?.Clear();
             Debug.LogWarning(
                 $"[DemonKnight] Perk draft disabled (wave {waveCleared}, +{goldEarned}g) — returning to town.");
@@ -130,36 +175,20 @@ namespace ArthurianAutobattler
 
         private void EnsurePanelWired()
         {
+            // Perks offline — never build a runtime draft panel; only bind+hide scene copy.
             if (perkDraftPanel == null)
             {
-                var found = GameObject.Find("PerkDraftPanel");
-                if (found == null)
+                foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
                 {
-                    foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+                    if (t != null && t.gameObject.scene.IsValid()
+                        && t.name.Equals("PerkDraftPanel", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (t != null && t.gameObject.scene.IsValid() && t.name == "PerkDraftPanel")
-                        {
-                            found = t.gameObject;
-                            break;
-                        }
+                        perkDraftPanel = t.gameObject;
+                        break;
                     }
                 }
-                if (found != null) perkDraftPanel = found;
             }
-
-            if (perkDraftPanel == null)
-            {
-                perkDraftPanel = BuildRuntimePerkPanel();
-            }
-
-            if (perkDraftPanel == null) return;
-
-            if (choiceButtons == null || choiceButtons.Length < 3
-                || choiceTitleTexts == null || choiceDescTexts == null
-                || choiceButtons[0] == null)
-            {
-                WireChoicesFromChildren();
-            }
+            if (perkDraftPanel != null) perkDraftPanel.SetActive(false);
         }
 
         private void WireChoicesFromChildren()

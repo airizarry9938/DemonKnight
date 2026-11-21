@@ -367,35 +367,11 @@ public static class ArthurianSceneBuilder
         warbandScrollRect.horizontal = false;
         warbandScrollRect.vertical = true;
 
-        // Perk Draft Modal
-        GameObject perkPanel = CreatePanel(townCanvasObj.transform, "PerkDraftPanel",
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 360f),
-            new Color(0.06f, 0.08f, 0.12f, 0.98f));
-        perkPanel.SetActive(false);
-        CreateTMP(perkPanel.transform, "PerkTitle", "WAVE CLEAR — CHOOSE A RUN PERK", 26, TextAlignmentOptions.Center,
-            new Vector2(0f, 140f), new Vector2(860f, 40f));
-
-        Button[] perkButtons = new Button[3];
-        TextMeshProUGUI[] perkTitles = new TextMeshProUGUI[3];
-        TextMeshProUGUI[] perkDescs = new TextMeshProUGUI[3];
-        for (int i = 0; i < 3; i++)
-        {
-            float x = -280f + i * 280f;
-            GameObject card = CreatePanel(perkPanel.transform, $"PerkChoice_{i}",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, -20f), new Vector2(250f, 220f),
-                new Color(0.14f, 0.16f, 0.22f, 1f));
-            perkTitles[i] = CreateTMP(card.transform, "Title", "Perk", 18, TextAlignmentOptions.Center,
-                new Vector2(0f, 70f), new Vector2(230f, 40f));
-            perkDescs[i] = CreateTMP(card.transform, "Desc", "Description", 14, TextAlignmentOptions.Center,
-                new Vector2(0f, 10f), new Vector2(220f, 90f));
-            perkButtons[i] = CreateButton(card.transform, "Select", "Choose",
-                new Vector2(0f, -70f), new Vector2(140f, 40f), new Color(0.25f, 0.35f, 0.55f));
-        }
-
-        perks.perkDraftPanel = perkPanel;
-        perks.choiceButtons = perkButtons;
-        perks.choiceTitleTexts = perkTitles;
-        perks.choiceDescTexts = perkDescs;
+        // Perk draft UI removed till further notice — leave manager stub with no panel.
+        perks.perkDraftPanel = null;
+        perks.choiceButtons = null;
+        perks.choiceTitleTexts = null;
+        perks.choiceDescTexts = null;
 
         // Merlin Resurrection Canvas
         GameObject resCanvasObj = CreateCanvas("ResurrectionCanvas", 20);
