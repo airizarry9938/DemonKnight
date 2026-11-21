@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "5bfa8d8418ef0f1e61352b46a321545ed35f9351";
 
-    private const string ExpectedPackageId = "sync-nuke-phase25-cs0101";
+    private const string ExpectedPackageId = "fix-paperdoll-random-cs0104";
 
     /// <summary>
     /// EDITOR InitializeOnLoad — runs even when runtime Assembly-CSharp is CS0101-broken
@@ -1025,7 +1025,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ModularSpriteAnimator")
                    && body.Contains("DA-59 EMBEDDED ModularSpriteAnimator")
                    && body.Contains("ConfigurePaperDoll")
-                   && body.Contains("PlayRecruitReveal");
+                   && body.Contains("PlayRecruitReveal")
+                   && body.Contains("UnityEngine.Random.Range")
+                   && !Regex.IsMatch(body, @"(?<!UnityEngine\.)Random\.(Range|insideUnitCircle)");
         }
 
         if (rel.EndsWith("TavernDiceMinigame.cs", StringComparison.OrdinalIgnoreCase))

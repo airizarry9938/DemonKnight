@@ -400,7 +400,7 @@ namespace ArthurianAutobattler
             propImg = seat.propLayer;
             CaptureBase();
             ResolveClips();
-            startOffset = Random.Range(0f, 1.5f);
+            startOffset = UnityEngine.Random.Range(0f, 1.5f);
             state = AnimState.Idle;
             stateTime = 0f;
             ApplyUnscoutedTint(immediate: true);
@@ -421,7 +421,7 @@ namespace ArthurianAutobattler
             propSr = actor.transform.Find("Prop")?.GetComponent<SpriteRenderer>();
             CaptureBase();
             ResolveClips();
-            startOffset = Random.Range(0f, 1.5f);
+            startOffset = UnityEngine.Random.Range(0f, 1.5f);
             state = AnimState.Idle;
             stateTime = 0f;
             enabled = true;
@@ -788,7 +788,7 @@ namespace ArthurianAutobattler
                     var rt = go.GetComponent<RectTransform>();
                     rt.sizeDelta = new Vector2(6f, 6f);
                     rt.anchoredPosition = Vector2.zero;
-                    StartCoroutine(BurstParticleUI(rt, Random.insideUnitCircle.normalized * Random.Range(24f, 70f)));
+                    StartCoroutine(BurstParticleUI(rt, UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(24f, 70f)));
                 }
                 else
                 {
@@ -797,7 +797,7 @@ namespace ArthurianAutobattler
                     sr.sprite = SoftQuad();
                     sr.sortingOrder = 200;
                     go.transform.localScale = Vector3.one * 0.12f;
-                    StartCoroutine(BurstParticleWorld(go.transform, Random.insideUnitCircle.normalized * Random.Range(0.4f, 1.2f)));
+                    StartCoroutine(BurstParticleWorld(go.transform, UnityEngine.Random.insideUnitCircle.normalized * UnityEngine.Random.Range(0.4f, 1.2f)));
                 }
             }
             Destroy(root, 0.85f);
