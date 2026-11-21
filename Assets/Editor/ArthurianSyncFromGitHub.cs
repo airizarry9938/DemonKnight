@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "376f288d2eb83d6bbd844af6370d54d8631f821d";
 
-    private const string ExpectedPackageId = "hide-perks-runes-ui";
+    private const string ExpectedPackageId = "train-random-plus2";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -548,6 +548,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("train-random-plus2")
                    || body.Contains("hide-perks-runes-ui")
                    || body.Contains("legends-columns-wider")
                    || body.Contains("force-sync-main-landed")

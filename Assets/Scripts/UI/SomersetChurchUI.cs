@@ -1984,8 +1984,16 @@ namespace ArthurianAutobattler
                 RefreshDossier();
                 return;
             }
+            if (!selected.TrainRole(role, out string bonus))
+            {
+                if (dossierDialogue != null)
+                    dossierDialogue.text = "<color=#FFAA66>Already trained that role.</color>";
+                RefreshDossier();
+                return;
+            }
             Town.playerGold -= 15;
-            selected.TrainRole(role);
+            if (dossierDialogue != null)
+                dossierDialogue.text = $"<color=#7CFF9A>Trained as {role} — {bonus}!</color>";
             RefreshDossier();
             RefreshHUD();
         }

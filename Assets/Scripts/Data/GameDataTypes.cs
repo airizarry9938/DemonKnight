@@ -256,29 +256,59 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Paid training: Tank HP boost, or Train Ranged crossbow (+ATK, canAttackFromBack).
+        /// Paid training: Tank HP boost, or Train Ranged crossbow (+ATK, canAttackFromBack),
+        /// plus one random +2 to HP / ATK / SPD (exactly one roll).
         /// Warriors are blocked from the ranged kit — use SetFormationRole to move them BACK.
+        /// Returns false when the purchase is refused (no gold should be taken).
         /// </summary>
-        public void TrainRole(CombatRole newRole)
+        public bool TrainRole(CombatRole newRole) => TrainRole(newRole, out _);
+
+        /// <param name="bonusLabel">e.g. "+2 HP" when the purchase succeeds.</param>
+        public bool TrainRole(CombatRole newRole, out string bonusLabel)
         {
+            bonusLabel = null;
             if (newRole == CombatRole.BacklineRanged)
             {
-                if (!CanTrainRangedKit(unitType)) return;
+                if (!CanTrainRangedKit(unitType)) return false;
                 // Already BACK with kit — nothing to spend.
-                if (assignedRole == CombatRole.BacklineRanged && canAttackFromBack) return;
+                if (assignedRole == CombatRole.BacklineRanged && canAttackFromBack) return false;
                 assignedRole = CombatRole.BacklineRanged;
                 if (!canAttackFromBack)
                 {
                     attackDamage = Mathf.RoundToInt(attackDamage * 1.20f);
                     canAttackFromBack = true;
                 }
-                return;
+                bonusLabel = ApplyRandomTrainStatBonus();
+                return true;
             }
 
-            if (assignedRole == newRole) return;
+            if (assignedRole == newRole) return false;
             assignedRole = newRole;
             if (newRole == CombatRole.FrontlineTank)
                 maxHealth = Mathf.RoundToInt(maxHealth * 1.25f);
+            bonusLabel = ApplyRandomTrainStatBonus();
+            return true;
+        }
+
+        /// <summary>
+        /// One roll per Train purchase: +2 HP, +2 ATK, or +2 SPD.
+        /// SPD is stored as attacks/sec — +2 SPD = +0.2 APS (0.1 APS per SPD point).
+        /// </summary>
+        public string ApplyRandomTrainStatBonus()
+        {
+            int roll = UnityEngine.Random.Range(0, 3);
+            switch (roll)
+            {
+                case 0:
+                    maxHealth += 2;
+                    return "+2 HP";
+                case 1:
+                    attackDamage += 2;
+                    return "+2 ATK";
+                default:
+                    attackSpeed = Mathf.Min(3f, attackSpeed + 0.2f);
+                    return "+2 SPD";
+            }
         }
 
         /// <summary>

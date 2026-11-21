@@ -386,13 +386,21 @@ namespace ArthurianAutobattler
                     : 0);
                 return;
             }
+            if (!selectedRecruit.TrainRole(role, out string bonus))
+            {
+                if (characterDialogueText != null)
+                    characterDialogueText.text = "<color=#FFAA66>Already trained that role.</color>";
+                RefreshDossierUI(GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
+                    : 0);
+                return;
+            }
             playerGold -= 15;
-            selectedRecruit.TrainRole(role);
             UpdateHUD();
             RefreshDossierUI(GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
                 : 0);
-            characterDialogueText.text = $"<color=#00FFFF>Trained as {role}!</color>";
+            characterDialogueText.text = $"<color=#00FFFF>Trained as {role} — {bonus}!</color>";
         }
 
         public void MediateSelectedRecruit()
