@@ -1,7 +1,9 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Cache;
 using ArthurianAutobattler;
 using UnityEditor;
 using UnityEngine;
@@ -20,7 +22,29 @@ public static class ArthurianMenuBootstrap
     /// </summary>
     public const string ArtToolsPinSha = "a58b1f60bb9eca4e00f0aebbef63d576b468c873";
 
+    /// <summary>
+    /// Hard pin for Phase 2–5 emergency fetch (absolute raw URLs). Updated each ship.
+    /// Force Sync often skips upgrading ArthurianSyncFromGitHub — this menu lives here so
+    /// a normal Sync of MenuBootstrap still gives Andrew a one-shot download.
+    /// </summary>
+    public const string Phase25FetchPinSha = "7b84155b2199ae8c3aa644ea4125337a75b78c7d";
+
     const string Repo = "airizarry9938/DemonKnight";
+    const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
+    const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
+
+    /// <summary>Master Spec Phase 2–5 files that Force Sync missed when Sync host was stale.</summary>
+    public static readonly string[] Phase25ScriptPaths =
+    {
+        "Assets/Scripts/Data/SpriteAnimClip.cs",
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+        "Assets/Scripts/Systems/StageParallaxController.cs",
+        "Assets/Scripts/Systems/DiceManager.cs",
+        "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArtArchitectWindow.cs",
+    };
 
     [MenuItem("Arthurian/Diagnose Project", false, 1)]
     public static void DiagnoseProject()
@@ -52,6 +76,10 @@ public static class ArthurianMenuBootstrap
         bool hasBattleSlicer = TypeExists("ArthurianBattleSpriteSheetSlicerWindow");
         bool hasSeeder = TypeExists("ArthurianCharacterCatalogSeeder");
         bool hasDbEditor = TypeExists("ArthurianCharacterDatabaseEditor");
+        bool hasStageLayout = TypeExists("ArthurianAutobattler.StageLayoutProfile");
+        bool hasParallax = TypeExists("ArthurianAutobattler.StageParallaxController");
+        bool hasModAnim = TypeExists("ArthurianAutobattler.ModularSpriteAnimator");
+        bool hasDiceMgr = TypeExists("ArthurianAutobattler.DiceManager");
 
         string packageId = "(no version stamp — old first build)";
         string packageGit = "?";
@@ -131,7 +159,18 @@ public static class ArthurianMenuBootstrap
             $"TextMeshPro loaded: {(hasTmp ? "YES" : "NO")}\n" +
             $"Gameplay scripts: {(hasGameplay ? "YES" : "NO")}\n" +
             $"Church pew layout: {(hasPews ? "YES" : "NO")}\n" +
-            $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n\n";
+            $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n" +
+            $"Phase 2–5 StageLayoutProfile: {(hasStageLayout ? "YES" : "MISSING — run Fetch Missing Phase 2–5 Scripts")}\n" +
+            $"Phase 4 StageParallaxController: {(hasParallax ? "YES" : "MISSING")}\n" +
+            $"Phase 4 ModularSpriteAnimator: {(hasModAnim ? "YES" : "MISSING")}\n" +
+            $"Phase 5 DiceManager: {(hasDiceMgr ? "YES" : "MISSING")}\n\n";
+
+        if (!hasStageLayout || !hasParallax || !hasModAnim || !hasDiceMgr)
+        {
+            msg +=
+                "CS0103 FIX: Arthurian → Fetch Missing Phase 2–5 Scripts\n" +
+                "(downloads StageLayoutProfile / ModularSpriteAnimator / StageParallax / DiceManager by absolute raw URL)\n\n";
+        }
 
         if (!string.IsNullOrEmpty(strayHits))
             msg += "Found under Editor (search):\n" + strayHits + "\n";
@@ -490,13 +529,138 @@ public static class ArthurianMenuBootstrap
         EditorUtility.RevealInFinder(Application.dataPath);
         EditorUtility.DisplayDialog(
             "DemonKnight Setup",
-            "1) Arthurian → Force Delete+Sync ALL Scripts (from GitHub pin).\n"
-            + "2) Wait for compile — Diagnose must show force-sync-main-landed.\n"
-            + "3) Art tools (if needed): Arthurian → Art Tools → Install Art Importers Now.\n"
-            + "4) If ChurchBackground exists: Align Crowd Grid To Church Pews.\n\n"
+            "1) Arthurian → Bootstrap CompatApi + Sync Tools (pinned).\n"
+            + "2) Arthurian → Fetch Missing Phase 2–5 Scripts (if CS0103 StageLayout/Dice/Anim).\n"
+            + "3) Arthurian → Force Delete+Sync ALL Scripts.\n"
+            + "4) Diagnose must show sync-phase25-fetch-menu (or newer).\n\n"
             + "Project Assets path:\n" + Application.dataPath,
             "OK");
         Debug.Log("[DemonKnight] Assets path: " + Application.dataPath);
+    }
+
+    /// <summary>
+    /// DA-59 hard fix: download ONLY Master Spec Phase 2–5 scripts via absolute raw URLs.
+    /// Does not depend on ArthurianSyncFromGitHub ScriptPaths (stale Sync host skips those files).
+    /// </summary>
+    [MenuItem("Arthurian/Fetch Missing Phase 2–5 Scripts", false, 4)]
+    public static void FetchMissingPhase25Scripts()
+    {
+        if (!EditorUtility.DisplayDialog(
+                "Fetch Phase 2–5 Scripts",
+                "Download Master Spec Phase 2–5 foundation scripts by absolute raw GitHub URL:\n\n"
+                + "• SpriteAnimClip / StageLayoutProfile / ModularSpriteLibrary\n"
+                + "• ModularSpriteAnimator / StageParallaxController / DiceManager\n"
+                + "• Art Architect + StageLayoutProfileEnsure\n\n"
+                + "Pin: " + Phase25FetchPinSha + " (also tries tip of main).\n"
+                + "Use when Force Delete+Sync leaves CS0103 for these types.",
+                "Download Now", "Cancel"))
+            return;
+
+        int ok = FetchPhase25ScriptsInternal(out string report);
+        AssetDatabase.Refresh();
+        EditorUtility.DisplayDialog(
+            ok == Phase25ScriptPaths.Length ? "Phase 2–5 Fetch OK" : "Phase 2–5 Fetch Incomplete",
+            report, "OK");
+    }
+
+    /// <summary>Callable from Sync host after Bootstrap upgrades it.</summary>
+    public static int FetchPhase25ScriptsInternal(out string report)
+    {
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        var errors = new List<string>();
+        int ok = 0;
+        string sha = Phase25FetchPinSha;
+
+        try
+        {
+            for (int i = 0; i < Phase25ScriptPaths.Length; i++)
+            {
+                string rel = Phase25ScriptPaths[i];
+                EditorUtility.DisplayProgressBar(
+                    "Phase 2–5 Fetch", rel, (float)i / Phase25ScriptPaths.Length);
+                try
+                {
+                    string body = DownloadPhase25Absolute(rel, sha, out string source);
+                    if (string.IsNullOrEmpty(body) || body.Length < 40)
+                        throw new Exception("empty body from " + source);
+                    if (body.StartsWith("404", StringComparison.Ordinal)
+                        || body.IndexOf("Not Found", StringComparison.OrdinalIgnoreCase) >= 0)
+                        throw new Exception("404 from " + source);
+                    // Sanity: must declare the expected type name fragment.
+                    string leaf = Path.GetFileNameWithoutExtension(rel);
+                    if (body.IndexOf(leaf, StringComparison.OrdinalIgnoreCase) < 0)
+                        throw new Exception("body missing type name " + leaf + " via " + source);
+
+                    string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                    string tmp = dest + ".dk-p25-tmp";
+                    File.WriteAllText(tmp, body);
+                    if (File.Exists(dest))
+                    {
+                        try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                        try { File.Delete(dest); } catch { /* ignore */ }
+                    }
+                    File.Move(tmp, dest);
+                    ok++;
+                    Debug.Log($"[DemonKnight] Phase 2–5 fetched {rel} via {source} ({body.Length} bytes)");
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{rel}: {ex.Message}");
+                    Debug.LogError($"[DemonKnight] Phase 2–5 fetch FAILED {rel}: {ex.Message}");
+                }
+            }
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
+
+        report = $"Fetched {ok}/{Phase25ScriptPaths.Length} Phase 2–5 scripts @ {sha}.\n";
+        if (errors.Count > 0)
+            report += "\nFailures:\n" + string.Join("\n", errors);
+        else
+            report += "\nWait for compile. Diagnose must show StageLayoutProfile / DiceManager = YES.";
+        return ok;
+    }
+
+    static string DownloadPhase25Absolute(string rel, string pinSha, out string source)
+    {
+        string bust = "t=" + DateTime.UtcNow.Ticks;
+        string[] urls =
+        {
+            RawBase + pinSha + "/" + rel + "?" + bust,
+            RawBase + pinSha + "/" + rel,
+            RawBase + "main/" + rel + "?" + bust,
+            RawBase + "main/" + rel,
+            JsDelivrBase + pinSha + "/" + rel + "?" + bust,
+            JsDelivrBase + pinSha + "/" + rel,
+            JsDelivrBase + "main/" + rel,
+        };
+        Exception last = null;
+        foreach (string url in urls)
+        {
+            try
+            {
+                using var wc = new WebClient();
+                wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
+                wc.Headers.Add("User-Agent", "DemonKnight-Phase25-Fetch/1.0");
+                wc.Headers.Add("Cache-Control", "no-cache, no-store");
+                string body = wc.DownloadString(url);
+                if (!string.IsNullOrEmpty(body) && body.Length > 40
+                    && body.IndexOf("404: Not Found", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    source = url;
+                    return body;
+                }
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+        }
+        throw last ?? new Exception("all absolute URLs failed for " + rel);
     }
 }
 #endif

@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "37fe7df45bf6e91c854bfb1ef0dbbd46ef9b8419";
 
-    private const string ExpectedPackageId = "sync-phase2-5-mustrestore";
+    private const string ExpectedPackageId = "sync-phase25-fetch-menu";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -235,6 +235,15 @@ public static class ArthurianSyncFromGitHub
             "Assets/Scripts/UI/LegendCodexUI.cs",
             "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
             "Assets/Scripts/UI/MenuListSortBar.cs",
+            // DA-59: Phase 2–5 foundations — Bootstrap must land these even if Sync host is stale.
+            "Assets/Scripts/Data/SpriteAnimClip.cs",
+            "Assets/Scripts/Data/StageLayoutProfile.cs",
+            "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+            "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+            "Assets/Scripts/Systems/StageParallaxController.cs",
+            "Assets/Scripts/Systems/DiceManager.cs",
+            "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+            "Assets/Editor/ArthurianArtArchitectWindow.cs",
         };
 
         var errors = new List<string>();
@@ -268,11 +277,40 @@ public static class ArthurianSyncFromGitHub
             EditorUtility.ClearProgressBar();
         }
 
+        // Absolute-URL insurance after bootstrap (MenuBootstrap fetch).
+        TryFetchPhase25Insurance(errors, null);
+
         AssetDatabase.Refresh();
         string msg = $"Bootstrapped {ok}/{bootstrap.Length} @ {sha}.";
         if (errors.Count > 0) msg += "\n\nFailures:\n" + string.Join("\n", errors);
-        else msg += "\n\nWait for compile, then run Force Delete+Sync ALL Scripts.";
+        else msg += "\n\nWait for compile, then run Force Delete+Sync ALL Scripts"
+                    + "\n(or Arthurian → Fetch Missing Phase 2–5 Scripts if CS0103 remains).";
         EditorUtility.DisplayDialog("DemonKnight Bootstrap", msg, "OK");
+    }
+
+    /// <summary>Call MenuBootstrap absolute-URL Phase 2–5 fetch when that type is compiled.</summary>
+    static void TryFetchPhase25Insurance(List<string> errors, List<string> okFiles)
+    {
+        try
+        {
+            int n = ArthurianMenuBootstrap.FetchPhase25ScriptsInternal(out string report);
+            Debug.Log("[DemonKnight] Phase 2–5 insurance: " + report);
+            if (okFiles != null)
+            {
+                foreach (string rel in ArthurianMenuBootstrap.Phase25ScriptPaths)
+                {
+                    if (!okFiles.Contains(rel)) okFiles.Add(rel);
+                }
+            }
+            if (n < ArthurianMenuBootstrap.Phase25ScriptPaths.Length && errors != null)
+                errors.Add("Phase 2–5 insurance incomplete — run Arthurian → Fetch Missing Phase 2–5 Scripts");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] Phase 2–5 insurance skipped: " + ex.Message
+                             + " — run Arthurian → Fetch Missing Phase 2–5 Scripts after MenuBootstrap syncs.");
+            errors?.Add("Phase 2–5 insurance: " + ex.Message);
+        }
     }
 
     [MenuItem("Arthurian/Force Re-Sync Night/HUD Fix", false, 3)]
@@ -314,34 +352,39 @@ public static class ArthurianSyncFromGitHub
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 bool protectMenu = NeverBulkDeleteEditorMenus.Contains(rel);
 
-                // Permanent fix (DA-37 / e42119b): NEVER Force-Sync overwrite the Sync host.
-                // CDN Empty/404 on ArthurianSyncFromGitHub.cs was reporting 37/38 while the
-                // running menus stayed fine. Upgrade Sync tools via Bootstrap only.
-                if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase)
-                    && File.Exists(dest))
-                {
-                    okFiles.Add(rel);
-                    Debug.Log(
-                        "[DemonKnight] Kept local ArthurianSyncFromGitHub.cs (Force Sync skips self-overwrite; use Bootstrap to upgrade).");
-                    continue;
-                }
+                // DA-59: try to upgrade Sync host (old hosts omit Phase 2–5 ScriptPaths).
+                // Keep local only when CDN returns empty/invalid — never leave ScriptPaths stale forever.
+                bool isSyncHost = rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase);
 
                 try
                 {
                     // Menu hosts: relax package-id so tip Sync always lands even when local
                     // ExpectedPackageId lags one Force Sync behind.
-                    string text = DownloadPinned(rel, sha, out string source, relaxPackageId: protectMenu);
-                    if (!protectMenu) ValidateCritical(rel, text);
+                    string text = DownloadPinned(rel, sha, out string source, relaxPackageId: protectMenu || isSyncHost);
+                    if (!protectMenu && !isSyncHost) ValidateCritical(rel, text);
+                    if (isSyncHost)
+                    {
+                        // Reject empty CDN hits that wiped menus historically (DA-37).
+                        if (string.IsNullOrEmpty(text) || text.Length < 200
+                            || !text.Contains("ForceDeleteSyncAll")
+                            || !text.Contains("BootstrapCompatAndSyncTools"))
+                        {
+                            okFiles.Add(rel);
+                            Debug.LogWarning(
+                                "[DemonKnight] Kept local ArthurianSyncFromGitHub.cs — tip body failed sanity (use Bootstrap).");
+                            continue;
+                        }
+                    }
                     // Menu hosts: in-place replace only (no delete-first gap).
-                    WriteReplacing(dest, text, deleteFirst: deleteFirst && !protectMenu);
-                    VerifyOnDisk(rel, dest, relaxPackageId: protectMenu);
+                    WriteReplacing(dest, text, deleteFirst: deleteFirst && !protectMenu && !isSyncHost);
+                    VerifyOnDisk(rel, dest, relaxPackageId: protectMenu || isSyncHost);
                     okFiles.Add(rel);
                     Debug.Log($"[DemonKnight] Synced {rel} via {source}");
                 }
                 catch (Exception ex)
                 {
                     // Menu hosts: keep local copy on CDN miss — never fail the whole Sync.
-                    if (protectMenu && File.Exists(dest))
+                    if ((protectMenu || isSyncHost) && File.Exists(dest))
                     {
                         okFiles.Add(rel);
                         Debug.LogWarning(
@@ -357,6 +400,8 @@ public static class ArthurianSyncFromGitHub
             EnsureEditorMenuHostsPresent(projectRoot, sha, errors, okFiles);
             // Force Delete can wipe helpers then fail mid-pass — restore before compile.
             EnsureUiHelpersPresent(projectRoot, sha, errors, okFiles);
+            // DA-59 hard insurance: absolute-URL fetch for Phase 2–5 even if ScriptPaths miss them.
+            TryFetchPhase25Insurance(errors, okFiles);
         }
         finally
         {
@@ -982,12 +1027,15 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ForceDeleteSyncAll")
                    && body.Contains("BootstrapCompatAndSyncTools")
                    && body.Contains("EnsureUiHelpersPresent")
-                   && body.Contains("Kept local ArthurianSyncFromGitHub");
+                   && body.Contains("TryFetchPhase25Insurance");
         }
 
         if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("Diagnose Project") && body.Contains("DemonKnightPackageVersion");
+            return body.Contains("Diagnose Project")
+                   && body.Contains("DemonKnightPackageVersion")
+                   && body.Contains("FetchMissingPhase25Scripts")
+                   && body.Contains("Phase25ScriptPaths");
         }
 
         return true;
