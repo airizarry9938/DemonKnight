@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "3c0a695cbdd420e0274fdfb2e248bba370ebac32";
 
-    private const string ExpectedPackageId = "legends-warband-sort-hp-spd";
+    private const string ExpectedPackageId = "fix-menulistsortmode-cs0246";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -48,6 +48,9 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
+        // Types before UI that reference them (MenuListSortMode / RecruitInstance).
+        "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
@@ -59,7 +62,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/DemonHordeGenerator.cs",
         "Assets/Scripts/Combat/FloatingCombatText.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
-        "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/Data/TownsfolkAppearance.cs",
         "Assets/Scripts/Data/ModularSpriteLibrary.cs",
         "Assets/Scripts/Data/Characters/CharacterDefinition.cs",
@@ -82,7 +84,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
-        "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
@@ -106,6 +107,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
+        "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
@@ -516,6 +519,14 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("RefreshWaveBossHud");
         }
 
+        if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            // MenuListSortMode must live here so LegendCodexUI / SomersetChurchUI never CS0246.
+            return body.Contains("enum MenuListSortMode")
+                   && body.Contains("HighestHp")
+                   && body.Contains("class RecruitInstance");
+        }
+
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("RewireMarchButton")
@@ -562,7 +573,11 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("MenuListSortBar.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("HighestHp") && body.Contains("HighestSpeed") && body.Contains("SortedParty");
+            // Enum is in GameDataTypes — this file is the chip UI + sort helpers only.
+            return body.Contains("SortedParty")
+                   && body.Contains("SortRecipes")
+                   && body.Contains("MenuListSortMode")
+                   && !body.Contains("enum MenuListSortMode");
         }
 
         if (rel.EndsWith("LegendCodexUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -612,6 +627,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-menulistsortmode-cs0246")
                    || body.Contains("legends-warband-sort-hp-spd")
                    || body.Contains("priest-multi-fuse-victory-hover")
                    || body.Contains("wave-win-night-priest-fuse")

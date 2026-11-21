@@ -6,19 +6,10 @@ using TMPro;
 
 namespace ArthurianAutobattler
 {
-    /// <summary>Shared sort modes for Legends recipes and Warband roster lists.</summary>
-    public enum MenuListSortMode
-    {
-        Default = 0,
-        HighestHp = 1,
-        LowestHp = 2,
-        HighestSpeed = 3,
-        LowestSpeed = 4,
-    }
-
     /// <summary>
     /// Runtime sort chip row: Highest HP / Lowest HP / Highest SPD / Lowest SPD / Default.
     /// Used by Legends (codex) and Warband (Camelot Crowd) menus.
+    /// <see cref="MenuListSortMode"/> lives in GameDataTypes (early Sync).
     /// </summary>
     public static class MenuListSortBar
     {

@@ -30,6 +30,19 @@ namespace ArthurianAutobattler
     public enum SinRuneID { None, Jealousy, Lust }
 
     /// <summary>
+    /// Legends / Warband list sort chips. Lives in GameDataTypes so Force Sync lands the
+    /// type with early ScriptPaths (avoids CS0246 when MenuListSortBar.cs lags a Sync).
+    /// </summary>
+    public enum MenuListSortMode
+    {
+        Default = 0,
+        HighestHp = 1,
+        LowestHp = 2,
+        HighestSpeed = 3,
+        LowestSpeed = 4,
+    }
+
+    /// <summary>
     /// Single source of truth for hire add-ons / subtractions.
     /// UI (dossier, dialogue, mood) and payment both use <see cref="RecruitInstance.ComputeHireBreakdown"/>.
     /// </summary>
