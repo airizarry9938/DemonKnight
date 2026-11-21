@@ -1870,10 +1870,15 @@ namespace ArthurianAutobattler
         /// <summary>RMB: deselect and close the unit stats menu; clear pew highlight lock.</summary>
         public void CloseUnitSelectionMenu()
         {
+            bool wasOpen = dossierModal != null && dossierModal.activeSelf;
             if (dossierModal != null) dossierModal.SetActive(false);
             ClearSeatMenuLocks();
-            Debug.Log("[DemonKnight] Unit menu CLOSED (RMB deselect).");
+            if (wasOpen)
+                Debug.Log("[DemonKnight] Unit menu CLOSED (RMB deselect).");
         }
+
+        /// <summary>True when the floating unit stats / recruit panel is open.</summary>
+        bool IsUnitSelectionMenuOpen => dossierModal != null && dossierModal.activeSelf;
 
         /// <summary>Legacy LMB path — opens/toggles unit stats menu.</summary>
         private void OnSeatClicked(RecruitInstance recruit) => ToggleUnitSelectionMenu(recruit);
@@ -3186,6 +3191,10 @@ namespace ArthurianAutobattler
 
         private void Update()
         {
+            // RMB anywhere closes unit stats/recruit menu (not only when clicking a pew).
+            if (IsUnitSelectionMenuOpen && Input.GetMouseButtonDown(1))
+                CloseUnitSelectionMenu();
+
             var loop = GameLoopManager.Instance;
             if (loop == null) return;
             // Keep the Warband (N) label live whenever the party can change.

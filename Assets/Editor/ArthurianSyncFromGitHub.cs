@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "c88aacda2c2a731a8ae7bc2841e942f22390ffcd";
 
-    private const string ExpectedPackageId = "rmb-close-sort-recruit-purse";
+    private const string ExpectedPackageId = "rmb-anywhere-sort-chip-order";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -636,7 +636,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("CloseUnitSelectionMenu")
                    && body.Contains("ApplyRecruitButtonLabel")
                    && body.Contains("Recruit {hireCost}g ({purse}g)")
-                   && body.Contains("58f, 8f");
+                   && body.Contains("58f, 8f")
+                   && body.Contains("GetMouseButtonDown(1)");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -717,7 +718,11 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("SortedParty")
                    && body.Contains("0.905f")
                    && body.Contains("High Attack")
+                   && body.Contains("Low Attack")
+                   && body.Contains("Low Speed")
+                   && body.Contains("High Speed")
                    && body.Contains("sortAttack")
+                   && body.Contains("ChipsMatchRoot")
                    && !body.Contains("(MenuListSortMode.Default, \"Default\")");
         }
 
@@ -763,6 +768,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("rmb-anywhere-sort-chip-order")
                    || body.Contains("rmb-close-sort-recruit-purse")
                    || body.Contains("rmb-deselect-legends-atk-sort")
                    || body.Contains("unit-stats-lmb-taller-panel")

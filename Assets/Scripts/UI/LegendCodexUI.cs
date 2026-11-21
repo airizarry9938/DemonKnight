@@ -450,15 +450,15 @@ namespace ArthurianAutobattler
     {
         public const string RootName = "MenuSortBar";
 
-        // Low HP leftmost; no Default; High/Low Attack added.
+        // Andrew order: Low HP, High HP, Low Attack, High Attack, Low Speed, High Speed.
         static readonly (MenuListSortMode mode, string label)[] Chips =
         {
             (MenuListSortMode.LowestHp, "Low HP"),
             (MenuListSortMode.HighestHp, "High HP"),
-            (MenuListSortMode.HighestAttack, "High Attack"),
             (MenuListSortMode.LowestAttack, "Low Attack"),
-            (MenuListSortMode.HighestSpeed, "High SPD"),
-            (MenuListSortMode.LowestSpeed, "Low SPD"),
+            (MenuListSortMode.HighestAttack, "High Attack"),
+            (MenuListSortMode.LowestSpeed, "Low Speed"),
+            (MenuListSortMode.HighestSpeed, "High Speed"),
         };
 
         public static void Ensure(
@@ -471,11 +471,8 @@ namespace ArthurianAutobattler
             if (parent == null || onChanged == null) return;
 
             Transform root = parent.Find(RootName);
-            // Rebuild when chip set changes (drop Default / add Attack).
-            if (root != null
-                && (root.Find("Sort_Default") != null
-                    || root.Find("Sort_HighestAttack") == null
-                    || root.childCount != Chips.Length))
+            // Rebuild when chip set/order changes (drop Default; Low-before-High Attack/Speed).
+            if (root != null && !ChipsMatchRoot(root))
             {
                 UnityEngine.Object.Destroy(root.gameObject);
                 root = null;
@@ -549,6 +546,18 @@ namespace ArthurianAutobattler
                 btn.onClick.RemoveAllListeners();
                 btn.onClick.AddListener(() => onChanged(captured));
             }
+        }
+
+        static bool ChipsMatchRoot(Transform root)
+        {
+            if (root == null || root.childCount != Chips.Length) return false;
+            if (root.Find("Sort_Default") != null) return false;
+            for (int i = 0; i < Chips.Length; i++)
+            {
+                var child = root.GetChild(i);
+                if (child == null || child.name != $"Sort_{Chips[i].mode}") return false;
+            }
+            return true;
         }
 
         public static void SortRecipes(List<CodexRecipeEntry> recipes, MenuListSortMode mode)
