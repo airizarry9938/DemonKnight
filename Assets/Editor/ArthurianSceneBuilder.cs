@@ -383,44 +383,23 @@ public static class ArthurianSceneBuilder
             "Merlin turns the hourglass...", 20, TextAlignmentOptions.Center,
             new Vector2(0f, 160f), new Vector2(820f, 120f));
 
-        GameObject bankPanel = CreatePanel(resPanel.transform, "LegacyBankPanel",
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -40f), new Vector2(760f, 280f),
-            new Color(0.10f, 0.12f, 0.18f, 1f));
-        bankPanel.SetActive(false);
-
-        var pointsTxt = CreateTMP(bankPanel.transform, "Points", "Legacy Points: 0", 22, TextAlignmentOptions.Center,
-            new Vector2(0f, 100f), new Vector2(700f, 36f));
-        var goldBank = CreateTMP(bankPanel.transform, "GoldBank", "Royal Treasury", 16, TextAlignmentOptions.Left,
-            new Vector2(-120f, 40f), new Vector2(420f, 32f));
-        var discountBank = CreateTMP(bankPanel.transform, "DiscountBank", "Royal Writ", 16, TextAlignmentOptions.Left,
-            new Vector2(-120f, 0f), new Vector2(420f, 32f));
-        var rationsBank = CreateTMP(bankPanel.transform, "RationsBank", "War Rations", 16, TextAlignmentOptions.Left,
-            new Vector2(-120f, -40f), new Vector2(420f, 32f));
-
-        var upgradeGold = CreateButton(bankPanel.transform, "UpgradeGold", "+Gold",
-            new Vector2(280f, 40f), new Vector2(120f, 32f), new Color(0.45f, 0.35f, 0.12f));
-        var upgradeDiscount = CreateButton(bankPanel.transform, "UpgradeDiscount", "+Writ",
-            new Vector2(280f, 0f), new Vector2(120f, 32f), new Color(0.25f, 0.30f, 0.45f));
-        var upgradeRations = CreateButton(bankPanel.transform, "UpgradeRations", "+Rations",
-            new Vector2(280f, -40f), new Vector2(120f, 32f), new Color(0.20f, 0.40f, 0.25f));
-        var nextRun = CreateButton(bankPanel.transform, "NextRun", "Enter Next Timeline",
-            new Vector2(0f, -100f), new Vector2(260f, 44f), new Color(0.35f, 0.15f, 0.40f));
-
-        // Persist listeners so they survive scene save / Play Mode.
-        // Persist bank upgrade listeners. Next Timeline is wired at runtime by
-        // MerlinResurrectionManager.WireNextRunButton (clears onClick first) — a persistent
-        // listener here previously stacked with the runtime one and advanced night twice.
-        UnityEventTools.AddPersistentListener(upgradeGold.onClick, merlin.UpgradeStartingGold);
-        UnityEventTools.AddPersistentListener(upgradeDiscount.onClick, merlin.UpgradeRecruitmentDiscount);
-        UnityEventTools.AddPersistentListener(upgradeRations.onClick, merlin.UpgradeSupplyRations);
+        // Legacy bank panel removed — Next Night advances the night; End Run → Main Menu.
+        // Runtime MerlinResurrectionManager also hides any leftover LegacyBankPanel in Downloads scenes.
+        var nextNight = CreateButton(resPanel.transform, "NextNight", "Next Night",
+            new Vector2(160f, -180f), new Vector2(280f, 56f), new Color(0.28f, 0.18f, 0.42f));
+        var endRun = CreateButton(resPanel.transform, "EndRun", "End Run",
+            new Vector2(-160f, -180f), new Vector2(280f, 56f), new Color(0.45f, 0.16f, 0.14f));
+        // Wired at runtime (single listener) — do not add persistent Next Night here.
+        _ = nextNight;
+        _ = endRun;
 
         merlin.resurrectionCanvas = resCanvasObj;
         merlin.loreNarrativeText = lore;
-        merlin.legacyBankPanel = bankPanel;
-        merlin.pointsAvailableText = pointsTxt;
-        merlin.goldBankText = goldBank;
-        merlin.discountBankText = discountBank;
-        merlin.rationsBankText = rationsBank;
+        merlin.legacyBankPanel = null;
+        merlin.pointsAvailableText = null;
+        merlin.goldBankText = null;
+        merlin.discountBankText = null;
+        merlin.rationsBankText = null;
 
         // Wire GameLoop + Church Stage
         loop.rngGenerator = rng;

@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "81f25276281f2aa02439a4ab56fc81bcc8766528";
 
-    private const string ExpectedPackageId = "sync-host-da37";
+    private const string ExpectedPackageId = "next-night-no-legacy";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -566,6 +566,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("next-night-no-legacy")
                    || body.Contains("sync-host-da37")
                    || body.Contains("train-random-plus2")
                    || body.Contains("hide-perks-runes-ui")

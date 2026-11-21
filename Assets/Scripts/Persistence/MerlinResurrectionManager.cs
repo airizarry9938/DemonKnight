@@ -39,6 +39,7 @@ namespace ArthurianAutobattler
         private bool nextRunButtonWired;
         private bool endRunButtonWired;
         private Button endRunButton;
+        private Button nextNightButton;
         /// <summary>Blocks double AdvanceNight when scene persistent + runtime listeners both fire.</summary>
         private bool advancingNight;
 
@@ -49,37 +50,63 @@ namespace ArthurianAutobattler
             // Runes disabled pending redesign — ranks stay zeroed.
             ZeroRuneRanks();
             if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
+            HideLegacyBankPanel();
             WireAbandonScreenButtons();
         }
 
         private void Start()
         {
+            HideLegacyBankPanel();
             WireAbandonScreenButtons();
         }
 
         void WireAbandonScreenButtons()
         {
-            WireNextRunButton();
+            HideLegacyBankPanel();
+            WireNextNightButton();
             WireEndRunButton();
-            HideRuneUpgradeUi();
         }
 
         /// <summary>
-        /// Always (re)wire Next Run with a single listener. SceneBuilder / Downloads scenes
-        /// may still carry a persistent Inspector listener — stacking with AddListener
-        /// advanced night twice (Night 1 → Night 3). Clear onClick first.
+        /// Legacy Merlin bank UI is removed — Next Night advances the run instead.
         /// </summary>
-        private void WireNextRunButton()
+        void HideLegacyBankPanel()
         {
-            EnsureLegacyBankPanel();
-            if (legacyBankPanel == null) return;
+            EnsureLegacyBankPanelRef();
+            if (legacyBankPanel != null)
+                legacyBankPanel.SetActive(false);
 
-            Button btn = FindPanelButton(legacyBankPanel.transform, "NextRun", "Next Timeline", "Next Run", "Next Night");
-            if (btn == null) return;
+            foreach (var t in Resources.FindObjectsOfTypeAll<Transform>())
+            {
+                if (t == null || !t.gameObject.scene.IsValid()) continue;
+                string n = t.gameObject.name ?? "";
+                if (n.Equals("LegacyBankPanel", StringComparison.OrdinalIgnoreCase)
+                    || n.Equals("BankPanel", StringComparison.OrdinalIgnoreCase))
+                    t.gameObject.SetActive(false);
+            }
+        }
 
+        /// <summary>
+        /// Next Night = same advance as former Enter Next Timeline (AdvanceNightAndRestart).
+        /// Single listener only — clears persistent Inspector wiring.
+        /// </summary>
+        private void WireNextNightButton()
+        {
+            EnsureResurrectionCanvas();
+            Transform host = GetAbandonHost();
+            if (host == null) return;
+
+            nextNightButton = FindPanelButton(host, "NextNight", "Next Night", "NextRun", "Next Timeline", "Next Run");
+            if (nextNightButton == null)
+                nextNightButton = CreateNextNightButton(host);
+
+            if (nextNightButton == null) return;
             // Replace ALL listeners (persistent scene + prior runtime) with exactly one.
-            btn.onClick = new Button.ButtonClickedEvent();
-            btn.onClick.AddListener(StartNextTimelineRun);
+            nextNightButton.onClick = new Button.ButtonClickedEvent();
+            nextNightButton.onClick.AddListener(StartNextTimelineRun);
+            nextNightButton.gameObject.SetActive(true);
+            var label = nextNightButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (label != null) label.text = "Next Night";
             nextRunButtonWired = true;
         }
 
@@ -88,11 +115,8 @@ namespace ArthurianAutobattler
         /// </summary>
         private void WireEndRunButton()
         {
-            EnsureLegacyBankPanel();
             EnsureResurrectionCanvas();
-            Transform host = legacyBankPanel != null
-                ? legacyBankPanel.transform
-                : resurrectionCanvas != null ? resurrectionCanvas.transform : null;
+            Transform host = GetAbandonHost();
             if (host == null) return;
 
             endRunButton = FindPanelButton(host, "EndRun", "End Run", "Abandon Camelot", "Return to Menu");
@@ -100,13 +124,21 @@ namespace ArthurianAutobattler
                 endRunButton = CreateEndRunButton(host);
 
             if (endRunButton == null) return;
-            endRunButton.onClick.RemoveListener(EndRunToMainMenu);
+            endRunButton.onClick = new Button.ButtonClickedEvent();
             endRunButton.onClick.AddListener(EndRunToMainMenu);
             endRunButton.gameObject.SetActive(true);
             endRunButtonWired = true;
         }
 
-        void EnsureLegacyBankPanel()
+        Transform GetAbandonHost()
+        {
+            EnsureResurrectionCanvas();
+            if (resurrectionCanvas == null) return null;
+            var panel = resurrectionCanvas.transform.Find("ResurrectionPanel");
+            return panel != null ? panel : resurrectionCanvas.transform;
+        }
+
+        void EnsureLegacyBankPanelRef()
         {
             if (legacyBankPanel != null) return;
             var found = GameObject.Find("LegacyBankPanel");
@@ -153,15 +185,27 @@ namespace ArthurianAutobattler
 
         Button CreateEndRunButton(Transform parent)
         {
-            var go = new GameObject("EndRun", typeof(RectTransform), typeof(Image), typeof(Button));
+            return CreateAbandonButton(parent, "EndRun", "End Run",
+                new Vector2(-160f, 36f), new Color(0.45f, 0.16f, 0.14f, 0.98f));
+        }
+
+        Button CreateNextNightButton(Transform parent)
+        {
+            return CreateAbandonButton(parent, "NextNight", "Next Night",
+                new Vector2(160f, 36f), new Color(0.28f, 0.18f, 0.42f, 0.98f));
+        }
+
+        static Button CreateAbandonButton(Transform parent, string name, string label, Vector2 anchored, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0.5f, 0f);
             rt.anchorMax = new Vector2(0.5f, 0f);
             rt.pivot = new Vector2(0.5f, 0f);
-            rt.anchoredPosition = new Vector2(0f, 28f);
+            rt.anchoredPosition = anchored;
             rt.sizeDelta = new Vector2(280f, 56f);
-            go.GetComponent<Image>().color = new Color(0.45f, 0.16f, 0.14f, 0.98f);
+            go.GetComponent<Image>().color = color;
 
             var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             labelGo.transform.SetParent(go.transform, false);
@@ -171,84 +215,14 @@ namespace ArthurianAutobattler
             lrt.offsetMin = Vector2.zero;
             lrt.offsetMax = Vector2.zero;
             var tmp = labelGo.GetComponent<TextMeshProUGUI>();
-            tmp.text = "End Run";
+            tmp.text = label;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontSize = 26f;
             tmp.color = Color.white;
             return go.GetComponent<Button>();
         }
 
-        void HideRuneUpgradeUi()
-        {
-            EnsureLegacyBankPanel();
-            PerkDraftManager.SuppressAllPerkUi();
-            if (legacyBankPanel == null) return;
-
-            // Keep only Next Timeline + End Run. Hide rune upgrades AND meta bank
-            // (+Gold / +Writ / +Rations) while perks/runes are offline.
-            foreach (var b in legacyBankPanel.GetComponentsInChildren<Button>(true))
-            {
-                if (b == null) continue;
-                string n = b.gameObject.name ?? "";
-                string label = b.GetComponentInChildren<TextMeshProUGUI>()?.text ?? "";
-                bool keep =
-                    n.IndexOf("NextRun", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("EndRun", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Next Timeline", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Next Run", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Next Night", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("End Run", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Abandon", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Main Menu", StringComparison.OrdinalIgnoreCase) >= 0;
-                if (keep) continue;
-
-                bool hide =
-                    n.IndexOf("Rune", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Gossip", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Gambler", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Blood", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Crown", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Upgrade", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Gold", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Writ", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Discount", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Ration", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Gossip", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Gambler", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Blood", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Crown", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("+Gold", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("+Writ", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("+Ration", StringComparison.OrdinalIgnoreCase) >= 0
-                    || label.IndexOf("Upgrade", StringComparison.OrdinalIgnoreCase) >= 0;
-                if (hide) b.gameObject.SetActive(false);
-            }
-
-            // Hide bank level labels so the panel isn't a perk/rune shop.
-            foreach (var tmp in legacyBankPanel.GetComponentsInChildren<TextMeshProUGUI>(true))
-            {
-                if (tmp == null) continue;
-                string n = tmp.gameObject.name ?? "";
-                if (n.IndexOf("GoldBank", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("DiscountBank", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("RationsBank", StringComparison.OrdinalIgnoreCase) >= 0
-                    || n.IndexOf("Rune", StringComparison.OrdinalIgnoreCase) >= 0)
-                    tmp.gameObject.SetActive(false);
-            }
-
-            if (runeStatusText != null)
-            {
-                runeStatusText.text =
-                    "Runes & perks are offline while we redesign them.\n"
-                    + "Press <b>Enter Next Timeline</b> for the next night, or <b>End Run</b> for the Main Menu.";
-                runeStatusText.gameObject.SetActive(true);
-            }
-            else if (pointsAvailableText != null)
-            {
-                pointsAvailableText.text =
-                    "Perks & runes offline — End Run → Main Menu, or Enter Next Timeline.";
-            }
-        }
+        void HideRuneUpgradeUi() => HideLegacyBankPanel();
 
         void ZeroRuneRanks()
         {
@@ -317,7 +291,7 @@ namespace ArthurianAutobattler
         private IEnumerator PlayResurrectionSequence(int earnedPoints, bool defeatedNimue, string customReason)
         {
             if (resurrectionCanvas != null) resurrectionCanvas.SetActive(true);
-            if (legacyBankPanel != null) legacyBankPanel.SetActive(false);
+            HideLegacyBankPanel();
 
             if (merlinCutsceneAnimator != null)
                 merlinCutsceneAnimator.SetTrigger("CastResurrection");
@@ -343,11 +317,10 @@ namespace ArthurianAutobattler
                 string outcome = defeatedNimue ? "VICTORY" : "DEFEAT";
                 loreNarrativeText.text =
                     $"<b>{outcome}</b>\n\n"
-                    + $"You gained <b>+{earnedPoints} Arcane Legacy Points</b>.\n"
                     + "Perks & runes are offline while we redesign them.\n"
-                    + "Press <b>End Run</b> to return to the Main Menu, or continue the next night.";
+                    + "Press <b>Next Night</b> to continue, or <b>End Run</b> for the Main Menu.";
             }
-            if (legacyBankPanel != null) legacyBankPanel.SetActive(true);
+            HideLegacyBankPanel();
             WireAbandonScreenButtons();
             RefreshBankUI();
         }
@@ -475,43 +448,25 @@ namespace ArthurianAutobattler
 
         private void RefreshBankUI()
         {
-            HideRuneUpgradeUi();
+            HideLegacyBankPanel();
+            PerkDraftManager.SuppressAllPerkUi();
             if (pointsAvailableText != null)
-            {
-                pointsAvailableText.text = $"Legacy Points: {unspentLegacyPoints}";
-                if (pointsAvailableText.fontSize < 24f) pointsAvailableText.fontSize = 24f;
-            }
+                pointsAvailableText.gameObject.SetActive(false);
             if (goldBankText != null)
-            {
-                goldBankText.text = $"Royal Treasury (+{GetBonusStartingGold()}g Start)";
-                if (goldBankText.fontSize < 20f) goldBankText.fontSize = 20f;
-            }
+                goldBankText.gameObject.SetActive(false);
             if (discountBankText != null)
-            {
-                discountBankText.text = $"Royal Writ (-{GetGlobalCostDiscount()}g Cost)";
-                if (discountBankText.fontSize < 20f) discountBankText.fontSize = 20f;
-            }
+                discountBankText.gameObject.SetActive(false);
             if (rationsBankText != null)
-            {
-                rationsBankText.text = $"War Rations (+{startingSupplyRationsLevel * 10}% HP)";
-                if (rationsBankText.fontSize < 20f) rationsBankText.fontSize = 20f;
-            }
+                rationsBankText.gameObject.SetActive(false);
             if (runeStatusText != null)
             {
                 runeStatusText.text =
-                    "Runes & perks are offline while we redesign them.\n"
-                    + "Press <b>End Run</b> to return to the Main Menu.";
-                if (runeStatusText.fontSize < 16f) runeStatusText.fontSize = 16f;
+                    "Press <b>Next Night</b> to continue, or <b>End Run</b> for the Main Menu.";
+                if (runeStatusText.fontSize < 18f) runeStatusText.fontSize = 18f;
+                runeStatusText.gameObject.SetActive(true);
             }
             if (loreNarrativeText != null && loreNarrativeText.fontSize < 28f)
                 loreNarrativeText.fontSize = 28f;
-            if (legacyBankPanel != null)
-            {
-                foreach (var tmp in legacyBankPanel.GetComponentsInChildren<TextMeshProUGUI>(true))
-                {
-                    if (tmp != null && tmp.fontSize < 18f) tmp.fontSize = 18f;
-                }
-            }
         }
 
         private static string DescribeGossipEffect(int rank) => rank switch
