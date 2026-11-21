@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "e14c7c4018501ea8bce70c5cca94adc927e66beb";
 
-    private const string ExpectedPackageId = "train-random-plus2";
+    private const string ExpectedPackageId = "sync-host-da37";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -252,12 +252,14 @@ public static class ArthurianSyncFromGitHub
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 try
                 {
-                    string text = DownloadPinned(rel, sha, out string source, relaxPackageId: false);
-                    ValidateCritical(rel, text);
-                    // Menu hosts: in-place replace only (no delete-first gap).
+                    // Menu hosts: relax package-id so tip Sync always lands even when local
+                    // ExpectedPackageId lags one Force Sync behind.
                     bool protectMenu = NeverBulkDeleteEditorMenus.Contains(rel);
+                    string text = DownloadPinned(rel, sha, out string source, relaxPackageId: protectMenu);
+                    if (!protectMenu) ValidateCritical(rel, text);
+                    // Menu hosts: in-place replace only (no delete-first gap).
                     WriteReplacing(dest, text, deleteFirst: deleteFirst && !protectMenu);
-                    VerifyOnDisk(rel, dest);
+                    VerifyOnDisk(rel, dest, relaxPackageId: protectMenu);
                     okFiles.Add(rel);
                     Debug.Log($"[DemonKnight] Synced {rel} via {source}");
                 }
@@ -328,44 +330,60 @@ public static class ArthurianSyncFromGitHub
 
     private static string DownloadPinned(string rel, string sha, out string source, bool relaxPackageId)
     {
-        string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N");
         Exception last = null;
 
+        // Prefer raw.githubusercontent.com first — jsDelivr often 404s for minutes after a
+        // main push (DA-37: Force Sync 37/38 Empty or 404 on ArthurianSyncFromGitHub.cs).
         // NEVER unpinned jsDelivr @main — that CDN was days stale.
-        string[] urls =
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            JsDelivrBase + sha + "/" + rel + "?" + bust,
-            JsDelivrBase + sha + "/" + rel,
-            JsDelivrBase + FallbackCommitSha + "/" + rel + "?" + bust,
-            RawBase + sha + "/" + rel + "?" + bust,
-            RawBase + "main/" + rel + "?" + bust,
-            RawBase + "main/" + rel,
-        };
-        string[] labels =
-        {
-            "jsdelivr@" + sha + "+bust",
-            "jsdelivr@" + sha,
-            "jsdelivr@" + FallbackCommitSha + "+bust",
-            "raw@" + sha + "+bust",
-            "raw@main+bust",
-            "raw@main",
-        };
+            string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N")
+                          + "&a=" + attempt;
+            string[] urls =
+            {
+                RawBase + sha + "/" + rel + "?" + bust,
+                RawBase + sha + "/" + rel,
+                RawBase + FallbackCommitSha + "/" + rel + "?" + bust,
+                RawBase + FallbackCommitSha + "/" + rel,
+                RawBase + "main/" + rel + "?" + bust,
+                RawBase + "main/" + rel,
+                JsDelivrBase + sha + "/" + rel + "?" + bust,
+                JsDelivrBase + sha + "/" + rel,
+                JsDelivrBase + FallbackCommitSha + "/" + rel + "?" + bust,
+            };
+            string[] labels =
+            {
+                "raw@" + sha + "+bust",
+                "raw@" + sha,
+                "raw@" + FallbackCommitSha + "+bust",
+                "raw@" + FallbackCommitSha,
+                "raw@main+bust",
+                "raw@main",
+                "jsdelivr@" + sha + "+bust",
+                "jsdelivr@" + sha,
+                "jsdelivr@" + FallbackCommitSha + "+bust",
+            };
 
-        for (int i = 0; i < urls.Length; i++)
-        {
-            try
+            for (int i = 0; i < urls.Length; i++)
             {
-                string body = DownloadString(urls[i]);
-                if (string.IsNullOrEmpty(body) || body.StartsWith("404") || body.Contains("404: Not Found"))
-                    throw new Exception("Empty or 404");
-                if (IsCritical(rel) && !PassesCriticalCheck(rel, body, relaxPackageId))
-                    throw new Exception("stale body failed sanity check");
-                source = labels[i];
-                return body;
-            }
-            catch (Exception ex)
-            {
-                last = ex;
+                try
+                {
+                    string body = DownloadString(urls[i]);
+                    if (string.IsNullOrEmpty(body) || body.StartsWith("404")
+                        || body.Contains("404: Not Found")
+                        || body.Contains("Failed to fetch")
+                        || body.Contains("Package size exceeded")
+                        || body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+                        throw new Exception("Empty or 404");
+                    if (IsCritical(rel) && !PassesCriticalCheck(rel, body, relaxPackageId))
+                        throw new Exception("stale body failed sanity check");
+                    source = labels[i] + (attempt > 0 ? $"#retry{attempt}" : "");
+                    return body;
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                }
             }
         }
 
@@ -432,12 +450,12 @@ public static class ArthurianSyncFromGitHub
         }
     }
 
-    private static void VerifyOnDisk(string rel, string dest)
+    private static void VerifyOnDisk(string rel, string dest, bool relaxPackageId = false)
     {
         if (!File.Exists(dest))
             throw new Exception("write vanished — file missing after sync");
         string disk = File.ReadAllText(dest);
-        if (!PassesCriticalCheck(rel, disk, relaxPackageId: false))
+        if (!PassesCriticalCheck(rel, disk, relaxPackageId))
             throw new Exception("on-disk file failed sanity check after write");
     }
 
@@ -548,6 +566,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("sync-host-da37")
                    || body.Contains("train-random-plus2")
                    || body.Contains("hide-perks-runes-ui")
                    || body.Contains("legends-columns-wider")
@@ -590,32 +609,9 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("DownloadPinned") || body.Contains("BootstrapCompatAndSyncTools")
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
-            // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
-            return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
-                    || body.Contains("warrior-no-train-ranged-night-seq")
-                    || body.Contains("pew-generate-appearance-if-null")
-                    || body.Contains("art-tools-runtime-deps")
-                    || body.Contains("art-tools-install-menu")
-                    || body.Contains("art-tools-under-arthurian")
-                    || body.Contains("end-run-remove-perks-runes")
-                    || body.Contains("character-registry-battle-sprites")
-                    || body.Contains("modular-townsfolk-appearance")
-                    || body.Contains("fix-night-double-advance")
-                    || body.Contains("fix-fusion-serialize-flat-autosave")
-                    || body.Contains("fix-fusion-serialize-intel-costs")
-                    || body.Contains("fix-boss-dialog-cs0136")
-                    || body.Contains("balance-v2-arthurian-expansion")
-                    || body.Contains("autobattle-boss-dialog-video-bg")
-                    || body.Contains("back-row-melee-no-attack")
-                    || body.Contains("perk-rune-bonus-math")
-                    || body.Contains("autobattle-frontline-targeting")
-                    || body.Contains("warband-formation-diagram")
-                    || body.Contains("new-game-wipe-runes-perks")
-                    || body.Contains("peasant-hire-floor-10")
-                    || body.Contains("new-game-gold-200")
-                    || body.Contains("tavern-discount-wave-hud")
-                    || body.Contains("stars-visible-hire-bands-gold200")
-                    || body.Contains("sync-keep-editor-menus") || body.Contains("victory-stars-hire"))
+            // DA-37: always accept a Sync host that still has the Force Sync menus.
+            // Package-id match is best-effort — tip Sync may be newer than local ExpectedPackageId.
+            return body.Contains("DownloadPinned")
                    && body.Contains("NeverBulkDeleteEditorMenus")
                    && body.Contains("ForceDeleteSyncAll")
                    && body.Contains("BootstrapCompatAndSyncTools");
