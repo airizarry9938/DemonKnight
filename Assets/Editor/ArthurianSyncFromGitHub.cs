@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "386d09117494bb141c2e08eecf0c67d2197d38cb";
 
-    private const string ExpectedPackageId = "sync-phase25-fetch-menu";
+    private const string ExpectedPackageId = "embed-phase25-types-nuclear";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -142,6 +142,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
         "Assets/Scripts/Systems/CardFusionSystem.cs",
+        "Assets/Scripts/Systems/TavernDiceMinigame.cs",
         "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
     };
 
@@ -162,8 +163,10 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
-        // Embed hosts + stubs.
+        // Embed hosts + stubs (DA-59 nuclear — Phase 2–5 types live in these hosts).
         "Assets/Scripts/UI/PaperDollSeatView.cs",
+        "Assets/Scripts/Systems/GameLoopManager.cs",
+        "Assets/Scripts/Systems/TavernDiceMinigame.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
@@ -672,7 +675,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("RedrawVeteranStarIcons")
                    && body.Contains("StartTownRecruitPhase")
                    && body.Contains("soulsLostThisRun")
-                   && body.Contains("DiceManager");
+                   && body.Contains("DiceManager")
+                   && body.Contains("DA-59 EMBEDDED StageParallaxController")
+                   && body.Contains("MicroShake");
         }
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
@@ -713,24 +718,21 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("EffectiveVeteranRank")
                    && body.Contains("class IntelGossip")
                    && body.Contains("class FlockEconomy")
-                   && body.Contains("PewRowSize = 13");
+                   && body.Contains("PewRowSize = 13")
+                   // DA-59 nuclear embeds — types live here so stale Sync hosts still compile.
+                   && body.Contains("class SpriteAnimClip")
+                   && body.Contains("class StageLayoutProfile")
+                   && body.Contains("class ModularSpriteLibrary")
+                   && body.Contains("ChurchPewCount = 52");
         }
 
-        if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
+        // Standalone Phase 2–5 files are stubs — real types embedded in GameDataTypes / PaperDoll / etc.
+        if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("class StageLayoutProfile")
-                   && body.Contains("class SlotTransformConfig")
-                   && body.Contains("class StageParallaxLayer")
-                   && body.Contains("ChurchPewCount = 52")
-                   && body.Contains("PlayerBattleCount = 52")
-                   && body.Contains("EnemyBattleCount = 20");
-        }
-
-        if (rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            return body.Contains("class SpriteAnimClip")
-                   && body.Contains("framesPerSecond")
-                   && body.Contains("List<Sprite> frames");
+            return body.Contains("EMBEDDED in GameDataTypes.cs")
+                   && !body.Contains("public class ");
         }
 
         if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
@@ -742,13 +744,6 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("Auto-Arrange 52 Overflow Formation")
                    && body.Contains("RegisterAnimClip")
                    && body.Contains("Save as CharacterDefinition");
-        }
-
-        if (rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            return body.Contains("class ModularSpriteLibrary")
-                   && body.Contains("RegisterAnimClip")
-                   && body.Contains("ModularAnimRegistration");
         }
 
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -849,33 +844,35 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("menuLocked")
                    && body.Contains("VictoryStarBadge.Apply")
                    && body.Contains("IsProtectedSeatChrome")
-                   && body.Contains("ModularSpriteAnimator");
+                   && body.Contains("ModularSpriteAnimator")
+                   && body.Contains("DA-59 EMBEDDED ModularSpriteAnimator")
+                   && body.Contains("ConfigurePaperDoll")
+                   && body.Contains("PlayRecruitReveal");
         }
 
         if (rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("class ModularSpriteAnimator")
-                   && body.Contains("ConfigurePaperDoll")
-                   && body.Contains("ConfigureBattleActor")
-                   && body.Contains("PlayRecruitReveal")
-                   && body.Contains("A8B0C0");
+            return body.Contains("EMBEDDED in PaperDollSeatView.cs")
+                   && !body.Contains("public class ");
         }
 
         if (rel.EndsWith("StageParallaxController.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("class StageParallaxController")
-                   && body.Contains("MicroShake")
-                   && body.Contains("enableRainFX")
-                   && body.Contains("0.15f");
+            return body.Contains("EMBEDDED in GameLoopManager.cs")
+                   && !body.Contains("public class ");
         }
 
         if (rel.EndsWith("DiceManager.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("class DiceManager")
-                   && body.Contains("GrantTownPhaseFreeRoll")
-                   && body.Contains("TryFreeRoll")
-                   && body.Contains("CursedDiceOfCaerleon")
-                   && body.Contains("hireCostForcedZero");
+            return body.Contains("EMBEDDED in TavernDiceMinigame.cs")
+                   && !body.Contains("public class ");
+        }
+
+        if (rel.EndsWith("TavernDiceMinigame.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class TavernDiceMinigame")
+                   && body.Contains("DA-59 EMBEDDED DiceManager")
+                   && body.Contains("GrantTownPhaseFreeRoll");
         }
 
         if (rel.EndsWith("ArthurianStageLayoutProfileEnsure.cs", StringComparison.OrdinalIgnoreCase))

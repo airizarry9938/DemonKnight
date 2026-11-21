@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace ArthurianAutobattler
 {
@@ -344,4 +346,514 @@ namespace ArthurianAutobattler
             transform.localScale = lit ? HoverScale : baseScale;
         }
     }
+
+    // ===== DA-59 EMBEDDED ModularSpriteAnimator (Force Sync nuclear — do not remove) =====
+    /// <summary>
+    /// Master Spec Phase 4 — synchronized modular clip playback + procedural fallbacks.
+    /// Attach to <see cref="PaperDollSeatView"/> (UI Images) and <see cref="UnitVisualActor"/> (SpriteRenderer).
+    /// </summary>
+    [DisallowMultipleComponent]
+    public class ModularSpriteAnimator : MonoBehaviour
+    {
+        public enum AnimState { Idle, Attack, Hit, Death }
+
+        static readonly Color UnscoutedTint = new Color(0xA8 / 255f, 0xB0 / 255f, 0xC0 / 255f, 1f);
+
+        Image bodyImg, outfitImg, headImg, propImg;
+        SpriteRenderer bodySr, outfitSr, headSr, propSr;
+        ModularSpriteLibrary library;
+        RecruitInstance boundRecruit;
+        bool uiMode;
+        bool battleMode;
+
+        AnimState state = AnimState.Idle;
+        float stateTime;
+        float startOffset;
+        Vector3 baseScale = Vector3.one;
+        Vector3 baseLocalPos;
+        bool baseCaptured;
+        Color[] layerBaseColors = new Color[4];
+        bool playingReveal;
+        Coroutine proceduralRoutine;
+
+        SpriteAnimClip poseClip, outfitClip, headClip, weaponClip;
+        bool poseMulti, outfitMulti, headMulti, weaponMulti;
+
+        public static ModularSpriteAnimator EnsureOn(GameObject go)
+        {
+            if (go == null) return null;
+            var a = go.GetComponent<ModularSpriteAnimator>();
+            if (a == null) a = go.AddComponent<ModularSpriteAnimator>();
+            return a;
+        }
+
+        public void ConfigurePaperDoll(PaperDollSeatView seat, RecruitInstance recruit)
+        {
+            if (seat == null) return;
+            uiMode = true;
+            battleMode = false;
+            boundRecruit = recruit;
+            library = TownsfolkVisualApplier.Library ?? ModularSpriteLibrary.Load();
+            bodyImg = seat.bodyLayer;
+            outfitImg = seat.outfitLayer;
+            headImg = seat.headLayer;
+            propImg = seat.propLayer;
+            CaptureBase();
+            ResolveClips();
+            startOffset = Random.Range(0f, 1.5f);
+            state = AnimState.Idle;
+            stateTime = 0f;
+            ApplyUnscoutedTint(immediate: true);
+            enabled = true;
+        }
+
+        public void ConfigureBattleActor(UnitVisualActor actor)
+        {
+            if (actor == null) return;
+            uiMode = false;
+            battleMode = true;
+            boundRecruit = null;
+            library = ModularSpriteLibrary.Load();
+            bodySr = actor.spriteRenderer;
+            // Optional modular children if present later.
+            outfitSr = actor.transform.Find("Outfit")?.GetComponent<SpriteRenderer>();
+            headSr = actor.transform.Find("Head")?.GetComponent<SpriteRenderer>();
+            propSr = actor.transform.Find("Prop")?.GetComponent<SpriteRenderer>();
+            CaptureBase();
+            ResolveClips();
+            startOffset = Random.Range(0f, 1.5f);
+            state = AnimState.Idle;
+            stateTime = 0f;
+            enabled = true;
+        }
+
+        public void Play(AnimState next)
+        {
+            if (next == state && next == AnimState.Idle) return;
+            state = next;
+            stateTime = 0f;
+            if (proceduralRoutine != null)
+            {
+                StopCoroutine(proceduralRoutine);
+                proceduralRoutine = null;
+            }
+            if (!HasMultiFrameFor(next))
+                proceduralRoutine = StartCoroutine(ProceduralRoutine(next));
+        }
+
+        /// <summary>Hire reveal: tint → white, 1.08× pop, gold coin burst.</summary>
+        public void PlayRecruitReveal()
+        {
+            if (!isActiveAndEnabled) return;
+            if (boundRecruit != null)
+            {
+                boundRecruit.isScouted = true;
+                boundRecruit.intelTierUnlocked = Mathf.Max(boundRecruit.intelTierUnlocked, 1);
+            }
+            if (proceduralRoutine != null) StopCoroutine(proceduralRoutine);
+            proceduralRoutine = StartCoroutine(RecruitRevealRoutine());
+        }
+
+        void Update()
+        {
+            if (!baseCaptured) CaptureBase();
+            if (playingReveal) return;
+            stateTime += Time.unscaledDeltaTime;
+            if (state == AnimState.Idle)
+                TickIdle(stateTime + startOffset);
+            else if (HasMultiFrameFor(state))
+                TickClipState(state, stateTime);
+        }
+
+        void TickIdle(float t)
+        {
+            if (poseMulti || outfitMulti || headMulti || weaponMulti)
+            {
+                ApplyClipFrame(poseClip, poseMulti, 0, t);
+                ApplyClipFrame(outfitClip, outfitMulti, 1, t);
+                ApplyClipFrame(headClip, headMulti, 2, t);
+                ApplyClipFrame(weaponClip, weaponMulti, 3, t);
+            }
+            else
+            {
+                // Procedural breath bob 1.0 ↔ 1.03
+                float bob = 1f + 0.03f * Mathf.Sin(t * 2.2f);
+                transform.localScale = new Vector3(baseScale.x, baseScale.y * bob, baseScale.z);
+            }
+        }
+
+        void TickClipState(AnimState s, float t)
+        {
+            string name = ClipName(s);
+            var p = library?.FindAnimClip("Pose", name) ?? poseClip;
+            var o = library?.FindAnimClip("Outfit", name) ?? outfitClip;
+            var h = library?.FindAnimClip("Head", name) ?? headClip;
+            var w = library?.FindAnimClip("Weapon", name) ?? weaponClip;
+            ApplyClipFrame(p, p != null && p.FrameCount > 1, 0, t);
+            ApplyClipFrame(o, o != null && o.FrameCount > 1, 1, t);
+            ApplyClipFrame(h, h != null && h.FrameCount > 1, 2, t);
+            ApplyClipFrame(w, w != null && w.FrameCount > 1, 3, t);
+            float dur = EstimateClipDuration(p, o, h, w);
+            if (!IsLooping(s) && t >= dur)
+                Play(AnimState.Idle);
+        }
+
+        IEnumerator ProceduralRoutine(AnimState s)
+        {
+            switch (s)
+            {
+                case AnimState.Attack:
+                {
+                    // Forward X-lunge +18px (UI) / world units for battle.
+                    Vector3 peak = baseLocalPos + new Vector3(uiMode ? 18f : 0.35f, 0f, 0f);
+                    float t = 0f;
+                    while (t < 0.1f)
+                    {
+                        transform.localPosition = Vector3.Lerp(baseLocalPos, peak, t / 0.1f);
+                        t += Time.deltaTime;
+                        yield return null;
+                    }
+                    t = 0f;
+                    while (t < 0.12f)
+                    {
+                        transform.localPosition = Vector3.Lerp(peak, baseLocalPos, t / 0.12f);
+                        t += Time.deltaTime;
+                        yield return null;
+                    }
+                    transform.localPosition = baseLocalPos;
+                    Play(AnimState.Idle);
+                    break;
+                }
+                case AnimState.Hit:
+                {
+                    FlashLayers(Color.white);
+                    Vector3 knock = baseLocalPos + new Vector3(uiMode ? -10f : -0.2f, 0f, 0f);
+                    transform.localPosition = knock;
+                    yield return new WaitForSeconds(0.07f);
+                    RestoreLayerColors();
+                    float t = 0f;
+                    while (t < 0.12f)
+                    {
+                        transform.localPosition = Vector3.Lerp(knock, baseLocalPos, t / 0.12f);
+                        t += Time.deltaTime;
+                        yield return null;
+                    }
+                    transform.localPosition = baseLocalPos;
+                    Play(AnimState.Idle);
+                    break;
+                }
+                case AnimState.Death:
+                {
+                    SpawnBurst(new Color(0.7f, 0.75f, 0.85f, 1f), 10);
+                    float t = 0f;
+                    Quaternion start = transform.localRotation;
+                    Quaternion tilt = Quaternion.Euler(0f, 0f, uiMode ? -28f : -40f);
+                    while (t < 0.35f)
+                    {
+                        float u = t / 0.35f;
+                        transform.localRotation = Quaternion.Slerp(start, tilt, u);
+                        SetLayersAlpha(1f - u);
+                        transform.localScale = Vector3.Lerp(baseScale, baseScale * 0.85f, u);
+                        t += Time.deltaTime;
+                        yield return null;
+                    }
+                    SetLayersAlpha(0f);
+                    break;
+                }
+                default:
+                    Play(AnimState.Idle);
+                    break;
+            }
+            proceduralRoutine = null;
+        }
+
+        IEnumerator RecruitRevealRoutine()
+        {
+            playingReveal = true;
+            SpawnGoldCoinBurst();
+            float t = 0f;
+            Color from = UnscoutedTint;
+            Color to = Color.white;
+            Vector3 pop = baseScale * 1.08f;
+            while (t < 0.28f)
+            {
+                float u = t / 0.28f;
+                MultiplyLayerTints(Color.Lerp(from, to, u));
+                transform.localScale = Vector3.Lerp(baseScale, pop, Mathf.Sin(u * Mathf.PI));
+                t += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            MultiplyLayerTints(Color.white);
+            transform.localScale = baseScale;
+            playingReveal = false;
+            proceduralRoutine = null;
+            Play(AnimState.Idle);
+        }
+
+        void ResolveClips()
+        {
+            poseClip = library?.FindAnimClip("Pose", SpriteAnimClip.Idle);
+            outfitClip = library?.FindAnimClip("Outfit", SpriteAnimClip.Idle);
+            headClip = library?.FindAnimClip("Head", SpriteAnimClip.Idle);
+            weaponClip = library?.FindAnimClip("Weapon", SpriteAnimClip.Idle);
+            poseMulti = poseClip != null && poseClip.FrameCount > 1;
+            outfitMulti = outfitClip != null && outfitClip.FrameCount > 1;
+            headMulti = headClip != null && headClip.FrameCount > 1;
+            weaponMulti = weaponClip != null && weaponClip.FrameCount > 1;
+        }
+
+        bool HasMultiFrameFor(AnimState s)
+        {
+            string n = ClipName(s);
+            var p = library?.FindAnimClip("Pose", n);
+            var o = library?.FindAnimClip("Outfit", n);
+            var h = library?.FindAnimClip("Head", n);
+            var w = library?.FindAnimClip("Weapon", n);
+            return (p != null && p.FrameCount > 1)
+                   || (o != null && o.FrameCount > 1)
+                   || (h != null && h.FrameCount > 1)
+                   || (w != null && w.FrameCount > 1);
+        }
+
+        static string ClipName(AnimState s) => s switch
+        {
+            AnimState.Attack => SpriteAnimClip.Attack,
+            AnimState.Hit => SpriteAnimClip.Hit,
+            AnimState.Death => SpriteAnimClip.Death,
+            _ => SpriteAnimClip.Idle
+        };
+
+        static bool IsLooping(AnimState s) => s == AnimState.Idle;
+
+        static float EstimateClipDuration(params SpriteAnimClip[] clips)
+        {
+            float best = 0.25f;
+            foreach (var c in clips)
+            {
+                if (c == null || c.FrameCount <= 0) continue;
+                float d = c.FrameCount / Mathf.Max(0.1f, c.framesPerSecond);
+                if (d > best) best = d;
+            }
+            return best;
+        }
+
+        void ApplyClipFrame(SpriteAnimClip clip, bool multi, int layer, float t)
+        {
+            if (!multi || clip == null || clip.FrameCount == 0) return;
+            int frame = Mathf.FloorToInt(t * Mathf.Max(0.1f, clip.framesPerSecond));
+            if (clip.loop) frame %= clip.FrameCount;
+            else frame = Mathf.Min(frame, clip.FrameCount - 1);
+            Sprite sp = clip.FrameAt(frame);
+            SetLayerSprite(layer, sp);
+        }
+
+        void SetLayerSprite(int layer, Sprite sp)
+        {
+            if (sp == null) return;
+            if (uiMode)
+            {
+                Image img = LayerImage(layer);
+                if (img != null) { img.sprite = sp; img.enabled = true; }
+            }
+            else
+            {
+                SpriteRenderer sr = LayerSr(layer);
+                if (sr != null) { sr.sprite = sp; sr.enabled = true; }
+            }
+        }
+
+        Image LayerImage(int i) => i switch { 0 => bodyImg, 1 => outfitImg, 2 => headImg, 3 => propImg, _ => null };
+        SpriteRenderer LayerSr(int i) => i switch { 0 => bodySr, 1 => outfitSr, 2 => headSr, 3 => propSr, _ => null };
+
+        void CaptureBase()
+        {
+            baseScale = transform.localScale;
+            if (baseScale == Vector3.zero) baseScale = Vector3.one;
+            baseLocalPos = transform.localPosition;
+            for (int i = 0; i < 4; i++)
+                layerBaseColors[i] = ReadLayerColor(i);
+            baseCaptured = true;
+        }
+
+        Color ReadLayerColor(int i)
+        {
+            if (uiMode)
+            {
+                var img = LayerImage(i);
+                return img != null ? img.color : Color.white;
+            }
+            var sr = LayerSr(i);
+            return sr != null ? sr.color : Color.white;
+        }
+
+        void WriteLayerColor(int i, Color c)
+        {
+            if (uiMode)
+            {
+                var img = LayerImage(i);
+                if (img != null) img.color = c;
+            }
+            else
+            {
+                var sr = LayerSr(i);
+                if (sr != null) sr.color = c;
+            }
+        }
+
+        void ApplyUnscoutedTint(bool immediate)
+        {
+            bool scouted = boundRecruit == null
+                           || boundRecruit.isScouted
+                           || boundRecruit.intelTierUnlocked >= 1;
+            Color tint = scouted ? Color.white : UnscoutedTint;
+            if (immediate) MultiplyLayerTints(tint);
+        }
+
+        void MultiplyLayerTints(Color tint)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                Color baseC = layerBaseColors[i];
+                if (baseC.a <= 0.01f && uiMode)
+                {
+                    // Keep disabled layers untouched.
+                    var img = LayerImage(i);
+                    if (img == null || !img.enabled) continue;
+                }
+                Color c = baseC;
+                c.r = baseC.r * tint.r;
+                c.g = baseC.g * tint.g;
+                c.b = baseC.b * tint.b;
+                WriteLayerColor(i, c);
+            }
+        }
+
+        void FlashLayers(Color flash)
+        {
+            for (int i = 0; i < 4; i++) WriteLayerColor(i, flash);
+        }
+
+        void RestoreLayerColors()
+        {
+            for (int i = 0; i < 4; i++) WriteLayerColor(i, layerBaseColors[i]);
+            ApplyUnscoutedTint(immediate: true);
+        }
+
+        void SetLayersAlpha(float a)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                Color c = ReadLayerColor(i);
+                c.a = a * layerBaseColors[i].a;
+                WriteLayerColor(i, c);
+            }
+        }
+
+        void SpawnGoldCoinBurst()
+        {
+            SpawnBurst(new Color(1f, 0.84f, 0.2f, 1f), 14);
+        }
+
+        void SpawnBurst(Color color, int count)
+        {
+            var root = new GameObject("DK_FX_Burst");
+            root.transform.SetParent(transform.parent != null ? transform.parent : transform, false);
+            if (uiMode)
+            {
+                var rt = root.AddComponent<RectTransform>();
+                var selfRt = transform as RectTransform;
+                if (selfRt != null)
+                {
+                    rt.anchorMin = selfRt.anchorMin;
+                    rt.anchorMax = selfRt.anchorMax;
+                    rt.pivot = selfRt.pivot;
+                    rt.anchoredPosition = selfRt.anchoredPosition;
+                    rt.sizeDelta = selfRt.sizeDelta;
+                }
+            }
+            else
+            {
+                root.transform.position = transform.position;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                var go = new GameObject("p", typeof(RectTransform));
+                go.transform.SetParent(root.transform, false);
+                if (uiMode)
+                {
+                    var img = go.AddComponent<Image>();
+                    img.color = color;
+                    img.raycastTarget = false;
+                    var rt = go.GetComponent<RectTransform>();
+                    rt.sizeDelta = new Vector2(6f, 6f);
+                    rt.anchoredPosition = Vector2.zero;
+                    StartCoroutine(BurstParticleUI(rt, Random.insideUnitCircle.normalized * Random.Range(24f, 70f)));
+                }
+                else
+                {
+                    var sr = go.AddComponent<SpriteRenderer>();
+                    sr.color = color;
+                    sr.sprite = SoftQuad();
+                    sr.sortingOrder = 200;
+                    go.transform.localScale = Vector3.one * 0.12f;
+                    StartCoroutine(BurstParticleWorld(go.transform, Random.insideUnitCircle.normalized * Random.Range(0.4f, 1.2f)));
+                }
+            }
+            Destroy(root, 0.85f);
+        }
+
+        IEnumerator BurstParticleUI(RectTransform rt, Vector2 vel)
+        {
+            float t = 0f;
+            var img = rt.GetComponent<Image>();
+            while (t < 0.55f && rt != null)
+            {
+                rt.anchoredPosition += vel * Time.unscaledDeltaTime;
+                vel *= 0.92f;
+                if (img != null)
+                {
+                    var c = img.color;
+                    c.a = 1f - t / 0.55f;
+                    img.color = c;
+                }
+                t += Time.unscaledDeltaTime;
+                yield return null;
+            }
+        }
+
+        IEnumerator BurstParticleWorld(Transform tr, Vector2 vel)
+        {
+            float t = 0f;
+            var sr = tr.GetComponent<SpriteRenderer>();
+            Vector3 v = new Vector3(vel.x, vel.y, 0f);
+            while (t < 0.55f && tr != null)
+            {
+                tr.position += v * Time.deltaTime;
+                v *= 0.92f;
+                if (sr != null)
+                {
+                    var c = sr.color;
+                    c.a = 1f - t / 0.55f;
+                    sr.color = c;
+                }
+                t += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        static Sprite s_quad;
+        static Sprite SoftQuad()
+        {
+            if (s_quad != null) return s_quad;
+            var tex = new Texture2D(8, 8, TextureFormat.RGBA32, false);
+            var pixels = new Color[64];
+            for (int i = 0; i < 64; i++) pixels[i] = Color.white;
+            tex.SetPixels(pixels);
+            tex.Apply();
+            s_quad = Sprite.Create(tex, new Rect(0, 0, 8, 8), new Vector2(0.5f, 0.5f), 8f);
+            return s_quad;
+        }
+    }
+
 }
