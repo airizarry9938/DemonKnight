@@ -131,51 +131,42 @@ namespace ArthurianAutobattler
             _ => null
         };
 
+        /// <summary>
+        /// Ingredient-only gates. Do NOT block when the product type is already in party —
+        /// e.g. fuse Priest repeatedly while ≥2 Peasants remain.
+        /// </summary>
         bool CanFuseLegacy(UnitType type, List<RecruitInstance> p) => type switch
         {
             UnitType.Priest => CountType(p, UnitType.Peasant) >= 2,
             UnitType.Captain => CountType(p, UnitType.Warrior) >= 2,
             UnitType.KingArthur => CountType(p, UnitType.Knight) >= 2
-                                  && CountType(p, UnitType.Captain) >= 1
-                                  && !HasType(p, UnitType.KingArthur),
+                                  && CountType(p, UnitType.Captain) >= 1,
             UnitType.Merlin => CountType(p, UnitType.Priest) >= 2
-                               && CountType(p, UnitType.Knight) >= 1
-                               && !HasType(p, UnitType.Merlin),
+                               && CountType(p, UnitType.Knight) >= 1,
             UnitType.SirLancelot => CountType(p, UnitType.Knight) >= 2
                                     && CountType(p, UnitType.Warrior) >= 1
-                                    && p != null && p.Any(u => u != null && u.unitType == UnitType.Knight && u.primaryTrait == TraitTag.Noble)
-                                    && !HasType(p, UnitType.SirLancelot),
-            UnitType.MorganLeFay => CanPickDistinct(p, r => r.unitType == UnitType.Priest, 2, r => r.primaryTrait == TraitTag.Outlaw, 1)
-                                    && !HasType(p, UnitType.MorganLeFay),
+                                    && p != null && p.Any(u => u != null && u.unitType == UnitType.Knight && u.primaryTrait == TraitTag.Noble),
+            UnitType.MorganLeFay => CanPickDistinct(p, r => r.unitType == UnitType.Priest, 2, r => r.primaryTrait == TraitTag.Outlaw, 1),
             UnitType.LadyOfTheLake => CountType(p, UnitType.Priest) >= 2
-                                      && CountType(p, UnitType.Captain) >= 1
-                                      && !HasType(p, UnitType.LadyOfTheLake),
+                                      && CountType(p, UnitType.Captain) >= 1,
             UnitType.SirGawain => CountType(p, UnitType.Warrior) >= 2
-                                  && CountType(p, UnitType.Knight) >= 1
-                                  && !HasType(p, UnitType.SirGawain),
-            UnitType.Mordred => CanPickDistinct(p, r => r.unitType == UnitType.Knight, 2, r => r.primaryTrait == TraitTag.Outlaw, 1)
-                                && !HasType(p, UnitType.Mordred),
+                                  && CountType(p, UnitType.Knight) >= 1,
+            UnitType.Mordred => CanPickDistinct(p, r => r.unitType == UnitType.Knight, 2, r => r.primaryTrait == TraitTag.Outlaw, 1),
             UnitType.SirGalahad => CountWhere(p, r => r.unitType == UnitType.Knight
                                                      && (r.primaryTrait == TraitTag.Zealot || r.primaryTrait == TraitTag.Loyalist)) >= 1
                                    && CountType(p, UnitType.Priest) >= 1
-                                   && CountType(p, UnitType.Warrior) >= 1
-                                   && !HasType(p, UnitType.SirGalahad),
+                                   && CountType(p, UnitType.Warrior) >= 1,
             UnitType.SirTristan => CountType(p, UnitType.Knight) >= 1
                                    && CountWhere(p, r => r.unitType == UnitType.Peasant
-                                                         && (r.primaryTrait == TraitTag.Outlaw || r.primaryTrait == TraitTag.Noble)) >= 1
-                                   && !HasType(p, UnitType.SirTristan),
+                                                         && (r.primaryTrait == TraitTag.Outlaw || r.primaryTrait == TraitTag.Noble)) >= 1,
             UnitType.SirPercival => CountWhere(p, r => r.unitType == UnitType.Knight && r.primaryTrait == TraitTag.Zealot) >= 1
-                                    && CountType(p, UnitType.Peasant) >= 1
-                                    && !HasType(p, UnitType.SirPercival),
+                                    && CountType(p, UnitType.Peasant) >= 1,
             UnitType.SirKay => CountType(p, UnitType.Warrior) >= 1
-                               && CountType(p, UnitType.Peasant) >= 2
-                               && !HasType(p, UnitType.SirKay),
+                               && CountType(p, UnitType.Peasant) >= 2,
             UnitType.SirBedivere => CountType(p, UnitType.Knight) >= 1
-                                    && CountType(p, UnitType.Warrior) >= 1
-                                    && !HasType(p, UnitType.SirBedivere),
+                                    && CountType(p, UnitType.Warrior) >= 1,
             UnitType.Guinevere => CountWhere(p, r => r.primaryTrait == TraitTag.Noble) >= 1
-                                  && CountType(p, UnitType.Priest) >= 1
-                                  && !HasType(p, UnitType.Guinevere),
+                                  && CountType(p, UnitType.Priest) >= 1,
             _ => false
         };
 
@@ -469,14 +460,13 @@ namespace ArthurianAutobattler
             return n;
         }
 
-        private static bool HasType(List<RecruitInstance> p, UnitType t) =>
-            p != null && p.Any(u => u != null && u.unitType == t);
-
         private RecruitInstance CreateHero(string id, string name, UnitType type, Sprite sp, int hp, int atk, float aps, TraitTag trait, CombatRole role)
         {
+            // Unique id per fuse so a second Priest/Captain is not collapsed with the first.
+            string uniqueId = $"{id}_{System.Guid.NewGuid().ToString("N").Substring(0, 8)}";
             return new RecruitInstance
             {
-                unitID = id,
+                unitID = uniqueId,
                 characterName = name,
                 unitType = type,
                 randomAvatar = sp,

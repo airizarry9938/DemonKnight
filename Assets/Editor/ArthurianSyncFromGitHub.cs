@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "2b6c37856d11755934d807031143b83da6703f0d";
 
-    private const string ExpectedPackageId = "wave-win-night-priest-fuse";
+    private const string ExpectedPackageId = "priest-multi-fuse-victory-hover";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -81,6 +81,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
+        "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
@@ -533,7 +534,28 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("DemonKnightCompatApi")
                    && body.Contains("BattleBossDialogUI")
                    && body.Contains("waveBoss") // CS0136 fix: no shadowed local `boss`
-                   && body.Contains("AdvanceNightCounterAfterWaveWin");
+                   && body.Contains("TriggerWaveVictoryScreen");
+        }
+
+        if (rel.EndsWith("MerlinResurrectionManager.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("DemonKnightCompatApi")
+                   && body.Contains("TriggerWaveVictoryScreen")
+                   && body.Contains("Next Night");
+        }
+
+        if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            // No product-uniqueness locks (!HasType) — multi Priest while ingredients remain.
+            return body.Contains("CanFuseLegacy")
+                   && body.Contains("CountType(p, UnitType.Peasant) >= 2")
+                   && !body.Contains("!HasType(p, UnitType.Priest)")
+                   && !body.Contains("!HasType(p, UnitType.Merlin)");
+        }
+
+        if (rel.EndsWith("PewSeatHoverHighlight.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("IPointerEnterHandler") && body.Contains("PewHoverRim");
         }
 
         if (rel.EndsWith("CharacterDatabase.cs", StringComparison.OrdinalIgnoreCase))
@@ -578,6 +600,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("priest-multi-fuse-victory-hover")
                    || body.Contains("wave-win-night-priest-fuse")
                    || body.Contains("next-night-no-legacy")
                    || body.Contains("sync-host-da37")

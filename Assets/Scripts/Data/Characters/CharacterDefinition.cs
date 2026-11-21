@@ -149,9 +149,12 @@ namespace ArthurianAutobattler
             bool ranged = canAttackFromBack
                           || roleCombat == CombatRole.BacklineRanged
                           || RecruitInstance.IsRangedUnitType(unitType);
+            // Unique id every fuse — repeated Priest/etc. must not share one unitID.
+            string baseId = string.IsNullOrEmpty(characterId) ? "hero_" + unitType : characterId;
+            string uniqueId = $"{baseId}_{System.Guid.NewGuid().ToString("N").Substring(0, 8)}";
             return new RecruitInstance
             {
-                unitID = string.IsNullOrEmpty(characterId) ? "hero_" + unitType : characterId,
+                unitID = uniqueId,
                 characterName = string.IsNullOrEmpty(displayName) ? unitType.ToString() : displayName,
                 unitType = unitType,
                 randomAvatar = sp,

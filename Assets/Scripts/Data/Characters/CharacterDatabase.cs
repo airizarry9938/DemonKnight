@@ -170,6 +170,13 @@ namespace ArthurianAutobattler
                 {
                     var r = party[i];
                     if (r == null || used.Contains(r)) continue;
+                    // Never spend an already-fused legend as a base ingredient
+                    // (e.g. Priest cannot fill a Peasant slot).
+                    if (r.IsFusedLegend && rule.matchUnitType
+                        && (rule.unitType == UnitType.Peasant
+                            || rule.unitType == UnitType.Warrior
+                            || rule.unitType == UnitType.Knight))
+                        continue;
                     if (!rule.Matches(r)) continue;
                     chosen.Add(r);
                     used.Add(r);
@@ -182,14 +189,6 @@ namespace ArthurianAutobattler
                 }
             }
             return chosen.Count > 0;
-        }
-
-        static bool HasUnitType(List<RecruitInstance> party, UnitType type)
-        {
-            if (party == null) return false;
-            foreach (var r in party)
-                if (r != null && r.unitType == type) return true;
-            return false;
         }
 
         /// <summary>Register a definition into the correct category list (no duplicates).</summary>

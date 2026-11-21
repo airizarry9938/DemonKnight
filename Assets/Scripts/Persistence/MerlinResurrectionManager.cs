@@ -151,7 +151,99 @@ namespace ArthurianAutobattler
             if (resurrectionCanvas != null) return;
             var found = GameObject.Find("ResurrectionCanvas");
             if (found == null) found = GameObject.Find("MerlinResurrection");
-            if (found != null) resurrectionCanvas = found;
+            if (found != null)
+            {
+                resurrectionCanvas = found;
+                return;
+            }
+            BuildRuntimeVictoryCanvas();
+        }
+
+        /// <summary>Downloads scenes sometimes lack ResurrectionCanvas — build a minimal victory overlay.</summary>
+        void BuildRuntimeVictoryCanvas()
+        {
+            var canvasGo = new GameObject("ResurrectionCanvas", typeof(RectTransform), typeof(Canvas),
+                typeof(CanvasScaler), typeof(GraphicRaycaster));
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 900;
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+            var panel = new GameObject("ResurrectionPanel", typeof(RectTransform), typeof(Image));
+            panel.transform.SetParent(canvasGo.transform, false);
+            var prt = panel.GetComponent<RectTransform>();
+            prt.anchorMin = Vector2.zero;
+            prt.anchorMax = Vector2.one;
+            prt.offsetMin = Vector2.zero;
+            prt.offsetMax = Vector2.zero;
+            panel.GetComponent<Image>().color = new Color(0.04f, 0.05f, 0.08f, 0.92f);
+
+            var loreGo = new GameObject("LoreNarrative", typeof(RectTransform), typeof(TextMeshProUGUI));
+            loreGo.transform.SetParent(panel.transform, false);
+            var lrt = loreGo.GetComponent<RectTransform>();
+            lrt.anchorMin = new Vector2(0.1f, 0.35f);
+            lrt.anchorMax = new Vector2(0.9f, 0.85f);
+            lrt.offsetMin = Vector2.zero;
+            lrt.offsetMax = Vector2.zero;
+            loreNarrativeText = loreGo.GetComponent<TextMeshProUGUI>();
+            loreNarrativeText.alignment = TextAlignmentOptions.Center;
+            loreNarrativeText.fontSize = 36f;
+            loreNarrativeText.color = new Color(0.95f, 0.88f, 0.65f);
+
+            var statusGo = new GameObject("RuneStatus", typeof(RectTransform), typeof(TextMeshProUGUI));
+            statusGo.transform.SetParent(panel.transform, false);
+            var srt = statusGo.GetComponent<RectTransform>();
+            srt.anchorMin = new Vector2(0.15f, 0.18f);
+            srt.anchorMax = new Vector2(0.85f, 0.32f);
+            srt.offsetMin = Vector2.zero;
+            srt.offsetMax = Vector2.zero;
+            runeStatusText = statusGo.GetComponent<TextMeshProUGUI>();
+            runeStatusText.alignment = TextAlignmentOptions.Center;
+            runeStatusText.fontSize = 22f;
+            runeStatusText.color = new Color(0.8f, 0.85f, 0.9f);
+
+            resurrectionCanvas = canvasGo;
+            canvasGo.SetActive(false);
+            Debug.LogError("[DemonKnight] Built runtime ResurrectionCanvas for victory / Next Night.");
+        }
+
+        /// <summary>
+        /// Mid-run wave win: victory message + Next Night (advances night via StartNextTimelineRun).
+        /// </summary>
+        public void TriggerWaveVictoryScreen(int waveCleared, int goldEarned)
+        {
+            EnsureResurrectionCanvas();
+            string msg =
+                $"<b>VICTORY</b> — Wave {waveCleared} cleared (+{goldEarned}g).\n\n"
+                + "The pews hold. Press <b>Next Night</b> to advance, or <b>End Run</b> for the Main Menu.";
+            StartCoroutine(PlayWaveVictorySequence(msg));
+        }
+
+        IEnumerator PlayWaveVictorySequence(string message)
+        {
+            EnsureResurrectionCanvas();
+            if (resurrectionCanvas != null) resurrectionCanvas.SetActive(true);
+            HideLegacyBankPanel();
+            PerkDraftManager.SuppressAllPerkUi();
+
+            if (loreNarrativeText != null)
+                loreNarrativeText.text = message;
+
+            yield return new WaitForSeconds(1.0f);
+
+            if (loreNarrativeText != null && string.IsNullOrEmpty(loreNarrativeText.text) == false)
+            {
+                // Keep victory copy; append Next Night cue if missing.
+                if (loreNarrativeText.text.IndexOf("Next Night", StringComparison.OrdinalIgnoreCase) < 0)
+                    loreNarrativeText.text += "\n\nPress <b>Next Night</b> to continue.";
+            }
+
+            HideLegacyBankPanel();
+            WireAbandonScreenButtons();
+            RefreshBankUI();
+            Debug.LogError("[DemonKnight] Wave victory screen ready — awaiting Next Night.");
         }
 
         static Button FindPanelButton(Transform root, params string[] nameOrLabels)

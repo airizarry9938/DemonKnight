@@ -230,12 +230,17 @@ namespace ArthurianAutobattler
             }
 
             VictoryStarBadge.Apply(btnObj.transform, recruit);
+            PewSeatHoverHighlight.Ensure(btnObj, recruit != null);
 
             Button btn = btnObj.GetComponent<Button>();
             if (btn != null)
             {
                 btn.onClick.RemoveAllListeners();
                 btn.interactable = recruit != null;
+                var colors = btn.colors;
+                colors.highlightedColor = new Color(0.95f, 0.9f, 0.55f, 1f);
+                colors.selectedColor = new Color(0.85f, 0.78f, 0.4f, 1f);
+                btn.colors = colors;
                 if (recruit != null)
                 {
                     RecruitInstance captured = recruit;

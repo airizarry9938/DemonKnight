@@ -780,11 +780,19 @@ namespace ArthurianAutobattler
                 }
 
                 Debug.LogError(
-                    $"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Perks disabled — returning to town.");
-                // Night counter must advance on every mid-run wave win (HUD Night 1→2→3…).
-                loop?.AdvanceNightCounterAfterWaveWin();
+                    $"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Showing victory → Next Night.");
                 PerkDraftManager.SuppressAllPerkUi();
-                loop?.StartTownPhase();
+                // Victory screen with Next Night (advances night). Do not silent-return to town.
+                var merlin = MerlinResurrectionManager.Instance
+                             ?? FindFirstObjectByType<MerlinResurrectionManager>();
+                if (merlin != null)
+                    merlin.TriggerWaveVictoryScreen(clearedWave, goldEarned);
+                else
+                {
+                    // Fallback if Merlin missing from scene: bump night and open town.
+                    loop?.AdvanceNightCounterAfterWaveWin();
+                    loop?.StartTownPhase();
+                }
             }
         }
 

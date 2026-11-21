@@ -79,9 +79,15 @@ namespace ArthurianAutobattler
             seatButton.interactable = true;
             if (seatButton.targetGraphic == null && layers.body != null)
                 seatButton.targetGraphic = layers.body;
+            // ColorTint alone is weak on modular layers — rim hover is the clear signal.
+            var colors = seatButton.colors;
+            colors.highlightedColor = new Color(0.95f, 0.9f, 0.55f, 1f);
+            colors.selectedColor = new Color(0.85f, 0.78f, 0.4f, 1f);
+            seatButton.colors = colors;
             seatButton.onClick.RemoveAllListeners();
             seatButton.onClick.AddListener(() => onClick?.Invoke(recruit));
 
+            PewSeatHoverHighlight.Ensure(gameObject, recruit != null);
             VictoryStarBadge.Apply(transform, recruit);
         }
 
@@ -106,6 +112,7 @@ namespace ArthurianAutobattler
                 seatButton.onClick.RemoveAllListeners();
                 seatButton.interactable = false;
             }
+            PewSeatHoverHighlight.Ensure(gameObject, false);
         }
 
         TownsfolkVisualApplier.LayerSet EnsureModularLayers()
