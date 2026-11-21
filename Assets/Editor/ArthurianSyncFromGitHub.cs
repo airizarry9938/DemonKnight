@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "82b08c35d73bb964fcb5d4149ae36d5bd724af1b";
 
-    private const string ExpectedPackageId = "stub-phase25-dupes-cs0101";
+    private const string ExpectedPackageId = "delete-phase25-standalones-cs0101";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -48,14 +48,10 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // === Master Spec Phase 2–5 foundations FIRST (CS0103 if consumers land alone) ===
-        "Assets/Scripts/Data/SpriteAnimClip.cs",
-        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        // Phase 2–5 types are EMBEDDED (GameDataTypes / PaperDoll / GameLoop / TavernDice).
+        // Do NOT download SpriteAnimClip/StageLayoutProfile/ModularSpriteLibrary/
+        // ModularSpriteAnimator/StageParallaxController/DiceManager standalones (CS0101).
         "Assets/Scripts/Data/GameDataTypes.cs",
-        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
-        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
-        "Assets/Scripts/Systems/StageParallaxController.cs",
-        "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
@@ -115,14 +111,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // Phase 2–5 foundations — must land or Sync reports INCOMPLETE.
-        "Assets/Scripts/Data/SpriteAnimClip.cs",
-        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        // Phase 2–5 types embedded in hosts below — no standalone downloads.
         "Assets/Scripts/Data/GameDataTypes.cs",
-        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
-        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
-        "Assets/Scripts/Systems/StageParallaxController.cs",
-        "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
@@ -148,28 +138,31 @@ public static class ArthurianSyncFromGitHub
 
     /// <summary>
     /// Always write these first + restore after Force Delete. Embeds live in PaperDoll/LegendCodex;
-    /// stubs overwrite leftover standalone full copies (CS0101).
-    /// Phase 2–5 scripts are here so Force Delete cannot wipe them if a later CDN miss fails.
+    /// Phase 2–5 standalones are NOT restored (types embedded — CS0101 if re-downloaded).
     /// </summary>
     private static readonly string[] MustRestoreUiHelpers =
     {
-        // Phase 2–5 foundations (DA-59 — Sync CS0103 cascade).
-        "Assets/Scripts/Data/SpriteAnimClip.cs",
-        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
-        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
-        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
-        "Assets/Scripts/Systems/StageParallaxController.cs",
-        "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
-        // Embed hosts + stubs (DA-59 nuclear — Phase 2–5 types live in these hosts).
+        // Embed hosts (DA-59 — Phase 2–5 types live here).
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/Systems/TavernDiceMinigame.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
+    };
+
+    /// <summary>Standalone Phase 2–5 paths — never download; delete if they redefine embeds.</summary>
+    public static readonly string[] Phase25StandaloneKillList =
+    {
+        "Assets/Scripts/Data/SpriteAnimClip.cs",
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+        "Assets/Scripts/Systems/StageParallaxController.cs",
+        "Assets/Scripts/Systems/DiceManager.cs",
     };
 
     [MenuItem("Arthurian/Sync All Scripts From GitHub", false, 0)]
@@ -238,13 +231,7 @@ public static class ArthurianSyncFromGitHub
             "Assets/Scripts/UI/LegendCodexUI.cs",
             "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
             "Assets/Scripts/UI/MenuListSortBar.cs",
-            // DA-59: Phase 2–5 foundations — Bootstrap must land these even if Sync host is stale.
-            "Assets/Scripts/Data/SpriteAnimClip.cs",
-            "Assets/Scripts/Data/StageLayoutProfile.cs",
-            "Assets/Scripts/Data/ModularSpriteLibrary.cs",
-            "Assets/Scripts/UI/ModularSpriteAnimator.cs",
-            "Assets/Scripts/Systems/StageParallaxController.cs",
-            "Assets/Scripts/Systems/DiceManager.cs",
+            // Phase 2–5 types embedded in GameDataTypes/PaperDoll/GameLoop/TavernDice — do not bootstrap standalones.
             "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
         };
@@ -280,39 +267,80 @@ public static class ArthurianSyncFromGitHub
             EditorUtility.ClearProgressBar();
         }
 
-        // Absolute-URL insurance after bootstrap (MenuBootstrap fetch).
-        TryFetchPhase25Insurance(errors, null);
+        // Kill any leftover Phase 2–5 standalones (CS0101 against embeds).
+        DeletePhase25Standalones(projectRoot, errors);
 
         AssetDatabase.Refresh();
         string msg = $"Bootstrapped {ok}/{bootstrap.Length} @ {sha}.";
         if (errors.Count > 0) msg += "\n\nFailures:\n" + string.Join("\n", errors);
-        else msg += "\n\nWait for compile, then run Force Delete+Sync ALL Scripts"
-                    + "\n(or Arthurian → Fetch Missing Phase 2–5 Scripts if CS0103 remains).";
+        else msg += "\n\nWait for compile, then run Force Delete+Sync ALL Scripts.";
         EditorUtility.DisplayDialog("DemonKnight Bootstrap", msg, "OK");
     }
 
-    /// <summary>Call MenuBootstrap absolute-URL Phase 2–5 fetch when that type is compiled.</summary>
+    /// <summary>Delete Phase 2–5 standalone .cs (+ .meta) that redefine embedded types.</summary>
+    public static int DeletePhase25Standalones(string projectRoot = null, List<string> errors = null)
+    {
+        projectRoot ??= Directory.GetParent(Application.dataPath)!.FullName;
+        int killed = 0;
+        foreach (string rel in Phase25StandaloneKillList)
+        {
+            try
+            {
+                string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(dest)) continue;
+                string body = File.ReadAllText(dest);
+                bool hasType = body.IndexOf("public class ", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("public partial class ", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class SpriteAnimClip", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class ModularSpriteLibrary", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class ModularSpriteAnimator", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class StageParallaxController", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class DiceManager", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class SlotTransformConfig", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class ModularHeadEntry", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class ModularAnimRegistration", StringComparison.Ordinal) >= 0
+                               || body.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) >= 0;
+                // Always delete these paths — types live in embeds; even stubs confuse Sync hosts.
+                try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                File.Delete(dest);
+                string meta = dest + ".meta";
+                if (File.Exists(meta))
+                {
+                    try { File.SetAttributes(meta, FileAttributes.Normal); } catch { /* ignore */ }
+                    try { File.Delete(meta); } catch { /* ignore */ }
+                }
+                killed++;
+                Debug.Log($"[DemonKnight] DA-59 deleted Phase 2–5 standalone {rel} (hadType={hasType})");
+            }
+            catch (Exception ex)
+            {
+                errors?.Add($"{rel} (delete): {ex.Message}");
+                Debug.LogWarning($"[DemonKnight] Could not delete {rel}: {ex.Message}");
+            }
+        }
+        return killed;
+    }
+
+    /// <summary>Legacy name — now deletes standalones instead of fetching.</summary>
     static void TryFetchPhase25Insurance(List<string> errors, List<string> okFiles)
     {
         try
         {
-            int n = ArthurianMenuBootstrap.FetchPhase25ScriptsInternal(out string report);
-            Debug.Log("[DemonKnight] Phase 2–5 insurance: " + report);
+            int n = DeletePhase25Standalones(null, errors);
+            Debug.Log($"[DemonKnight] Phase 2–5 insurance deleted {n} standalone(s).");
             if (okFiles != null)
             {
-                foreach (string rel in ArthurianMenuBootstrap.Phase25ScriptPaths)
+                foreach (string rel in Phase25StandaloneKillList)
                 {
-                    if (!okFiles.Contains(rel)) okFiles.Add(rel);
+                    if (!okFiles.Contains(rel)) okFiles.Add(rel + " (deleted)");
                 }
             }
-            if (n < ArthurianMenuBootstrap.Phase25ScriptPaths.Length && errors != null)
-                errors.Add("Phase 2–5 insurance incomplete — run Arthurian → Fetch Missing Phase 2–5 Scripts");
         }
         catch (Exception ex)
         {
-            Debug.LogWarning("[DemonKnight] Phase 2–5 insurance skipped: " + ex.Message
-                             + " — run Arthurian → Fetch Missing Phase 2–5 Scripts after MenuBootstrap syncs.");
-            errors?.Add("Phase 2–5 insurance: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] Phase 2–5 delete insurance skipped: " + ex.Message);
+            errors?.Add("Phase 2–5 delete: " + ex.Message);
         }
     }
 
@@ -678,7 +706,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("DiceManager")
                    && body.Contains("DA-59 EMBEDDED StageParallaxController")
                    && body.Contains("MicroShake")
-                   && body.Contains("DkStubDuplicatePhase25Standalones");
+                   && body.Contains("DkDeleteDuplicatePhase25Standalones");
         }
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
@@ -727,13 +755,15 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ChurchPewCount = 52");
         }
 
-        // Standalone Phase 2–5 files are stubs — real types embedded in GameDataTypes / PaperDoll / etc.
+        // Phase 2–5 standalones are NOT synced — reject any download that would redefine embeds.
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase))
+            || rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("StageParallaxController.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("DiceManager.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("EMBEDDED in GameDataTypes.cs")
-                   && !body.Contains("public class ");
+            return false;
         }
 
         if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
@@ -849,24 +879,6 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("DA-59 EMBEDDED ModularSpriteAnimator")
                    && body.Contains("ConfigurePaperDoll")
                    && body.Contains("PlayRecruitReveal");
-        }
-
-        if (rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            return body.Contains("EMBEDDED in PaperDollSeatView.cs")
-                   && !body.Contains("public class ");
-        }
-
-        if (rel.EndsWith("StageParallaxController.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            return body.Contains("EMBEDDED in GameLoopManager.cs")
-                   && !body.Contains("public class ");
-        }
-
-        if (rel.EndsWith("DiceManager.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            return body.Contains("EMBEDDED in TavernDiceMinigame.cs")
-                   && !body.Contains("public class ");
         }
 
         if (rel.EndsWith("TavernDiceMinigame.cs", StringComparison.OrdinalIgnoreCase))
@@ -1033,6 +1045,7 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("Diagnose Project")
                    && body.Contains("DemonKnightPackageVersion")
                    && body.Contains("FetchMissingPhase25Scripts")
+                   && body.Contains("Phase25StandaloneKillList")
                    && body.Contains("Phase25ScriptPaths");
         }
 

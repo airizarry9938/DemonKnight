@@ -23,9 +23,9 @@ public static class ArthurianMenuBootstrap
     public const string ArtToolsPinSha = "a58b1f60bb9eca4e00f0aebbef63d576b468c873";
 
     /// <summary>
-    /// Hard pin for Phase 2–5 emergency fetch (absolute raw URLs). Updated each ship.
-    /// Force Sync often skips upgrading ArthurianSyncFromGitHub — this menu lives here so
-    /// a normal Sync of MenuBootstrap still gives Andrew a one-shot download.
+    /// Hard pin for Phase 2–5 editor helpers (absolute raw URLs). Updated each ship.
+    /// Standalone ModularSpriteLibrary / StageLayout / Dice / Anim / Parallax are NEVER
+    /// downloaded — types live in embeds; leftover standalones are deleted (CS0101).
     /// </summary>
     public const string Phase25FetchPinSha = "82b08c35d73bb964fcb5d4149ae36d5bd724af1b";
 
@@ -33,8 +33,8 @@ public static class ArthurianMenuBootstrap
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
-    /// <summary>Master Spec Phase 2–5 files that Force Sync missed when Sync host was stale.</summary>
-    public static readonly string[] Phase25ScriptPaths =
+    /// <summary>Phase 2–5 standalones to DELETE (types embedded elsewhere). CS0101 kill list.</summary>
+    public static readonly string[] Phase25StandaloneKillList =
     {
         "Assets/Scripts/Data/SpriteAnimClip.cs",
         "Assets/Scripts/Data/StageLayoutProfile.cs",
@@ -42,6 +42,11 @@ public static class ArthurianMenuBootstrap
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/Systems/DiceManager.cs",
+    };
+
+    /// <summary>Editor helpers only — never the six embedded-type standalones.</summary>
+    public static readonly string[] Phase25ScriptPaths =
+    {
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
     };
@@ -160,16 +165,17 @@ public static class ArthurianMenuBootstrap
             $"Gameplay scripts: {(hasGameplay ? "YES" : "NO")}\n" +
             $"Church pew layout: {(hasPews ? "YES" : "NO")}\n" +
             $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n" +
-            $"Phase 2–5 StageLayoutProfile: {(hasStageLayout ? "YES" : "MISSING — run Fetch Missing Phase 2–5 Scripts")}\n" +
-            $"Phase 4 StageParallaxController: {(hasParallax ? "YES" : "MISSING")}\n" +
-            $"Phase 4 ModularSpriteAnimator: {(hasModAnim ? "YES" : "MISSING")}\n" +
-            $"Phase 5 DiceManager: {(hasDiceMgr ? "YES" : "MISSING")}\n\n";
+            $"Phase 2–5 StageLayoutProfile (embed): {(hasStageLayout ? "YES" : "MISSING — Force Sync GameDataTypes.cs")}\n" +
+            $"Phase 4 StageParallaxController (embed): {(hasParallax ? "YES" : "MISSING — Force Sync GameLoopManager.cs")}\n" +
+            $"Phase 4 ModularSpriteAnimator (embed): {(hasModAnim ? "YES" : "MISSING — Force Sync PaperDollSeatView.cs")}\n" +
+            $"Phase 5 DiceManager (embed): {(hasDiceMgr ? "YES" : "MISSING — Force Sync TavernDiceMinigame.cs")}\n\n";
 
         if (!hasStageLayout || !hasParallax || !hasModAnim || !hasDiceMgr)
         {
             msg +=
-                "CS0103 FIX: Arthurian → Fetch Missing Phase 2–5 Scripts\n" +
-                "(downloads StageLayoutProfile / ModularSpriteAnimator / StageParallax / DiceManager by absolute raw URL)\n\n";
+                "CS0103 FIX: Force Sync hosts that embed these types (GameDataTypes / PaperDoll / GameLoop / TavernDice).\n" +
+                "CS0101 FIX: Arthurian → Delete Phase 2–5 Duplicate Standalones\n" +
+                "(or manually delete Assets/Scripts/Data/ModularSpriteLibrary.cs then recompile)\n\n";
         }
 
         if (!string.IsNullOrEmpty(strayHits))
@@ -428,7 +434,7 @@ public static class ArthurianMenuBootstrap
             "Assets/Editor/ArthurianCharacterDatabaseEditor.cs",
             // PackageVersion is NOT in this list — Install must not overwrite a newer Diagnose marker.
             "Assets/Scripts/Data/GameDataTypes.cs",
-            "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+            // ModularSpriteLibrary.cs standalone REMOVED — type embedded in GameDataTypes.cs (CS0101).
             "Assets/Scripts/Data/TownsfolkAppearance.cs",
             "Assets/Scripts/Data/Characters/CharacterDefinition.cs",
             "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
@@ -530,98 +536,96 @@ public static class ArthurianMenuBootstrap
         EditorUtility.DisplayDialog(
             "DemonKnight Setup",
             "1) Arthurian → Bootstrap CompatApi + Sync Tools (pinned).\n"
-            + "2) Arthurian → Fetch Missing Phase 2–5 Scripts (if CS0103 StageLayout/Dice/Anim).\n"
-            + "3) Arthurian → Force Delete+Sync ALL Scripts.\n"
-            + "4) Diagnose must show sync-phase25-fetch-menu (or newer).\n\n"
+            + "2) Arthurian → Force Delete+Sync ALL Scripts.\n"
+            + "3) If CS0101 ModularSpriteLibrary: Arthurian → Delete Phase 2–5 Duplicate Standalones\n"
+            + "   (or manually delete Assets/Scripts/Data/ModularSpriteLibrary.cs then recompile).\n"
+            + "4) Diagnose must show delete-phase25-standalones-cs0101 (or newer).\n\n"
             + "Project Assets path:\n" + Application.dataPath,
             "OK");
         Debug.Log("[DemonKnight] Assets path: " + Application.dataPath);
     }
 
     /// <summary>
-    /// DA-59 hard fix: download ONLY Master Spec Phase 2–5 scripts via absolute raw URLs.
-    /// Does not depend on ArthurianSyncFromGitHub ScriptPaths (stale Sync host skips those files).
+    /// DA-59 CS0101 fix: DELETE Phase 2–5 standalones that redefine embedded types.
+    /// Never re-download ModularSpriteLibrary / StageLayout / Dice / Anim / Parallax .cs.
     /// </summary>
-    [MenuItem("Arthurian/Stub Phase 2–5 Duplicate Standalones", false, 4)]
-    [MenuItem("Arthurian/Fetch Missing Phase 2–5 Scripts", false, 5)]
+    [MenuItem("Arthurian/Delete Phase 2–5 Duplicate Standalones", false, 4)]
+    [MenuItem("Arthurian/Stub Phase 2–5 Duplicate Standalones", false, 5)]
+    [MenuItem("Arthurian/Fetch Missing Phase 2–5 Scripts", false, 6)]
     public static void FetchMissingPhase25Scripts()
     {
         if (!EditorUtility.DisplayDialog(
-                "Stub Phase 2–5 Duplicates",
-                "Write type-definition-free stubs for Phase 2–5 standalones so they no longer\n"
-                + "CS0101 against embeds in GameDataTypes / PaperDollSeatView / GameLoopManager / TavernDice.\n\n"
+                "Delete Phase 2–5 Duplicates",
+                "DELETE standalone Phase 2–5 .cs files that contain public class\n"
+                + "(CS0101 against embeds in GameDataTypes / PaperDollSeatView / GameLoopManager / TavernDice).\n\n"
                 + "Also fetches Art Architect editor helpers if missing.\n"
-                + "Use when Force Sync re-downloaded full ModularSpriteLibrary.cs (etc.).",
-                "Stub Now", "Cancel"))
+                + "If CS0101 persists: manually delete Assets/Scripts/Data/ModularSpriteLibrary.cs then recompile.",
+                "Delete Now", "Cancel"))
             return;
 
         int ok = WritePhase25StubsInternal(out string report);
         AssetDatabase.Refresh();
         EditorUtility.DisplayDialog(
-            ok > 0 ? "Phase 2–5 Stubs OK" : "Phase 2–5 Stubs Incomplete",
+            ok >= 0 ? "Phase 2–5 Delete Done" : "Phase 2–5 Delete Incomplete",
             report, "OK");
     }
 
-    /// <summary>
-    /// DA-59 CS0101 fix: NEVER re-download full Phase 2–5 standalones (old pins still have
-    /// public class bodies). Always write type-definition-free stubs — real types are embedded.
-    /// </summary>
+    /// <summary>Legacy name — now deletes standalones (never re-downloads type bodies).</summary>
     public static int FetchPhase25ScriptsInternal(out string report)
     {
         return WritePhase25StubsInternal(out report);
     }
 
-    /// <summary>Hardcoded stubs for Phase 2–5 standalones (embedded elsewhere).</summary>
+    /// <summary>DELETE Phase 2–5 standalones with public class; fetch editor helpers only.</summary>
     public static int WritePhase25StubsInternal(out string report)
     {
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
         var errors = new List<string>();
         int ok = 0;
-        var map = new (string rel, string host, string typeName)[]
-        {
-            ("Assets/Scripts/Data/SpriteAnimClip.cs", "GameDataTypes.cs", "SpriteAnimClip"),
-            ("Assets/Scripts/Data/StageLayoutProfile.cs", "GameDataTypes.cs", "StageLayoutProfile"),
-            ("Assets/Scripts/Data/ModularSpriteLibrary.cs", "GameDataTypes.cs", "ModularSpriteLibrary"),
-            ("Assets/Scripts/UI/ModularSpriteAnimator.cs", "PaperDollSeatView.cs", "ModularSpriteAnimator"),
-            ("Assets/Scripts/Systems/StageParallaxController.cs", "GameLoopManager.cs", "StageParallaxController"),
-            ("Assets/Scripts/Systems/DiceManager.cs", "TavernDiceMinigame.cs", "DiceManager"),
-            // Art tools stay downloadable; not type-duplicated in embeds.
-        };
 
         try
         {
-            for (int i = 0; i < map.Length; i++)
+            for (int i = 0; i < Phase25StandaloneKillList.Length; i++)
             {
-                var e = map[i];
-                EditorUtility.DisplayProgressBar("Phase 2–5 Stubs", e.rel, (float)i / map.Length);
+                string rel = Phase25StandaloneKillList[i];
+                EditorUtility.DisplayProgressBar("Phase 2–5 Delete", rel, (float)i / Phase25StandaloneKillList.Length);
                 try
                 {
-                    string dest = Path.Combine(projectRoot, e.rel.Replace('/', Path.DirectorySeparatorChar));
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                    string stub =
-                        "// EMBEDDED in " + e.host + " — DA-59 nuclear Sync fix (CS0101 if type redefined here).\n"
-                        + "// Real type: ArthurianAutobattler." + e.typeName + "\n"
-                        + "// Force Sync may still download this stub; keep it type-definition-free.\n";
-                    if (File.Exists(dest))
+                    string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                    if (!File.Exists(dest)) continue;
+                    string cur = File.ReadAllText(dest);
+                    bool hasType = cur.IndexOf("public class ", StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("public partial class ", StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class ModularSpriteLibrary", StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class SpriteAnimClip", StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class ModularSpriteAnimator", StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class StageParallaxController", StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class DiceManager", StringComparison.Ordinal) >= 0;
+                    if (!hasType)
                     {
-                        try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                        // Comment-only stub — still delete so Sync never leaves a ghost path.
+                        hasType = true;
                     }
-                    File.WriteAllText(dest, stub);
+                    try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                    File.Delete(dest);
+                    string meta = dest + ".meta";
+                    if (File.Exists(meta))
+                    {
+                        try { File.SetAttributes(meta, FileAttributes.Normal); } catch { /* ignore */ }
+                        try { File.Delete(meta); } catch { /* ignore */ }
+                    }
                     ok++;
-                    Debug.Log("[DemonKnight] Phase 2–5 stubbed " + e.rel);
+                    Debug.Log("[DemonKnight] Phase 2–5 DELETED " + rel);
                 }
                 catch (Exception ex)
                 {
-                    errors.Add($"{e.rel}: {ex.Message}");
+                    errors.Add($"{rel}: {ex.Message}");
                 }
             }
 
-            // Still try to fetch Art Architect helpers (not embedded) by absolute URL.
-            foreach (string rel in new[]
-                     {
-                         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
-                         "Assets/Editor/ArthurianArtArchitectWindow.cs",
-                     })
+            // Editor helpers only (not embedded) by absolute URL.
+            foreach (string rel in Phase25ScriptPaths)
             {
                 try
                 {
@@ -645,7 +649,9 @@ public static class ArthurianMenuBootstrap
             EditorUtility.ClearProgressBar();
         }
 
-        report = $"Stubbed/fetched Phase 2–5 paths ({ok} writes). Types live in GameDataTypes / PaperDoll / GameLoop / TavernDice.\n";
+        report = $"Deleted Phase 2–5 standalones / fetched editor helpers ({ok} ops).\n"
+                 + "Types live in GameDataTypes / PaperDoll / GameLoop / TavernDice.\n"
+                 + "If CS0101 remains: manually delete Assets/Scripts/Data/ModularSpriteLibrary.cs then recompile.\n";
         if (errors.Count > 0)
             report += "\nFailures:\n" + string.Join("\n", errors);
         else

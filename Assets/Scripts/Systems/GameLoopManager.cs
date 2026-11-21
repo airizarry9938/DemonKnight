@@ -11,53 +11,56 @@ namespace ArthurianAutobattler
 
 #if UNITY_EDITOR
         /// <summary>
-        /// DA-59: when embeds land in GameDataTypes/PaperDoll/this file/TavernDice but Sync
-        /// re-downloads full Phase 2–5 standalones from an old pin → CS0101. Force stubs on load.
+        /// DA-59: DELETE Phase 2–5 standalones if they contain public class (CS0101).
+        /// Types live in GameDataTypes / PaperDollSeatView / GameLoopManager / TavernDiceMinigame.
+        /// Sync no longer downloads these paths; this cleans leftovers from old pins.
         /// </summary>
         [UnityEditor.InitializeOnLoadMethod]
-        static void DkStubDuplicatePhase25Standalones()
+        static void DkDeleteDuplicatePhase25Standalones()
         {
             try
             {
                 string data = Application.dataPath;
-                var stubs = new (string rel, string host, string typeName)[]
+                string[] rels =
                 {
-                    ("Scripts/Data/SpriteAnimClip.cs", "GameDataTypes.cs", "SpriteAnimClip"),
-                    ("Scripts/Data/StageLayoutProfile.cs", "GameDataTypes.cs", "StageLayoutProfile"),
-                    ("Scripts/Data/ModularSpriteLibrary.cs", "GameDataTypes.cs", "ModularSpriteLibrary"),
-                    ("Scripts/UI/ModularSpriteAnimator.cs", "PaperDollSeatView.cs", "ModularSpriteAnimator"),
-                    ("Scripts/Systems/StageParallaxController.cs", "GameLoopManager.cs", "StageParallaxController"),
-                    ("Scripts/Systems/DiceManager.cs", "TavernDiceMinigame.cs", "DiceManager"),
+                    "Scripts/Data/SpriteAnimClip.cs",
+                    "Scripts/Data/StageLayoutProfile.cs",
+                    "Scripts/Data/ModularSpriteLibrary.cs",
+                    "Scripts/UI/ModularSpriteAnimator.cs",
+                    "Scripts/Systems/StageParallaxController.cs",
+                    "Scripts/Systems/DiceManager.cs",
                 };
                 bool any = false;
-                foreach (var s in stubs)
+                foreach (string rel in rels)
                 {
-                    string path = System.IO.Path.Combine(data, s.rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
-                    string stub =
-                        "// EMBEDDED in " + s.host + " — DA-59 nuclear Sync fix (CS0101 if type redefined here).\n"
-                        + "// Real type: ArthurianAutobattler." + s.typeName + "\n"
-                        + "// Force Sync may still download this stub; keep it type-definition-free.\n";
-                    bool need = !System.IO.File.Exists(path);
-                    if (!need)
-                    {
-                        string cur = System.IO.File.ReadAllText(path);
-                        need = cur.IndexOf("public class ", System.StringComparison.Ordinal) >= 0
-                               || cur.IndexOf("public partial class ", System.StringComparison.Ordinal) >= 0
-                               || cur.IndexOf("class " + s.typeName, System.StringComparison.Ordinal) >= 0;
-                    }
-                    if (!need) continue;
+                    string path = System.IO.Path.Combine(data, rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                    if (!System.IO.File.Exists(path)) continue;
+                    string cur = System.IO.File.ReadAllText(path);
+                    bool hasType = cur.IndexOf("public class ", System.StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("public partial class ", System.StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class ModularSpriteLibrary", System.StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class StageLayoutProfile", System.StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class SpriteAnimClip", System.StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class ModularSpriteAnimator", System.StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class StageParallaxController", System.StringComparison.Ordinal) >= 0
+                                   || cur.IndexOf("class DiceManager", System.StringComparison.Ordinal) >= 0;
+                    if (!hasType) continue;
                     try
                     {
-                        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
-                        if (System.IO.File.Exists(path))
-                            System.IO.File.SetAttributes(path, System.IO.FileAttributes.Normal);
-                        System.IO.File.WriteAllText(path, stub);
+                        System.IO.File.SetAttributes(path, System.IO.FileAttributes.Normal);
+                        System.IO.File.Delete(path);
+                        string meta = path + ".meta";
+                        if (System.IO.File.Exists(meta))
+                        {
+                            try { System.IO.File.SetAttributes(meta, System.IO.FileAttributes.Normal); } catch { /* ignore */ }
+                            try { System.IO.File.Delete(meta); } catch { /* ignore */ }
+                        }
                         any = true;
-                        Debug.Log("[DemonKnight] DA-59 stubbed duplicate " + s.rel);
+                        Debug.Log("[DemonKnight] DA-59 DELETED duplicate standalone " + rel);
                     }
                     catch (System.Exception ex)
                     {
-                        Debug.LogWarning("[DemonKnight] DA-59 stub failed " + s.rel + ": " + ex.Message);
+                        Debug.LogWarning("[DemonKnight] DA-59 delete failed " + rel + ": " + ex.Message);
                     }
                 }
                 if (any)
@@ -65,7 +68,7 @@ namespace ArthurianAutobattler
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning("[DemonKnight] DA-59 stub pass skipped: " + ex.Message);
+                Debug.LogWarning("[DemonKnight] DA-59 delete pass skipped: " + ex.Message);
             }
         }
 #endif
