@@ -221,43 +221,62 @@ public static class ArthurianSceneBuilder
             new Color(0.12f, 0.14f, 0.12f, 0.92f));
         crowdPanel.SetActive(false);
 
-        // BOTTOM: Dossier / Training / Mediation
+        // Compact unit stats (floats upper-right of selected pew at runtime).
+        // Dialogue/quotes live on ChurchBottomDialogue — not inside Panel_Dossier.
         GameObject dossier = CreatePanel(townCanvasObj.transform, "Panel_Dossier",
-            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 160f), new Vector2(1180f, 280f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(200f, 40f), new Vector2(360f, 300f),
             new Color(0.10f, 0.09f, 0.08f, 0.96f));
+        dossier.SetActive(false);
 
         GameObject avatarObj = new GameObject("SelectedAvatar", typeof(RectTransform), typeof(Image));
         avatarObj.transform.SetParent(dossier.transform, false);
         var avatarRt = avatarObj.GetComponent<RectTransform>();
-        avatarRt.anchoredPosition = new Vector2(-480f, 20f);
-        avatarRt.sizeDelta = new Vector2(120f, 120f);
+        avatarRt.anchorMin = avatarRt.anchorMax = new Vector2(0f, 0f);
+        avatarRt.pivot = new Vector2(0f, 0f);
+        avatarRt.anchoredPosition = new Vector2(12f, 180f);
+        avatarRt.sizeDelta = new Vector2(72f, 72f);
         townUI.selectedAvatarImage = avatarObj.GetComponent<Image>();
         townUI.selectedAvatarImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
         townUI.selectedAvatarImage.enabled = false;
 
-        townUI.characterDialogueText = CreateTMP(dossier.transform, "Dialogue",
-            "The tavern murmurs. Select a citizen.", 18, TextAlignmentOptions.Left,
-            new Vector2(-180f, 80f), new Vector2(520f, 70f));
+        GameObject bottomDlg = CreatePanel(townCanvasObj.transform, "ChurchBottomDialogue",
+            new Vector2(0.08f, 0.02f), new Vector2(0.92f, 0.14f), Vector2.zero, Vector2.zero,
+            new Color(0.06f, 0.07f, 0.09f, 0.88f));
+        var bottomPanelRt = bottomDlg.GetComponent<RectTransform>();
+        bottomPanelRt.offsetMin = Vector2.zero;
+        bottomPanelRt.offsetMax = Vector2.zero;
+        townUI.characterDialogueText = CreateTMP(bottomDlg.transform, "Dialogue",
+            "The tavern murmurs. Hover a citizen — right-click for stats.", 18, TextAlignmentOptions.TopLeft,
+            Vector2.zero, Vector2.zero);
+        var bottomDlgRt = townUI.characterDialogueText.rectTransform;
+        bottomDlgRt.anchorMin = new Vector2(0.02f, 0.45f);
+        bottomDlgRt.anchorMax = new Vector2(0.98f, 0.95f);
+        bottomDlgRt.offsetMin = Vector2.zero;
+        bottomDlgRt.offsetMax = Vector2.zero;
+
         townUI.dossierStatsText = CreateTMP(dossier.transform, "DossierStats",
-            "Select a citizen on the right to inspect, train, mediate, or recruit.", 16, TextAlignmentOptions.TopLeft,
-            new Vector2(-180f, -10f), new Vector2(520f, 120f));
+            "Right-click a pew citizen for hire / train / intel.", 15, TextAlignmentOptions.TopLeft,
+            new Vector2(96f, 120f), new Vector2(248f, 160f));
+        var statsRt = townUI.dossierStatsText.rectTransform;
+        statsRt.anchorMin = statsRt.anchorMax = new Vector2(0f, 0f);
+        statsRt.pivot = new Vector2(0f, 0f);
 
         townUI.tier1RevealButton = CreateButton(dossier.transform, "ScoutBtn", "Scout (Free)",
-            new Vector2(280f, 90f), new Vector2(140f, 36f), new Color(0.25f, 0.28f, 0.35f));
-        townUI.tier2RevealButton = CreateButton(dossier.transform, "InvestigateBtn", "Investigate 20g",
-            new Vector2(430f, 90f), new Vector2(160f, 36f), new Color(0.25f, 0.28f, 0.35f));
-        townUI.tier3RevealButton = CreateButton(dossier.transform, "FullReportBtn", "Full Report 30g",
-            new Vector2(280f, 45f), new Vector2(140f, 36f), new Color(0.25f, 0.28f, 0.35f));
+            new Vector2(12f, 78f), new Vector2(110f, 32f), new Color(0.25f, 0.28f, 0.35f));
+        townUI.tier2RevealButton = CreateButton(dossier.transform, "InvestigateBtn", "Investigate",
+            new Vector2(130f, 78f), new Vector2(110f, 32f), new Color(0.25f, 0.28f, 0.35f));
+        townUI.tier3RevealButton = CreateButton(dossier.transform, "FullReportBtn", "Full Report",
+            new Vector2(248f, 78f), new Vector2(100f, 32f), new Color(0.25f, 0.28f, 0.35f));
         townUI.hireRecruitButton = CreateButton(dossier.transform, "HireBtn", "Recruit",
-            new Vector2(430f, 45f), new Vector2(160f, 36f), new Color(0.18f, 0.40f, 0.22f));
+            new Vector2(12f, 40f), new Vector2(160f, 32f), new Color(0.18f, 0.40f, 0.22f));
         townUI.hireButtonText = townUI.hireRecruitButton.GetComponentInChildren<TextMeshProUGUI>();
 
         townUI.trainTankButton = CreateButton(dossier.transform, "TrainTank", "Train Tank 15g",
-            new Vector2(280f, -10f), new Vector2(160f, 36f), new Color(0.35f, 0.22f, 0.15f));
+            new Vector2(180f, 40f), new Vector2(160f, 32f), new Color(0.35f, 0.22f, 0.15f));
         townUI.trainRangedButton = CreateButton(dossier.transform, "TrainRanged", "Train Ranged 15g",
-            new Vector2(450f, -10f), new Vector2(170f, 36f), new Color(0.20f, 0.30f, 0.35f));
+            new Vector2(12f, 6f), new Vector2(160f, 32f), new Color(0.20f, 0.30f, 0.35f));
         townUI.mediateRivalryButton = CreateButton(dossier.transform, "Mediate", "Mediate 100g",
-            new Vector2(360f, -60f), new Vector2(180f, 36f), new Color(0.30f, 0.20f, 0.35f));
+            new Vector2(180f, 6f), new Vector2(160f, 32f), new Color(0.30f, 0.20f, 0.35f));
 
         // Legend Codex modal — near full-screen so all 10 recipes + Fuse buttons fit.
         GameObject codexPanel = CreatePanel(townCanvasObj.transform, "CodexPanel",

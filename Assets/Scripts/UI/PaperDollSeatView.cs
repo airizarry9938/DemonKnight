@@ -203,6 +203,7 @@ namespace ArthurianAutobattler
         Image rim;
         Vector3 baseScale = Vector3.one;
         bool hovering;
+        bool menuLocked;
         bool occupied = true;
         Action onHoverInfo;
         Action onRightClick;
@@ -225,15 +226,25 @@ namespace ArthurianAutobattler
             occupied = isOccupied;
             this.onHoverInfo = onHoverInfo;
             this.onRightClick = onRightClick;
-            if (!hovering) baseScale = transform.localScale;
+            if (!hovering && !menuLocked) baseScale = transform.localScale;
             EnsureRim();
-            Apply(false);
+            ApplyVisual();
             if (!occupied)
             {
                 hovering = false;
+                menuLocked = false;
                 transform.localScale = baseScale;
             }
         }
+
+        /// <summary>Keep pew/avatar highlight while the RMB unit stats menu is open.</summary>
+        public void SetMenuLocked(bool locked)
+        {
+            menuLocked = locked && occupied;
+            ApplyVisual();
+        }
+
+        public bool IsMenuLocked => menuLocked;
 
         void EnsureRim()
         {
@@ -263,7 +274,7 @@ namespace ArthurianAutobattler
         {
             if (!occupied) return;
             hovering = true;
-            Apply(true);
+            ApplyVisual();
             // Bottom dialogue only — never opens selection menu / never locks hire select.
             onHoverInfo?.Invoke();
         }
@@ -271,7 +282,8 @@ namespace ArthurianAutobattler
         public void OnPointerExit(PointerEventData eventData)
         {
             hovering = false;
-            Apply(false);
+            // Menu lock keeps rim/scale while stats panel is open (RMB toggle).
+            ApplyVisual();
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -284,18 +296,20 @@ namespace ArthurianAutobattler
         void OnDisable()
         {
             hovering = false;
-            Apply(false);
+            // Keep menuLocked so re-enable after brief disable still shows selection.
+            ApplyVisual();
         }
 
-        void Apply(bool on)
+        void ApplyVisual()
         {
             EnsureRim();
+            bool lit = occupied && (hovering || menuLocked);
             if (rim != null)
             {
                 rim.enabled = occupied;
-                rim.color = on && occupied ? RimHover : RimIdle;
+                rim.color = lit ? RimHover : RimIdle;
             }
-            transform.localScale = on && occupied ? HoverScale : baseScale;
+            transform.localScale = lit ? HoverScale : baseScale;
         }
     }
 }

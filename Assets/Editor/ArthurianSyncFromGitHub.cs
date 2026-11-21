@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "6c427b7278a4e82e873b69312f06e0dc00a871ab";
 
-    private const string ExpectedPackageId = "dedupe-victory-wire-eventsystem";
+    private const string ExpectedPackageId = "unit-stats-ur-bottom-dialog";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -622,7 +622,11 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ShowHoverPreview")
                    && body.Contains("ToggleUnitSelectionMenu")
                    && body.Contains("textWrappingMode")
-                   && !body.Contains("enableWordWrapping");
+                   && !body.Contains("enableWordWrapping")
+                   && body.Contains("CompactUnitStatsPanel")
+                   && body.Contains("PositionUnitStatsNearSelected")
+                   && body.Contains("ChurchBottomDialogue")
+                   && body.Contains("LockSeatHighlight");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -683,7 +687,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("onHoverInfo")
                    && body.Contains("onRightClick")
                    && body.Contains("IPointerClickHandler")
-                   && body.Contains("onClick?.Invoke(recruit)");
+                   && body.Contains("onClick?.Invoke(recruit)")
+                   && body.Contains("SetMenuLocked")
+                   && body.Contains("menuLocked");
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -742,6 +748,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("unit-stats-ur-bottom-dialog")
                    || body.Contains("dedupe-victory-wire-eventsystem")
                    || body.Contains("victory-next-night-visible")
                    || body.Contains("fix-bind-action-textwrapping")

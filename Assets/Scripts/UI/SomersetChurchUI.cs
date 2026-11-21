@@ -462,7 +462,8 @@ namespace ArthurianAutobattler
                 if (found != null) dossierModal = found.gameObject;
             }
 
-            if (dossierDialogue == null) dossierDialogue = town.characterDialogueText;
+            // Dialogue/gossip live on the bottom strip only — never reuse Panel_Dossier/Dialogue
+            // (that caused the unit dialog to show twice: stats panel + bottom bar).
             if (dossierStats == null) dossierStats = town.dossierStatsText;
             if (dossierPortrait == null) dossierPortrait = town.selectedAvatarImage;
             if (hireButton == null) hireButton = town.hireRecruitButton;
@@ -1826,6 +1827,8 @@ namespace ArthurianAutobattler
         {
             if (recruit == null) return;
             AutoWireDossierFromTownUI();
+            EnsureBottomDialogueStrip();
+            CompactUnitStatsPanel();
 
             bool alreadyOpenOnThis = dossierModal != null
                                      && dossierModal.activeSelf
@@ -1833,6 +1836,7 @@ namespace ArthurianAutobattler
             if (alreadyOpenOnThis)
             {
                 if (dossierModal != null) dossierModal.SetActive(false);
+                ClearSeatMenuLocks();
                 Debug.Log($"[DemonKnight] Unit menu CLOSED for {recruit.characterName} (RMB).");
                 return;
             }
@@ -1842,10 +1846,14 @@ namespace ArthurianAutobattler
             {
                 dossierModal.SetActive(true);
                 dossierModal.transform.SetAsLastSibling();
+                PositionUnitStatsNearSelected(recruit);
             }
+            LockSeatHighlight(recruit);
             RefreshDossier();
             WriteBottomDialogue(recruit);
             Town?.SelectRecruit(recruit, null);
+            // Town.SelectRecruit may refill Panel_Dossier/Dialogue — keep it hidden.
+            HideStatsPanelDialogueChildren();
             Debug.Log($"[DemonKnight] Unit menu OPEN for {recruit.characterName} (RMB, pew {recruit.pewSeatIndex}).");
         }
 
@@ -1855,6 +1863,7 @@ namespace ArthurianAutobattler
         void WriteBottomDialogue(RecruitInstance recruit)
         {
             if (recruit == null) return;
+            EnsureBottomDialogueStrip();
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(recruit.unitID) : 0;
             int discount = MerlinResurrectionManager.Instance != null
@@ -1866,20 +1875,14 @@ namespace ArthurianAutobattler
                 gossipText.text = BuildGossip(recruit);
         }
 
-        /// <summary>Always-on bottom strip for dialogue + NPC quotes (independent of selection menu).</summary>
+        /// <summary>
+        /// Bottom-bar dialogue + NPC quotes only. Never use Panel_Dossier/Dialogue (duplicate).
+        /// </summary>
         void EnsureBottomDialogueStrip()
         {
             AutoWireDossierFromTownUI();
-            // Prefer existing wired texts; if they live under a closed modal, keep a HUD strip.
-            if (dossierDialogue != null && gossipText != null)
-            {
-                dossierDialogue.gameObject.SetActive(true);
-                gossipText.gameObject.SetActive(true);
-                return;
-            }
+            HideStatsPanelDialogueChildren();
 
-            var hud = transform as RectTransform;
-            if (hud == null) return;
             Transform strip = transform.Find("ChurchBottomDialogue");
             if (strip == null)
             {
@@ -1892,6 +1895,7 @@ namespace ArthurianAutobattler
                 srt.offsetMin = Vector2.zero;
                 srt.offsetMax = Vector2.zero;
                 go.GetComponent<Image>().color = new Color(0.06f, 0.07f, 0.09f, 0.88f);
+                go.GetComponent<Image>().raycastTarget = false;
 
                 var dlgGo = new GameObject("Dialogue", typeof(RectTransform), typeof(TextMeshProUGUI));
                 dlgGo.transform.SetParent(strip, false);
@@ -1900,10 +1904,12 @@ namespace ArthurianAutobattler
                 drt.anchorMax = new Vector2(0.98f, 0.95f);
                 drt.offsetMin = Vector2.zero;
                 drt.offsetMax = Vector2.zero;
-                dossierDialogue = dlgGo.GetComponent<TextMeshProUGUI>();
-                dossierDialogue.fontSize = 20f;
-                dossierDialogue.color = new Color(0.95f, 0.9f, 0.75f);
-                dossierDialogue.alignment = TextAlignmentOptions.TopLeft;
+                var dlg = dlgGo.GetComponent<TextMeshProUGUI>();
+                dlg.fontSize = 20f;
+                dlg.color = new Color(0.95f, 0.9f, 0.75f);
+                dlg.alignment = TextAlignmentOptions.TopLeft;
+                dlg.raycastTarget = false;
+                dlg.textWrappingMode = TextWrappingModes.Normal;
 
                 var gGo = new GameObject("Gossip", typeof(RectTransform), typeof(TextMeshProUGUI));
                 gGo.transform.SetParent(strip, false);
@@ -1912,17 +1918,171 @@ namespace ArthurianAutobattler
                 grt.anchorMax = new Vector2(0.98f, 0.45f);
                 grt.offsetMin = Vector2.zero;
                 grt.offsetMax = Vector2.zero;
-                gossipText = gGo.GetComponent<TextMeshProUGUI>();
-                gossipText.fontSize = 16f;
-                gossipText.color = new Color(0.75f, 0.82f, 0.9f);
-                gossipText.alignment = TextAlignmentOptions.TopLeft;
+                var gtmp = gGo.GetComponent<TextMeshProUGUI>();
+                gtmp.fontSize = 16f;
+                gtmp.color = new Color(0.75f, 0.82f, 0.9f);
+                gtmp.alignment = TextAlignmentOptions.TopLeft;
+                gtmp.raycastTarget = false;
+                gtmp.textWrappingMode = TextWrappingModes.Normal;
             }
+
+            // Always bind church dialogue refs to the bottom strip (never Panel_Dossier).
+            var stripDlg = strip.Find("Dialogue")?.GetComponent<TextMeshProUGUI>();
+            var stripGossip = strip.Find("Gossip")?.GetComponent<TextMeshProUGUI>();
+            if (stripDlg != null) dossierDialogue = stripDlg;
+            if (stripGossip != null) gossipText = stripGossip;
             strip.gameObject.SetActive(true);
+            strip.SetAsLastSibling();
+        }
+
+        /// <summary>Hide Dialogue (and gossip) children on the unit stats panel so quotes aren't duplicated.</summary>
+        void HideStatsPanelDialogueChildren()
+        {
+            if (dossierModal == null) return;
+            foreach (Transform child in dossierModal.transform)
+            {
+                if (child == null) continue;
+                string n = child.name ?? "";
+                if (n.Equals("Dialogue", StringComparison.OrdinalIgnoreCase)
+                    || n.Equals("Gossip", StringComparison.OrdinalIgnoreCase))
+                    child.gameObject.SetActive(false);
+            }
+            var town = Town;
+            if (town?.characterDialogueText != null
+                && town.characterDialogueText.transform.IsChildOf(dossierModal.transform))
+                town.characterDialogueText.gameObject.SetActive(false);
+        }
+
+        /// <summary>Compact stats panel (hire/train/intel) — no dialogue block.</summary>
+        void CompactUnitStatsPanel()
+        {
+            if (dossierModal == null) return;
+            HideStatsPanelDialogueChildren();
+            var rt = dossierModal.GetComponent<RectTransform>();
+            if (rt == null) return;
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0f, 0f);
+            rt.sizeDelta = new Vector2(360f, 300f);
+
+            // Reflow children into a tight column so the old 1180×280 bottom bar layout fits.
+            PlaceChild(dossierModal.transform, "SelectedAvatar", new Vector2(12f, 180f), new Vector2(72f, 72f));
+            PlaceChild(dossierModal.transform, "DossierStats", new Vector2(96f, 120f), new Vector2(248f, 160f));
+            PlaceChild(dossierModal.transform, "ScoutBtn", new Vector2(12f, 78f), new Vector2(110f, 32f));
+            PlaceChild(dossierModal.transform, "InvestigateBtn", new Vector2(130f, 78f), new Vector2(110f, 32f));
+            PlaceChild(dossierModal.transform, "FullReportBtn", new Vector2(248f, 78f), new Vector2(100f, 32f));
+            PlaceChild(dossierModal.transform, "HireBtn", new Vector2(12f, 40f), new Vector2(160f, 32f));
+            PlaceChild(dossierModal.transform, "TrainTank", new Vector2(180f, 40f), new Vector2(160f, 32f));
+            PlaceChild(dossierModal.transform, "TrainRanged", new Vector2(12f, 6f), new Vector2(160f, 32f));
+            PlaceChild(dossierModal.transform, "Mediate", new Vector2(180f, 6f), new Vector2(160f, 32f));
+        }
+
+        static void PlaceChild(Transform parent, string name, Vector2 anchored, Vector2 size)
+        {
+            if (parent == null) return;
+            var t = parent.Find(name);
+            if (t == null) return;
+            var rt = t as RectTransform;
+            if (rt == null) return;
+            rt.anchorMin = rt.anchorMax = new Vector2(0f, 0f);
+            rt.pivot = new Vector2(0f, 0f);
+            rt.anchoredPosition = anchored;
+            rt.sizeDelta = size;
+            t.gameObject.SetActive(true);
+        }
+
+        /// <summary>Float the compact stats panel at the upper-right of the selected pew/avatar.</summary>
+        void PositionUnitStatsNearSelected(RecruitInstance recruit)
+        {
+            if (dossierModal == null || recruit == null) return;
+            CompactUnitStatsPanel();
+            var panelRt = dossierModal.GetComponent<RectTransform>();
+            var parentRt = panelRt != null ? panelRt.parent as RectTransform : null;
+            if (panelRt == null || parentRt == null) return;
+
+            RectTransform seatRt = null;
+            for (int i = 0; i < seats.Count; i++)
+            {
+                var v = seats[i];
+                if (v != null && v.Bound == recruit)
+                {
+                    seatRt = v.transform as RectTransform;
+                    break;
+                }
+            }
+            if (seatRt == null)
+            {
+                // Fallback: upper-right of screen.
+                panelRt.anchoredPosition = new Vector2(parentRt.rect.width * 0.15f, parentRt.rect.height * 0.05f);
+                return;
+            }
+
+            var cam = null as Camera;
+            var canvas = parentRt.GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                cam = canvas.worldCamera;
+
+            Vector3[] corners = new Vector3[4];
+            seatRt.GetWorldCorners(corners); // 0=BL 1=TL 2=TR 3=BR
+            Vector3 worldTR = corners[2];
+            Vector2 screen = RectTransformUtility.WorldToScreenPoint(cam, worldTR);
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parentRt, screen, cam, out Vector2 local))
+            {
+                // Upper-right of unit: panel pivot is bottom-left, sit just outside the seat.
+                panelRt.anchoredPosition = local + new Vector2(10f, 8f);
+            }
+
+            ClampPanelToParent(panelRt, parentRt);
+        }
+
+        static void ClampPanelToParent(RectTransform panel, RectTransform parent)
+        {
+            if (panel == null || parent == null) return;
+            Rect pr = parent.rect;
+            Vector2 pos = panel.anchoredPosition;
+            Vector2 size = panel.sizeDelta;
+            // Parent pivot often center — convert so we clamp in parent local space.
+            float minX = pr.xMin + 8f;
+            float maxX = pr.xMax - size.x - 8f;
+            float minY = pr.yMin + 8f;
+            float maxY = pr.yMax - size.y - 8f;
+            if (maxX < minX) maxX = minX;
+            if (maxY < minY) maxY = minY;
+            pos.x = Mathf.Clamp(pos.x, minX, maxX);
+            pos.y = Mathf.Clamp(pos.y, minY, maxY);
+            panel.anchoredPosition = pos;
+        }
+
+        void ClearSeatMenuLocks()
+        {
+            for (int i = 0; i < seats.Count; i++)
+            {
+                var v = seats[i];
+                if (v == null) continue;
+                var h = v.GetComponent<PewSeatHoverHighlight>();
+                h?.SetMenuLocked(false);
+            }
+        }
+
+        void LockSeatHighlight(RecruitInstance recruit)
+        {
+            ClearSeatMenuLocks();
+            if (recruit == null) return;
+            for (int i = 0; i < seats.Count; i++)
+            {
+                var v = seats[i];
+                if (v == null || v.Bound != recruit) continue;
+                var h = v.GetComponent<PewSeatHoverHighlight>();
+                if (h != null) h.SetMenuLocked(true);
+                break;
+            }
         }
 
         private void RefreshDossier()
         {
             if (selected == null) return;
+            EnsureBottomDialogueStrip();
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selected.unitID) : 0;
             int discount = MerlinResurrectionManager.Instance != null
@@ -1930,11 +2090,10 @@ namespace ArthurianAutobattler
 
             ApplyDossierPortrait(selected);
 
-            if (dossierDialogue != null)
-                dossierDialogue.text = selected.FormatHireDialogue(grudge, discount);
+            // Stats only on the floating panel — dialogue/quotes stay on the bottom bar.
             if (dossierStats != null)
                 dossierStats.text = selected.GetDisplayDescription(grudge, discount);
-            if (gossipText != null) gossipText.text = BuildGossip(selected);
+            WriteBottomDialogue(selected);
 
             int cost = selected.GetFinalHireCost(grudge, discount);
             if (hireButtonLabel != null) hireButtonLabel.text = $"Recruit ({cost}g)";
@@ -2824,7 +2983,7 @@ namespace ArthurianAutobattler
                 RefreshWarbandPanel();
         }
 
-        /// <summary>Close floating overlays only — keep the bottom dossier panel visible.</summary>
+        /// <summary>Close floating overlays only — keep the bottom dialogue strip visible.</summary>
         public void CloseFloatingModals()
         {
             diceModalUserOpen = false;
@@ -2835,6 +2994,8 @@ namespace ArthurianAutobattler
             if (diceModal != null) diceModal.SetActive(false);
             if (codexModal != null) codexModal.SetActive(false);
             if (warbandModal != null) warbandModal.SetActive(false);
+            if (dossierModal != null) dossierModal.SetActive(false);
+            ClearSeatMenuLocks();
 
             // Also force-hide LegendCodexUI panel if it diverged from codexModal ref.
             var codexUi = FindFirstObjectByType<LegendCodexUI>();
