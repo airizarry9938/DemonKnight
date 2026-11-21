@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "52038c10fba26266b82d1565cfcd447ec6a15d4c";
 
-    private const string ExpectedPackageId = "fix-bind-action-textwrapping";
+    private const string ExpectedPackageId = "victory-next-night-visible";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -644,7 +644,9 @@ public static class ArthurianSyncFromGitHub
         {
             return body.Contains("DemonKnightCompatApi")
                    && body.Contains("TriggerWaveVictoryScreen")
-                   && body.Contains("Next Night");
+                   && body.Contains("Next Night")
+                   && body.Contains("PromoteVictoryCanvas")
+                   && body.Contains("StyleVictoryActionButton");
         }
 
         if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
@@ -735,6 +737,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("victory-next-night-visible")
                    || body.Contains("fix-bind-action-textwrapping")
                    || body.Contains("sync-skip-self-hover-rmb")
                    || body.Contains("sortbar-raise-hover-instant")

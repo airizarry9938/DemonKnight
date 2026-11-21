@@ -374,7 +374,7 @@ public static class ArthurianSceneBuilder
         perks.choiceDescTexts = null;
 
         // Merlin Resurrection Canvas
-        GameObject resCanvasObj = CreateCanvas("ResurrectionCanvas", 20);
+        GameObject resCanvasObj = CreateCanvas("ResurrectionCanvas", 5000);
         resCanvasObj.SetActive(false);
         GameObject resPanel = CreatePanel(resCanvasObj.transform, "ResurrectionPanel",
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 520f),
@@ -386,9 +386,9 @@ public static class ArthurianSceneBuilder
         // Legacy bank panel removed — Next Night advances the night; End Run → Main Menu.
         // Runtime MerlinResurrectionManager also hides any leftover LegacyBankPanel in Downloads scenes.
         var nextNight = CreateButton(resPanel.transform, "NextNight", "Next Night",
-            new Vector2(160f, -180f), new Vector2(280f, 56f), new Color(0.28f, 0.18f, 0.42f));
+            new Vector2(170f, -200f), new Vector2(320f, 72f), new Color(0.72f, 0.52f, 0.12f));
         var endRun = CreateButton(resPanel.transform, "EndRun", "End Run",
-            new Vector2(-160f, -180f), new Vector2(280f, 56f), new Color(0.45f, 0.16f, 0.14f));
+            new Vector2(-170f, -200f), new Vector2(320f, 72f), new Color(0.55f, 0.18f, 0.16f));
         // Wired at runtime (single listener) — do not add persistent Next Night here.
         _ = nextNight;
         _ = endRun;
