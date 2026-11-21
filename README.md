@@ -31,7 +31,7 @@ King Arthur's warband is cornered in a gothic Somerset church. Scout, bribe, tra
 
 **Initial hire bands:** Peasants **10–20g**, Warriors **50–100g**, Knights **200–400g** (higher ATK/HP → higher within band). Starting royal gold **200g**.
 
-**Buy Tavern Round (50g):** −10g hire for **all** units until the wave ends. HUD night label shows **Night N · Wave M (Boss/Horde)**.
+**Buy Tavern Round (50g):** −10g hire for **all** units until the wave ends. HUD night label shows **Night N · Wave M (Boss/Horde)** and advances **1 → 2 → 3…** (not by twos).
 
 **New Game:** always **200g**; wipes **all** bank runes, sin runes, relics, run perks, and pacts (every scene manager + PlayerPrefs). Modifiers accumulate only during the run. Continue restores saved gold only (no bank re-add).
 
@@ -47,7 +47,7 @@ After this PR merges, pin the **merge commit SHA** (or tip of `main`). Until the
 
 **Perk / rune hire math:** dossier Hire line lists every add-on/subtraction (Writ, Crown, Blood-Oath, Jealousy, ★, Tavern, Loyalist ÷2, floor) from the same breakdown as Recruit (Ng).
 
-**Formation vs type:** melee (Warrior/Knight/melee legends) in **BACK** cannot attack — only ranged types (Peasant, Priest, Merlin, Morgan, Lady) fight from BACK. Warband shows **NO REACH**.
+**Formation vs type:** melee in **BACK** without a ranged kit cannot attack (**NO REACH**). Warband FRONT/BACK buttons move formation seats only. **Train Ranged** (15g crossbow) is blocked for **Warriors** — they may sit BACK but keep NO REACH. Knights may still Train Ranged. Native ranged (Peasant, Priest, Merlin, Morgan, Lady, …) fire from BACK without a kit.
 
 **Boss dialog + video bg:** boss waves open a bottom dialog bar; fight scene can loop `Assets/Art/Backgrounds/BattlefieldLoop.mp4` (VideoPlayer → RenderTexture). See `Assets/Art/Backgrounds/README-BATTLE-VIDEO.txt`.
 

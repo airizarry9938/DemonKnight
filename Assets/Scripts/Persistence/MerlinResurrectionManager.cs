@@ -39,6 +39,8 @@ namespace ArthurianAutobattler
         private bool nextRunButtonWired;
         private bool endRunButtonWired;
         private Button endRunButton;
+        /// <summary>Blocks double AdvanceNight when scene persistent + runtime listeners both fire.</summary>
+        private bool advancingNight;
 
         private void Awake()
         {
@@ -63,19 +65,20 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Persistent UnityEvent wiring can be missing on downloaded scenes — always
-        /// attach a runtime listener to the Next Run button under the bank panel.
+        /// Always (re)wire Next Run with a single listener. SceneBuilder / Downloads scenes
+        /// may still carry a persistent Inspector listener — stacking with AddListener
+        /// advanced night twice (Night 1 → Night 3). Clear onClick first.
         /// </summary>
         private void WireNextRunButton()
         {
-            if (nextRunButtonWired) return;
             EnsureLegacyBankPanel();
             if (legacyBankPanel == null) return;
 
             Button btn = FindPanelButton(legacyBankPanel.transform, "NextRun", "Next Timeline", "Next Run", "Next Night");
             if (btn == null) return;
 
-            btn.onClick.RemoveListener(StartNextTimelineRun);
+            // Replace ALL listeners (persistent scene + prior runtime) with exactly one.
+            btn.onClick = new Button.ButtonClickedEvent();
             btn.onClick.AddListener(StartNextTimelineRun);
             nextRunButtonWired = true;
         }
@@ -335,29 +338,42 @@ namespace ArthurianAutobattler
         /// </summary>
         public void StartNextTimelineRun()
         {
-            if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
-            if (legacyBankPanel != null) legacyBankPanel.SetActive(false);
-
-            var loop = GameLoopManager.Instance ?? FindFirstObjectByType<GameLoopManager>();
-            if (loop != null)
+            if (advancingNight)
             {
-                loop.AdvanceNightAndRestart();
+                Debug.LogWarning("[DemonKnight] StartNextTimelineRun ignored — night advance already in progress (duplicate click/listener).");
                 return;
             }
-
-            var scene = SceneManager.GetActiveScene();
-            if (scene.buildIndex >= 0)
+            advancingNight = true;
+            try
             {
-                SceneManager.LoadScene(scene.buildIndex);
-                return;
-            }
-            if (!string.IsNullOrEmpty(scene.name))
-            {
-                SceneManager.LoadScene(scene.name);
-                return;
-            }
+                if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
+                if (legacyBankPanel != null) legacyBankPanel.SetActive(false);
 
-            Debug.LogError("[DemonKnight] StartNextTimelineRun failed — no GameLoopManager and scene is not loadable.");
+                var loop = GameLoopManager.Instance ?? FindFirstObjectByType<GameLoopManager>();
+                if (loop != null)
+                {
+                    loop.AdvanceNightAndRestart();
+                    return;
+                }
+
+                var scene = SceneManager.GetActiveScene();
+                if (scene.buildIndex >= 0)
+                {
+                    SceneManager.LoadScene(scene.buildIndex);
+                    return;
+                }
+                if (!string.IsNullOrEmpty(scene.name))
+                {
+                    SceneManager.LoadScene(scene.name);
+                    return;
+                }
+
+                Debug.LogError("[DemonKnight] StartNextTimelineRun failed — no GameLoopManager and scene is not loadable.");
+            }
+            finally
+            {
+                advancingNight = false;
+            }
         }
 
         public int GetBonusStartingGold() => startingGoldBankLevel * 15;

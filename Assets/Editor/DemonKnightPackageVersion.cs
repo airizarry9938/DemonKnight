@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "pew-generate-appearance-if-null";
-    public const string GitHint = "Bind-generates-TownsfolkAppearance-delete-legacy-ArtTools";
-    public const string BuiltUtc = "2026-11-21T01:25:00Z";
+    public const string Id = "warrior-no-train-ranged-night-seq";
+    public const string GitHint = "Warriors-no-TrainRanged-night-HUD-1-2-3";
+    public const string BuiltUtc = "2026-11-21T15:10:00Z";
 }
 #endif

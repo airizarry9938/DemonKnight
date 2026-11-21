@@ -46,7 +46,8 @@ namespace ArthurianAutobattler
                     primaryTrait = r.primaryTrait,
                     hatedTrait = r.hatedTrait,
                     lovedTrait = r.lovedTrait,
-                    canAttackFromBack = r.canAttackFromBack
+                    // Warriors never fight from BACK — strip stale kits from older saves.
+                    canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior
                 };
                 copy.isSirenEnchantress = r.isSirenEnchantress;
                 combatRoster.Add(copy);
@@ -85,7 +86,7 @@ namespace ArthurianAutobattler
                     currentHealth = r.maxHealth,
                     attackDamage = atk,
                     attacksPerSecond = aps,
-                    canAttackFromBack = r.canAttackFromBack,
+                    canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior,
                     cannotBeHealed = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight),
                     maxHpDrainPerSecond = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight)
                         ? r.maxHealth * 0.05f : 0f

@@ -376,6 +376,16 @@ namespace ArthurianAutobattler
         public void TrainSelectedRole(CombatRole role)
         {
             if (selectedRecruit == null || playerGold < 15) return;
+            if (role == CombatRole.BacklineRanged && !selectedRecruit.AllowsTrainRangedKit)
+            {
+                if (characterDialogueText != null)
+                    characterDialogueText.text =
+                        "<color=#FF6644>Warriors cannot Train Ranged.</color> Move them to BACK in the warband — they keep NO REACH there.";
+                RefreshDossierUI(GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
+                    : 0);
+                return;
+            }
             playerGold -= 15;
             selectedRecruit.TrainRole(role);
             UpdateHUD();
@@ -460,7 +470,11 @@ namespace ArthurianAutobattler
             if (tier3RevealButton != null) tier3RevealButton.interactable = selectedRecruit.intelTierUnlocked < 3;
             if (hireRecruitButton != null) hireRecruitButton.interactable = true;
             if (trainTankButton != null) trainTankButton.interactable = playerGold >= 15;
-            if (trainRangedButton != null) trainRangedButton.interactable = playerGold >= 15;
+            if (trainRangedButton != null)
+            {
+                bool warriorBlocked = selectedRecruit != null && !selectedRecruit.AllowsTrainRangedKit;
+                trainRangedButton.interactable = playerGold >= 15 && !warriorBlocked;
+            }
             if (mediateRivalryButton != null)
             {
                 mediateRivalryButton.interactable = playerGold >= GameLoopManager.MediateCostGold;

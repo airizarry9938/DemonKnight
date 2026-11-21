@@ -1838,7 +1838,12 @@ namespace ArthurianAutobattler
             if (tier3Button != null) tier3Button.interactable = selected.intelTierUnlocked < 3;
             if (hireButton != null) hireButton.interactable = true;
             if (trainTankButton != null) trainTankButton.interactable = Town != null && Town.playerGold >= 15;
-            if (trainRangedButton != null) trainRangedButton.interactable = Town != null && Town.playerGold >= 15;
+            if (trainRangedButton != null)
+            {
+                // Warriors may move BACK via formation, but cannot Train Ranged / crossbow.
+                bool warriorBlocked = selected != null && !selected.AllowsTrainRangedKit;
+                trainRangedButton.interactable = Town != null && Town.playerGold >= 15 && !warriorBlocked;
+            }
             int mediateCost = GameLoopManager.MediateCostGold;
             if (mediateButton != null)
             {
@@ -1934,6 +1939,14 @@ namespace ArthurianAutobattler
         private void Train(CombatRole role)
         {
             if (selected == null || Town == null || Town.playerGold < 15) return;
+            if (role == CombatRole.BacklineRanged && !selected.AllowsTrainRangedKit)
+            {
+                if (dossierDialogue != null)
+                    dossierDialogue.text =
+                        "<color=#FF6644>Warriors cannot Train Ranged.</color> Move them to BACK in the warband — they keep NO REACH there.";
+                RefreshDossier();
+                return;
+            }
             Town.playerGold -= 15;
             selected.TrainRole(role);
             RefreshDossier();
@@ -2204,7 +2217,7 @@ namespace ArthurianAutobattler
             bool anyMeleeBack = party != null && party.Exists(r => r != null && r.IsMeleeStuckInBackRow);
             string captionText = anyMeleeBack
                 ? "BATTALION — Melee in BACK cannot attack!"
-                : "BATTALION — Front faces the horde · BACK = ranged only";
+                : "BATTALION — Front faces the horde · BACK fires ranged (Warriors keep NO REACH)";
             var caption = MakeFormationLabel(formationDiagramRoot, "Caption",
                 captionText,
                 new Vector2(0.5f, 0.92f), 14f,
@@ -2467,8 +2480,9 @@ namespace ArthurianAutobattler
                         var captured = m;
                         buttons[0].onClick.RemoveAllListeners();
                         buttons[1].onClick.RemoveAllListeners();
-                        buttons[0].onClick.AddListener(() => { captured.TrainRole(CombatRole.FrontlineTank); RefreshWarbandPanel(); });
-                        buttons[1].onClick.AddListener(() => { captured.TrainRole(CombatRole.BacklineRanged); RefreshWarbandPanel(); });
+                        // Formation seats only — no Train Ranged kit / canAttackFromBack.
+                        buttons[0].onClick.AddListener(() => { captured.SetFormationRole(CombatRole.FrontlineTank); RefreshWarbandPanel(); });
+                        buttons[1].onClick.AddListener(() => { captured.SetFormationRole(CombatRole.BacklineRanged); RefreshWarbandPanel(); });
                     }
                 }
                 else
@@ -2515,8 +2529,11 @@ namespace ArthurianAutobattler
                     : "FRONT (unassigned)";
             string numBit = unitNum > 0 ? $"#{unitNum}  " : "";
             string reachWarn = m.IsMeleeStuckInBackRow
-                ? "\n<color=#FF6644><b>NO REACH</b> — Train Ranged (crossbow) or move to FRONT</color>"
-                : (m.assignedRole == CombatRole.BacklineRanged && m.canAttackFromBack && !RecruitInstance.IsRangedUnitType(m.unitType)
+                ? (m.unitType == UnitType.Warrior
+                    ? "\n<color=#FF6644><b>NO REACH</b> — Warriors cannot Train Ranged. Move to FRONT</color>"
+                    : "\n<color=#FF6644><b>NO REACH</b> — Train Ranged (crossbow) or move to FRONT</color>")
+                : (m.assignedRole == CombatRole.BacklineRanged && m.canAttackFromBack
+                   && m.unitType != UnitType.Warrior && !RecruitInstance.IsRangedUnitType(m.unitType)
                     ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
                     : "");
 
@@ -2609,12 +2626,13 @@ namespace ArthurianAutobattler
                 var captured = member;
                 btnGo.GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    captured.TrainRole(role);
+                    // Warband FRONT/BACK = formation seats only (Warriors may sit BACK with NO REACH).
+                    captured.SetFormationRole(role);
                     RefreshWarbandPanel();
                 });
             }
-            MakeTrain("TrainTank", "Tank", CombatRole.FrontlineTank, 22f);
-            MakeTrain("TrainRanged", "Ranged", CombatRole.BacklineRanged, -22f);
+            MakeTrain("TrainTank", "FRONT", CombatRole.FrontlineTank, 22f);
+            MakeTrain("TrainRanged", "BACK", CombatRole.BacklineRanged, -22f);
         }
 
         public void OpenModal(GameObject modal)
