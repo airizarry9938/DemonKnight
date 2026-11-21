@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "e8c21dd0b0bccf2b4a56dbf5529d60958b10644c";
 
-    private const string ExpectedPackageId = "fix-cs0103-cs0414-wire-flags";
+    private const string ExpectedPackageId = "fix-cs0104-object-ambiguous";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -626,7 +626,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("CompactUnitStatsPanel")
                    && body.Contains("PositionUnitStatsNearSelected")
                    && body.Contains("ChurchBottomDialogue")
-                   && body.Contains("LockSeatHighlight");
+                   && body.Contains("LockSeatHighlight")
+                   && body.Contains("UnityEngine.Object.Destroy")
+                   && body.Contains("using System;");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -750,6 +752,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-cs0104-object-ambiguous")
                    || body.Contains("fix-cs0103-cs0414-wire-flags")
                    || body.Contains("unit-stats-ur-bottom-dialog")
                    || body.Contains("dedupe-victory-wire-eventsystem")

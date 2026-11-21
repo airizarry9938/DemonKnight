@@ -1095,7 +1095,7 @@ namespace ArthurianAutobattler
             {
                 var lg = layoutGroups[i];
                 if (lg == null || lg is GridLayoutGroup) continue;
-                Object.DestroyImmediate(lg);
+                UnityEngine.Object.DestroyImmediate(lg);
             }
         }
 
@@ -1127,9 +1127,9 @@ namespace ArthurianAutobattler
 
             // Kill auto layout groups so they cannot fight authored positions.
             var oldLayout = hud.GetComponent<HorizontalLayoutGroup>();
-            if (oldLayout != null) Object.Destroy(oldLayout);
+            if (oldLayout != null) UnityEngine.Object.Destroy(oldLayout);
             var fitter = hud.GetComponent<ContentSizeFitter>();
-            if (fitter != null) Object.Destroy(fitter);
+            if (fitter != null) UnityEngine.Object.Destroy(fitter);
 
             if (nightText == null)
             {
