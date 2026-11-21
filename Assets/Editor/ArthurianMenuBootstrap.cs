@@ -81,21 +81,39 @@ public static class ArthurianMenuBootstrap
         string menuBootPath = Path.Combine(editorDir, "ArthurianMenuBootstrap.cs");
         string modularImporterPath = Path.Combine(editorDir, "ModularSpriteSheetImporterWindow.cs");
         string battleSlicerPath = Path.Combine(editorDir, "BattleSpriteSheetSlicerWindow.cs");
+        // Common mistake: extract zip-with-Assets/Editor/ INTO Assets/Editor → nested path.
+        string nestedModular = Path.Combine(editorDir, "Assets", "Editor", "ModularSpriteSheetImporterWindow.cs");
+        string nestedBattle = Path.Combine(editorDir, "Assets", "Editor", "BattleSpriteSheetSlicerWindow.cs");
         bool alignFileOnDisk = File.Exists(alignPath);
         bool syncOnDisk = File.Exists(syncPath);
         bool menuBootOnDisk = File.Exists(menuBootPath);
         bool modularImporterOnDisk = File.Exists(modularImporterPath);
         bool battleSlicerOnDisk = File.Exists(battleSlicerPath);
+        bool nestedZipExtract = File.Exists(nestedModular) || File.Exists(nestedBattle);
         bool hasSyncType = TypeExists("ArthurianSyncFromGitHub");
         string builderStamp = File.Exists(builderPath)
             ? File.GetLastWriteTimeUtc(builderPath).ToString("u") + " UTC"
             : "MISSING";
+
+        string strayHits = "";
+        try
+        {
+            if (Directory.Exists(editorDir))
+            {
+                foreach (var hit in Directory.GetFiles(editorDir, "*Importer*.cs", SearchOption.AllDirectories))
+                    strayHits += "  " + hit + "\n";
+                foreach (var hit in Directory.GetFiles(editorDir, "*Slicer*.cs", SearchOption.AllDirectories))
+                    strayHits += "  " + hit + "\n";
+            }
+        }
+        catch { /* ignore */ }
 
         string msg =
             "DemonKnight / Arthurian diagnose\n\n" +
             $"Package: {packageId} ({packageGit})\n" +
             $"Art Tools pin: {ArtToolsPinSha}\n" +
             $"Assets path:\n{Application.dataPath}\n" +
+            $"Expected importer path:\n{modularImporterPath}\n" +
             $"Sync menus on disk: {(syncOnDisk ? "YES" : "NO")}\n" +
             $"Sync menus compiled: {(hasSyncType ? "YES" : "NO")}\n" +
             $"Diagnose host on disk: {(menuBootOnDisk ? "YES" : "NO")}\n" +
@@ -107,11 +125,15 @@ public static class ArthurianMenuBootstrap
             $"Battle slicer compiled: {(hasBattleSlicer ? "YES" : "NO")}\n" +
             $"Seeder compiled: {(hasSeeder ? "YES" : "NO")}\n" +
             $"DB editor compiled: {(hasDbEditor ? "YES" : "NO")}\n" +
+            $"Nested zip extract?: {(nestedZipExtract ? "YES — files under Assets/Editor/Assets/Editor" : "NO")}\n" +
             $"ArthurianSceneBuilder.cs mtime: {builderStamp}\n\n" +
             $"TextMeshPro loaded: {(hasTmp ? "YES" : "NO")}\n" +
             $"Gameplay scripts: {(hasGameplay ? "YES" : "NO")}\n" +
             $"Church pew layout: {(hasPews ? "YES" : "NO")}\n" +
             $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n\n";
+
+        if (!string.IsNullOrEmpty(strayHits))
+            msg += "Found under Editor (search):\n" + strayHits + "\n";
 
         if (hasModularImporter && hasBattleSlicer)
         {
@@ -121,6 +143,14 @@ public static class ArthurianMenuBootstrap
                 "• Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
                 "• Arthurian → Art Tools → Battle Sprite Sheet Slicer\n" +
                 "DemonKnight menu is an optional alias for the same windows.\n";
+        }
+        else if (nestedZipExtract)
+        {
+            msg +=
+                "ART TOOLS ZIP EXTRACTED ONE FOLDER TOO DEEP.\n" +
+                "Files are in Assets/Editor/Assets/Editor/ — Unity ignores that.\n" +
+                "Use: Arthurian → Art Tools → Fix Nested Art Tools Zip Extract\n" +
+                "(moves the .cs files up into Assets/Editor/).\n";
         }
         else if (modularImporterOnDisk || battleSlicerOnDisk)
         {
@@ -134,13 +164,92 @@ public static class ArthurianMenuBootstrap
         else
         {
             msg +=
-                "ART TOOLS NOT DOWNLOADED YET.\n" +
-                "Use once: Arthurian → Art Tools → Install Art Importers Now\n" +
-                "Then wait for compile (no red Console errors).\n";
+                "ART TOOLS NOT AT EXPECTED PATH.\n" +
+                "Put these 4 files DIRECTLY in Assets/Editor/ (same folder as this Diagnose script):\n" +
+                "• ModularSpriteSheetImporterWindow.cs\n" +
+                "• BattleSpriteSheetSlicerWindow.cs\n" +
+                "• CharacterCatalogSeeder.cs\n" +
+                "• CharacterDatabaseEditor.cs\n" +
+                "Flat zip: docs/DemonKnight-ArtTools-Editor.zip (files at zip root).\n";
         }
 
         Debug.Log(msg);
         EditorUtility.DisplayDialog("Arthurian Diagnose", msg, "OK");
+    }
+
+    /// <summary>
+    /// Moves Art Tools .cs files from Assets/Editor/Assets/Editor/ up into Assets/Editor/
+    /// (happens when the nested zip was extracted into the Editor folder).
+    /// </summary>
+    [MenuItem("Arthurian/Art Tools/Fix Nested Art Tools Zip Extract", false, 39)]
+    public static void FixNestedArtToolsZipExtract()
+    {
+        string editorDir = Path.Combine(Application.dataPath, "Editor");
+        string nestedDir = Path.Combine(editorDir, "Assets", "Editor");
+        string[] names =
+        {
+            "ModularSpriteSheetImporterWindow.cs",
+            "BattleSpriteSheetSlicerWindow.cs",
+            "CharacterCatalogSeeder.cs",
+            "CharacterDatabaseEditor.cs",
+        };
+
+        int moved = 0;
+        var log = "";
+        if (!Directory.Exists(nestedDir))
+        {
+            // Also search one level of subfolders for the four files.
+            nestedDir = null;
+            try
+            {
+                foreach (var dir in Directory.GetDirectories(editorDir, "*", SearchOption.AllDirectories))
+                {
+                    if (File.Exists(Path.Combine(dir, names[0])))
+                    {
+                        nestedDir = dir;
+                        break;
+                    }
+                }
+            }
+            catch { /* ignore */ }
+        }
+
+        if (string.IsNullOrEmpty(nestedDir) || !Directory.Exists(nestedDir))
+        {
+            EditorUtility.DisplayDialog(
+                "Art Tools Zip Fix",
+                "No nested ModularSpriteSheetImporterWindow.cs found under Assets/Editor/.\n\n" +
+                "In File Explorer open Assets\\Editor and confirm the 4 .cs files sit NEXT TO\n" +
+                "ArthurianMenuBootstrap.cs (not in a subfolder).",
+                "OK");
+            EditorUtility.RevealInFinder(editorDir);
+            return;
+        }
+
+        foreach (var name in names)
+        {
+            string src = Path.Combine(nestedDir, name);
+            string dest = Path.Combine(editorDir, name);
+            if (!File.Exists(src)) continue;
+            try
+            {
+                if (File.Exists(dest)) File.Delete(dest);
+                File.Move(src, dest);
+                moved++;
+                log += "Moved " + name + "\n";
+            }
+            catch (Exception ex)
+            {
+                log += name + ": " + ex.Message + "\n";
+            }
+        }
+
+        AssetDatabase.Refresh();
+        EditorUtility.DisplayDialog(
+            "Art Tools Zip Fix",
+            $"Moved {moved}/4 into Assets/Editor/.\n\n{log}\nWait for compile, then Diagnose again.",
+            "OK");
+        EditorUtility.RevealInFinder(editorDir);
     }
 
     /// <summary>
