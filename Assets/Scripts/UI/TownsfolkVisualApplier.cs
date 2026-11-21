@@ -124,14 +124,13 @@ namespace ArthurianAutobattler
         static void SetLayer(Image img, Sprite sprite, Color color, bool enabled)
         {
             if (img == null) return;
+            img.type = Image.Type.Simple;
+            img.preserveAspect = true;
             img.sprite = sprite;
             img.color = color;
-            img.enabled = enabled && (sprite != null || color.a > 0.01f);
-            if (sprite == null && enabled)
-            {
-                // Solid placeholder only for body; callers pass enabled=false for empty overlays.
+            img.enabled = enabled && sprite != null;
+            if (sprite == null)
                 img.enabled = false;
-            }
         }
 
         public static Color PlaceholderColor(UnitType type) => type switch

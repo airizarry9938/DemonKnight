@@ -19,10 +19,13 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI seatLabel;
         public RecruitInstance Bound { get; private set; }
 
+        static bool _loggedFirstBind;
+
         public void Bind(RecruitInstance recruit, System.Action<RecruitInstance> onClick)
         {
             Bound = recruit;
             var layers = EnsureModularLayers();
+            HideNonModularImages(layers);
 
             if (recruit != null && recruit.appearance != null)
                 recruit.appearance.BindSeatSalt(recruit.pewSeatIndex);
@@ -31,6 +34,22 @@ namespace ArthurianAutobattler
                 recruit?.appearance,
                 layers,
                 recruit);
+
+            if (!_loggedFirstBind && recruit != null)
+            {
+                _loggedFirstBind = true;
+                string bodyName = layers.body != null && layers.body.sprite != null
+                    ? layers.body.sprite.name : "NULL";
+                string outfitName = layers.outfit != null && layers.outfit.sprite != null
+                    ? layers.outfit.sprite.name : "NULL";
+                string headName = layers.head != null && layers.head.sprite != null
+                    ? layers.head.sprite.name : "NULL";
+                Debug.Log(
+                    $"[DemonKnight] First pew Bind '{recruit.characterName}': " +
+                    $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
+                    $"body={bodyName} outfit={outfitName} head={headName} " +
+                    $"bodyEnabled={(layers.body != null && layers.body.enabled)}");
+            }
 
             if (moodLayer != null)
             {
@@ -99,12 +118,36 @@ namespace ArthurianAutobattler
             var rootImg = GetComponent<Image>();
             if (rootImg != null && rootImg != bodyLayer)
             {
+                rootImg.sprite = null;
                 rootImg.color = new Color(1f, 1f, 1f, 0f);
                 rootImg.raycastTarget = false;
+                rootImg.enabled = false;
             }
 
             if (seatButton == null) seatButton = GetComponent<Button>();
             return set;
+        }
+
+        /// <summary>
+        /// Prefab avatar buttons often keep a solid-color Image that reads as the old
+        /// "box" even after modular Body/Outfit/Head are applied — hide those.
+        /// </summary>
+        void HideNonModularImages(TownsfolkVisualApplier.LayerSet layers)
+        {
+            foreach (var img in GetComponentsInChildren<Image>(true))
+            {
+                if (img == null) continue;
+                if (img == layers.body || img == layers.outfit || img == layers.head
+                    || img == layers.prop || img == moodLayer)
+                {
+                    img.type = Image.Type.Simple;
+                    img.preserveAspect = true;
+                    continue;
+                }
+                img.sprite = null;
+                img.enabled = false;
+                img.raycastTarget = false;
+            }
         }
     }
 }
