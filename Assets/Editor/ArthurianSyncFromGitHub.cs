@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "4d2379bcf12575855d0626e09e53b30405b95ecb";
 
-    private const string ExpectedPackageId = "force-upgrade-sync-hosts";
+    private const string ExpectedPackageId = "manual-box-splicer-tab1";
 
     /// <summary>Menu hosts that must always overwrite from tip/main — never skip-self, never Fallback pin.</summary>
     public static readonly string[] SyncHostForceOverwritePaths =
@@ -1079,6 +1079,8 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("class ArthurianArtArchitectWindow")
                    && body.Contains("Art & Stage Architect")
                    && body.Contains("Sheet Splicer")
+                   && body.Contains("Manual Box Crop")
+                   && body.Contains("Slice Manual Boxes")
                    && body.Contains("Paper-Doll")
                    && body.Contains("Auto-Arrange 52 Overflow Formation")
                    && body.Contains("RegisterAnimClip")

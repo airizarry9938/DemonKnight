@@ -22,6 +22,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
     enum SheetCategory { Pose, Outfit, Head, Weapon, EnemyBoss }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
     enum BattleSlotSide { Player, Enemy }
+    enum CropToolMode { ManualBox, GridCrop, AutoIsland }
+    enum BoxPivotMode { BottomCenter, Center, Custom }
 
     ArchitectTab tab;
     Vector2 scroll;
@@ -40,6 +42,24 @@ public class ArthurianArtArchitectWindow : EditorWindow
     float clipFps = 6f;
     bool clipLoop = true;
     string sliceOutputFolder = DefaultSliceFolder;
+
+    // Interactive Manual Box Splicer (default crop tool)
+    CropToolMode cropTool = CropToolMode.ManualBox;
+    readonly List<RectInt> manualBoxes = new List<RectInt>();
+    int selectedBox = -1;
+    BoxPivotMode boxPivot = BoxPivotMode.BottomCenter;
+    Vector2 customPivot = new Vector2(0.5f, 0f);
+    float sheetZoom = 1f;
+    Vector2 sheetPan;
+    bool sheetDraggingPan;
+    bool boxDrawing;
+    bool boxMoving;
+    bool boxResizing;
+    int resizeHandle = -1; // 0..7: NW N NE E SE S SW W
+    Vector2Int boxDragStartTex;
+    RectInt boxDragOrig;
+    const float HandlePx = 8f;
+    static Texture2D _checkerTex;
 
     // ── Tab 2: Paper-Doll ──────────────────────────────────────────────────
     int poseIndex;
@@ -76,6 +96,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     void OnEnable()
     {
+        wantsMouseMove = true;
         if (targetLibrary == null)
             targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(DefaultLibraryPath)
                             ?? ModularSpriteLibrary.Load();
@@ -123,15 +144,15 @@ public class ArthurianArtArchitectWindow : EditorWindow
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Tab 1 — Sheet Splicer & Animation Builder
+    // Tab 1 — Sheet Splicer & Animation Builder (+ Interactive Manual Box Splicer)
     // ═══════════════════════════════════════════════════════════════════════
 
     void DrawSplicerTab()
     {
         EditorGUILayout.LabelField("Sheet Splicer & Animation Builder", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Drop a sprite sheet, Auto-Prepare (Sprite/Point/RGBA32/readable + key-out), " +
-            "Grid Crop or Auto-Island Crop, select frames, Create Animation Clip → ModularSpriteLibrary.",
+            "Drop a sprite sheet → Auto-Prepare → crop with Manual Box (default), Grid, or Auto-Island → " +
+            "Create Animation Clip into ModularSpriteLibrary. Manual: LMB drag green boxes; select gold + handles.",
             MessageType.Info);
 
         sheetTexture = (Texture2D)EditorGUILayout.ObjectField("Sprite Sheet", sheetTexture, typeof(Texture2D), false);
@@ -142,22 +163,27 @@ public class ArthurianArtArchitectWindow : EditorWindow
         keyColor = EditorGUILayout.ColorField("Key Color", keyColor);
         keyTolerance = EditorGUILayout.Slider("Key Tolerance", keyTolerance, 0f, 64f);
 
-        EditorGUILayout.BeginHorizontal();
-        cellWidth = Mathf.Max(4, EditorGUILayout.IntField("Cell Width", cellWidth));
-        cellHeight = Mathf.Max(4, EditorGUILayout.IntField("Cell Height", cellHeight));
+        EditorGUILayout.Space(4);
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        if (GUILayout.Toggle(cropTool == CropToolMode.ManualBox, "Manual Box Crop", EditorStyles.toolbarButton))
+            cropTool = CropToolMode.ManualBox;
+        if (GUILayout.Toggle(cropTool == CropToolMode.GridCrop, "Grid Crop", EditorStyles.toolbarButton))
+            cropTool = CropToolMode.GridCrop;
+        if (GUILayout.Toggle(cropTool == CropToolMode.AutoIsland, "Auto-Island Crop", EditorStyles.toolbarButton))
+            cropTool = CropToolMode.AutoIsland;
         EditorGUILayout.EndHorizontal();
 
-        EditorGUILayout.Space(6);
         EditorGUI.BeginDisabledGroup(sheetTexture == null);
         if (GUILayout.Button("Auto-Prepare Sheet", GUILayout.Height(28)))
             AutoPrepareSheet();
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Grid Crop", GUILayout.Height(32)))
-            RunGridCrop();
-        if (GUILayout.Button("Auto-Island Crop", GUILayout.Height(32)))
-            RunIslandCrop();
-        EditorGUILayout.EndHorizontal();
         EditorGUI.EndDisabledGroup();
+
+        if (cropTool == CropToolMode.ManualBox)
+            DrawManualBoxSplicer();
+        else if (cropTool == CropToolMode.GridCrop)
+            DrawGridCropControls();
+        else
+            DrawIslandCropControls();
 
         DrawCroppedFramePicker();
 
@@ -187,6 +213,480 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     EditorStyles.miniLabel);
             }
         }
+    }
+
+    void DrawGridCropControls()
+    {
+        EditorGUILayout.BeginHorizontal();
+        cellWidth = Mathf.Max(4, EditorGUILayout.IntField("Cell Width", cellWidth));
+        cellHeight = Mathf.Max(4, EditorGUILayout.IntField("Cell Height", cellHeight));
+        EditorGUILayout.EndHorizontal();
+        EditorGUI.BeginDisabledGroup(sheetTexture == null);
+        if (GUILayout.Button("Grid Crop", GUILayout.Height(32)))
+            RunGridCrop();
+        EditorGUI.EndDisabledGroup();
+    }
+
+    void DrawIslandCropControls()
+    {
+        EditorGUI.BeginDisabledGroup(sheetTexture == null);
+        if (GUILayout.Button("Auto-Island Crop", GUILayout.Height(32)))
+            RunIslandCrop();
+        EditorGUI.EndDisabledGroup();
+    }
+
+    void DrawManualBoxSplicer()
+    {
+        Event ke = Event.current;
+        if (ke.type == EventType.KeyDown
+            && (ke.keyCode == KeyCode.Delete || ke.keyCode == KeyCode.Backspace)
+            && selectedBox >= 0
+            && !(EditorGUIUtility.editingTextField))
+        {
+            RemoveSelectedBox();
+            ke.Use();
+        }
+
+        EditorGUILayout.LabelField("Interactive Manual Box Splicer", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Scroll-wheel zoom · MMB/Alt+LMB pan · LMB drag empty area = new green box · " +
+            "Click box = gold select · drag body move · 8×8 corner/edge handles resize · " +
+            "Delete/Backspace removes selection.",
+            MessageType.None);
+
+        EditorGUILayout.BeginHorizontal();
+        sheetZoom = EditorGUILayout.Slider("Zoom", sheetZoom, 0.25f, 8f);
+        if (GUILayout.Button("Fit", GUILayout.Width(40)))
+        {
+            sheetZoom = 1f;
+            sheetPan = Vector2.zero;
+        }
+        EditorGUILayout.EndHorizontal();
+
+        DrawManualBoxCanvas();
+
+        // Selection inspector: X/Y/W/H + Pivot
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField($"Boxes: {manualBoxes.Count}", GUILayout.Width(80));
+        if (GUILayout.Button("Remove Selected", GUILayout.Width(120)))
+            RemoveSelectedBox();
+        if (GUILayout.Button("Clear All", GUILayout.Width(80)))
+        {
+            manualBoxes.Clear();
+            selectedBox = -1;
+            Repaint();
+        }
+        EditorGUILayout.EndHorizontal();
+
+        boxPivot = (BoxPivotMode)EditorGUILayout.EnumPopup("Pivot", boxPivot);
+        if (boxPivot == BoxPivotMode.Custom)
+            customPivot = EditorGUILayout.Vector2Field("Custom Pivot (0–1)", customPivot);
+
+        if (selectedBox >= 0 && selectedBox < manualBoxes.Count)
+        {
+            var r = manualBoxes[selectedBox];
+            EditorGUI.BeginChangeCheck();
+            int x = EditorGUILayout.IntField("X", r.x);
+            int y = EditorGUILayout.IntField("Y", r.y);
+            int w = Mathf.Max(1, EditorGUILayout.IntField("W", r.width));
+            int h = Mathf.Max(1, EditorGUILayout.IntField("H", r.height));
+            if (EditorGUI.EndChangeCheck() && sheetTexture != null)
+            {
+                r = ClampBox(new RectInt(x, y, w, h), sheetTexture.width, sheetTexture.height);
+                manualBoxes[selectedBox] = r;
+            }
+        }
+        else
+        {
+            EditorGUILayout.HelpBox("No box selected — drag on the preview to draw one.", MessageType.None);
+        }
+
+        EditorGUI.BeginDisabledGroup(sheetTexture == null || manualBoxes.Count == 0);
+        if (GUILayout.Button("Slice Manual Boxes → Point Sprites", GUILayout.Height(34)))
+            SliceManualBoxes();
+        EditorGUI.EndDisabledGroup();
+    }
+
+    void DrawManualBoxCanvas()
+    {
+        float viewH = Mathf.Clamp(position.height * 0.42f, 280f, 520f);
+        Rect canvas = GUILayoutUtility.GetRect(10, viewH, GUILayout.ExpandWidth(true), GUILayout.MinHeight(260f));
+        DrawCheckerboard(canvas);
+
+        if (sheetTexture == null)
+        {
+            GUI.Label(canvas, "Assign a Sprite Sheet to preview.", EditorStyles.centeredGreyMiniLabel);
+            return;
+        }
+
+        Event e = Event.current;
+        // Zoom with scroll wheel over canvas
+        if (e.type == EventType.ScrollWheel && canvas.Contains(e.mousePosition))
+        {
+            float old = sheetZoom;
+            sheetZoom = Mathf.Clamp(sheetZoom * (e.delta.y > 0 ? 0.9f : 1.1f), 0.25f, 8f);
+            // Zoom toward cursor
+            Vector2 local = e.mousePosition - canvas.center - sheetPan;
+            sheetPan += local * (1f - sheetZoom / old);
+            e.Use();
+            Repaint();
+        }
+
+        Rect texRect = SheetDrawRect(canvas);
+        GUI.DrawTexture(texRect, sheetTexture, ScaleMode.StretchToFill, true);
+
+        // Draw boxes (texture y-up → GUI y-down)
+        for (int i = 0; i < manualBoxes.Count; i++)
+        {
+            Rect gr = TexToGui(manualBoxes[i], texRect);
+            bool sel = i == selectedBox;
+            Color fill = sel ? new Color(1f, 0.85f, 0.15f, 0.18f) : new Color(0.2f, 0.95f, 0.35f, 0.12f);
+            Color edge = sel ? new Color(1f, 0.85f, 0.15f, 1f) : new Color(0.25f, 0.95f, 0.4f, 1f);
+            EditorGUI.DrawRect(gr, fill);
+            DrawRectOutline(gr, edge, sel ? 2f : 1.5f);
+            GUI.Label(new Rect(gr.x + 2f, gr.y + 1f, 40f, 14f), i.ToString(), EditorStyles.miniBoldLabel);
+            if (sel)
+                DrawBoxHandles(gr);
+        }
+
+        // Live rubber-band while drawing
+        if (boxDrawing && e.type == EventType.Repaint)
+        {
+            Vector2Int cur = GuiToTex(e.mousePosition, texRect, sheetTexture.width, sheetTexture.height);
+            RectInt live = ClampBox(RectFromCorners(boxDragStartTex, cur), sheetTexture.width, sheetTexture.height);
+            DrawRectOutline(TexToGui(live, texRect), new Color(0.3f, 1f, 0.45f, 0.9f), 1.5f);
+        }
+
+        HandleManualBoxInput(canvas, texRect, e);
+    }
+
+    void HandleManualBoxInput(Rect canvas, Rect texRect, Event e)
+    {
+        if (!canvas.Contains(e.mousePosition) && e.type != EventType.MouseDrag && e.type != EventType.MouseUp)
+            return;
+
+        // Pan: MMB or Alt+LMB
+        if (e.type == EventType.MouseDown && (e.button == 2 || (e.button == 0 && e.alt)))
+        {
+            sheetDraggingPan = true;
+            e.Use();
+        }
+        if (sheetDraggingPan && e.type == EventType.MouseDrag)
+        {
+            sheetPan += e.delta;
+            e.Use();
+            Repaint();
+        }
+        if (sheetDraggingPan && e.type == EventType.MouseUp)
+        {
+            sheetDraggingPan = false;
+            e.Use();
+        }
+        if (e.alt) return;
+
+        Vector2Int texPt = GuiToTex(e.mousePosition, texRect, sheetTexture.width, sheetTexture.height);
+
+        if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            // Resize handle on selection?
+            if (selectedBox >= 0 && selectedBox < manualBoxes.Count)
+            {
+                Rect gr = TexToGui(manualBoxes[selectedBox], texRect);
+                int h = HitHandle(gr, e.mousePosition);
+                if (h >= 0)
+                {
+                    boxResizing = true;
+                    resizeHandle = h;
+                    boxDragOrig = manualBoxes[selectedBox];
+                    boxDragStartTex = texPt;
+                    e.Use();
+                    Repaint();
+                    return;
+                }
+            }
+
+            // Hit existing box?
+            int hit = HitBox(texPt);
+            if (hit >= 0)
+            {
+                selectedBox = hit;
+                boxMoving = true;
+                boxDragOrig = manualBoxes[hit];
+                boxDragStartTex = texPt;
+                e.Use();
+                Repaint();
+                return;
+            }
+
+            // Start new box
+            selectedBox = -1;
+            boxDrawing = true;
+            boxDragStartTex = texPt;
+            e.Use();
+            Repaint();
+        }
+
+        if (e.type == EventType.MouseDrag && e.button == 0)
+        {
+            if (boxResizing && selectedBox >= 0)
+            {
+                manualBoxes[selectedBox] = ResizeBox(boxDragOrig, resizeHandle, texPt,
+                    sheetTexture.width, sheetTexture.height);
+                e.Use();
+                Repaint();
+            }
+            else if (boxMoving && selectedBox >= 0)
+            {
+                int dx = texPt.x - boxDragStartTex.x;
+                int dy = texPt.y - boxDragStartTex.y;
+                var r = boxDragOrig;
+                r.x += dx;
+                r.y += dy;
+                manualBoxes[selectedBox] = ClampBox(r, sheetTexture.width, sheetTexture.height);
+                e.Use();
+                Repaint();
+            }
+            else if (boxDrawing)
+            {
+                e.Use();
+                Repaint();
+            }
+        }
+
+        if (e.type == EventType.MouseUp && e.button == 0)
+        {
+            if (boxDrawing)
+            {
+                RectInt live = ClampBox(RectFromCorners(boxDragStartTex, texPt),
+                    sheetTexture.width, sheetTexture.height);
+                if (live.width >= 2 && live.height >= 2)
+                {
+                    manualBoxes.Add(live);
+                    selectedBox = manualBoxes.Count - 1;
+                }
+                boxDrawing = false;
+                e.Use();
+                Repaint();
+            }
+            if (boxMoving || boxResizing)
+            {
+                boxMoving = false;
+                boxResizing = false;
+                resizeHandle = -1;
+                e.Use();
+            }
+        }
+    }
+
+    Rect SheetDrawRect(Rect canvas)
+    {
+        float tw = sheetTexture.width * sheetZoom;
+        float th = sheetTexture.height * sheetZoom;
+        return new Rect(
+            canvas.center.x - tw * 0.5f + sheetPan.x,
+            canvas.center.y - th * 0.5f + sheetPan.y,
+            tw, th);
+    }
+
+    Rect TexToGui(RectInt tex, Rect drawRect)
+    {
+        float ux = drawRect.width / Mathf.Max(1f, sheetTexture.width);
+        float uy = drawRect.height / Mathf.Max(1f, sheetTexture.height);
+        float x = drawRect.x + tex.x * ux;
+        float y = drawRect.y + (sheetTexture.height - tex.y - tex.height) * uy;
+        return new Rect(x, y, tex.width * ux, tex.height * uy);
+    }
+
+    Vector2Int GuiToTex(Vector2 gui, Rect drawRect, int texW, int texH)
+    {
+        float ux = drawRect.width / Mathf.Max(1f, texW);
+        float uy = drawRect.height / Mathf.Max(1f, texH);
+        int x = Mathf.RoundToInt((gui.x - drawRect.x) / ux);
+        int yFromTop = Mathf.RoundToInt((gui.y - drawRect.y) / uy);
+        int y = texH - yFromTop;
+        return new Vector2Int(Mathf.Clamp(x, 0, texW), Mathf.Clamp(y, 0, texH));
+    }
+
+    void DrawBoxHandles(Rect gr)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            Rect h = HandleRect(gr, i);
+            EditorGUI.DrawRect(h, new Color(1f, 0.9f, 0.2f, 1f));
+            DrawRectOutline(h, Color.black, 1f);
+        }
+    }
+
+    static Rect HandleRect(Rect gr, int handle)
+    {
+        float hx = HandlePx, hy = HandlePx;
+        Vector2 c = gr.center;
+        switch (handle)
+        {
+            case 0: return new Rect(gr.xMin - hx * 0.5f, gr.yMin - hy * 0.5f, hx, hy); // NW
+            case 1: return new Rect(c.x - hx * 0.5f, gr.yMin - hy * 0.5f, hx, hy); // N
+            case 2: return new Rect(gr.xMax - hx * 0.5f, gr.yMin - hy * 0.5f, hx, hy); // NE
+            case 3: return new Rect(gr.xMax - hx * 0.5f, c.y - hy * 0.5f, hx, hy); // E
+            case 4: return new Rect(gr.xMax - hx * 0.5f, gr.yMax - hy * 0.5f, hx, hy); // SE
+            case 5: return new Rect(c.x - hx * 0.5f, gr.yMax - hy * 0.5f, hx, hy); // S
+            case 6: return new Rect(gr.xMin - hx * 0.5f, gr.yMax - hy * 0.5f, hx, hy); // SW
+            default: return new Rect(gr.xMin - hx * 0.5f, c.y - hy * 0.5f, hx, hy); // W
+        }
+    }
+
+    static int HitHandle(Rect gr, Vector2 mouse)
+    {
+        for (int i = 0; i < 8; i++)
+            if (HandleRect(gr, i).Contains(mouse)) return i;
+        return -1;
+    }
+
+    int HitBox(Vector2Int texPt)
+    {
+        for (int i = manualBoxes.Count - 1; i >= 0; i--)
+            if (manualBoxes[i].Contains(new Vector2Int(texPt.x, texPt.y)))
+                return i;
+        return -1;
+    }
+
+    void RemoveSelectedBox()
+    {
+        if (selectedBox < 0 || selectedBox >= manualBoxes.Count) return;
+        manualBoxes.RemoveAt(selectedBox);
+        if (selectedBox >= manualBoxes.Count) selectedBox = manualBoxes.Count - 1;
+        Repaint();
+    }
+
+    static RectInt RectFromCorners(Vector2Int a, Vector2Int b)
+    {
+        int x0 = Mathf.Min(a.x, b.x);
+        int y0 = Mathf.Min(a.y, b.y);
+        int x1 = Mathf.Max(a.x, b.x);
+        int y1 = Mathf.Max(a.y, b.y);
+        return new RectInt(x0, y0, Mathf.Max(1, x1 - x0), Mathf.Max(1, y1 - y0));
+    }
+
+    static RectInt ClampBox(RectInt r, int texW, int texH)
+    {
+        r.width = Mathf.Max(1, r.width);
+        r.height = Mathf.Max(1, r.height);
+        r.x = Mathf.Clamp(r.x, 0, Mathf.Max(0, texW - r.width));
+        r.y = Mathf.Clamp(r.y, 0, Mathf.Max(0, texH - r.height));
+        if (r.xMax > texW) r.width = texW - r.x;
+        if (r.yMax > texH) r.height = texH - r.y;
+        return r;
+    }
+
+    static RectInt ResizeBox(RectInt orig, int handle, Vector2Int texPt, int texW, int texH)
+    {
+        // Handles in GUI space: 0=NW 1=N 2=NE 3=E 4=SE 5=S 6=SW 7=W
+        // Texture y-up: GUI-N pulls tex.yMax, GUI-S pulls tex.yMin.
+        int x0 = orig.xMin, y0 = orig.yMin, x1 = orig.xMax, y1 = orig.yMax;
+        switch (handle)
+        {
+            case 0: x0 = texPt.x; y1 = texPt.y; break;
+            case 1: y1 = texPt.y; break;
+            case 2: x1 = texPt.x; y1 = texPt.y; break;
+            case 3: x1 = texPt.x; break;
+            case 4: x1 = texPt.x; y0 = texPt.y; break;
+            case 5: y0 = texPt.y; break;
+            case 6: x0 = texPt.x; y0 = texPt.y; break;
+            case 7: x0 = texPt.x; break;
+        }
+        return ClampBox(RectFromCorners(new Vector2Int(x0, y0), new Vector2Int(x1, y1)), texW, texH);
+    }
+
+    void SliceManualBoxes()
+    {
+        if (sheetTexture == null || manualBoxes.Count == 0) return;
+        string path = AssetDatabase.GetAssetPath(sheetTexture);
+        Texture2D readable = LoadReadableCopy(sheetTexture, path);
+        if (readable == null)
+        {
+            EditorUtility.DisplayDialog("Slice Manual Boxes", "Could not read sheet pixels (isReadable?).", "OK");
+            return;
+        }
+        EnsureFolder(sliceOutputFolder);
+        string sheetPath = $"{sliceOutputFolder}/{sheetTexture.name}_ManualBoxes.png";
+        File.WriteAllBytes(sheetPath, readable.EncodeToPNG());
+        AssetDatabase.ImportAsset(sheetPath, ImportAssetOptions.ForceUpdate);
+        ConfigureManualBoxImporter(sheetPath, new List<RectInt>(manualBoxes), boxPivot, customPivot);
+        AssetDatabase.ImportAsset(sheetPath, ImportAssetOptions.ForceUpdate);
+        LoadFramesFromAsset(sheetPath);
+        Debug.Log($"[DemonKnight] Slice Manual Boxes → {croppedFrames.Count} Point sprites @ {sheetPath}");
+        EditorUtility.DisplayDialog(
+            "Slice Manual Boxes",
+            $"Created {croppedFrames.Count} Point sprites from {manualBoxes.Count} boxes.\n"
+            + "Select frames below → Create Animation Clip.",
+            "OK");
+    }
+
+    static void ConfigureManualBoxImporter(
+        string assetPath, List<RectInt> boxes, BoxPivotMode pivotMode, Vector2 custom)
+    {
+        var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+        if (importer == null) return;
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Multiple;
+        importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = false;
+        importer.filterMode = FilterMode.Point;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.isReadable = true;
+
+        SpriteAlignment align;
+        Vector2 pivot;
+        switch (pivotMode)
+        {
+            case BoxPivotMode.BottomCenter:
+                align = SpriteAlignment.BottomCenter;
+                pivot = new Vector2(0.5f, 0f);
+                break;
+            case BoxPivotMode.Center:
+                align = SpriteAlignment.Center;
+                pivot = new Vector2(0.5f, 0.5f);
+                break;
+            default:
+                align = SpriteAlignment.Custom;
+                pivot = new Vector2(Mathf.Clamp01(custom.x), Mathf.Clamp01(custom.y));
+                break;
+        }
+
+        var metas = new SpriteMetaData[boxes.Count];
+        for (int i = 0; i < boxes.Count; i++)
+        {
+            var r = boxes[i];
+            metas[i] = new SpriteMetaData
+            {
+                name = Path.GetFileNameWithoutExtension(assetPath) + "_" + i,
+                rect = new Rect(r.x, r.y, r.width, r.height),
+                alignment = (int)align,
+                pivot = pivot
+            };
+        }
+        importer.spritesheet = metas;
+        importer.SaveAndReimport();
+    }
+
+    static void DrawCheckerboard(Rect rect)
+    {
+        if (_checkerTex == null)
+        {
+            _checkerTex = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Repeat,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            _checkerTex.SetPixels32(new[]
+            {
+                new Color32(48, 48, 52, 255), new Color32(62, 62, 68, 255),
+                new Color32(62, 62, 68, 255), new Color32(48, 48, 52, 255)
+            });
+            _checkerTex.Apply();
+        }
+        GUI.DrawTextureWithTexCoords(rect, _checkerTex,
+            new Rect(0, 0, rect.width / 16f, rect.height / 16f));
     }
 
     void DrawCroppedFramePicker()

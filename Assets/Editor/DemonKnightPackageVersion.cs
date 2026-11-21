@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "force-upgrade-sync-hosts";
-    public const string GitHint = "raw-main-ForceOverwrite-no-FallbackPin-no-skip-self";
-    public const string BuiltUtc = "2026-11-21T21:36:35Z";
+    public const string Id = "manual-box-splicer-tab1";
+    public const string GitHint = "Interactive-Manual-Box-Crop-Tab1-ArtArchitect";
+    public const string BuiltUtc = "2026-11-21T22:21:21Z";
 }
 #endif
