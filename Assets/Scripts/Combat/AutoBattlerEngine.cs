@@ -10,6 +10,8 @@ namespace ArthurianAutobattler
         public int currentBattleNumber = 1;
         public int finalBossWave = 10;
         public bool isBattling = false;
+        /// <summary>Blocks re-entrant EndBattle (double victory wire / double Next Night).</summary>
+        private bool endingBattle;
         public int frontlineSize = 6;
 
         [Header("Pacing")]
@@ -650,7 +652,25 @@ namespace ArthurianAutobattler
 
         private void EndBattle(bool playerWon)
         {
+            if (endingBattle)
+            {
+                Debug.LogWarning("[DemonKnight] EndBattle ignored — already ending (stops double victory wire).");
+                return;
+            }
+            endingBattle = true;
             isBattling = false;
+            try
+            {
+            EndBattleBody(playerWon);
+            }
+            finally
+            {
+                endingBattle = false;
+            }
+        }
+
+        private void EndBattleBody(bool playerWon)
+        {
             BattleBossDialogUI.Hide();
             BattlefieldVisualizer.Instance?.ClearAllActors();
             BattlefieldVisualizer.Instance?.StopBattleVideo();

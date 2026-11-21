@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "2bef9d5d18536981bedfe92f5d376ae6680bf8bc";
 
-    private const string ExpectedPackageId = "victory-next-night-visible";
+    private const string ExpectedPackageId = "dedupe-victory-wire-eventsystem";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -637,7 +637,9 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("DemonKnightCompatApi")
                    && body.Contains("BattleBossDialogUI")
                    && body.Contains("waveBoss") // CS0136 fix: no shadowed local `boss`
-                   && body.Contains("TriggerWaveVictoryScreen");
+                   && body.Contains("TriggerWaveVictoryScreen")
+                   && body.Contains("endingBattle")
+                   && body.Contains("EndBattleBody");
         }
 
         if (rel.EndsWith("MerlinResurrectionManager.cs", StringComparison.OrdinalIgnoreCase))
@@ -646,7 +648,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("TriggerWaveVictoryScreen")
                    && body.Contains("Next Night")
                    && body.Contains("PromoteVictoryCanvas")
-                   && body.Contains("StyleVictoryActionButton");
+                   && body.Contains("StyleVictoryActionButton")
+                   && body.Contains("CullDuplicateEventSystems")
+                   && body.Contains("BeginVictoryShow")
+                   && body.Contains("BindButtonOnce");
         }
 
         if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
@@ -737,6 +742,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("dedupe-victory-wire-eventsystem")
                    || body.Contains("victory-next-night-visible")
                    || body.Contains("fix-bind-action-textwrapping")
                    || body.Contains("sync-skip-self-hover-rmb")

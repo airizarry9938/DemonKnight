@@ -43,29 +43,60 @@ namespace ArthurianAutobattler
         private Button nextNightButton;
         /// <summary>Blocks double AdvanceNight when scene persistent + runtime listeners both fire.</summary>
         private bool advancingNight;
+        /// <summary>One wire pass per victory/resurrection show — stops EndBattle double-bind logs.</summary>
+        private int victoryShowId;
+        private int victoryWiredForShowId = -1;
+        private Coroutine victorySequenceRoutine;
+        private Coroutine resurrectionSequenceRoutine;
 
         private void Awake()
         {
-            if (Instance == null) Instance = this;
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning("[DemonKnight] Duplicate MerlinResurrectionManager destroyed (prevents double Next Night).");
+                Destroy(gameObject);
+                return;
+            }
+            Instance = this;
             LoadBankData();
             // Runes disabled pending redesign — ranks stay zeroed.
             ZeroRuneRanks();
             if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
             HideLegacyBankPanel();
-            WireAbandonScreenButtons();
+            // Do NOT wire/promote victory UI on Awake — that activated the overlay mid-game
+            // and double-fired with Start() (pause/play felt like double-click).
+            CullDuplicateEventSystems();
         }
 
         private void Start()
         {
             HideLegacyBankPanel();
-            WireAbandonScreenButtons();
+            CullDuplicateEventSystems();
+            // Idle bind only (canvas stays hidden) — no PromoteVictoryCanvas.
+            WireAbandonScreenButtons(promoteOverlay: false, force: false);
         }
 
-        void WireAbandonScreenButtons()
+        /// <summary>
+        /// Idempotent button bind. <paramref name="promoteOverlay"/> true only when showing
+        /// victory/defeat UI. Second call for the same show is a no-op.
+        /// </summary>
+        void WireAbandonScreenButtons(bool promoteOverlay = true, bool force = false)
         {
+            if (!force && promoteOverlay && victoryWiredForShowId == victoryShowId)
+                return;
+
             HideLegacyBankPanel();
-            WireNextNightButton();
-            WireEndRunButton();
+            WireNextNightButton(promoteOverlay);
+            WireEndRunButton(promoteOverlay);
+            if (promoteOverlay)
+                victoryWiredForShowId = victoryShowId;
+        }
+
+        void BeginVictoryShow()
+        {
+            victoryShowId++;
+            victoryWiredForShowId = -1;
+            CullDuplicateEventSystems();
         }
 
         /// <summary>
@@ -91,11 +122,11 @@ namespace ArthurianAutobattler
         /// Next Night = same advance as former Enter Next Timeline (AdvanceNightAndRestart).
         /// Single listener only — clears persistent Inspector wiring.
         /// </summary>
-        private void WireNextNightButton()
+        private void WireNextNightButton(bool promoteOverlay)
         {
             EnsureResurrectionCanvas();
-            PromoteVictoryCanvas();
-            EnsureEventSystemAlive();
+            if (promoteOverlay) PromoteVictoryCanvas();
+            CullDuplicateEventSystems();
             Transform host = GetAbandonHost();
             if (host == null) return;
 
@@ -110,23 +141,23 @@ namespace ArthurianAutobattler
                 "Next Night",
                 new Vector2(170f, 48f),
                 new Color(0.72f, 0.52f, 0.12f, 1f)); // bright amber — readable on dark panel
-            // Replace ALL listeners (persistent scene + prior runtime) with exactly one.
-            nextNightButton.onClick = new Button.ButtonClickedEvent();
-            nextNightButton.onClick.AddListener(StartNextTimelineRun);
+            BindButtonOnce(nextNightButton, StartNextTimelineRun);
             nextNightButton.interactable = true;
             nextNightButton.gameObject.SetActive(true);
-            nextNightButton.transform.SetAsLastSibling();
+            if (promoteOverlay)
+                nextNightButton.transform.SetAsLastSibling();
             nextRunButtonWired = true;
-            Debug.LogError("[DemonKnight] Next Night button wired + visible on victory panel.");
+            if (promoteOverlay)
+                Debug.LogError("[DemonKnight] Next Night button wired + visible on victory panel.");
         }
 
         /// <summary>
         /// Camelot abandon / end-of-run screen: End Run closes the cutscene and opens Main Menu.
         /// </summary>
-        private void WireEndRunButton()
+        private void WireEndRunButton(bool promoteOverlay)
         {
             EnsureResurrectionCanvas();
-            PromoteVictoryCanvas();
+            if (promoteOverlay) PromoteVictoryCanvas();
             Transform host = GetAbandonHost();
             if (host == null) return;
 
@@ -141,12 +172,21 @@ namespace ArthurianAutobattler
                 "End Run",
                 new Vector2(-170f, 48f),
                 new Color(0.55f, 0.18f, 0.16f, 1f));
-            endRunButton.onClick = new Button.ButtonClickedEvent();
-            endRunButton.onClick.AddListener(EndRunToMainMenu);
+            BindButtonOnce(endRunButton, EndRunToMainMenu);
             endRunButton.interactable = true;
             endRunButton.gameObject.SetActive(true);
-            endRunButton.transform.SetAsLastSibling();
+            if (promoteOverlay)
+                endRunButton.transform.SetAsLastSibling();
             endRunButtonWired = true;
+        }
+
+        /// <summary>Fresh onClick with exactly one runtime listener (no stacking across Sync/domain reloads).</summary>
+        static void BindButtonOnce(Button button, UnityEngine.Events.UnityAction action)
+        {
+            if (button == null || action == null) return;
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
         }
 
         Transform GetAbandonHost()
@@ -179,12 +219,43 @@ namespace ArthurianAutobattler
             if (panel != null) panel.gameObject.SetActive(true);
         }
 
-        static void EnsureEventSystemAlive()
+        /// <summary>
+        /// Exactly one EventSystem. Duplicates (domain reload / runtime create) make every
+        /// UI click fire twice — Andrew's pause/play "double-click" feel.
+        /// </summary>
+        static void CullDuplicateEventSystems()
         {
-            if (FindFirstObjectByType<EventSystem>() != null) return;
-            var go = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-            go.name = "EventSystem";
-            Debug.LogError("[DemonKnight] Created EventSystem for victory Next Night clicks.");
+            var all = FindObjectsByType<EventSystem>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (all == null || all.Length == 0)
+            {
+                var go = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+                go.name = "EventSystem";
+                Debug.LogError("[DemonKnight] Created EventSystem for UI clicks.");
+                return;
+            }
+
+            // Keep the first enabled (or first overall); destroy the rest.
+            EventSystem keep = null;
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] != null && all[i].isActiveAndEnabled)
+                {
+                    keep = all[i];
+                    break;
+                }
+            }
+            if (keep == null) keep = all[0];
+
+            int culled = 0;
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] == null || all[i] == keep) continue;
+                culled++;
+                if (Application.isPlaying) Destroy(all[i].gameObject);
+                else DestroyImmediate(all[i].gameObject);
+            }
+            if (culled > 0)
+                Debug.LogWarning($"[DemonKnight] Culled {culled} duplicate EventSystem(s) (stops double-clicks).");
         }
 
         /// <summary>
@@ -319,45 +390,40 @@ namespace ArthurianAutobattler
         /// </summary>
         public void TriggerWaveVictoryScreen(int waveCleared, int goldEarned)
         {
+            BeginVictoryShow();
             EnsureResurrectionCanvas();
             PromoteVictoryCanvas();
             string msg =
                 $"<b>VICTORY</b> — Wave {waveCleared} cleared (+{goldEarned}g).\n\n"
                 + "The pews hold. Press <b>Next Night</b> to advance, or <b>End Run</b> for the Main Menu.";
-            // Buttons first — never wait before Next Night is visible/clickable.
+            // Buttons once — coroutine must not re-wire (that logged Wire* twice per EndBattle).
             HideLegacyBankPanel();
             PerkDraftManager.SuppressAllPerkUi();
             if (loreNarrativeText != null)
                 loreNarrativeText.text = msg;
-            WireAbandonScreenButtons();
+            WireAbandonScreenButtons(promoteOverlay: true, force: true);
             RefreshBankUI();
-            StartCoroutine(PlayWaveVictorySequence(msg));
+            if (victorySequenceRoutine != null)
+                StopCoroutine(victorySequenceRoutine);
+            victorySequenceRoutine = StartCoroutine(PlayWaveVictorySequence(msg));
         }
 
         IEnumerator PlayWaveVictorySequence(string message)
         {
-            EnsureResurrectionCanvas();
-            PromoteVictoryCanvas();
-            HideLegacyBankPanel();
-            PerkDraftManager.SuppressAllPerkUi();
-
-            if (loreNarrativeText != null)
-                loreNarrativeText.text = message;
-
-            // Realtime so a paused/scaled battle clock cannot delay the buttons.
+            // Lore polish only — wiring already done in TriggerWaveVictoryScreen.
             yield return new WaitForSecondsRealtime(0.35f);
 
-            if (loreNarrativeText != null && string.IsNullOrEmpty(loreNarrativeText.text) == false)
+            if (loreNarrativeText != null && !string.IsNullOrEmpty(loreNarrativeText.text))
             {
                 if (loreNarrativeText.text.IndexOf("Next Night", StringComparison.OrdinalIgnoreCase) < 0)
                     loreNarrativeText.text += "\n\nPress <b>Next Night</b> to continue.";
             }
 
             HideLegacyBankPanel();
-            WireAbandonScreenButtons();
             RefreshBankUI();
             PromoteVictoryCanvas();
             Debug.LogError("[DemonKnight] Wave victory screen ready — Next Night visible.");
+            victorySequenceRoutine = null;
         }
 
         static Button FindPanelButton(Transform root, params string[] nameOrLabels)
@@ -473,16 +539,19 @@ namespace ArthurianAutobattler
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
             GrudgeSaveManager.Instance?.CommitStagedGrudgesToDisk();
-            StartCoroutine(PlayResurrectionSequence(earnedPoints, defeatedNimue, customReason));
+            if (resurrectionSequenceRoutine != null)
+                StopCoroutine(resurrectionSequenceRoutine);
+            resurrectionSequenceRoutine = StartCoroutine(PlayResurrectionSequence(earnedPoints, defeatedNimue, customReason));
         }
 
         private IEnumerator PlayResurrectionSequence(int earnedPoints, bool defeatedNimue, string customReason)
         {
+            BeginVictoryShow();
             EnsureResurrectionCanvas();
             PromoteVictoryCanvas();
             HideLegacyBankPanel();
-            // Show Next Night immediately on end-of-run too (don't wait for lore beat).
-            WireAbandonScreenButtons();
+            // Wire once at show open — do not wire again after the lore wait.
+            WireAbandonScreenButtons(promoteOverlay: true, force: true);
 
             if (merlinCutsceneAnimator != null)
                 merlinCutsceneAnimator.SetTrigger("CastResurrection");
@@ -512,9 +581,9 @@ namespace ArthurianAutobattler
                     + "Press <b>Next Night</b> to continue, or <b>End Run</b> for the Main Menu.";
             }
             HideLegacyBankPanel();
-            WireAbandonScreenButtons();
             RefreshBankUI();
             PromoteVictoryCanvas();
+            resurrectionSequenceRoutine = null;
         }
 
         public void UpgradeStartingGold() => SpendPointOn(() => startingGoldBankLevel++);
