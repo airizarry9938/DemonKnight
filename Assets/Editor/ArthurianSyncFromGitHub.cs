@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "3de1502546b9fb2f64274ee5ea25f7601726491b";
 
-    private const string ExpectedPackageId = "priest-multi-fuse-victory-hover";
+    private const string ExpectedPackageId = "legends-warband-sort-hp-spd";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -82,6 +82,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
+        "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
@@ -519,7 +520,8 @@ public static class ArthurianSyncFromGitHub
         {
             return body.Contains("RewireMarchButton")
                    && body.Contains("ForceNamedTavernDicePanelsInactive")
-                   && body.Contains("forceEqualHudSlots");
+                   && body.Contains("forceEqualHudSlots")
+                   && body.Contains("MenuListSortBar");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -556,6 +558,16 @@ public static class ArthurianSyncFromGitHub
         if (rel.EndsWith("PewSeatHoverHighlight.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("IPointerEnterHandler") && body.Contains("PewHoverRim");
+        }
+
+        if (rel.EndsWith("MenuListSortBar.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("HighestHp") && body.Contains("HighestSpeed") && body.Contains("SortedParty");
+        }
+
+        if (rel.EndsWith("LegendCodexUI.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("DemonKnightCompatApi") && body.Contains("MenuListSortBar");
         }
 
         if (rel.EndsWith("CharacterDatabase.cs", StringComparison.OrdinalIgnoreCase))
@@ -600,6 +612,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("legends-warband-sort-hp-spd")
                    || body.Contains("priest-multi-fuse-victory-hover")
                    || body.Contains("wave-win-night-priest-fuse")
                    || body.Contains("next-night-no-legacy")

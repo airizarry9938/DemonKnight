@@ -14,6 +14,8 @@ namespace ArthurianAutobattler
         public string ingredientFormula;
         public string combatPerkSummary;
         public UnitType resultingType;
+        public int sortHp;
+        public float sortSpeed;
     }
 
     public class LegendCodexUI : MonoBehaviour
@@ -29,6 +31,8 @@ namespace ArthurianAutobattler
         public Image fusionPreviewPortrait;
         public TextMeshProUGUI fusionPreviewStats;
         public TextMeshProUGUI fusionPreviewPassive;
+
+        MenuListSortMode legendsSortMode = MenuListSortMode.Default;
 
         private void Start()
         {
@@ -74,6 +78,8 @@ namespace ArthurianAutobattler
                 DemonKnightCompatApi.EnsureCodexScrollViewport(codexPanel.transform);
             DemonKnightCompatApi.ApplyTwoColumnCodexLayout(recipeListContainer);
 
+            EnsureLegendsSortBar();
+
             foreach (Transform child in recipeListContainer) Destroy(child.gameObject);
 
             var party = GameLoopManager.Instance != null
@@ -81,6 +87,8 @@ namespace ArthurianAutobattler
                 : new List<RecruitInstance>();
 
             EnsureRecipesFromDatabase();
+            FillRecipeSortStats();
+            MenuListSortBar.SortRecipes(allRecipes, legendsSortMode);
             RefreshFusionPreview(party);
 
             foreach (var entry in allRecipes)
@@ -274,6 +282,22 @@ namespace ArthurianAutobattler
             fusionPreviewPassive.color = new Color(0.75f, 0.9f, 0.75f);
         }
 
+        void EnsureLegendsSortBar()
+        {
+            if (codexPanel == null) return;
+            // Sit under fusion preview strip; above the two-column recipe scroll.
+            MenuListSortBar.Ensure(
+                codexPanel.transform,
+                legendsSortMode,
+                mode =>
+                {
+                    legendsSortMode = mode;
+                    RefreshCodexList();
+                },
+                new Vector2(0.04f, 0.78f),
+                new Vector2(0.96f, 0.84f));
+        }
+
         void EnsureRecipesFromDatabase()
         {
             var db = CharacterDatabase.Load();
@@ -291,8 +315,27 @@ namespace ArthurianAutobattler
                     combatPerkSummary = string.IsNullOrWhiteSpace(def.passiveDescription)
                         ? def.passiveType.ToString()
                         : def.passiveDescription,
-                    resultingType = def.unitType
+                    resultingType = def.unitType,
+                    sortHp = def.baseHP,
+                    sortSpeed = def.baseAPS
                 });
+            }
+        }
+
+        void FillRecipeSortStats()
+        {
+            if (allRecipes == null) return;
+            var db = CharacterDatabase.Load();
+            foreach (var entry in allRecipes)
+            {
+                if (entry == null) continue;
+                if (entry.sortHp > 0 && entry.sortSpeed > 0f) continue;
+                var def = db?.GetByUnitType(entry.resultingType);
+                if (def != null)
+                {
+                    entry.sortHp = def.baseHP;
+                    entry.sortSpeed = def.baseAPS;
+                }
             }
         }
 

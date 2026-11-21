@@ -70,6 +70,7 @@ namespace ArthurianAutobattler
         private bool diceModalUserOpen;
         private bool codexModalUserOpen;
         private bool warbandModalUserOpen;
+        MenuListSortMode warbandSortMode = MenuListSortMode.Default;
         private List<GameObject> cachedDicePanels;
         private float nextDicePanelRescan;
         private bool diceToggleWireLogged;
@@ -2202,6 +2203,7 @@ namespace ArthurianAutobattler
             }
 
             EnsureFormationDiagram(warbandModal.transform);
+            EnsureWarbandSortBar();
             EnsureWarbandScrollViewport(warbandModal.transform);
             if (warbandListContainer == null)
             {
@@ -2246,11 +2248,27 @@ namespace ArthurianAutobattler
                 go.GetComponent<Image>().color = new Color(0.10f, 0.12f, 0.14f, 0.92f);
             }
 
-            formationDiagramRoot.anchorMin = new Vector2(0.08f, 0.70f);
-            formationDiagramRoot.anchorMax = new Vector2(0.92f, 0.88f);
+            // Leave a strip above for MenuSortBar (Highest HP / SPD chips).
+            formationDiagramRoot.anchorMin = new Vector2(0.08f, 0.68f);
+            formationDiagramRoot.anchorMax = new Vector2(0.92f, 0.84f);
             formationDiagramRoot.offsetMin = Vector2.zero;
             formationDiagramRoot.offsetMax = Vector2.zero;
             formationDiagramRoot.SetSiblingIndex(1); // under title, above scroll
+        }
+
+        void EnsureWarbandSortBar()
+        {
+            if (warbandModal == null) return;
+            MenuListSortBar.Ensure(
+                warbandModal.transform,
+                warbandSortMode,
+                mode =>
+                {
+                    warbandSortMode = mode;
+                    RefreshWarbandPanel();
+                },
+                new Vector2(0.08f, 0.84f),
+                new Vector2(0.92f, 0.90f));
         }
 
         /// <summary>Rebuild front/back boxes from current party roles.</summary>
@@ -2450,9 +2468,9 @@ namespace ArthurianAutobattler
             var scrollRt = scrollHost as RectTransform;
             if (scrollRt != null)
             {
-                // Leave room above for the battalion formation diagram.
+                // Leave room above for sort chips + battalion formation diagram.
                 scrollRt.anchorMin = new Vector2(0.04f, 0.06f);
-                scrollRt.anchorMax = new Vector2(0.96f, 0.68f);
+                scrollRt.anchorMax = new Vector2(0.96f, 0.66f);
                 scrollRt.offsetMin = Vector2.zero;
                 scrollRt.offsetMax = Vector2.zero;
             }
@@ -2491,12 +2509,14 @@ namespace ArthurianAutobattler
             if (warbandListContainer == null || GameLoopManager.Instance == null) return;
 
             foreach (Transform c in warbandListContainer) Destroy(c.gameObject);
+            EnsureWarbandSortBar();
             EnsureWarbandScrollViewport(warbandModal != null ? warbandModal.transform : warbandListContainer.parent);
 
             var party = GameLoopManager.Instance.recruitedParty;
             RefreshFormationDiagram(party);
+            var display = MenuListSortBar.SortedParty(party, warbandSortMode);
 
-            if (party == null || party.Count == 0)
+            if (display == null || display.Count == 0)
             {
                 BuildWarbandFallbackRow(warbandListContainer,
                     "<i>No recruits yet.</i> Hire townsfolk from the pews — they appear here. "
@@ -2506,11 +2526,12 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            for (int i = 0; i < party.Count; i++)
+            for (int i = 0; i < display.Count; i++)
             {
-                var m = party[i];
+                var m = display[i];
                 if (m == null) continue;
-                int unitNum = i + 1;
+                int unitNum = (party != null ? party.IndexOf(m) : i) + 1;
+                if (unitNum <= 0) unitNum = i + 1;
                 string body = BuildCrowdMemberSummary(m, party, unitNum);
                 GameObject row;
                 if (warbandRowPrefab != null)
