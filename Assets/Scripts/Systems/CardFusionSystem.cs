@@ -365,6 +365,8 @@ namespace ArthurianAutobattler
                 product.fusionIngredients.Add(CloneForFusionMemory(r));
 
             party.Add(product);
+            // Phase 4 — Legend fusion micro-shake.
+            StageParallaxController.MicroShake();
             Debug.Log(
                 $"[DemonKnight] Fused {product.characterName}: consumed {chosen.Count} ingredient(s), party size now {party.Count}.");
             return true;

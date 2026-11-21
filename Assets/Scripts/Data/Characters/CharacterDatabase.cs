@@ -145,6 +145,7 @@ namespace ArthurianAutobattler
                 product.fusionIngredients.Add(CardFusionSystem.CloneForFusionMemory(r));
 
             party.Add(product);
+            StageParallaxController.MicroShake();
             Debug.Log(
                 $"[DemonKnight] Fused {product.characterName} via CharacterDatabase: consumed {chosen.Count}, party={party.Count} " +
                 $"(product already in party before fuse was OK — multi-fuse allowed).");

@@ -992,6 +992,7 @@ namespace ArthurianAutobattler
             townSecondsSpentThisPhase = 0f;
             if (townCanvasObj != null) townCanvasObj.SetActive(true);
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
+            StageParallaxController.EnsureOnStageRoots();
 
             if (seatPopulateRoutine != null) StopCoroutine(seatPopulateRoutine);
             seatPopulateRoutine = StartCoroutine(PopulateTownSeatsNextFrame());

@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "9ed28e5c9dfdad9312d38cab7d5b4c65be0afbf7";
 
-    private const string ExpectedPackageId = "master-spec-phase3-art-architect";
+    private const string ExpectedPackageId = "master-spec-phase4-anim-parallax";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -89,6 +89,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
+        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+        "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
@@ -118,6 +120,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/ModularSpriteLibrary.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
+        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+        "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
@@ -773,7 +777,25 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("SetMenuLocked")
                    && body.Contains("menuLocked")
                    && body.Contains("VictoryStarBadge.Apply")
-                   && body.Contains("IsProtectedSeatChrome");
+                   && body.Contains("IsProtectedSeatChrome")
+                   && body.Contains("ModularSpriteAnimator");
+        }
+
+        if (rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class ModularSpriteAnimator")
+                   && body.Contains("ConfigurePaperDoll")
+                   && body.Contains("ConfigureBattleActor")
+                   && body.Contains("PlayRecruitReveal")
+                   && body.Contains("A8B0C0");
+        }
+
+        if (rel.EndsWith("StageParallaxController.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class StageParallaxController")
+                   && body.Contains("MicroShake")
+                   && body.Contains("enableRainFX")
+                   && body.Contains("0.15f");
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))

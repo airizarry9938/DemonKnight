@@ -110,6 +110,10 @@ namespace ArthurianAutobattler
                 onHoverInfo: onHover,
                 onRightClick: onRightClick);
             VictoryStarBadge.Apply(transform, recruit);
+
+            // Phase 4 — modular Idle clips / breath bob + unscouted tint.
+            var anim = ModularSpriteAnimator.EnsureOn(gameObject);
+            anim?.ConfigurePaperDoll(this, recruit);
         }
 
         public void BindEmpty()
@@ -128,6 +132,8 @@ namespace ArthurianAutobattler
             if (moodLayer != null) moodLayer.enabled = false;
             if (seatLabel != null) seatLabel.text = "";
             VictoryStarBadge.Clear(transform);
+            var anim = GetComponent<ModularSpriteAnimator>();
+            if (anim != null) anim.enabled = false;
             if (seatButton != null)
             {
                 seatButton.onClick.RemoveAllListeners();

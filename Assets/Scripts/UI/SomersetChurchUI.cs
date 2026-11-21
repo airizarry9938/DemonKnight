@@ -2351,7 +2351,10 @@ namespace ArthurianAutobattler
                 Town.playerGold -= cost;
                 // Recruited members always keep full stats visible (warband + pew return).
                 selected.intelTierUnlocked = Mathf.Max(selected.intelTierUnlocked, 3);
+                selected.isScouted = true;
                 GrudgeSaveManager.Instance?.RememberIntel(selected.unitID, selected.intelTierUnlocked);
+                // Phase 4 — reveal pop + gold burst on the pew seat before it leaves.
+                PlayHireRevealOnSeat(selected);
                 party.Add(selected);
                 GameLoopManager.Instance.currentTownPool?.Remove(selected);
                 Town.NotifyHiredFromChurch(selected);
@@ -2367,6 +2370,21 @@ namespace ArthurianAutobattler
             finally
             {
                 hireInProgress = false;
+            }
+        }
+
+        void PlayHireRevealOnSeat(RecruitInstance recruit)
+        {
+            if (recruit == null) return;
+            for (int i = 0; i < seats.Count; i++)
+            {
+                var seat = seats[i];
+                if (seat == null || seat.Bound != recruit) continue;
+                var anim = seat.GetComponent<ModularSpriteAnimator>()
+                           ?? ModularSpriteAnimator.EnsureOn(seat.gameObject);
+                anim.ConfigurePaperDoll(seat, recruit);
+                anim.PlayRecruitReveal();
+                return;
             }
         }
 

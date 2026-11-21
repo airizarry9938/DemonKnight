@@ -142,6 +142,7 @@ namespace ArthurianAutobattler
             }
             if (arena == null) return;
             arenaRoot = arena;
+            EnsureParallaxHost();
 
             if (battleBackground == null)
             {
@@ -410,6 +411,17 @@ namespace ArthurianAutobattler
             {
                 atk.PlayAttackLunge(def.transform.position);
                 def.PlayHitFlash();
+            }
+        }
+
+        /// <summary>Phase 4 — ensure Churchyard arena has a parallax controller.</summary>
+        public void EnsureParallaxHost()
+        {
+            StageParallaxController.EnsureOnStageRoots();
+            if (arenaRoot != null)
+            {
+                if (arenaRoot.GetComponent<StageParallaxController>() == null)
+                    arenaRoot.gameObject.AddComponent<StageParallaxController>();
             }
         }
 

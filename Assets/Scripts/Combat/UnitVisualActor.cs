@@ -20,6 +20,7 @@ namespace ArthurianAutobattler
 
         private Vector3 homePosition;
         private Image healthFill;
+        private bool deathAnimPlayed;
 
         public void Initialize(CombatUnit unit, Sprite artwork, Vector3 spawnPos, bool flipX, float visualScale = 1f)
         {
@@ -58,6 +59,10 @@ namespace ArthurianAutobattler
             RefreshHpText();
             if (nameLabel != null && unit != null)
                 nameLabel.text = string.IsNullOrEmpty(unit.unitName) ? unit.unitType.ToString() : unit.unitName;
+
+            // Phase 4 — battle token Idle/Attack/Hit/Death juice.
+            var anim = ModularSpriteAnimator.EnsureOn(gameObject);
+            anim?.ConfigureBattleActor(this);
         }
 
         private void Update()
@@ -77,7 +82,16 @@ namespace ArthurianAutobattler
                 }
             }
             RefreshHpText();
-            if (!boundUnit.IsAlive) Destroy(gameObject, 0.25f);
+            if (!boundUnit.IsAlive)
+            {
+                if (!deathAnimPlayed)
+                {
+                    deathAnimPlayed = true;
+                    var anim = GetComponent<ModularSpriteAnimator>();
+                    anim?.Play(ModularSpriteAnimator.AnimState.Death);
+                    Destroy(gameObject, 0.4f);
+                }
+            }
         }
 
         /// <summary>
@@ -99,6 +113,12 @@ namespace ArthurianAutobattler
         public void PlayAttackLunge(Vector3 targetPos)
         {
             if (!gameObject.activeInHierarchy) return;
+            var anim = GetComponent<ModularSpriteAnimator>();
+            if (anim != null)
+            {
+                anim.Play(ModularSpriteAnimator.AnimState.Attack);
+                return;
+            }
             StopAllCoroutines();
             StartCoroutine(LungeRoutine(targetPos));
         }
@@ -106,6 +126,12 @@ namespace ArthurianAutobattler
         public void PlayHitFlash()
         {
             if (!gameObject.activeInHierarchy) return;
+            var anim = GetComponent<ModularSpriteAnimator>();
+            if (anim != null)
+            {
+                anim.Play(ModularSpriteAnimator.AnimState.Hit);
+                return;
+            }
             StartCoroutine(FlashRedRoutine());
         }
 

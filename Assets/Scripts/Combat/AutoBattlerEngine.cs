@@ -108,11 +108,13 @@ namespace ArthurianAutobattler
             SpawnLustSirensIntoHorde(demonArmy);
 
             // Balance V2: bosses start wave 3+.
+            bool spawnedBoss = false;
             if (currentBattleNumber >= 3)
             {
                 float mult = 1f + ((currentBattleNumber - 1) * hordeGenerator.statScalePerBattle);
                 var waveBoss = hordeGenerator.SpawnCorruptedLegendBoss(currentBattleNumber, mult);
                 demonArmy.Insert(0, waveBoss);
+                spawnedBoss = waveBoss != null;
                 // King Lot: summons 2 Frenzied Imps on spawn.
                 if (waveBoss.unitType == UnitType.BossKingLot)
                 {
@@ -124,6 +126,10 @@ namespace ArthurianAutobattler
             foreach (var d in demonArmy) d.ResetAttackCooldown();
             TriggerBattleStartPassives();
             isBattling = true;
+            BattlefieldVisualizer.Instance?.EnsureParallaxHost();
+            // Phase 4 — boss wave micro-shake.
+            if (spawnedBoss)
+                StageParallaxController.MicroShake();
 
             // Boss waves: bottom-of-frame dialog before steel flies.
             // Requires Assets/Scripts/Combat/BattleBossDialogUI.cs (on Sync ScriptPaths).
@@ -648,6 +654,9 @@ namespace ArthurianAutobattler
                 BattlefieldVisualizer.Instance?.SpawnPopup(fallen, "SCABBARD!", Color.yellow);
                 return;
             }
+
+            // Phase 4 — true fatal blow micro-shake.
+            StageParallaxController.MicroShake();
 
             if (!fallen.isDemon)
             {
