@@ -27,7 +27,7 @@ public static class ArthurianMenuBootstrap
     /// Standalone ModularSpriteLibrary / StageLayout / Dice / Anim / Parallax are NEVER
     /// downloaded — types live in embeds; leftover standalones are deleted (CS0101).
     /// </summary>
-    public const string Phase25FetchPinSha = "17a6860a01b22a69bcbe77ed63d55639f6ca3c44";
+    public const string Phase25FetchPinSha = "272b6ccf9fecad9348370600a5ff667f5ae046d9";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
