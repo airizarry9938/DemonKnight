@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "b0fa0a6738265374f76b8a75cd3c45c510f6dbce";
 
-    private const string ExpectedPackageId = "master-spec-phase5-intel-dice-flock";
+    private const string ExpectedPackageId = "fix-stagelayoutprofile-cs0103";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -49,9 +49,10 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
-        "Assets/Scripts/Data/GameDataTypes.cs",
+        // StageLayoutProfile BEFORE GameDataTypes — never leave GameDataTypes compiling alone (CS0103).
         "Assets/Scripts/Data/SpriteAnimClip.cs",
         "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
@@ -114,11 +115,12 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
+        // StageLayoutProfile before GameDataTypes (DA-59 CS0103 after Sync).
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
-        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/ModularSpriteLibrary.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
@@ -146,6 +148,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private static readonly string[] MustRestoreUiHelpers =
     {
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",

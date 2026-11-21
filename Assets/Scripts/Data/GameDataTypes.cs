@@ -788,7 +788,11 @@ namespace ArthurianAutobattler
     /// <summary>Phase 5 — Intel purchase marks scouted + gossip-adjacent pew neighbors.</summary>
     public static class IntelGossip
     {
-        public const int PewRowSize = StageLayoutProfile.PewRowSize;
+        /// <summary>
+        /// Same as StageLayoutProfile.PewRowSize (13). Local const so GameDataTypes
+        /// compiles even if StageLayoutProfile.cs is missing mid-Force-Sync (CS0103).
+        /// </summary>
+        public const int PewRowSize = 13;
 
         public static void ApplyIntelPurchase(RecruitInstance target, int tier, List<RecruitInstance> townPool)
         {
