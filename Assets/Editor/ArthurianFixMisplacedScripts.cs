@@ -69,6 +69,8 @@ public static class ArthurianFixMisplacedScripts
         Add("SomersetChurchUI.cs", "Scripts/UI/SomersetChurchUI.cs");
         Add("ChurchPewLayout.cs", "Scripts/UI/ChurchPewLayout.cs");
         Add("PaperDollSeatView.cs", "Scripts/UI/PaperDollSeatView.cs");
+        Add("PewSeatHoverHighlight.cs", "Scripts/UI/PewSeatHoverHighlight.cs");
+        Add("MenuListSortBar.cs", "Scripts/UI/MenuListSortBar.cs");
         Add("TownSplitUIController.cs", "Scripts/UI/TownSplitUIController.cs");
         Add("LegendCodexUI.cs", "Scripts/UI/LegendCodexUI.cs");
 

@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "5ab0ebb98dccf5a1e0e4950be12881b1d56cacd9";
 
-    private const string ExpectedPackageId = "fix-menulistsortmode-cs0246";
+    private const string ExpectedPackageId = "fix-hover-sortbar-sync-cs0103";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -48,9 +48,10 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // Types before UI that reference them (MenuListSortMode / RecruitInstance).
+        // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
+        "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
@@ -83,7 +84,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
-        "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
@@ -109,10 +109,12 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
+        "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
         "Assets/Scripts/UI/WaveBossHudView.cs",
+        "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/MainMenuUI.cs",
@@ -121,6 +123,17 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
+    };
+
+    /// <summary>
+    /// Soft deps that Force Delete can wipe then fail to re-download — restore like menu hosts.
+    /// Prevents CS0103 on TownSplit / PaperDoll / LegendCodex / SomersetChurch.
+    /// </summary>
+    private static readonly string[] MustRestoreUiHelpers =
+    {
+        "Assets/Scripts/UI/MenuListSortBar.cs",
+        "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
+        "Assets/Scripts/Data/GameDataTypes.cs",
     };
 
     [MenuItem("Arthurian/Sync All Scripts From GitHub", false, 0)]
@@ -277,6 +290,8 @@ public static class ArthurianSyncFromGitHub
 
             // If a mid-pass failure still left a menu host missing, restore it now.
             EnsureEditorMenuHostsPresent(projectRoot, sha, errors, okFiles);
+            // Force Delete can wipe helpers then fail mid-pass — restore before compile.
+            EnsureUiHelpersPresent(projectRoot, sha, errors, okFiles);
         }
         finally
         {
@@ -418,6 +433,36 @@ public static class ArthurianSyncFromGitHub
             {
                 errors.Add($"{rel} (menu restore): {ex.Message}");
                 Debug.LogError($"[DemonKnight] Could not restore menu host {rel}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Re-download MenuListSortBar / PewSeatHoverHighlight / GameDataTypes if Force Delete
+    /// wiped them and the main Sync pass failed (CS0103 on consumers).
+    /// </summary>
+    private static void EnsureUiHelpersPresent(
+        string projectRoot,
+        string sha,
+        List<string> errors,
+        List<string> okFiles)
+    {
+        foreach (string rel in MustRestoreUiHelpers)
+        {
+            string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(dest) && okFiles.Contains(rel)) continue;
+            try
+            {
+                string text = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
+                WriteReplacing(dest, text, deleteFirst: false);
+                VerifyOnDisk(rel, dest, relaxPackageId: true);
+                if (!okFiles.Contains(rel)) okFiles.Add(rel);
+                Debug.LogWarning($"[DemonKnight] Restored UI helper {rel} via {source} @ {sha}");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{rel} (ui helper restore): {ex.Message}");
+                Debug.LogError($"[DemonKnight] Could not restore UI helper {rel}: {ex.Message}");
             }
         }
     }
@@ -568,7 +613,9 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("PewSeatHoverHighlight.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("IPointerEnterHandler") && body.Contains("PewHoverRim");
+            return body.Contains("IPointerEnterHandler")
+                   && body.Contains("PewHoverRim")
+                   && body.Contains("class PewSeatHoverHighlight");
         }
 
         if (rel.EndsWith("MenuListSortBar.cs", StringComparison.OrdinalIgnoreCase))
@@ -577,7 +624,18 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("SortedParty")
                    && body.Contains("SortRecipes")
                    && body.Contains("MenuListSortMode")
+                   && body.Contains("class MenuListSortBar")
                    && !body.Contains("enum MenuListSortMode");
+        }
+
+        if (rel.EndsWith("PaperDollSeatView.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("PewSeatHoverHighlight") && body.Contains("class PaperDollSeatView");
+        }
+
+        if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("DemonKnightCompatApi") && body.Contains("PewSeatHoverHighlight");
         }
 
         if (rel.EndsWith("LegendCodexUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -627,6 +685,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-hover-sortbar-sync-cs0103")
                    || body.Contains("fix-menulistsortmode-cs0246")
                    || body.Contains("legends-warband-sort-hp-spd")
                    || body.Contains("priest-multi-fuse-victory-hover")
@@ -680,7 +739,9 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("DownloadPinned")
                    && body.Contains("NeverBulkDeleteEditorMenus")
                    && body.Contains("ForceDeleteSyncAll")
-                   && body.Contains("BootstrapCompatAndSyncTools");
+                   && body.Contains("BootstrapCompatAndSyncTools")
+                   && body.Contains("EnsureUiHelpersPresent")
+                   && body.Contains("PewSeatHoverHighlight.cs");
         }
 
         if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase))
