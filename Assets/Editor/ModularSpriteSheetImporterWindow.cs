@@ -151,22 +151,42 @@ public class ModularSpriteSheetImporterWindow : EditorWindow
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        // Also drop a Resources copy path hint.
+        // Runtime loads Resources/Art/Modular/ModularSpriteLibrary — always sync that copy
+        // (an empty earlier copy used to stick and leave colored pew "boxes").
         string resourcesDir = "Assets/Resources/Art/Modular";
         EnsureFolder(resourcesDir);
         string resourcesAsset = resourcesDir + "/ModularSpriteLibrary.asset";
-        if (AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resourcesAsset) == null)
-        {
-            AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(targetLibrary), resourcesAsset);
-            AssetDatabase.SaveAssets();
-        }
+        string srcPath = AssetDatabase.GetAssetPath(targetLibrary);
+        if (AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resourcesAsset) != null)
+            AssetDatabase.DeleteAsset(resourcesAsset);
+        AssetDatabase.CopyAsset(srcPath, resourcesAsset);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        // Drop any cached empty library from a previous Play session in this Editor domain.
+        TownsfolkVisualApplier.SetLibrary(null);
+
+        int posesFilled = CountFilled(targetLibrary.basePoses);
+        int outfitsFilled = CountFilled(targetLibrary.outfits);
+        int headsFilled = targetLibrary.heads != null ? targetLibrary.heads.Length : 0;
 
         EditorUtility.DisplayDialog(
             "Modular Import Complete",
-            $"Assigned sprites into {AssetDatabase.GetAssetPath(targetLibrary)}.\n" +
-            "Resources copy (if new): Assets/Resources/Art/Modular/ModularSpriteLibrary.asset\n" +
-            "Assign TownRNGGenerator.modularLibrary or rely on Resources.Load.",
+            $"Assigned sprites into {srcPath}\n" +
+            $"Synced runtime copy: {resourcesAsset}\n\n" +
+            $"Filled: poses {posesFilled}/4 · outfits {outfitsFilled}/6 · heads {headsFilled}\n\n" +
+            "NEXT: stop Play if running → Main Menu → New Game\n" +
+            "(old town still has placeholder boxes until regenerated).",
             "OK");
+    }
+
+    static int CountFilled(Sprite[] arr)
+    {
+        if (arr == null) return 0;
+        int n = 0;
+        for (int i = 0; i < arr.Length; i++)
+            if (arr[i] != null) n++;
+        return n;
     }
 
     List<Sprite> ProcessSheet(Texture2D source, string label, int cols, int rows, string folder)
