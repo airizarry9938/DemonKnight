@@ -113,6 +113,18 @@ namespace ArthurianAutobattler
         /// <summary>Persistent seat in the Somerset church (0–51).</summary>
         public int pewSeatIndex = 0;
 
+        /// <summary>Battle formation slot (0–51) on StageLayoutProfile.playerBattleSlots.</summary>
+        public int battleSlotIndex;
+
+        /// <summary>When false, unit stays in pew reserve and does not march.</summary>
+        public bool isDeployed = true;
+
+        /// <summary>Intel / gossip scouted — Phase 5 reveals hiddenTraitId + hire discount.</summary>
+        public bool isScouted;
+
+        /// <summary>Hidden spark id (e.g. "Legend Spark") revealed when scouted.</summary>
+        public string hiddenTraitId;
+
         public BodyPosture bodyPosture = BodyPosture.UprightFolded;
         public Sprite bodySprite;
         public Sprite headSprite;
@@ -125,11 +137,30 @@ namespace ArthurianAutobattler
         /// </summary>
         public TownsfolkAppearance appearance;
 
+        /// <summary>Modular part ids (string form of library indices / sheet keys).</summary>
+        public string modularPoseId;
+        public string modularOutfitId;
+        public string modularHeadId;
+        public string modularWeaponId;
+
+        /// <summary>Paper-doll tint overrides (a≤0 → resolve from appearance / library).</summary>
+        public Color skinTint;
+        public Color hairTint;
+        public Color armorTint;
+
         /// <summary>
-        /// Wave victories while this soul marched (and returned to a pew). Stacks.
-        /// Each star → −5g hire (stacks with win −10 grudge; Balance V2 removed loss/death +15).
+        /// Wave-victory experience rank (Master Spec). Serialized. Stacks; each → −5g hire.
+        /// </summary>
+        public int veteranRank;
+
+        /// <summary>
+        /// Legacy alias kept for hire/JSON compat. Prefer <see cref="EffectiveVeteranRank"/>.
+        /// Synced with veteranRank on award / load.
         /// </summary>
         public int victoryStars;
+
+        /// <summary>Max(veteranRank, victoryStars) — single source for ★ UI + hire discount.</summary>
+        public int EffectiveVeteranRank => Mathf.Max(0, Mathf.Max(veteranRank, victoryStars));
 
         /// <summary>
         /// Train Ranged equips a crossbow — Knights (and other non-Warrior melee) may
@@ -139,6 +170,44 @@ namespace ArthurianAutobattler
 
         /// <summary>Hire discount gold per victory star.</summary>
         public const int VictoryStarHireDiscount = 5;
+
+        /// <summary>Align veteranRank ↔ victoryStars after load or partial writes.</summary>
+        public void SyncVeteranRankFields()
+        {
+            int e = EffectiveVeteranRank;
+            veteranRank = e;
+            victoryStars = e;
+        }
+
+        /// <summary>WaveVictory award — increments both rank fields together.</summary>
+        public void AddVeteranRank(int delta = 1)
+        {
+            SyncVeteranRankFields();
+            veteranRank = Mathf.Max(0, veteranRank) + Mathf.Max(0, delta);
+            victoryStars = veteranRank;
+        }
+
+        /// <summary>Copy modular ids + tints from appearance (spawn / rebind).</summary>
+        public void SyncModularIdsFromAppearance()
+        {
+            if (appearance == null) return;
+            modularPoseId = appearance.poseIndex.ToString();
+            modularOutfitId = appearance.outfitIndex.ToString();
+            modularHeadId = appearance.headIndex.ToString();
+            modularWeaponId = appearance.propIndex.ToString();
+            if (skinTint.a <= 0.01f && appearance.skinToneIndex >= 0
+                && appearance.skinToneIndex < TownsfolkAppearance.SkinTones.Length)
+                skinTint = TownsfolkAppearance.SkinTones[appearance.skinToneIndex];
+            if (hairTint.a <= 0.01f && appearance.hairColorIndex >= 0
+                && appearance.hairColorIndex < TownsfolkAppearance.HairColors.Length)
+                hairTint = TownsfolkAppearance.HairColors[appearance.hairColorIndex];
+            if (armorTint.a <= 0.01f)
+                armorTint = Color.white;
+        }
+
+        /// <summary>Base troop types that must never carry fusion memory.</summary>
+        public static bool IsBaseTroopType(UnitType t) =>
+            t == UnitType.Peasant || t == UnitType.Warrior || t == UnitType.Knight;
 
         /// <summary>Balance V2 hire bands.</summary>
         public const int PeasantHireFloor = 10;
@@ -187,7 +256,7 @@ namespace ArthurianAutobattler
                 baseHire = baseHireCost,
                 rawGrudge = grudgePenalty,
                 writDiscount = Mathf.Max(0, globalDiscount),
-                victoryStars = Mathf.Max(0, victoryStars),
+                victoryStars = EffectiveVeteranRank,
                 loyalistHalf = primaryTrait == TraitTag.Loyalist,
                 floorApplied = HireFloorFor(unitType)
             };

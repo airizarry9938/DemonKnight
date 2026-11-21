@@ -48,6 +48,12 @@ namespace ArthurianAutobattler
                     primaryTrait = r.primaryTrait,
                     hatedTrait = r.hatedTrait,
                     lovedTrait = r.lovedTrait,
+                    battleSlotIndex = r.battleSlotIndex,
+                    isDeployed = r.isDeployed,
+                    isScouted = r.isScouted,
+                    hiddenTraitId = r.hiddenTraitId,
+                    veteranRank = r.EffectiveVeteranRank,
+                    victoryStars = r.EffectiveVeteranRank,
                     // Warriors never fight from BACK — strip stale kits from older saves.
                     canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior
                 };
@@ -717,6 +723,18 @@ namespace ArthurianAutobattler
 
             int sirensMarched = playerArmy.Count(u => u != null && !u.isDemon && u.isSirenEnchantress);
 
+            // Master Spec Phase 1: surviving battle clones → canonical veteranRank before disband.
+            if (playerWon)
+            {
+                var surviving = new HashSet<string>();
+                foreach (var u in playerArmy)
+                {
+                    if (u != null && !u.isDemon && u.IsAlive && !string.IsNullOrEmpty(u.unitID))
+                        surviving.Add(u.unitID);
+                }
+                DemonKnightCompatApi.AwardWaveVictoryVeteranRanks(loop, surviving);
+            }
+
             // PER-WAVE disband — EVERY EndBattle (win OR lose). Loud + nuclear clear.
             // Win → pews + hire discount; loss → pews + higher hire. Stats kept.
             Debug.LogError(
@@ -855,9 +873,8 @@ namespace ArthurianAutobattler
                         if (r == null) continue;
                         r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
                         r.fusionIngredients = null;
-                        // Nuclear path skipped ReturnOneToPew — still grant wave-win ★.
-                        if (waveWon)
-                            r.victoryStars = Mathf.Max(0, r.victoryStars) + 1;
+                        // ★ already applied via AwardWaveVictoryVeteranRanks on product/leaves.
+                        r.SyncVeteranRankFields();
                         if (!string.IsNullOrEmpty(r.unitID))
                             loop.currentTownPool.RemoveAll(t => t != null && t.unitID == r.unitID && t != r);
                         if (!loop.currentTownPool.Contains(r))

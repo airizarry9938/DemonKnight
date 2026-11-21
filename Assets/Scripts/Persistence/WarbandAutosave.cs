@@ -31,8 +31,23 @@ namespace ArthurianAutobattler
         public bool isSirenEnchantress;
         /// <summary>Train Ranged crossbow — can attack from BACK.</summary>
         public bool canAttackFromBack;
-        /// <summary>Wave-victory experience stars (−5g hire each). Run-scoped via autosave.</summary>
+        /// <summary>Legacy ★ count — kept so old autosaves still load.</summary>
         public int victoryStars;
+        /// <summary>Master Spec veteran rank (synced with victoryStars on load/save).</summary>
+        public int veteranRank;
+        public int battleSlotIndex;
+        /// <summary>True when this row was written by schema 2+ (distinguishes missing isDeployed).</summary>
+        public bool hasDeployFlag;
+        public bool isDeployed = true;
+        public bool isScouted;
+        public string hiddenTraitId;
+        public string modularPoseId;
+        public string modularOutfitId;
+        public string modularHeadId;
+        public string modularWeaponId;
+        public float skinTintR, skinTintG, skinTintB, skinTintA;
+        public float hairTintR, hairTintG, hairTintB, hairTintA;
+        public float armorTintR, armorTintG, armorTintB, armorTintA;
         // NOTE: Do NOT add List<WarbandMemberSave> here — Unity JsonUtility serialization
         // depth cycle (limit 10). Fusion trees use flat fusionParts + ownerUnitId.
     }
@@ -51,6 +66,8 @@ namespace ArthurianAutobattler
     [Serializable]
     public class WarbandAutosaveData
     {
+        /// <summary>2+ = Phase 1–2 fields (veteranRank, deploy, modular ids). Missing → treat as 1.</summary>
+        public int schemaVersion = 2;
         public int night = 1;
         public int battleNumber = 1;
         public int playerGold = 250;
@@ -80,6 +97,7 @@ namespace ArthurianAutobattler
 
             var data = new WarbandAutosaveData
             {
+                schemaVersion = 2,
                 night = Mathf.Max(1, loop.currentNight),
                 battleNumber = loop.battleEngine != null ? Mathf.Max(1, loop.battleEngine.currentBattleNumber) : 1,
                 playerGold = Mathf.Max(0, playerGold),
@@ -220,7 +238,19 @@ namespace ArthurianAutobattler
             dest.bodyPosture = src.bodyPosture;
             dest.isSirenEnchantress = src.isSirenEnchantress;
             dest.canAttackFromBack = src.canAttackFromBack || dest.canAttackFromBack;
-            dest.victoryStars = Mathf.Max(dest.victoryStars, src.victoryStars);
+            dest.veteranRank = Mathf.Max(dest.EffectiveVeteranRank, src.EffectiveVeteranRank);
+            dest.victoryStars = dest.veteranRank;
+            dest.battleSlotIndex = src.battleSlotIndex;
+            dest.isDeployed = src.isDeployed;
+            dest.isScouted = dest.isScouted || src.isScouted;
+            if (!string.IsNullOrEmpty(src.hiddenTraitId)) dest.hiddenTraitId = src.hiddenTraitId;
+            if (!string.IsNullOrEmpty(src.modularPoseId)) dest.modularPoseId = src.modularPoseId;
+            if (!string.IsNullOrEmpty(src.modularOutfitId)) dest.modularOutfitId = src.modularOutfitId;
+            if (!string.IsNullOrEmpty(src.modularHeadId)) dest.modularHeadId = src.modularHeadId;
+            if (!string.IsNullOrEmpty(src.modularWeaponId)) dest.modularWeaponId = src.modularWeaponId;
+            if (src.skinTint.a > 0.01f) dest.skinTint = src.skinTint;
+            if (src.hairTint.a > 0.01f) dest.hairTint = src.hairTint;
+            if (src.armorTint.a > 0.01f) dest.armorTint = src.armorTint;
             if (src.pewSeatIndex > 0) dest.pewSeatIndex = src.pewSeatIndex;
             if (src.randomAvatar != null) dest.randomAvatar = src.randomAvatar;
             if (src.headSprite != null) dest.headSprite = src.headSprite;
@@ -310,6 +340,11 @@ namespace ArthurianAutobattler
         /// <summary>Scalar snapshot only — never nests List&lt;WarbandMemberSave&gt;.</summary>
         private static WarbandMemberSave ToMemberScalars(RecruitInstance r)
         {
+            r.SyncVeteranRankFields();
+            r.SyncModularIdsFromAppearance();
+            var skin = r.skinTint.a > 0.01f ? r.skinTint : Color.clear;
+            var hair = r.hairTint.a > 0.01f ? r.hairTint : Color.clear;
+            var armor = r.armorTint.a > 0.01f ? r.armorTint : Color.clear;
             return new WarbandMemberSave
             {
                 unitID = r.unitID,
@@ -328,7 +363,20 @@ namespace ArthurianAutobattler
                 bodyPosture = r.bodyPosture,
                 isSirenEnchantress = r.isSirenEnchantress,
                 canAttackFromBack = r.canAttackFromBack,
-                victoryStars = Mathf.Max(0, r.victoryStars)
+                victoryStars = r.EffectiveVeteranRank,
+                veteranRank = r.EffectiveVeteranRank,
+                battleSlotIndex = r.battleSlotIndex,
+                hasDeployFlag = true,
+                isDeployed = r.isDeployed,
+                isScouted = r.isScouted,
+                hiddenTraitId = r.hiddenTraitId ?? "",
+                modularPoseId = r.modularPoseId ?? "",
+                modularOutfitId = r.modularOutfitId ?? "",
+                modularHeadId = r.modularHeadId ?? "",
+                modularWeaponId = r.modularWeaponId ?? "",
+                skinTintR = skin.r, skinTintG = skin.g, skinTintB = skin.b, skinTintA = skin.a,
+                hairTintR = hair.r, hairTintG = hair.g, hairTintB = hair.b, hairTintA = hair.a,
+                armorTintR = armor.r, armorTintG = armor.g, armorTintB = armor.b, armorTintA = armor.a
             };
         }
 
@@ -365,6 +413,7 @@ namespace ArthurianAutobattler
 
         private static RecruitInstance FromMemberScalars(WarbandMemberSave s)
         {
+            int rank = Mathf.Max(0, Mathf.Max(s.veteranRank, s.victoryStars));
             var r = new RecruitInstance
             {
                 unitID = s.unitID,
@@ -383,8 +432,22 @@ namespace ArthurianAutobattler
                 bodyPosture = s.bodyPosture,
                 isSirenEnchantress = s.isSirenEnchantress,
                 canAttackFromBack = s.canAttackFromBack,
-                victoryStars = Mathf.Max(0, s.victoryStars)
+                victoryStars = rank,
+                veteranRank = rank,
+                battleSlotIndex = s.battleSlotIndex,
+                isDeployed = !s.hasDeployFlag || s.isDeployed,
+                isScouted = s.isScouted || s.intelTierUnlocked >= 1,
+                hiddenTraitId = s.hiddenTraitId,
+                modularPoseId = s.modularPoseId,
+                modularOutfitId = s.modularOutfitId,
+                modularHeadId = s.modularHeadId,
+                modularWeaponId = s.modularWeaponId,
+                skinTint = new Color(s.skinTintR, s.skinTintG, s.skinTintB, s.skinTintA),
+                hairTint = new Color(s.hairTintR, s.hairTintG, s.hairTintB, s.hairTintA),
+                armorTint = new Color(s.armorTintR, s.armorTintG, s.armorTintB, s.armorTintA)
             };
+            CardFusionSystem.SanitizeBaseUnitFusionFlags(r);
+            r.SyncVeteranRankFields();
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
             r.RefreshBodyPostureFromTraits(grudge);
@@ -416,6 +479,8 @@ namespace ArthurianAutobattler
             }
             if (ings != null && ings.Count > 0)
                 r.fusionIngredients = ings;
+            // Phase 1 invariant: base troops must never stay classified as fused legends.
+            CardFusionSystem.SanitizeBaseUnitFusionFlags(r);
             return r;
         }
     }

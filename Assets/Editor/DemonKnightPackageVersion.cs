@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "restore-victory-star-pew-icons";
-    public const string GitHint = "HideNonModularImages-spared-stars-inside-seat-nuclear-award";
-    public const string BuiltUtc = "2026-11-21T19:25:00Z";
+    public const string Id = "master-spec-phase1-2";
+    public const string GitHint = "veteranRank-WaveVictory-StageLayoutProfile-SpriteAnimClip";
+    public const string BuiltUtc = "2026-11-21T20:20:00Z";
 }
 #endif

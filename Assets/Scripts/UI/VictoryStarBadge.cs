@@ -19,7 +19,7 @@ namespace ArthurianAutobattler
         public static void Apply(Transform seatRoot, RecruitInstance recruit)
         {
             if (seatRoot == null) return;
-            int stars = recruit != null ? Mathf.Max(0, recruit.victoryStars) : 0;
+            int stars = recruit != null ? recruit.EffectiveVeteranRank : 0;
             if (stars <= 0)
             {
                 Clear(seatRoot);

@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "2cef15c13eeaf2bbe3fc6a65bea48842d2c7b78e";
 
-    private const string ExpectedPackageId = "restore-victory-star-pew-icons";
+    private const string ExpectedPackageId = "master-spec-phase1-2";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -50,6 +50,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/Data/SpriteAnimClip.cs",
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
@@ -96,6 +98,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/SomersetAssetStudioWindow.cs",
         "Assets/Editor/ArthurianModularSpriteSheetImporterWindow.cs",
         "Assets/Editor/ArthurianBattleSpriteSheetSlicerWindow.cs",
+        "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianCharacterDatabaseEditor.cs",
         "Assets/Editor/ArthurianCharacterCatalogSeeder.cs",
         "Assets/Data/Characters/README.md",
@@ -111,6 +114,7 @@ public static class ArthurianSyncFromGitHub
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
@@ -594,7 +598,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("AutosaveWarband")
                    && body.Contains("mustDisbandPartyAfterCurrentWave")
                    && body.Contains("AdvanceNightCounterAfterWaveWin")
-                   && body.Contains("r.victoryStars = Mathf.Max(0, r.victoryStars) + 1");
+                   && body.Contains("AwardWaveVictoryVeteranRanks")
+                   && body.Contains("RedrawVeteranStarIcons")
+                   && body.Contains("StartTownRecruitPhase");
         }
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
@@ -603,7 +609,8 @@ public static class ArthurianSyncFromGitHub
                         && body.Contains("AutosaveWarband")
                         && body.Contains("ChurchRewireMarch")
                         && body.Contains("WaveVictoryGold")
-                        && body.Contains("RefreshTownAfterDisband");
+                        && body.Contains("RefreshTownAfterDisband")
+                        && body.Contains("AwardWaveVictoryVeteranRanks");
             if (!core) return false;
             // Bootstrap may land an older CompatApi; Force Sync wants the soft HUD helper.
             if (relaxPackageId) return true;
@@ -626,7 +633,29 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("HighestHp")
                    && body.Contains("HighestAttack")
                    && body.Contains("LowestAttack")
-                   && body.Contains("class RecruitInstance");
+                   && body.Contains("class RecruitInstance")
+                   && body.Contains("veteranRank")
+                   && body.Contains("battleSlotIndex")
+                   && body.Contains("isDeployed")
+                   && body.Contains("modularPoseId")
+                   && body.Contains("EffectiveVeteranRank");
+        }
+
+        if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class StageLayoutProfile")
+                   && body.Contains("class SlotTransformConfig")
+                   && body.Contains("class StageParallaxLayer")
+                   && body.Contains("ChurchPewCount = 52")
+                   && body.Contains("PlayerBattleCount = 52")
+                   && body.Contains("EnemyBattleCount = 20");
+        }
+
+        if (rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class SpriteAnimClip")
+                   && body.Contains("framesPerSecond")
+                   && body.Contains("List<Sprite> frames");
         }
 
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -669,7 +698,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("TriggerWaveVictoryScreen")
                    && body.Contains("endingBattle")
                    && body.Contains("EndBattleBody")
-                   && body.Contains("r.victoryStars = Mathf.Max(0, r.victoryStars) + 1")
+                   && body.Contains("AwardWaveVictoryVeteranRanks")
                    && body.Contains("RefreshTownAfterDisband");
         }
 

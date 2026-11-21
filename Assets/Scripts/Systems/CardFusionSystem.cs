@@ -100,27 +100,30 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Lives on CardFusionSystem so Force Sync cannot CS0117 when CharacterDatabase.cs
         /// lags one pass behind (Andrew: CardFusionSystem called missing DB method).
+        /// Invariant: base troops (Peasant/Warrior/Knight) never carry fusion memory.
         /// </summary>
         public static void SanitizeBaseUnitFusionFlags(List<RecruitInstance> party)
         {
             if (party == null) return;
             for (int i = 0; i < party.Count; i++)
+                SanitizeBaseUnitFusionFlags(party[i]);
+        }
+
+        /// <summary>
+        /// Spawn / deserialize invariant — clear fusionIngredients on base units so they
+        /// are never misclassified as fused legends. (fusionParts live only on autosave.)
+        /// </summary>
+        public static void SanitizeBaseUnitFusionFlags(RecruitInstance r)
+        {
+            if (r == null) return;
+            if (!RecruitInstance.IsBaseTroopType(r.unitType)) return;
+            if (r.fusionIngredients != null && r.fusionIngredients.Count > 0)
             {
-                var r = party[i];
-                if (r == null) continue;
-                if (r.unitType == UnitType.Peasant
-                    || r.unitType == UnitType.Warrior
-                    || r.unitType == UnitType.Knight)
-                {
-                    if (r.fusionIngredients != null && r.fusionIngredients.Count > 0)
-                    {
-                        Debug.LogWarning(
-                            $"[DemonKnight] Cleared bogus fusionIngredients on base unit " +
-                            $"{r.characterName} ({r.unitType}) — was blocking multi-fuse.");
-                        r.fusionIngredients = null;
-                    }
-                }
+                Debug.LogWarning(
+                    $"[DemonKnight] Cleared bogus fusionIngredients on base unit " +
+                    $"{r.characterName} ({r.unitType}) — was blocking multi-fuse.");
             }
+            r.fusionIngredients = null;
         }
 
         public bool CanFusePriest(List<RecruitInstance> p) => CanFuseType(UnitType.Priest, p);
@@ -432,7 +435,19 @@ namespace ArthurianAutobattler
                 headSprite = src.headSprite,
                 moodOverlaySprite = src.moodOverlaySprite,
                 isSirenEnchantress = src.isSirenEnchantress,
-                victoryStars = src.victoryStars,
+                victoryStars = src.EffectiveVeteranRank,
+                veteranRank = src.EffectiveVeteranRank,
+                battleSlotIndex = src.battleSlotIndex,
+                isDeployed = src.isDeployed,
+                isScouted = src.isScouted,
+                hiddenTraitId = src.hiddenTraitId,
+                modularPoseId = src.modularPoseId,
+                modularOutfitId = src.modularOutfitId,
+                modularHeadId = src.modularHeadId,
+                modularWeaponId = src.modularWeaponId,
+                skinTint = src.skinTint,
+                hairTint = src.hairTint,
+                armorTint = src.armorTint,
                 canAttackFromBack = src.canAttackFromBack,
                 appearance = src.appearance == null ? null : new TownsfolkAppearance
                 {
@@ -446,6 +461,7 @@ namespace ArthurianAutobattler
                     propIndex = src.appearance.propIndex
                 }
             };
+            SanitizeBaseUnitFusionFlags(c);
             if (src.fusionIngredients != null && src.fusionIngredients.Count > 0)
             {
                 c.fusionIngredients = new List<RecruitInstance>(src.fusionIngredients.Count);

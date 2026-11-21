@@ -49,6 +49,7 @@ namespace ArthurianAutobattler
 
             ShufflePewSeats(townList);
             townList.Sort((a, b) => a.pewSeatIndex.CompareTo(b.pewSeatIndex));
+            CardFusionSystem.SanitizeBaseUnitFusionFlags(townList);
             return townList;
         }
 
@@ -90,11 +91,17 @@ namespace ArthurianAutobattler
                 characterName = $"{firstNames[Random.Range(0, firstNames.Length)]} {epithets[Random.Range(0, epithets.Length)]}",
                 unitType = type,
                 pewSeatIndex = pewSeat,
+                battleSlotIndex = pewSeat,
+                isDeployed = true,
+                isScouted = unlockTier1,
                 randomAvatar = (pool != null && pool.Count > 0) ? pool[Random.Range(0, pool.Count)] : null,
                 intelTierUnlocked = unlockTier1 ? 1 : 0,
                 isSirenEnchantress = lustSiren,
                 appearance = TownsfolkAppearance.Generate(type, persistentID, pewSeat, lib)
             };
+            // Master Spec Phase 1: base units never carry fusion memory.
+            CardFusionSystem.SanitizeBaseUnitFusionFlags(r);
+            r.SyncModularIdsFromAppearance();
 
             // Optional CharacterDefinition portrait when avatar pool is empty.
             if (r.randomAvatar == null)

@@ -495,6 +495,57 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
+        /// Master Spec Phase 1: map surviving battle clones → canonical party recruits by
+        /// unitID and increment veteranRank. Fused products also push +1 onto leaf clones
+        /// so unfuse keeps the stars.
+        /// </summary>
+        public void AwardWaveVictoryVeteranRanks(HashSet<string> survivingUnitIds)
+        {
+            if (survivingUnitIds == null || survivingUnitIds.Count == 0) return;
+            if (recruitedParty == null) return;
+            int awarded = 0;
+            foreach (var r in recruitedParty)
+            {
+                if (r == null || string.IsNullOrEmpty(r.unitID)) continue;
+                if (!survivingUnitIds.Contains(r.unitID)) continue;
+                r.AddVeteranRank(1);
+                awarded++;
+                if (r.IsFusedLegend && r.fusionIngredients != null)
+                {
+                    foreach (var leaf in r.fusionIngredients)
+                    {
+                        if (leaf == null) continue;
+                        leaf.AddVeteranRank(1);
+                    }
+                }
+            }
+            Debug.Log($"[DemonKnight] WaveVictory veteranRank +1 on {awarded} canonical recruit(s).");
+        }
+
+        /// <summary>Spec alias — same as <see cref="StartTownPhase"/>.</summary>
+        public void StartTownRecruitPhase() => StartTownPhase();
+
+        /// <summary>
+        /// Force ★ badges on pews + warband after Next Night / StartTownRecruitPhase.
+        /// </summary>
+        public void RedrawVeteranStarIcons()
+        {
+            var church = ResolveChurchUI();
+            if (townUI == null) townUI = FindFirstObjectByType<TownSplitUIController>();
+            if (currentTownPool != null)
+            {
+                if (church != null && church.pewSeatLayer != null)
+                    church.PopulatePews(currentTownPool);
+                else
+                    townUI?.PopulateTownGrid(currentTownPool);
+            }
+            church?.RefreshHUD();
+            DemonKnightCompatApi.UpdateWarbandHudLabel(church);
+            DemonKnightCompatApi.RefreshWarbandPanel(church);
+            townUI?.UpdateHUD();
+        }
+
+        /// <summary>
         /// After every AutoBattle WAVE: entire party returns to recruitment pews with
         /// kept stats/upgrades/intel. Living: win → hire discount, loss → higher cost.
         /// Dead already recorded via RecordArmyDeath.
@@ -605,9 +656,9 @@ namespace ArthurianAutobattler
             r.fusionIngredients = null;
             GrudgeSaveManager.Instance?.RememberIntel(r.unitID, r.intelTierUnlocked);
 
-            // Wave victory → +1 experience star (stacks; each star −5g hire).
-            if (waveWon)
-                r.victoryStars = Mathf.Max(0, r.victoryStars) + 1;
+            // WaveVictory ★ is awarded via AwardWaveVictoryVeteranRanks (clone→canonical)
+            // before disband so fused products can push rank onto leaves. Sync here only.
+            r.SyncVeteranRankFields();
 
             bool diedInCombat = combatDead != null && !string.IsNullOrEmpty(r.unitID)
                                 && combatDead.Contains(r.unitID);
@@ -968,6 +1019,8 @@ namespace ArthurianAutobattler
 
             townUI?.UpdateHUD();
             church?.RefreshHUD();
+            // Master Spec: redraw veteran ★ after Next Night / StartTownRecruitPhase.
+            RedrawVeteranStarIcons();
         }
 
         public void StartBattlePhase()

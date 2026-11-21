@@ -89,6 +89,25 @@ namespace ArthurianAutobattler
             }
         }
 
+        /// <summary>WaveVictory: map surviving combat unitIDs → canonical veteranRank.</summary>
+        public static void AwardWaveVictoryVeteranRanks(
+            GameLoopManager loop,
+            HashSet<string> survivingUnitIds)
+        {
+            loop ??= ResolveLoop();
+            if (loop == null) return;
+            if (TryInvoke(loop, "AwardWaveVictoryVeteranRanks", survivingUnitIds)) return;
+            Debug.LogWarning("[DemonKnight] AwardWaveVictoryVeteranRanks missing — Sync GameLoopManager.cs.");
+        }
+
+        public static void RedrawVeteranStarIcons(GameLoopManager loop = null)
+        {
+            loop ??= ResolveLoop();
+            if (loop == null) return;
+            if (TryInvoke(loop, "RedrawVeteranStarIcons")) return;
+            RefreshTownAfterDisband(loop);
+        }
+
         public static void SetMustDisband(GameLoopManager loop, bool value)
         {
             loop ??= ResolveLoop();
