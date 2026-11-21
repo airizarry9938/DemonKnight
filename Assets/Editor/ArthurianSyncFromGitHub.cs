@@ -25,7 +25,30 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "46f509e468faae72c360c1ecb6eecb97395ea3d9";
 
-    private const string ExpectedPackageId = "delete-phase25-standalones-cs0101";
+    private const string ExpectedPackageId = "sync-nuke-phase25-cs0101";
+
+    /// <summary>
+    /// EDITOR InitializeOnLoad — runs even when runtime Assembly-CSharp is CS0101-broken
+    /// (GameLoopManager Init never runs in that state). Nukes Phase 2–5 standalones on disk.
+    /// </summary>
+    [InitializeOnLoadMethod]
+    static void DkEditorNukePhase25StandalonesOnLoad()
+    {
+        try
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+            int n = NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: null);
+            if (n > 0)
+            {
+                Debug.Log($"[DemonKnight] DA-59 Editor OnLoad nuked {n} Phase 2–5 standalone(s) (CS0101).");
+                EditorApplication.delayCall += () => AssetDatabase.Refresh();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] DA-59 Editor OnLoad nuke skipped: " + ex.Message);
+        }
+    }
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -238,6 +261,8 @@ public static class ArthurianSyncFromGitHub
 
         var errors = new List<string>();
         int ok = 0;
+        // DA-59 FIRST: Editor path — delete ModularSpriteLibrary.cs before any compile attempt.
+        NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
         try
         {
             for (int i = 0; i < bootstrap.Length; i++)
@@ -267,8 +292,9 @@ public static class ArthurianSyncFromGitHub
             EditorUtility.ClearProgressBar();
         }
 
-        // Kill any leftover Phase 2–5 standalones (CS0101 against embeds).
-        DeletePhase25Standalones(projectRoot, errors);
+        // Kill any leftover Phase 2–5 standalones (CS0101 against embeds) — before compile.
+        NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
+        StubPhase25StandalonesOver(projectRoot, errors);
 
         AssetDatabase.Refresh();
         string msg = $"Bootstrapped {ok}/{bootstrap.Length} @ {sha}.";
@@ -277,70 +303,175 @@ public static class ArthurianSyncFromGitHub
         EditorUtility.DisplayDialog("DemonKnight Bootstrap", msg, "OK");
     }
 
+    /// <summary>Comment-only stub — no type defs (CS0101-safe overwrite when delete fails).</summary>
+    static string Phase25StandaloneStub(string rel)
+    {
+        string host = rel.Contains("ModularSpriteAnimator") ? "PaperDollSeatView.cs"
+            : rel.Contains("StageParallax") ? "GameLoopManager.cs"
+            : rel.Contains("DiceManager") ? "TavernDiceMinigame.cs"
+            : "GameDataTypes.cs";
+        return "// DA-59: EMBEDDED in " + host + " — Sync nuked this standalone (CS0101).\n"
+               + "// Do not put public class here. Safe to delete this file.\n";
+    }
+
     /// <summary>Delete Phase 2–5 standalone .cs (+ .meta) that redefine embedded types.</summary>
     public static int DeletePhase25Standalones(string projectRoot = null, List<string> errors = null)
     {
+        return NukePhase25Standalones(projectRoot, writeStubIfNeeded: false, errors: errors);
+    }
+
+    /// <summary>
+    /// Force-Sync / Editor OnLoad nuke: DELETE standalones (+ .meta). Optionally overwrite with
+    /// a comment stub when delete fails or when GameDataTypes Sync demands a safe on-disk body.
+    /// Runs from Editor assembly — does NOT wait for runtime compile.
+    /// </summary>
+    public static int NukePhase25Standalones(
+        string projectRoot = null,
+        bool writeStubIfNeeded = true,
+        List<string> errors = null)
+    {
         projectRoot ??= Directory.GetParent(Application.dataPath)!.FullName;
-        int killed = 0;
+        int touched = 0;
         foreach (string rel in Phase25StandaloneKillList)
         {
             try
             {
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
-                if (!File.Exists(dest)) continue;
-                string body = File.ReadAllText(dest);
-                bool hasType = body.IndexOf("public class ", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("public partial class ", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class SpriteAnimClip", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class ModularSpriteLibrary", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class ModularSpriteAnimator", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class StageParallaxController", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class DiceManager", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class SlotTransformConfig", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class ModularHeadEntry", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class ModularAnimRegistration", StringComparison.Ordinal) >= 0
-                               || body.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) >= 0;
-                // Always delete these paths — types live in embeds; even stubs confuse Sync hosts.
-                try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
-                File.Delete(dest);
+                bool existed = File.Exists(dest);
+                bool hadType = false;
+                if (existed)
+                {
+                    string body = File.ReadAllText(dest);
+                    hadType = body.IndexOf("public class ", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("public partial class ", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class SpriteAnimClip", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class ModularSpriteLibrary", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class ModularSpriteAnimator", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class StageParallaxController", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class DiceManager", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class SlotTransformConfig", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class ModularHeadEntry", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class ModularAnimRegistration", StringComparison.Ordinal) >= 0
+                              || body.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) >= 0;
+                }
+
+                if (existed)
+                {
+                    try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                    try { File.Delete(dest); } catch (Exception delEx)
+                    {
+                        Debug.LogWarning($"[DemonKnight] Delete failed {rel}: {delEx.Message} — will stub.");
+                    }
+                    string meta = dest + ".meta";
+                    if (File.Exists(meta))
+                    {
+                        try { File.SetAttributes(meta, FileAttributes.Normal); } catch { /* ignore */ }
+                        try { File.Delete(meta); } catch { /* ignore */ }
+                    }
+                }
+
+                // After GameDataTypes Sync / when delete fails: overwrite with type-free stub.
+                if (writeStubIfNeeded && (hadType || File.Exists(dest) || existed))
+                {
+                    // Prefer gone; if still present OR we want a hard overwrite after GameDataTypes:
+                    if (File.Exists(dest) || hadType)
+                    {
+                        try
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                            if (File.Exists(dest))
+                            {
+                                try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                            }
+                            // If delete succeeded, skip re-creating unless writeStubAlways path.
+                            // When hadType and delete succeeded, leave deleted (cleanest).
+                            if (File.Exists(dest))
+                            {
+                                File.WriteAllText(dest, Phase25StandaloneStub(rel));
+                                Debug.Log($"[DemonKnight] DA-59 stubbed Phase 2–5 standalone {rel}");
+                            }
+                        }
+                        catch (Exception stubEx)
+                        {
+                            errors?.Add($"{rel} (stub): {stubEx.Message}");
+                        }
+                    }
+                }
+
+                if (existed || hadType)
+                {
+                    touched++;
+                    Debug.Log($"[DemonKnight] DA-59 nuked Phase 2–5 standalone {rel} (hadType={hadType}, gone={!File.Exists(dest)})");
+                }
+            }
+            catch (Exception ex)
+            {
+                errors?.Add($"{rel} (nuke): {ex.Message}");
+                Debug.LogWarning($"[DemonKnight] Could not nuke {rel}: {ex.Message}");
+            }
+        }
+        return touched;
+    }
+
+    /// <summary>
+    /// During Sync of GameDataTypes: overwrite kill-list paths with comment stubs (or delete).
+    /// Guarantees ModularSpriteLibrary.cs cannot keep a public class beside the embed.
+    /// </summary>
+    public static int StubPhase25StandalonesOver(string projectRoot = null, List<string> errors = null)
+    {
+        projectRoot ??= Directory.GetParent(Application.dataPath)!.FullName;
+        int n = 0;
+        foreach (string rel in Phase25StandaloneKillList)
+        {
+            try
+            {
+                string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                if (File.Exists(dest))
+                {
+                    try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                }
+                // Hard overwrite — replaces full class bodies from old pins.
+                File.WriteAllText(dest, Phase25StandaloneStub(rel));
                 string meta = dest + ".meta";
                 if (File.Exists(meta))
                 {
                     try { File.SetAttributes(meta, FileAttributes.Normal); } catch { /* ignore */ }
                     try { File.Delete(meta); } catch { /* ignore */ }
                 }
-                killed++;
-                Debug.Log($"[DemonKnight] DA-59 deleted Phase 2–5 standalone {rel} (hadType={hasType})");
+                n++;
+                Debug.Log($"[DemonKnight] DA-59 GameDataTypes-pass stubbed {rel}");
             }
             catch (Exception ex)
             {
-                errors?.Add($"{rel} (delete): {ex.Message}");
-                Debug.LogWarning($"[DemonKnight] Could not delete {rel}: {ex.Message}");
+                errors?.Add($"{rel} (gdt-stub): {ex.Message}");
             }
         }
-        return killed;
+        // Prefer delete after stub write so no ghost files remain.
+        NukePhase25Standalones(projectRoot, writeStubIfNeeded: false, errors: errors);
+        return n;
     }
 
-    /// <summary>Legacy name — now deletes standalones instead of fetching.</summary>
+    /// <summary>Legacy name — now nukes standalones instead of fetching.</summary>
     static void TryFetchPhase25Insurance(List<string> errors, List<string> okFiles)
     {
         try
         {
-            int n = DeletePhase25Standalones(null, errors);
-            Debug.Log($"[DemonKnight] Phase 2–5 insurance deleted {n} standalone(s).");
+            int n = NukePhase25Standalones(null, writeStubIfNeeded: true, errors: errors);
+            Debug.Log($"[DemonKnight] Phase 2–5 insurance nuked {n} standalone(s).");
             if (okFiles != null)
             {
                 foreach (string rel in Phase25StandaloneKillList)
                 {
-                    if (!okFiles.Contains(rel)) okFiles.Add(rel + " (deleted)");
+                    if (!okFiles.Contains(rel)) okFiles.Add(rel + " (nuked)");
                 }
             }
         }
         catch (Exception ex)
         {
-            Debug.LogWarning("[DemonKnight] Phase 2–5 delete insurance skipped: " + ex.Message);
-            errors?.Add("Phase 2–5 delete: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] Phase 2–5 nuke insurance skipped: " + ex.Message);
+            errors?.Add("Phase 2–5 nuke: " + ex.Message);
         }
     }
 
@@ -360,6 +491,11 @@ public static class ArthurianSyncFromGitHub
 
         try
         {
+            // DA-59 FIRST (before compile / before any download): kill ModularSpriteLibrary.cs etc.
+            // Runs in Editor menu path — does not need runtime Assembly-CSharp to compile.
+            EditorUtility.DisplayProgressBar("DemonKnight Sync", "Nuking Phase 2–5 CS0101 standalones…", 0f);
+            NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
+
             // BEFORE Force Delete: land embeds + stubs so CS0103 never wins a race.
             EnsureUiHelpersPresent(projectRoot, sha, errors, okFiles);
 
@@ -374,6 +510,8 @@ public static class ArthurianSyncFromGitHub
                     if (IsMustRestoreUiHelper(rel)) continue;
                     TryDeleteFile(Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar)));
                 }
+                // Force Delete must not leave Phase 2–5 standalones either.
+                NukePhase25Standalones(projectRoot, writeStubIfNeeded: false, errors: errors);
             }
 
             for (int i = 0; i < ScriptPaths.Length; i++)
@@ -411,6 +549,10 @@ public static class ArthurianSyncFromGitHub
                     VerifyOnDisk(rel, dest, relaxPackageId: protectMenu || isSyncHost);
                     okFiles.Add(rel);
                     Debug.Log($"[DemonKnight] Synced {rel} via {source}");
+
+                    // DA-59: the moment GameDataTypes (embed host) lands, stub/delete standalones.
+                    if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
+                        StubPhase25StandalonesOver(projectRoot, errors);
                 }
                 catch (Exception ex)
                 {
@@ -431,7 +573,8 @@ public static class ArthurianSyncFromGitHub
             EnsureEditorMenuHostsPresent(projectRoot, sha, errors, okFiles);
             // Force Delete can wipe helpers then fail mid-pass — restore before compile.
             EnsureUiHelpersPresent(projectRoot, sha, errors, okFiles);
-            // DA-59 hard insurance: absolute-URL fetch for Phase 2–5 even if ScriptPaths miss them.
+            // DA-59: nuke again after ensure (GameDataTypes restore may race with old pin leftovers).
+            StubPhase25StandalonesOver(projectRoot, errors);
             TryFetchPhase25Insurance(errors, okFiles);
         }
         finally
@@ -440,6 +583,8 @@ public static class ArthurianSyncFromGitHub
         }
 
         ArthurianFixMisplacedScripts.Run();
+        // After FixMisplaced (old compiled maps may re-drop standalones) — nuke again BEFORE refresh/compile.
+        NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
         AssetDatabase.Refresh();
 
         var missingCritical = new List<string>();
@@ -607,6 +752,8 @@ public static class ArthurianSyncFromGitHub
                 VerifyOnDisk(rel, dest, relaxPackageId: true);
                 if (!okFiles.Contains(rel)) okFiles.Add(rel);
                 Debug.Log($"[DemonKnight] Ensured UI helper/embed {rel} via {source} @ {sha}");
+                if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
+                    StubPhase25StandalonesOver(projectRoot, errors);
             }
             catch (Exception ex)
             {
@@ -1037,7 +1184,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ForceDeleteSyncAll")
                    && body.Contains("BootstrapCompatAndSyncTools")
                    && body.Contains("EnsureUiHelpersPresent")
-                   && body.Contains("TryFetchPhase25Insurance");
+                   && body.Contains("TryFetchPhase25Insurance")
+                   && body.Contains("NukePhase25Standalones")
+                   && body.Contains("StubPhase25StandalonesOver")
+                   && body.Contains("DkEditorNukePhase25StandalonesOnLoad");
         }
 
         if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase))
