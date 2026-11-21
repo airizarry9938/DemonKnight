@@ -10,7 +10,7 @@ using ArthurianAutobattler;
 /// Keys out slate backgrounds, slices pose/outfit/head-prop sheets, and assigns
 /// sprites into a ModularSpriteLibrary. Menu: DemonKnight → Modular Sprite Sheet Importer
 /// </summary>
-public class ModularSpriteSheetImporterWindow : EditorWindow
+public class ArthurianModularSpriteSheetImporterWindow : EditorWindow
 {
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultOutputFolder = "Assets/Art/Modular/Sliced";
@@ -31,7 +31,7 @@ public class ModularSpriteSheetImporterWindow : EditorWindow
     [MenuItem("DemonKnight/Modular Sprite Sheet Importer", false, 41)]
     public static void Open()
     {
-        var win = GetWindow<ModularSpriteSheetImporterWindow>("Modular Sprite Importer");
+        var win = GetWindow<ArthurianModularSpriteSheetImporterWindow>("Modular Sprite Importer");
         win.minSize = new Vector2(520, 480);
     }
 

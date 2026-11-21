@@ -23,12 +23,29 @@ public static class ArthurianFixMisplacedScripts
         "ArthurianSyncFromGitHub.cs",
         "DemonKnightPackageVersion.cs",
         "SomersetAssetStudioWindow.cs",
-        // Art Tools — must stay in Editor (InitializeOnLoad was deleting these on every compile)
+        // Art Tools (Arthurian* prefix also covered by IsAllowedEditorScript)
+        "ArthurianModularSpriteSheetImporterWindow.cs",
+        "ArthurianBattleSpriteSheetSlicerWindow.cs",
+        "ArthurianCharacterCatalogSeeder.cs",
+        "ArthurianCharacterDatabaseEditor.cs",
+        // Legacy names — keep if someone still has pre-rename copies
         "ModularSpriteSheetImporterWindow.cs",
         "BattleSpriteSheetSlicerWindow.cs",
         "CharacterCatalogSeeder.cs",
         "CharacterDatabaseEditor.cs",
     };
+
+    static bool IsAllowedEditorScript(string fileName)
+    {
+        if (string.IsNullOrEmpty(fileName)) return false;
+        if (AllowedEditorScripts.Contains(fileName)) return true;
+        // Match the documented rule: Arthurian* / Somerset* / DemonKnight* stay in Editor.
+        // Prevents Sync/old cleaner wipes of Art Tools again.
+        if (fileName.StartsWith("Arthurian", System.StringComparison.OrdinalIgnoreCase)) return true;
+        if (fileName.StartsWith("Somerset", System.StringComparison.OrdinalIgnoreCase)) return true;
+        if (fileName.StartsWith("DemonKnight", System.StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
 
     /// <summary>
     /// Filename → path under Assets/. Keys must be unique (Dictionary ctor throws otherwise).
@@ -107,7 +124,7 @@ public static class ArthurianFixMisplacedScripts
         foreach (string path in Directory.GetFiles(editorDir, "*.cs", SearchOption.TopDirectoryOnly))
         {
             string fileName = Path.GetFileName(path);
-            if (AllowedEditorScripts.Contains(fileName)) continue;
+            if (IsAllowedEditorScript(fileName)) continue;
 
             // Known gameplay → Scripts/ (delete Editor copy if Scripts already has it)
             if (KnownGameplayTargets.TryGetValue(fileName, out string toRel))
@@ -150,7 +167,7 @@ public static class ArthurianFixMisplacedScripts
             EditorUtility.DisplayDialog(
                 "DemonKnight",
                 $"Cleaned {fixedCount} file(s) out of Assets/Editor/ (and duplicate gameplay copies).\n\n" +
-                "Editor may keep Arthurian*/Somerset* tools plus Art Tools importers.\n" +
+                "Kept: Arthurian* / Somerset* / DemonKnight* Editor tools (incl. Art Tools).\n" +
                 "Gameplay scripts belong under Assets/Scripts/.\n\n" +
                 "Wait for compile.",
                 "OK");

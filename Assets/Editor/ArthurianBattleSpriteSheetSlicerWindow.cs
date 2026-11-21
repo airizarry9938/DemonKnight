@@ -9,7 +9,7 @@ using UnityEngine;
 /// bottom-center pivot (0.5, 0.0) so feet/tails sit on the cobblestone anchor.
 /// Menu: DemonKnight → Battle Sprite Sheet Slicer
 /// </summary>
-public class BattleSpriteSheetSlicerWindow : EditorWindow
+public class ArthurianBattleSpriteSheetSlicerWindow : EditorWindow
 {
     Texture2D sheet;
     string outputFolder = "Assets/Art/Battle/Sliced";
@@ -27,7 +27,7 @@ public class BattleSpriteSheetSlicerWindow : EditorWindow
     [MenuItem("DemonKnight/Battle Sprite Sheet Slicer", false, 42)]
     public static void Open()
     {
-        var win = GetWindow<BattleSpriteSheetSlicerWindow>("Battle Sprite Slicer");
+        var win = GetWindow<ArthurianBattleSpriteSheetSlicerWindow>("Battle Sprite Slicer");
         win.minSize = new Vector2(480, 420);
     }
 

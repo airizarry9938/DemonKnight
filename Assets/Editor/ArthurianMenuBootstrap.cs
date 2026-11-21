@@ -47,10 +47,10 @@ public static class ArthurianMenuBootstrap
         bool hasPews = TypeExists("ArthurianAutobattler.SomersetPewLayout");
         bool hasBuilder = TypeExists("ArthurianSceneBuilder");
         bool hasAlignType = TypeExists("ArthurianAlignCrowdPews");
-        bool hasModularImporter = TypeExists("ModularSpriteSheetImporterWindow");
-        bool hasBattleSlicer = TypeExists("BattleSpriteSheetSlicerWindow");
-        bool hasSeeder = TypeExists("CharacterCatalogSeeder");
-        bool hasDbEditor = TypeExists("CharacterDatabaseEditor");
+        bool hasModularImporter = TypeExists("ArthurianModularSpriteSheetImporterWindow");
+        bool hasBattleSlicer = TypeExists("ArthurianBattleSpriteSheetSlicerWindow");
+        bool hasSeeder = TypeExists("ArthurianCharacterCatalogSeeder");
+        bool hasDbEditor = TypeExists("ArthurianCharacterDatabaseEditor");
 
         string packageId = "(no version stamp — old first build)";
         string packageGit = "?";
@@ -79,11 +79,11 @@ public static class ArthurianMenuBootstrap
         string builderPath = Path.Combine(editorDir, "ArthurianSceneBuilder.cs");
         string syncPath = Path.Combine(editorDir, "ArthurianSyncFromGitHub.cs");
         string menuBootPath = Path.Combine(editorDir, "ArthurianMenuBootstrap.cs");
-        string modularImporterPath = Path.Combine(editorDir, "ModularSpriteSheetImporterWindow.cs");
-        string battleSlicerPath = Path.Combine(editorDir, "BattleSpriteSheetSlicerWindow.cs");
+        string modularImporterPath = Path.Combine(editorDir, "ArthurianModularSpriteSheetImporterWindow.cs");
+        string battleSlicerPath = Path.Combine(editorDir, "ArthurianBattleSpriteSheetSlicerWindow.cs");
         // Common mistake: extract zip-with-Assets/Editor/ INTO Assets/Editor → nested path.
-        string nestedModular = Path.Combine(editorDir, "Assets", "Editor", "ModularSpriteSheetImporterWindow.cs");
-        string nestedBattle = Path.Combine(editorDir, "Assets", "Editor", "BattleSpriteSheetSlicerWindow.cs");
+        string nestedModular = Path.Combine(editorDir, "Assets", "Editor", "ArthurianModularSpriteSheetImporterWindow.cs");
+        string nestedBattle = Path.Combine(editorDir, "Assets", "Editor", "ArthurianBattleSpriteSheetSlicerWindow.cs");
         bool alignFileOnDisk = File.Exists(alignPath);
         bool syncOnDisk = File.Exists(syncPath);
         bool menuBootOnDisk = File.Exists(menuBootPath);
@@ -166,10 +166,10 @@ public static class ArthurianMenuBootstrap
             msg +=
                 "ART TOOLS NOT AT EXPECTED PATH.\n" +
                 "Put these 4 files DIRECTLY in Assets/Editor/ (same folder as this Diagnose script):\n" +
-                "• ModularSpriteSheetImporterWindow.cs\n" +
-                "• BattleSpriteSheetSlicerWindow.cs\n" +
-                "• CharacterCatalogSeeder.cs\n" +
-                "• CharacterDatabaseEditor.cs\n" +
+                "• ArthurianModularSpriteSheetImporterWindow.cs\n" +
+                "• ArthurianBattleSpriteSheetSlicerWindow.cs\n" +
+                "• ArthurianCharacterCatalogSeeder.cs\n" +
+                "• ArthurianCharacterDatabaseEditor.cs\n" +
                 "Flat zip: docs/DemonKnight-ArtTools-Editor.zip (files at zip root).\n";
         }
 
@@ -188,10 +188,10 @@ public static class ArthurianMenuBootstrap
         string nestedDir = Path.Combine(editorDir, "Assets", "Editor");
         string[] names =
         {
-            "ModularSpriteSheetImporterWindow.cs",
-            "BattleSpriteSheetSlicerWindow.cs",
-            "CharacterCatalogSeeder.cs",
-            "CharacterDatabaseEditor.cs",
+            "ArthurianModularSpriteSheetImporterWindow.cs",
+            "ArthurianBattleSpriteSheetSlicerWindow.cs",
+            "ArthurianCharacterCatalogSeeder.cs",
+            "ArthurianCharacterDatabaseEditor.cs",
         };
 
         int moved = 0;
@@ -218,7 +218,7 @@ public static class ArthurianMenuBootstrap
         {
             EditorUtility.DisplayDialog(
                 "Art Tools Zip Fix",
-                "No nested ModularSpriteSheetImporterWindow.cs found under Assets/Editor/.\n\n" +
+                "No nested ArthurianModularSpriteSheetImporterWindow.cs found under Assets/Editor/.\n\n" +
                 "In File Explorer open Assets\\Editor and confirm the 4 .cs files sit NEXT TO\n" +
                 "ArthurianMenuBootstrap.cs (not in a subfolder).",
                 "OK");
@@ -259,8 +259,8 @@ public static class ArthurianMenuBootstrap
     [MenuItem("Arthurian/Art Tools/Install Art Importers Now", false, 40)]
     public static void InstallArtImportersNow()
     {
-        bool modularCompiled = TypeExists("ModularSpriteSheetImporterWindow");
-        bool battleCompiled = TypeExists("BattleSpriteSheetSlicerWindow");
+        bool modularCompiled = TypeExists("ArthurianModularSpriteSheetImporterWindow");
+        bool battleCompiled = TypeExists("ArthurianBattleSpriteSheetSlicerWindow");
         if (modularCompiled && battleCompiled)
         {
             EditorUtility.DisplayDialog(
@@ -276,8 +276,8 @@ public static class ArthurianMenuBootstrap
         }
 
         string editorDir = Path.Combine(Application.dataPath, "Editor");
-        bool modularOnDisk = File.Exists(Path.Combine(editorDir, "ModularSpriteSheetImporterWindow.cs"));
-        bool battleOnDisk = File.Exists(Path.Combine(editorDir, "BattleSpriteSheetSlicerWindow.cs"));
+        bool modularOnDisk = File.Exists(Path.Combine(editorDir, "ArthurianModularSpriteSheetImporterWindow.cs"));
+        bool battleOnDisk = File.Exists(Path.Combine(editorDir, "ArthurianBattleSpriteSheetSlicerWindow.cs"));
         if ((modularOnDisk || battleOnDisk) && (!modularCompiled || !battleCompiled))
         {
             bool force = EditorUtility.DisplayDialog(
@@ -303,10 +303,10 @@ public static class ArthurianMenuBootstrap
         // stale pin and re-introduced duplicate MenuItems that always popped Install.
         string[] rels =
         {
-            "Assets/Editor/ModularSpriteSheetImporterWindow.cs",
-            "Assets/Editor/BattleSpriteSheetSlicerWindow.cs",
-            "Assets/Editor/CharacterCatalogSeeder.cs",
-            "Assets/Editor/CharacterDatabaseEditor.cs",
+            "Assets/Editor/ArthurianModularSpriteSheetImporterWindow.cs",
+            "Assets/Editor/ArthurianBattleSpriteSheetSlicerWindow.cs",
+            "Assets/Editor/ArthurianCharacterCatalogSeeder.cs",
+            "Assets/Editor/ArthurianCharacterDatabaseEditor.cs",
             // PackageVersion is NOT in this list — Install must not overwrite a newer Diagnose marker.
             "Assets/Scripts/Data/GameDataTypes.cs",
             "Assets/Scripts/Data/ModularSpriteLibrary.cs",

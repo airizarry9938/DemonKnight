@@ -6,7 +6,7 @@ using UnityEngine;
 using ArthurianAutobattler;
 
 [CustomEditor(typeof(CharacterDatabase))]
-public class CharacterDatabaseEditor : Editor
+public class ArthurianCharacterDatabaseEditor : Editor
 {
     public override void OnInspectorGUI()
     {

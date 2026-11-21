@@ -24,7 +24,7 @@ public static class ArthurianSyncFromGitHub
     // Updated when shipping Sync packages (main tip alone is still older merges).
     private const string FallbackCommitSha = "59fdd09";
 
-    private const string ExpectedPackageId = "art-tools-whitelist-fix-misplaced";
+    private const string ExpectedPackageId = "art-tools-arthurian-prefix-keep";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -89,10 +89,10 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianRepairChurchStage.cs",
         "Assets/Editor/ArthurianSceneBuilder.cs",
         "Assets/Editor/SomersetAssetStudioWindow.cs",
-        "Assets/Editor/ModularSpriteSheetImporterWindow.cs",
-        "Assets/Editor/BattleSpriteSheetSlicerWindow.cs",
-        "Assets/Editor/CharacterDatabaseEditor.cs",
-        "Assets/Editor/CharacterCatalogSeeder.cs",
+        "Assets/Editor/ArthurianModularSpriteSheetImporterWindow.cs",
+        "Assets/Editor/ArthurianBattleSpriteSheetSlicerWindow.cs",
+        "Assets/Editor/ArthurianCharacterDatabaseEditor.cs",
+        "Assets/Editor/ArthurianCharacterCatalogSeeder.cs",
         "Assets/Data/Characters/README.md",
     };
 

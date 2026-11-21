@@ -10,7 +10,7 @@ using ArthurianAutobattler;
 /// CardFusion / Horde / HUD can run data-driven without code edits for new entries.
 /// Menu: DemonKnight → Characters → Seed Default Character Definitions
 /// </summary>
-public static class CharacterCatalogSeeder
+public static class ArthurianCharacterCatalogSeeder
 {
     const string Root = "Assets/Data/Characters";
 
@@ -148,8 +148,8 @@ public static class CharacterCatalogSeeder
         SeedDemon("DreadLord", "demon_lord", "Feral Dread Lord", UnitType.DemonDreadLord,
             185, 26, 1.2f, 18, 1.4f, CharacterPassiveType.None, 0f, "Elite demon bruiser.");
 
-        var db = CharacterDatabaseEditor.EnsureDatabaseAsset();
-        CharacterDatabaseEditor.AutoCollect(db);
+        var db = ArthurianCharacterDatabaseEditor.EnsureDatabaseAsset();
+        ArthurianCharacterDatabaseEditor.AutoCollect(db);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         EditorUtility.DisplayDialog(
