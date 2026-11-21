@@ -18,7 +18,7 @@ public static class ArthurianMenuBootstrap
     /// Package tip with Modular/Battle importers + Art Tools.
     /// Update when shipping a new Sync pin (Force Sync prefers this over main).
     /// </summary>
-    public const string ArtToolsPinSha = "7d49c8ba0823916f331e28d5c56dbb4bfad42219";
+    public const string ArtToolsPinSha = "7ec34cf829329567ac0f941944a3b78f2f52cf2b";
 
     const string Repo = "airizarry9938/DemonKnight";
 
