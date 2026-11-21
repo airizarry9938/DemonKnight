@@ -1744,7 +1744,10 @@ namespace ArthurianAutobattler
                 if (view != null)
                 {
                     if (recruit != null)
-                        view.Bind(recruit, onLeftClick: null, onHover: () => ShowHoverPreview(recruit),
+                        view.Bind(
+                            recruit,
+                            onLeftClick: () => ToggleUnitSelectionMenu(recruit),
+                            onHover: () => ShowHoverPreview(recruit),
                             onRightClick: () => ToggleUnitSelectionMenu(recruit));
                     else view.BindEmpty();
                     seats.Add(view);
@@ -1762,6 +1765,11 @@ namespace ArthurianAutobattler
                         colors.highlightedColor = new Color(0.95f, 0.9f, 0.55f, 1f);
                         colors.selectedColor = new Color(0.85f, 0.78f, 0.4f, 1f);
                         btn.colors = colors;
+                        if (recruit != null)
+                        {
+                            RecruitInstance leftClick = recruit;
+                            btn.onClick.AddListener(() => ToggleUnitSelectionMenu(leftClick));
+                        }
                     }
                     if (recruit != null)
                     {
@@ -1822,7 +1830,8 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Right-click toggles the unit selection menu (hire / train / intel).
+        /// LMB or RMB toggles the unit selection menu (hire / train / intel).
+        /// Hover still only updates the bottom dialogue strip.
         /// </summary>
         public void ToggleUnitSelectionMenu(RecruitInstance recruit)
         {
@@ -1954,7 +1963,7 @@ namespace ArthurianAutobattler
                 town.characterDialogueText.gameObject.SetActive(false);
         }
 
-        /// <summary>Compact stats panel (hire/train/intel) — no dialogue block.</summary>
+        /// <summary>Lengthened stats panel (hire/train/intel) — room for stats + actions, no dialogue block.</summary>
         void CompactUnitStatsPanel()
         {
             if (dossierModal == null) return;
@@ -1964,18 +1973,19 @@ namespace ArthurianAutobattler
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0f, 0f);
-            rt.sizeDelta = new Vector2(360f, 300f);
+            // Taller + a bit wider so stats text and recruit options aren't stuffed.
+            rt.sizeDelta = new Vector2(420f, 460f);
 
-            // Reflow children into a tight column so the old 1180×280 bottom bar layout fits.
-            PlaceChild(dossierModal.transform, "SelectedAvatar", new Vector2(12f, 180f), new Vector2(72f, 72f));
-            PlaceChild(dossierModal.transform, "DossierStats", new Vector2(96f, 120f), new Vector2(248f, 160f));
-            PlaceChild(dossierModal.transform, "ScoutBtn", new Vector2(12f, 78f), new Vector2(110f, 32f));
-            PlaceChild(dossierModal.transform, "InvestigateBtn", new Vector2(130f, 78f), new Vector2(110f, 32f));
-            PlaceChild(dossierModal.transform, "FullReportBtn", new Vector2(248f, 78f), new Vector2(100f, 32f));
-            PlaceChild(dossierModal.transform, "HireBtn", new Vector2(12f, 40f), new Vector2(160f, 32f));
-            PlaceChild(dossierModal.transform, "TrainTank", new Vector2(180f, 40f), new Vector2(160f, 32f));
-            PlaceChild(dossierModal.transform, "TrainRanged", new Vector2(12f, 6f), new Vector2(160f, 32f));
-            PlaceChild(dossierModal.transform, "Mediate", new Vector2(180f, 6f), new Vector2(160f, 32f));
+            // Top: portrait + stats. Bottom: intel / hire / train with breathing room.
+            PlaceChild(dossierModal.transform, "SelectedAvatar", new Vector2(16f, 340f), new Vector2(88f, 88f));
+            PlaceChild(dossierModal.transform, "DossierStats", new Vector2(116f, 220f), new Vector2(288f, 220f));
+            PlaceChild(dossierModal.transform, "ScoutBtn", new Vector2(16f, 168f), new Vector2(126f, 36f));
+            PlaceChild(dossierModal.transform, "InvestigateBtn", new Vector2(150f, 168f), new Vector2(126f, 36f));
+            PlaceChild(dossierModal.transform, "FullReportBtn", new Vector2(284f, 168f), new Vector2(120f, 36f));
+            PlaceChild(dossierModal.transform, "HireBtn", new Vector2(16f, 116f), new Vector2(388f, 40f));
+            PlaceChild(dossierModal.transform, "TrainTank", new Vector2(16f, 64f), new Vector2(190f, 40f));
+            PlaceChild(dossierModal.transform, "TrainRanged", new Vector2(214f, 64f), new Vector2(190f, 40f));
+            PlaceChild(dossierModal.transform, "Mediate", new Vector2(16f, 12f), new Vector2(388f, 40f));
         }
 
         static void PlaceChild(Transform parent, string name, Vector2 anchored, Vector2 size)

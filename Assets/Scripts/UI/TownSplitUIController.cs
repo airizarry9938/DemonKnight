@@ -246,8 +246,12 @@ namespace ArthurianAutobattler
                     GameObject capturedObj = btnObj;
                     var church = FindFirstObjectByType<SomersetChurchUI>()
                                  ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
-                    // LMB kept for town-grid hire select; hover = bottom quotes only; RMB = menu.
-                    btn.onClick.AddListener(() => SelectRecruit(captured, capturedObj));
+                    // LMB + RMB toggle unit stats menu (church); hover = bottom quotes only.
+                    btn.onClick.AddListener(() =>
+                    {
+                        if (church != null) church.ToggleUnitSelectionMenu(captured);
+                        else SelectRecruit(captured, capturedObj);
+                    });
                     PewSeatHoverHighlight.Ensure(
                         btnObj, true,
                         onHoverInfo: () =>

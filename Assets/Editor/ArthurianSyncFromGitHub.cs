@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "76daf2f171a60450eeb8574f67b71626f9500c18";
 
-    private const string ExpectedPackageId = "fix-cs0104-object-ambiguous";
+    private const string ExpectedPackageId = "unit-stats-lmb-taller-panel";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -628,7 +628,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ChurchBottomDialogue")
                    && body.Contains("LockSeatHighlight")
                    && body.Contains("UnityEngine.Object.Destroy")
-                   && body.Contains("using System;");
+                   && body.Contains("using System;")
+                   && body.Contains("420f, 460f")
+                   && body.Contains("onLeftClick: () => ToggleUnitSelectionMenu");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -752,6 +754,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("unit-stats-lmb-taller-panel")
                    || body.Contains("fix-cs0104-object-ambiguous")
                    || body.Contains("fix-cs0103-cs0414-wire-flags")
                    || body.Contains("unit-stats-ur-bottom-dialog")
