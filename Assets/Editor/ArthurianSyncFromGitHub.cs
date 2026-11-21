@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "cff34c670fa939dc0dac8fd70ee3ad1fd603cb7a";
 
-    private const string ExpectedPackageId = "embed-hover-sortbar-cs0103";
+    private const string ExpectedPackageId = "sortbar-raise-hover-instant";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -647,7 +647,8 @@ public static class ArthurianSyncFromGitHub
         {
             return body.Contains("class PaperDollSeatView")
                    && body.Contains("class PewSeatHoverHighlight")
-                   && body.Contains("IPointerEnterHandler");
+                   && body.Contains("IPointerEnterHandler")
+                   && body.Contains("onHoverInfo");
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -660,7 +661,8 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("DemonKnightCompatApi")
                    && body.Contains("class LegendCodexUI")
                    && body.Contains("class MenuListSortBar")
-                   && body.Contains("SortedParty");
+                   && body.Contains("SortedParty")
+                   && body.Contains("0.905f");
         }
 
         if (rel.EndsWith("CharacterDatabase.cs", StringComparison.OrdinalIgnoreCase))
@@ -705,6 +707,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("sortbar-raise-hover-instant")
                    || body.Contains("embed-hover-sortbar-cs0103")
                    || body.Contains("fix-hover-sortbar-sync-cs0103")
                    || body.Contains("fix-menulistsortmode-cs0246")

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -88,7 +89,10 @@ namespace ArthurianAutobattler
             seatButton.onClick.RemoveAllListeners();
             seatButton.onClick.AddListener(() => onClick?.Invoke(recruit));
 
-            PewSeatHoverHighlight.Ensure(gameObject, recruit != null);
+            // Hover shows unit info immediately (same dossier path as click — no delay).
+            RecruitInstance captured = recruit;
+            Action showInfo = () => onClick?.Invoke(captured);
+            PewSeatHoverHighlight.Ensure(gameObject, recruit != null, showInfo);
             VictoryStarBadge.Apply(transform, recruit);
         }
 
@@ -113,7 +117,7 @@ namespace ArthurianAutobattler
                 seatButton.onClick.RemoveAllListeners();
                 seatButton.interactable = false;
             }
-            PewSeatHoverHighlight.Ensure(gameObject, false);
+            PewSeatHoverHighlight.Ensure(gameObject, false, null);
         }
 
         TownsfolkVisualApplier.LayerSet EnsureModularLayers()
@@ -184,19 +188,21 @@ namespace ArthurianAutobattler
         Vector3 baseScale = Vector3.one;
         bool hovering;
         bool occupied = true;
+        Action onHoverInfo;
 
-        public static PewSeatHoverHighlight Ensure(GameObject go, bool isOccupied)
+        public static PewSeatHoverHighlight Ensure(GameObject go, bool isOccupied, Action onHoverInfo = null)
         {
             if (go == null) return null;
             var h = go.GetComponent<PewSeatHoverHighlight>();
             if (h == null) h = go.AddComponent<PewSeatHoverHighlight>();
-            h.Configure(isOccupied);
+            h.Configure(isOccupied, onHoverInfo);
             return h;
         }
 
-        public void Configure(bool isOccupied)
+        public void Configure(bool isOccupied, Action onHoverInfo = null)
         {
             occupied = isOccupied;
+            this.onHoverInfo = onHoverInfo;
             if (!hovering) baseScale = transform.localScale;
             EnsureRim();
             Apply(false);
@@ -236,6 +242,8 @@ namespace ArthurianAutobattler
             if (!occupied) return;
             hovering = true;
             Apply(true);
+            // Instant unit info — fire on enter with no wait / coroutine delay.
+            onHoverInfo?.Invoke();
         }
 
         public void OnPointerExit(PointerEventData eventData)

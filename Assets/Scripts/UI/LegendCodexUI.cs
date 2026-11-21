@@ -285,7 +285,8 @@ namespace ArthurianAutobattler
         void EnsureLegendsSortBar()
         {
             if (codexPanel == null) return;
-            // Sit under fusion preview strip; above the two-column recipe scroll.
+            // Just under Legends/Codex title — above CodexScroll (≤0.88) so it never
+            // covers the first recipe row (was 0.78–0.84 and blocked click/read).
             MenuListSortBar.Ensure(
                 codexPanel.transform,
                 legendsSortMode,
@@ -294,8 +295,21 @@ namespace ArthurianAutobattler
                     legendsSortMode = mode;
                     RefreshCodexList();
                 },
-                new Vector2(0.04f, 0.78f),
-                new Vector2(0.96f, 0.84f));
+                new Vector2(0.04f, 0.905f),
+                new Vector2(0.96f, 0.965f));
+            // Keep fusion preview below the sort chips when present.
+            if (fusionPreviewRoot != null)
+            {
+                var frt = fusionPreviewRoot as RectTransform;
+                if (frt != null)
+                {
+                    frt.anchorMin = new Vector2(0f, 1f);
+                    frt.anchorMax = new Vector2(1f, 1f);
+                    frt.pivot = new Vector2(0.5f, 1f);
+                    frt.anchoredPosition = new Vector2(0f, -78f);
+                    frt.sizeDelta = new Vector2(-24f, 72f);
+                }
+            }
         }
 
         void EnsureRecipesFromDatabase()
@@ -507,6 +521,8 @@ namespace ArthurianAutobattler
                 rt.offsetMin = Vector2.zero;
                 rt.offsetMax = Vector2.zero;
             }
+            // Keep chips under the title, above scroll content (sibling draw order).
+            root.SetAsLastSibling();
 
             for (int i = 0; i < Chips.Length; i++)
             {

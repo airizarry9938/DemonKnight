@@ -1005,7 +1005,7 @@ namespace ArthurianAutobattler
                 scrollHost = hostGo.transform;
                 var hostRt = hostGo.GetComponent<RectTransform>();
                 hostRt.anchorMin = new Vector2(0.04f, 0.06f);
-                hostRt.anchorMax = new Vector2(0.96f, 0.88f);
+                hostRt.anchorMax = new Vector2(0.96f, 0.895f);
                 hostRt.offsetMin = Vector2.zero;
                 hostRt.offsetMax = Vector2.zero;
                 hostGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.12f);
@@ -1019,8 +1019,9 @@ namespace ArthurianAutobattler
             var scrollRt = scrollHost as RectTransform;
             if (scrollRt != null)
             {
+                // Top cap below MenuSortBar (0.905–0.965) so first recipes stay clickable.
                 scrollRt.anchorMin = new Vector2(0.04f, 0.06f);
-                scrollRt.anchorMax = new Vector2(0.96f, 0.88f);
+                scrollRt.anchorMax = new Vector2(0.96f, 0.895f);
                 scrollRt.offsetMin = Vector2.zero;
                 scrollRt.offsetMax = Vector2.zero;
             }
@@ -1763,7 +1764,6 @@ namespace ArthurianAutobattler
                 {
                     EnsureSeatImage(go, recruit);
                     VictoryStarBadge.Apply(go.transform, recruit);
-                    PewSeatHoverHighlight.Ensure(go, recruit != null);
                     Button btn = go.GetComponent<Button>();
                     if (btn != null)
                     {
@@ -1776,9 +1776,15 @@ namespace ArthurianAutobattler
                         if (recruit != null)
                         {
                             RecruitInstance captured = recruit;
-                            btn.onClick.AddListener(() => OnSeatClicked(captured));
+                            System.Action showInfo = () => OnSeatClicked(captured);
+                            btn.onClick.AddListener(() => showInfo());
+                            PewSeatHoverHighlight.Ensure(go, true, showInfo);
                         }
+                        else
+                            PewSeatHoverHighlight.Ensure(go, false, null);
                     }
+                    else
+                        PewSeatHoverHighlight.Ensure(go, recruit != null, null);
                 }
             }
 
@@ -2248,9 +2254,9 @@ namespace ArthurianAutobattler
                 go.GetComponent<Image>().color = new Color(0.10f, 0.12f, 0.14f, 0.92f);
             }
 
-            // Leave a strip above for MenuSortBar (Highest HP / SPD chips).
-            formationDiagramRoot.anchorMin = new Vector2(0.08f, 0.68f);
-            formationDiagramRoot.anchorMax = new Vector2(0.92f, 0.84f);
+            // Below MenuSortBar (just under title at 0.91–0.965).
+            formationDiagramRoot.anchorMin = new Vector2(0.08f, 0.66f);
+            formationDiagramRoot.anchorMax = new Vector2(0.92f, 0.90f);
             formationDiagramRoot.offsetMin = Vector2.zero;
             formationDiagramRoot.offsetMax = Vector2.zero;
             formationDiagramRoot.SetSiblingIndex(1); // under title, above scroll
@@ -2259,6 +2265,7 @@ namespace ArthurianAutobattler
         void EnsureWarbandSortBar()
         {
             if (warbandModal == null) return;
+            // Just under Warband title — above formation + list.
             MenuListSortBar.Ensure(
                 warbandModal.transform,
                 warbandSortMode,
@@ -2267,8 +2274,8 @@ namespace ArthurianAutobattler
                     warbandSortMode = mode;
                     RefreshWarbandPanel();
                 },
-                new Vector2(0.08f, 0.84f),
-                new Vector2(0.92f, 0.90f));
+                new Vector2(0.08f, 0.91f),
+                new Vector2(0.92f, 0.965f));
         }
 
         /// <summary>Rebuild front/back boxes from current party roles.</summary>

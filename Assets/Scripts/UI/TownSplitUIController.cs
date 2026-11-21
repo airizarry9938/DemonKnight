@@ -230,7 +230,6 @@ namespace ArthurianAutobattler
             }
 
             VictoryStarBadge.Apply(btnObj.transform, recruit);
-            PewSeatHoverHighlight.Ensure(btnObj, recruit != null);
 
             Button btn = btnObj.GetComponent<Button>();
             if (btn != null)
@@ -245,9 +244,16 @@ namespace ArthurianAutobattler
                 {
                     RecruitInstance captured = recruit;
                     GameObject capturedObj = btnObj;
-                    btn.onClick.AddListener(() => SelectRecruit(captured, capturedObj));
+                    System.Action showInfo = () => SelectRecruit(captured, capturedObj);
+                    btn.onClick.AddListener(() => showInfo());
+                    // Instant hover → dossier (no delay).
+                    PewSeatHoverHighlight.Ensure(btnObj, true, showInfo);
                 }
+                else
+                    PewSeatHoverHighlight.Ensure(btnObj, false, null);
             }
+            else
+                PewSeatHoverHighlight.Ensure(btnObj, recruit != null, null);
         }
 
         public void SelectRecruit(RecruitInstance recruit, GameObject btnObj)
