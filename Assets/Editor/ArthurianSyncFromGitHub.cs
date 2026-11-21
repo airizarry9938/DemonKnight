@@ -22,7 +22,7 @@ public static class ArthurianSyncFromGitHub
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Package tip pin — Force Sync prefers this over main until Art Tools PRs merge.
     // Updated when shipping Sync packages (main tip alone is still older merges).
-    private const string FallbackCommitSha = "38838a2";
+    private const string FallbackCommitSha = "e865f67";
 
     private const string ExpectedPackageId = "modular-verify-sync-flat-autosave";
 
