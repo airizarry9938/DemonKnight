@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "a58b1f60bb9eca4e00f0aebbef63d576b468c873";
 
-    private const string ExpectedPackageId = "next-night-no-legacy";
+    private const string ExpectedPackageId = "wave-win-night-priest-fuse";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -498,7 +498,8 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("WaveVictoryGold")
                    && body.Contains("EnsureDisbandedAfterWave")
                    && body.Contains("AutosaveWarband")
-                   && body.Contains("mustDisbandPartyAfterCurrentWave");
+                   && body.Contains("mustDisbandPartyAfterCurrentWave")
+                   && body.Contains("AdvanceNightCounterAfterWaveWin");
         }
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
@@ -531,7 +532,18 @@ public static class ArthurianSyncFromGitHub
             // Must reference BattleBossDialogUI (CS0103 if that file is missing from Sync).
             return body.Contains("DemonKnightCompatApi")
                    && body.Contains("BattleBossDialogUI")
-                   && body.Contains("waveBoss"); // CS0136 fix: no shadowed local `boss`
+                   && body.Contains("waveBoss") // CS0136 fix: no shadowed local `boss`
+                   && body.Contains("AdvanceNightCounterAfterWaveWin");
+        }
+
+        if (rel.EndsWith("CharacterDatabase.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            // Priest/legend fuse: ingredients-only — no HasUnitType one-product lock.
+            return body.Contains("TryPickIngredients")
+                   && body.Contains("CreateLegendRecruit")
+                   && !Regex.IsMatch(
+                       body,
+                       @"CanFuse\s*\([^)]*\)[\s\S]{0,200}?HasUnitType\s*\(\s*party\s*,\s*def\.unitType\s*\)");
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase)
@@ -566,6 +578,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("wave-win-night-priest-fuse")
                    || body.Contains("next-night-no-legacy")
                    || body.Contains("sync-host-da37")
                    || body.Contains("train-random-plus2")

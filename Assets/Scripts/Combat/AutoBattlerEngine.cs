@@ -710,18 +710,34 @@ namespace ArthurianAutobattler
                 Debug.LogError("[DemonKnight] !!! DISBAND FAILED — non-Mordred still hired after ForceWaveDisband !!!");
 
             // Award gold: win 200 / loss 100 + survivor bounty (+ Taxation if applicable).
-            var uiGold = FindFirstObjectByType<TownSplitUIController>();
+            var uiGold = FindFirstObjectByType<TownSplitUIController>()
+                         ?? loop?.townUI;
             if (uiGold != null)
             {
                 uiGold.playerGold += goldEarned;
                 Debug.LogError(
                     $"[DemonKnight] Wave gold +{goldEarned}g (won={playerWon}, survivors={survivors}, bounty={bounty}) → purse {uiGold.playerGold}g.");
+                uiGold.UpdateHUD();
             }
+            else
+            {
+                Debug.LogError(
+                    $"[DemonKnight] Wave gold +{goldEarned}g FAILED — no TownSplitUIController to credit.");
+            }
+
+            var churchGold = loop?.ResolveChurchUI()
+                             ?? FindFirstObjectByType<SomersetChurchUI>()
+                             ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
+            churchGold?.SyncGoldFromTownUI();
+            churchGold?.RefreshHUD();
 
             // Lust: hired Sirens drain 15g per wave (count from the march, before disband).
             if (playerWon && SomersetRunes.IsSinActive(SinRuneID.Lust) && sirensMarched > 0)
             {
                 if (uiGold != null) uiGold.playerGold = Mathf.Max(0, uiGold.playerGold - sirensMarched * 15);
+                churchGold?.SyncGoldFromTownUI();
+                churchGold?.RefreshHUD();
+                uiGold?.UpdateHUD();
             }
 
             // Disband again on every branch (idempotent) so win→town cannot skip.
@@ -765,6 +781,8 @@ namespace ArthurianAutobattler
 
                 Debug.LogError(
                     $"[DemonKnight] Wave {clearedWave} cleared (+{goldEarned}g). Perks disabled — returning to town.");
+                // Night counter must advance on every mid-run wave win (HUD Night 1→2→3…).
+                loop?.AdvanceNightCounterAfterWaveWin();
                 PerkDraftManager.SuppressAllPerkUi();
                 loop?.StartTownPhase();
             }

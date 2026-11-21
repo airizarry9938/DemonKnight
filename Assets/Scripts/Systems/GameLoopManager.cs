@@ -304,6 +304,22 @@ namespace ArthurianAutobattler
         private bool advancingNight;
 
         /// <summary>
+        /// Mid-wave victory: bump Night HUD (1→2→3…) without Merlin Next Night reload.
+        /// Keeps the player in the same town loop; only the night counter / label change.
+        /// </summary>
+        public void AdvanceNightCounterAfterWaveWin()
+        {
+            int from = Mathf.Max(1, currentNight);
+            currentNight = from + 1;
+            PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+            PlayerPrefs.Save();
+            RefreshNightHUD();
+            var church = ResolveChurchUI();
+            church?.SetNight(currentNight);
+            Debug.LogError($"[DemonKnight] Wave win night {from} → {currentNight}");
+        }
+
+        /// <summary>
         /// Called from Merlin's "Enter Next Timeline" after defeat/victory.
         /// Autosaves surviving warband, advances night, restores them into the next town phase.
         /// </summary>

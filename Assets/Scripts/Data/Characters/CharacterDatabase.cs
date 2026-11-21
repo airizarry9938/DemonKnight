@@ -116,7 +116,8 @@ namespace ArthurianAutobattler
         public bool CanFuse(CharacterDefinition def, List<RecruitInstance> party)
         {
             if (def == null || !def.HasFusionRecipe || party == null) return false;
-            if (HasUnitType(party, def.unitType)) return false;
+            // Allow multiple of the same legend (e.g. second Priest) whenever ingredients remain.
+            // Previously HasUnitType blocked a second fuse until the first was consumed.
             return TryPickIngredients(party, def.fusionRecipe, out _);
         }
 
@@ -124,7 +125,6 @@ namespace ArthurianAutobattler
         {
             product = null;
             if (def == null || party == null || !def.HasFusionRecipe) return false;
-            if (HasUnitType(party, def.unitType)) return false;
             if (!TryPickIngredients(party, def.fusionRecipe, out var chosen)) return false;
 
             foreach (var r in chosen)
