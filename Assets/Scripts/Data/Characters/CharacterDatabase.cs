@@ -117,15 +117,24 @@ namespace ArthurianAutobattler
         {
             if (def == null || !def.HasFusionRecipe || party == null) return false;
             // Allow multiple of the same legend (e.g. second Priest) whenever ingredients remain.
-            // Previously HasUnitType blocked a second fuse until the first was consumed.
-            return TryPickIngredients(party, def.fusionRecipe, out _);
+            // Never gate on HasUnitType / party already containing the product.
+            SanitizeBaseUnitFusionFlags(party);
+            bool ok = TryPickIngredients(party, def.fusionRecipe, out _);
+            if (!ok)
+                LogFuseBlocked(def, party);
+            return ok;
         }
 
         public bool TryFuse(CharacterDefinition def, List<RecruitInstance> party, out RecruitInstance product)
         {
             product = null;
             if (def == null || party == null || !def.HasFusionRecipe) return false;
-            if (!TryPickIngredients(party, def.fusionRecipe, out var chosen)) return false;
+            SanitizeBaseUnitFusionFlags(party);
+            if (!TryPickIngredients(party, def.fusionRecipe, out var chosen))
+            {
+                LogFuseBlocked(def, party);
+                return false;
+            }
 
             foreach (var r in chosen)
                 party.Remove(r);
@@ -137,8 +146,57 @@ namespace ArthurianAutobattler
 
             party.Add(product);
             Debug.Log(
-                $"[DemonKnight] Fused {product.characterName} via CharacterDatabase: consumed {chosen.Count}, party={party.Count}.");
+                $"[DemonKnight] Fused {product.characterName} via CharacterDatabase: consumed {chosen.Count}, party={party.Count} " +
+                $"(product already in party before fuse was OK — multi-fuse allowed).");
             return true;
+        }
+
+        /// <summary>
+        /// Pew townsfolk must never carry fusionIngredients — that made IsFusedLegend true and
+        /// skipped them as Peasant/Warrior/Knight ingredients (blocked second Priest).
+        /// </summary>
+        public static void SanitizeBaseUnitFusionFlags(List<RecruitInstance> party)
+        {
+            if (party == null) return;
+            for (int i = 0; i < party.Count; i++)
+            {
+                var r = party[i];
+                if (r == null) continue;
+                if (r.unitType == UnitType.Peasant
+                    || r.unitType == UnitType.Warrior
+                    || r.unitType == UnitType.Knight)
+                {
+                    if (r.fusionIngredients != null && r.fusionIngredients.Count > 0)
+                    {
+                        Debug.LogWarning(
+                            $"[DemonKnight] Cleared bogus fusionIngredients on base unit " +
+                            $"{r.characterName} ({r.unitType}) — was blocking multi-fuse.");
+                        r.fusionIngredients = null;
+                    }
+                }
+            }
+        }
+
+        static void LogFuseBlocked(CharacterDefinition def, List<RecruitInstance> party)
+        {
+            if (def == null) return;
+            int peasants = 0, warriors = 0, knights = 0, priests = 0;
+            if (party != null)
+            {
+                foreach (var r in party)
+                {
+                    if (r == null) continue;
+                    if (r.unitType == UnitType.Peasant) peasants++;
+                    else if (r.unitType == UnitType.Warrior) warriors++;
+                    else if (r.unitType == UnitType.Knight) knights++;
+                    else if (r.unitType == UnitType.Priest) priests++;
+                }
+            }
+            string recipe = def.FormatRecipeLine();
+            Debug.LogWarning(
+                $"[DemonKnight] Fuse BLOCKED for {def.displayName}/{def.unitType}: recipe=[{recipe}] " +
+                $"partyCounts peasant={peasants} warrior={warriors} knight={knights} priest={priests} " +
+                $"partySize={party?.Count ?? 0}. Need ingredients still in recruitedParty (pew-only does not count).");
         }
 
         public List<CharacterDefinition> GetReadyFusions(List<RecruitInstance> party)
@@ -170,12 +228,13 @@ namespace ArthurianAutobattler
                 {
                     var r = party[i];
                     if (r == null || used.Contains(r)) continue;
-                    // Never spend an already-fused legend as a base ingredient
-                    // (e.g. Priest cannot fill a Peasant slot).
-                    if (r.IsFusedLegend && rule.matchUnitType
+                    // Matches() already requires unitType — a Priest never fills a Peasant slot.
+                    // Do NOT skip base units via IsFusedLegend (bogus fusionIngredients caused that).
+                    if (rule.matchUnitType
                         && (rule.unitType == UnitType.Peasant
                             || rule.unitType == UnitType.Warrior
-                            || rule.unitType == UnitType.Knight))
+                            || rule.unitType == UnitType.Knight)
+                        && RecruitInstance.IsLegendUnit(r.unitType))
                         continue;
                     if (!rule.Matches(r)) continue;
                     chosen.Add(r);

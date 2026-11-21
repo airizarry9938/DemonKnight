@@ -413,7 +413,11 @@ namespace ArthurianAutobattler
         private bool CheckRecipeReady(UnitType t, List<RecruitInstance> p)
         {
             var f = CardFusionSystem.Instance;
-            if (f == null) return false;
+            if (f == null)
+            {
+                Debug.LogWarning("[DemonKnight] Fuse check: CardFusionSystem.Instance missing.");
+                return false;
+            }
             return f.CanFuseType(t, p);
         }
 
@@ -424,7 +428,12 @@ namespace ArthurianAutobattler
             if (f == null || loop == null) return;
 
             List<RecruitInstance> p = loop.recruitedParty;
-            int before = p.Count;
+            int before = p?.Count ?? 0;
+            int peasants = 0;
+            if (p != null)
+                foreach (var r in p)
+                    if (r != null && r.unitType == UnitType.Peasant) peasants++;
+
             bool ok = f.FuseType(t, p);
 
             if (ok)
@@ -438,6 +447,12 @@ namespace ArthurianAutobattler
                              ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
                 church?.RefreshHUD();
                 DemonKnightCompatApi.UpdateWarbandHudLabel(church);
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"[DemonKnight] Fuse FAILED for {t}: partySize={before} peasantsInParty={peasants}. " +
+                    "Peasants must be hired into the warband (recruitedParty), not only sitting on pews.");
             }
         }
     }

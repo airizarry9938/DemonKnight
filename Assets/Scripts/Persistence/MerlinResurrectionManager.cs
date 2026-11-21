@@ -125,27 +125,31 @@ namespace ArthurianAutobattler
             EnsureResurrectionCanvas();
             if (promoteOverlay) PromoteVictoryCanvas();
             CullDuplicateEventSystems();
-            Transform host = GetAbandonHost();
+            // Parent to canvas (not the 900×520 panel) so buttons sit on screen bottom.
+            Transform host = GetVictoryButtonHost();
             if (host == null) return;
 
             nextNightButton = FindPanelButton(host, "NextNight", "Next Night", "NextRun", "Next Timeline", "Next Run");
             if (nextNightButton == null)
+                nextNightButton = FindPanelButton(GetAbandonHost(), "NextNight", "Next Night", "NextRun", "Next Timeline", "Next Run");
+            if (nextNightButton == null)
                 nextNightButton = CreateNextNightButton(host);
+            else
+                nextNightButton.transform.SetParent(host, false);
 
             if (nextNightButton == null) return;
             StyleVictoryActionButton(
                 nextNightButton,
                 "NextNight",
                 "Next Night",
-                new Vector2(170f, 48f),
-                new Color(0.72f, 0.52f, 0.12f, 1f)); // bright amber — readable on dark panel
+                new Vector2(190f, 96f),
+                new Color(0.85f, 0.62f, 0.12f, 1f)); // bright amber — screen-bottom
             BindButtonOnce(nextNightButton, StartNextTimelineRun);
             nextNightButton.interactable = true;
             nextNightButton.gameObject.SetActive(true);
+            nextNightButton.transform.SetAsLastSibling();
             if (promoteOverlay)
-                nextNightButton.transform.SetAsLastSibling();
-            if (promoteOverlay)
-                Debug.LogError("[DemonKnight] Next Night button wired + visible on victory panel.");
+                Debug.LogError("[DemonKnight] Next Night button wired + visible on victory canvas.");
         }
 
         /// <summary>
@@ -155,25 +159,35 @@ namespace ArthurianAutobattler
         {
             EnsureResurrectionCanvas();
             if (promoteOverlay) PromoteVictoryCanvas();
-            Transform host = GetAbandonHost();
+            Transform host = GetVictoryButtonHost();
             if (host == null) return;
 
             endRunButton = FindPanelButton(host, "EndRun", "End Run", "Abandon Camelot", "Return to Menu");
             if (endRunButton == null)
+                endRunButton = FindPanelButton(GetAbandonHost(), "EndRun", "End Run", "Abandon Camelot", "Return to Menu");
+            if (endRunButton == null)
                 endRunButton = CreateEndRunButton(host);
+            else
+                endRunButton.transform.SetParent(host, false);
 
             if (endRunButton == null) return;
             StyleVictoryActionButton(
                 endRunButton,
                 "EndRun",
                 "End Run",
-                new Vector2(-170f, 48f),
+                new Vector2(-190f, 96f),
                 new Color(0.55f, 0.18f, 0.16f, 1f));
             BindButtonOnce(endRunButton, EndRunToMainMenu);
             endRunButton.interactable = true;
             endRunButton.gameObject.SetActive(true);
-            if (promoteOverlay)
-                endRunButton.transform.SetAsLastSibling();
+            endRunButton.transform.SetAsLastSibling();
+        }
+
+        /// <summary>Canvas root — buttons use screen-bottom anchors (panel-relative hid them).</summary>
+        Transform GetVictoryButtonHost()
+        {
+            EnsureResurrectionCanvas();
+            return resurrectionCanvas != null ? resurrectionCanvas.transform : null;
         }
 
         /// <summary>Fresh onClick with exactly one runtime listener (no stacking across Sync/domain reloads).</summary>
@@ -197,22 +211,57 @@ namespace ArthurianAutobattler
         void PromoteVictoryCanvas()
         {
             if (resurrectionCanvas == null) return;
+            // Manager must be active for coroutines / button wiring.
+            if (!gameObject.activeInHierarchy)
+                gameObject.SetActive(true);
+
             var canvas = resurrectionCanvas.GetComponent<Canvas>();
             if (canvas == null) canvas = resurrectionCanvas.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 5000;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 32000;
             if (resurrectionCanvas.GetComponent<GraphicRaycaster>() == null)
                 resurrectionCanvas.AddComponent<GraphicRaycaster>();
             var cg = resurrectionCanvas.GetComponent<CanvasGroup>();
-            if (cg != null)
-            {
-                cg.alpha = 1f;
-                cg.interactable = true;
-                cg.blocksRaycasts = true;
-            }
+            if (cg == null) cg = resurrectionCanvas.AddComponent<CanvasGroup>();
+            cg.alpha = 1f;
+            cg.interactable = true;
+            cg.blocksRaycasts = true;
+            cg.ignoreParentGroups = true;
             resurrectionCanvas.SetActive(true);
             var panel = resurrectionCanvas.transform.Find("ResurrectionPanel");
-            if (panel != null) panel.gameObject.SetActive(true);
+            if (panel != null)
+            {
+                panel.gameObject.SetActive(true);
+                var prt = panel as RectTransform;
+                if (prt != null)
+                {
+                    // Stretch panel full-screen so lore + chrome aren't clipped off a tiny box.
+                    prt.anchorMin = Vector2.zero;
+                    prt.anchorMax = Vector2.one;
+                    prt.offsetMin = Vector2.zero;
+                    prt.offsetMax = Vector2.zero;
+                    prt.localScale = Vector3.one;
+                }
+            }
+            ResolveLoreNarrativeText();
+        }
+
+        void ResolveLoreNarrativeText()
+        {
+            if (loreNarrativeText != null) return;
+            if (resurrectionCanvas == null) return;
+            foreach (var tmp in resurrectionCanvas.GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                if (tmp == null) continue;
+                string n = tmp.gameObject.name ?? "";
+                if (n.IndexOf("Lore", StringComparison.OrdinalIgnoreCase) >= 0
+                    || n.IndexOf("Narrative", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    loreNarrativeText = tmp;
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -270,7 +319,7 @@ namespace ArthurianAutobattler
             rt.anchorMax = new Vector2(0.5f, 0f);
             rt.pivot = new Vector2(0.5f, 0f);
             rt.anchoredPosition = anchored;
-            rt.sizeDelta = new Vector2(320f, 72f);
+            rt.sizeDelta = new Vector2(360f, 88f);
             rt.localScale = Vector3.one;
 
             var img = button.GetComponent<Image>();
@@ -320,13 +369,23 @@ namespace ArthurianAutobattler
 
         void EnsureResurrectionCanvas()
         {
-            if (resurrectionCanvas != null) return;
-            var found = GameObject.Find("ResurrectionCanvas");
-            if (found == null) found = GameObject.Find("MerlinResurrection");
-            if (found != null)
+            if (resurrectionCanvas != null)
             {
-                resurrectionCanvas = found;
+                // Keep even if inactive — PromoteVictoryCanvas will activate.
                 return;
+            }
+            // GameObject.Find skips inactive — search all transforms for Downloads scenes.
+            var all = FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] == null) continue;
+                string n = all[i].name ?? "";
+                if (n.Equals("ResurrectionCanvas", StringComparison.OrdinalIgnoreCase)
+                    || n.Equals("MerlinResurrection", StringComparison.OrdinalIgnoreCase))
+                {
+                    resurrectionCanvas = all[i].gameObject;
+                    return;
+                }
             }
             BuildRuntimeVictoryCanvas();
         }
@@ -386,22 +445,93 @@ namespace ArthurianAutobattler
         /// </summary>
         public void TriggerWaveVictoryScreen(int waveCleared, int goldEarned)
         {
+            if (!gameObject.activeInHierarchy)
+                gameObject.SetActive(true);
             BeginVictoryShow();
             EnsureResurrectionCanvas();
             PromoteVictoryCanvas();
+            CullDuplicateEventSystems();
             string msg =
                 $"<b>VICTORY</b> — Wave {waveCleared} cleared (+{goldEarned}g).\n\n"
                 + "The pews hold. Press <b>Next Night</b> to advance, or <b>End Run</b> for the Main Menu.";
             // Buttons once — coroutine must not re-wire (that logged Wire* twice per EndBattle).
             HideLegacyBankPanel();
             PerkDraftManager.SuppressAllPerkUi();
+            ResolveLoreNarrativeText();
             if (loreNarrativeText != null)
                 loreNarrativeText.text = msg;
             WireAbandonScreenButtons(promoteOverlay: true, force: true);
+            // Hard guarantee: Next Night exists, active, on canvas, clickable.
+            ForceVictoryNextNightVisible();
             RefreshBankUI();
             if (victorySequenceRoutine != null)
                 StopCoroutine(victorySequenceRoutine);
             victorySequenceRoutine = StartCoroutine(PlayWaveVictorySequence(msg));
+        }
+
+        /// <summary>Last-resort: always leave a clickable Next Night on the victory canvas.</summary>
+        void ForceVictoryNextNightVisible()
+        {
+            EnsureResurrectionCanvas();
+            PromoteVictoryCanvas();
+            CullDuplicateEventSystems();
+            Transform host = GetVictoryButtonHost();
+            if (host == null)
+            {
+                Debug.LogError("[DemonKnight] ForceVictoryNextNightVisible: no victory canvas host.");
+                return;
+            }
+
+            if (nextNightButton == null)
+            {
+                nextNightButton = FindPanelButton(host, "NextNight", "Next Night");
+                if (nextNightButton == null)
+                    nextNightButton = CreateNextNightButton(host);
+            }
+            if (nextNightButton == null)
+            {
+                Debug.LogError("[DemonKnight] ForceVictoryNextNightVisible: FAILED to create Next Night.");
+                return;
+            }
+
+            nextNightButton.transform.SetParent(host, false);
+            StyleVictoryActionButton(
+                nextNightButton,
+                "NextNight",
+                "Next Night",
+                new Vector2(190f, 96f),
+                new Color(0.85f, 0.62f, 0.12f, 1f));
+            BindButtonOnce(nextNightButton, StartNextTimelineRun);
+            nextNightButton.interactable = true;
+            nextNightButton.gameObject.SetActive(true);
+            nextNightButton.transform.SetAsLastSibling();
+
+            if (endRunButton == null)
+            {
+                endRunButton = FindPanelButton(host, "EndRun", "End Run");
+                if (endRunButton == null)
+                    endRunButton = CreateEndRunButton(host);
+            }
+            if (endRunButton != null)
+            {
+                endRunButton.transform.SetParent(host, false);
+                StyleVictoryActionButton(
+                    endRunButton,
+                    "EndRun",
+                    "End Run",
+                    new Vector2(-190f, 96f),
+                    new Color(0.55f, 0.18f, 0.16f, 1f));
+                BindButtonOnce(endRunButton, EndRunToMainMenu);
+                endRunButton.interactable = true;
+                endRunButton.gameObject.SetActive(true);
+                endRunButton.transform.SetAsLastSibling();
+            }
+
+            Debug.LogError(
+                $"[DemonKnight] Victory chrome OK: canvas={resurrectionCanvas.name} " +
+                $"sort={resurrectionCanvas.GetComponent<Canvas>()?.sortingOrder} " +
+                $"nextNightActive={nextNightButton.gameObject.activeInHierarchy} " +
+                $"eventSystems={FindObjectsByType<EventSystem>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length}");
         }
 
         IEnumerator PlayWaveVictorySequence(string message)
@@ -418,6 +548,7 @@ namespace ArthurianAutobattler
             HideLegacyBankPanel();
             RefreshBankUI();
             PromoteVictoryCanvas();
+            ForceVictoryNextNightVisible();
             Debug.LogError("[DemonKnight] Wave victory screen ready — Next Night visible.");
             victorySequenceRoutine = null;
         }

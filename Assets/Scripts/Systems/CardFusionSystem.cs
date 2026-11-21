@@ -57,15 +57,25 @@ namespace ArthurianAutobattler
 
         public bool CanFuseType(UnitType type, List<RecruitInstance> p)
         {
+            CharacterDatabase.SanitizeBaseUnitFusionFlags(p);
             var db = CharacterDatabase.Load();
             var def = db?.GetByUnitType(type);
             if (def != null && def.HasFusionRecipe)
-                return db.CanFuse(def, p);
+            {
+                if (db.CanFuse(def, p)) return true;
+                // DB recipe miss: still allow ingredient-only legacy (multi Priest while peasants remain).
+                bool legacy = CanFuseLegacy(type, p);
+                if (legacy)
+                    Debug.LogWarning(
+                        $"[DemonKnight] CanFuseType {type}: DB recipe blocked but legacy ingredients OK — allowing.");
+                return legacy;
+            }
             return CanFuseLegacy(type, p);
         }
 
         public bool FuseType(UnitType type, List<RecruitInstance> p)
         {
+            CharacterDatabase.SanitizeBaseUnitFusionFlags(p);
             var db = CharacterDatabase.Load();
             var def = db?.GetByUnitType(type);
             if (def != null && def.HasFusionRecipe)
@@ -74,7 +84,15 @@ namespace ArthurianAutobattler
                     def.portraitSprite = LegacySpriteFor(type);
                 if (def.battleSprite == null && def.portraitSprite != null)
                     def.battleSprite = def.portraitSprite;
-                return db.TryFuse(def, p, out _);
+                if (db.TryFuse(def, p, out _)) return true;
+                // Fall back to legacy fuse path when SO recipe fails but ingredients exist.
+                if (CanFuseLegacy(type, p))
+                {
+                    Debug.LogWarning(
+                        $"[DemonKnight] FuseType {type}: DB TryFuse failed — using legacy ingredient fuse.");
+                    return FuseLegacy(type, p);
+                }
+                return false;
             }
             return FuseLegacy(type, p);
         }

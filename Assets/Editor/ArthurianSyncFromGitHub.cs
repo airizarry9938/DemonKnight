@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "5e27283ba724f27eb3e86df06c55abb95917b014";
 
-    private const string ExpectedPackageId = "rmb-anywhere-sort-chip-order";
+    private const string ExpectedPackageId = "victory-nextnight-multifuse-priest";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -657,6 +657,15 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("EndBattleBody");
         }
 
+        if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("CanFuseLegacy")
+                   && body.Contains("CountType(p, UnitType.Peasant) >= 2")
+                   && body.Contains("SanitizeBaseUnitFusionFlags")
+                   && !body.Contains("!HasType(p, UnitType.Priest)")
+                   && !body.Contains("!HasType(p, UnitType.Merlin)");
+        }
+
         if (rel.EndsWith("MerlinResurrectionManager.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("DemonKnightCompatApi")
@@ -667,17 +676,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("CullDuplicateEventSystems")
                    && body.Contains("BeginVictoryShow")
                    && body.Contains("BindButtonOnce")
+                   && body.Contains("ForceVictoryNextNightVisible")
+                   && body.Contains("GetVictoryButtonHost")
                    && !body.Contains("nextRunButtonWired")
                    && !body.Contains("endRunButtonWired");
-        }
-
-        if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            // No product-uniqueness locks (!HasType) — multi Priest while ingredients remain.
-            return body.Contains("CanFuseLegacy")
-                   && body.Contains("CountType(p, UnitType.Peasant) >= 2")
-                   && !body.Contains("!HasType(p, UnitType.Priest)")
-                   && !body.Contains("!HasType(p, UnitType.Merlin)");
         }
 
         if (rel.EndsWith("PewSeatHoverHighlight.cs", StringComparison.OrdinalIgnoreCase))
@@ -731,6 +733,8 @@ public static class ArthurianSyncFromGitHub
             // Priest/legend fuse: ingredients-only — no HasUnitType one-product lock.
             return body.Contains("TryPickIngredients")
                    && body.Contains("CreateLegendRecruit")
+                   && body.Contains("SanitizeBaseUnitFusionFlags")
+                   && body.Contains("LogFuseBlocked")
                    && !Regex.IsMatch(
                        body,
                        @"CanFuse\s*\([^)]*\)[\s\S]{0,200}?HasUnitType\s*\(\s*party\s*,\s*def\.unitType\s*\)");
@@ -768,6 +772,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("victory-nextnight-multifuse-priest")
                    || body.Contains("rmb-anywhere-sort-chip-order")
                    || body.Contains("rmb-close-sort-recruit-purse")
                    || body.Contains("rmb-deselect-legends-atk-sort")
