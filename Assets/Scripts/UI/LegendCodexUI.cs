@@ -16,6 +16,7 @@ namespace ArthurianAutobattler
         public UnitType resultingType;
         public int sortHp;
         public float sortSpeed;
+        public int sortAttack;
     }
 
     public class LegendCodexUI : MonoBehaviour
@@ -32,7 +33,7 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI fusionPreviewStats;
         public TextMeshProUGUI fusionPreviewPassive;
 
-        MenuListSortMode legendsSortMode = MenuListSortMode.Default;
+        MenuListSortMode legendsSortMode = MenuListSortMode.LowestHp;
 
         private void Start()
         {
@@ -324,7 +325,8 @@ namespace ArthurianAutobattler
                         : def.passiveDescription,
                     resultingType = def.unitType,
                     sortHp = def.baseHP,
-                    sortSpeed = def.baseAPS
+                    sortSpeed = def.baseAPS,
+                    sortAttack = def.baseATK
                 });
             }
         }
@@ -336,12 +338,13 @@ namespace ArthurianAutobattler
             foreach (var entry in allRecipes)
             {
                 if (entry == null) continue;
-                if (entry.sortHp > 0 && entry.sortSpeed > 0f) continue;
+                if (entry.sortHp > 0 && entry.sortSpeed > 0f && entry.sortAttack > 0) continue;
                 var def = db?.GetByUnitType(entry.resultingType);
                 if (def != null)
                 {
                     entry.sortHp = def.baseHP;
                     entry.sortSpeed = def.baseAPS;
+                    entry.sortAttack = def.baseATK;
                 }
             }
         }
@@ -447,13 +450,15 @@ namespace ArthurianAutobattler
     {
         public const string RootName = "MenuSortBar";
 
+        // Low HP leftmost; no Default; High/Low Attack added.
         static readonly (MenuListSortMode mode, string label)[] Chips =
         {
-            (MenuListSortMode.Default, "Default"),
-            (MenuListSortMode.HighestHp, "Highest HP"),
-            (MenuListSortMode.LowestHp, "Lowest HP"),
-            (MenuListSortMode.HighestSpeed, "Highest SPD"),
-            (MenuListSortMode.LowestSpeed, "Lowest SPD"),
+            (MenuListSortMode.LowestHp, "Low HP"),
+            (MenuListSortMode.HighestHp, "High HP"),
+            (MenuListSortMode.HighestAttack, "High Attack"),
+            (MenuListSortMode.LowestAttack, "Low Attack"),
+            (MenuListSortMode.HighestSpeed, "High SPD"),
+            (MenuListSortMode.LowestSpeed, "Low SPD"),
         };
 
         public static void Ensure(
@@ -466,6 +471,16 @@ namespace ArthurianAutobattler
             if (parent == null || onChanged == null) return;
 
             Transform root = parent.Find(RootName);
+            // Rebuild when chip set changes (drop Default / add Attack).
+            if (root != null
+                && (root.Find("Sort_Default") != null
+                    || root.Find("Sort_HighestAttack") == null
+                    || root.childCount != Chips.Length))
+            {
+                UnityEngine.Object.Destroy(root.gameObject);
+                root = null;
+            }
+
             if (root == null)
             {
                 var go = new GameObject(RootName, typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
@@ -497,12 +512,12 @@ namespace ArthurianAutobattler
                     lrt.offsetMax = Vector2.zero;
                     var tmp = labelGo.GetComponent<TextMeshProUGUI>();
                     tmp.text = chip.label;
-                    tmp.fontSize = 15f;
+                    tmp.fontSize = 14f;
                     tmp.alignment = TextAlignmentOptions.Center;
                     tmp.color = Color.white;
                     tmp.enableAutoSizing = true;
-                    tmp.fontSizeMin = 11f;
-                    tmp.fontSizeMax = 15f;
+                    tmp.fontSizeMin = 10f;
+                    tmp.fontSizeMax = 14f;
                 }
             }
 
@@ -552,6 +567,8 @@ namespace ArthurianAutobattler
                     MenuListSortMode.LowestHp => a.sortHp.CompareTo(b.sortHp),
                     MenuListSortMode.HighestSpeed => b.sortSpeed.CompareTo(a.sortSpeed),
                     MenuListSortMode.LowestSpeed => a.sortSpeed.CompareTo(b.sortSpeed),
+                    MenuListSortMode.HighestAttack => b.sortAttack.CompareTo(a.sortAttack),
+                    MenuListSortMode.LowestAttack => a.sortAttack.CompareTo(b.sortAttack),
                     _ => 0
                 };
                 if (cmp != 0) return cmp;
@@ -575,6 +592,8 @@ namespace ArthurianAutobattler
                     MenuListSortMode.LowestHp => a.maxHealth.CompareTo(b.maxHealth),
                     MenuListSortMode.HighestSpeed => b.attackSpeed.CompareTo(a.attackSpeed),
                     MenuListSortMode.LowestSpeed => a.attackSpeed.CompareTo(b.attackSpeed),
+                    MenuListSortMode.HighestAttack => b.attackDamage.CompareTo(a.attackDamage),
+                    MenuListSortMode.LowestAttack => a.attackDamage.CompareTo(b.attackDamage),
                     _ => 0
                 };
                 if (cmp != 0) return cmp;

@@ -246,7 +246,7 @@ namespace ArthurianAutobattler
                     GameObject capturedObj = btnObj;
                     var church = FindFirstObjectByType<SomersetChurchUI>()
                                  ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
-                    // LMB + RMB toggle unit stats menu (church); hover = bottom quotes only.
+                    // LMB toggles unit stats; RMB closes/deselects; hover = bottom quotes only.
                     btn.onClick.AddListener(() =>
                     {
                         if (church != null) church.ToggleUnitSelectionMenu(captured);
@@ -261,8 +261,7 @@ namespace ArthurianAutobattler
                         },
                         onRightClick: () =>
                         {
-                            if (church != null) church.ToggleUnitSelectionMenu(captured);
-                            else SelectRecruit(captured, capturedObj);
+                            if (church != null) church.CloseUnitSelectionMenu();
                         });
                 }
                 else

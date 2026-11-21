@@ -40,6 +40,8 @@ namespace ArthurianAutobattler
         LowestHp = 2,
         HighestSpeed = 3,
         LowestSpeed = 4,
+        HighestAttack = 5,
+        LowestAttack = 6,
     }
 
     /// <summary>

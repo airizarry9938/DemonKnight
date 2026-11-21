@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "dc219f8c5425d4aa8b50b8040b25d35943b83b0a";
 
-    private const string ExpectedPackageId = "unit-stats-lmb-taller-panel";
+    private const string ExpectedPackageId = "rmb-deselect-legends-atk-sort";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -610,6 +610,8 @@ public static class ArthurianSyncFromGitHub
             // MenuListSortMode must live here so LegendCodexUI / SomersetChurchUI never CS0246.
             return body.Contains("enum MenuListSortMode")
                    && body.Contains("HighestHp")
+                   && body.Contains("HighestAttack")
+                   && body.Contains("LowestAttack")
                    && body.Contains("class RecruitInstance");
         }
 
@@ -630,7 +632,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("UnityEngine.Object.Destroy")
                    && body.Contains("using System;")
                    && body.Contains("420f, 460f")
-                   && body.Contains("onLeftClick: () => ToggleUnitSelectionMenu");
+                   && body.Contains("onLeftClick: () => ToggleUnitSelectionMenu")
+                   && body.Contains("CloseUnitSelectionMenu");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -709,7 +712,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class LegendCodexUI")
                    && body.Contains("class MenuListSortBar")
                    && body.Contains("SortedParty")
-                   && body.Contains("0.905f");
+                   && body.Contains("0.905f")
+                   && body.Contains("High Attack")
+                   && body.Contains("sortAttack")
+                   && !body.Contains("(MenuListSortMode.Default, \"Default\")");
         }
 
         if (rel.EndsWith("CharacterDatabase.cs", StringComparison.OrdinalIgnoreCase))
@@ -754,6 +760,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("rmb-deselect-legends-atk-sort")
                    || body.Contains("unit-stats-lmb-taller-panel")
                    || body.Contains("fix-cs0104-object-ambiguous")
                    || body.Contains("fix-cs0103-cs0414-wire-flags")

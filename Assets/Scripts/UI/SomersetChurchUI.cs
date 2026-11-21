@@ -71,7 +71,7 @@ namespace ArthurianAutobattler
         private bool diceModalUserOpen;
         private bool codexModalUserOpen;
         private bool warbandModalUserOpen;
-        MenuListSortMode warbandSortMode = MenuListSortMode.Default;
+        MenuListSortMode warbandSortMode = MenuListSortMode.LowestHp;
         private List<GameObject> cachedDicePanels;
         private float nextDicePanelRescan;
         private bool diceToggleWireLogged;
@@ -1748,7 +1748,7 @@ namespace ArthurianAutobattler
                             recruit,
                             onLeftClick: () => ToggleUnitSelectionMenu(recruit),
                             onHover: () => ShowHoverPreview(recruit),
-                            onRightClick: () => ToggleUnitSelectionMenu(recruit));
+                            onRightClick: () => CloseUnitSelectionMenu());
                     else view.BindEmpty();
                     seats.Add(view);
                 }
@@ -1776,7 +1776,7 @@ namespace ArthurianAutobattler
                         RecruitInstance captured = recruit;
                         PewSeatHoverHighlight.Ensure(go, true,
                             onHoverInfo: () => ShowHoverPreview(captured),
-                            onRightClick: () => ToggleUnitSelectionMenu(captured));
+                            onRightClick: () => CloseUnitSelectionMenu());
                     }
                     else
                         PewSeatHoverHighlight.Ensure(go, false, null, null);
@@ -1830,8 +1830,9 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// LMB or RMB toggles the unit selection menu (hire / train / intel).
-        /// Hover still only updates the bottom dialogue strip.
+        /// LMB toggles the unit selection menu (hire / train / intel).
+        /// Hover still only updates the bottom dialogue strip. RMB closes via
+        /// <see cref="CloseUnitSelectionMenu"/>.
         /// </summary>
         public void ToggleUnitSelectionMenu(RecruitInstance recruit)
         {
@@ -1845,9 +1846,8 @@ namespace ArthurianAutobattler
                                      && selected == recruit;
             if (alreadyOpenOnThis)
             {
-                if (dossierModal != null) dossierModal.SetActive(false);
-                ClearSeatMenuLocks();
-                Debug.Log($"[DemonKnight] Unit menu CLOSED for {recruit.characterName} (RMB).");
+                CloseUnitSelectionMenu();
+                Debug.Log($"[DemonKnight] Unit menu CLOSED for {recruit.characterName} (LMB toggle).");
                 return;
             }
 
@@ -1864,10 +1864,18 @@ namespace ArthurianAutobattler
             Town?.SelectRecruit(recruit, null);
             // Town.SelectRecruit may refill Panel_Dossier/Dialogue — keep it hidden.
             HideStatsPanelDialogueChildren();
-            Debug.Log($"[DemonKnight] Unit menu OPEN for {recruit.characterName} (RMB, pew {recruit.pewSeatIndex}).");
+            Debug.Log($"[DemonKnight] Unit menu OPEN for {recruit.characterName} (LMB, pew {recruit.pewSeatIndex}).");
         }
 
-        /// <summary>Legacy LMB path — prefer RMB for selection menu; still opens menu if used.</summary>
+        /// <summary>RMB: deselect and close the unit stats menu; clear pew highlight lock.</summary>
+        public void CloseUnitSelectionMenu()
+        {
+            if (dossierModal != null) dossierModal.SetActive(false);
+            ClearSeatMenuLocks();
+            Debug.Log("[DemonKnight] Unit menu CLOSED (RMB deselect).");
+        }
+
+        /// <summary>Legacy LMB path — opens/toggles unit stats menu.</summary>
         private void OnSeatClicked(RecruitInstance recruit) => ToggleUnitSelectionMenu(recruit);
 
         void WriteBottomDialogue(RecruitInstance recruit)
