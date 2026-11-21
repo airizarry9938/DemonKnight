@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "9854753470e8b49d6b642171f5f5439170c0c0d7";
 
-    private const string ExpectedPackageId = "sync-skip-self-hover-rmb";
+    private const string ExpectedPackageId = "fix-bind-action-textwrapping";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -620,7 +620,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("forceEqualHudSlots")
                    && body.Contains("MenuListSortBar")
                    && body.Contains("ShowHoverPreview")
-                   && body.Contains("ToggleUnitSelectionMenu");
+                   && body.Contains("ToggleUnitSelectionMenu")
+                   && body.Contains("textWrappingMode")
+                   && !body.Contains("enableWordWrapping");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -673,7 +675,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("IPointerEnterHandler")
                    && body.Contains("onHoverInfo")
                    && body.Contains("onRightClick")
-                   && body.Contains("IPointerClickHandler");
+                   && body.Contains("IPointerClickHandler")
+                   && body.Contains("onClick?.Invoke(recruit)");
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -732,6 +735,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-bind-action-textwrapping")
                    || body.Contains("sync-skip-self-hover-rmb")
                    || body.Contains("sortbar-raise-hover-instant")
                    || body.Contains("embed-hover-sortbar-cs0103")

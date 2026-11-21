@@ -25,7 +25,11 @@ namespace ArthurianAutobattler
 
         /// <summary>Legacy: left-click = select. Prefer the hover/RMB overload.</summary>
         public void Bind(RecruitInstance recruit, System.Action<RecruitInstance> onClick) =>
-            Bind(recruit, onLeftClick: onClick, onHover: null, onRightClick: onClick);
+            Bind(
+                recruit,
+                onLeftClick: () => onClick?.Invoke(recruit),
+                onHover: null,
+                onRightClick: () => onClick?.Invoke(recruit));
 
         /// <summary>
         /// Hover → bottom dialogue only (no lock). RMB → selection menu. LMB optional.

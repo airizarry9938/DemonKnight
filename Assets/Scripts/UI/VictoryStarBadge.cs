@@ -106,7 +106,7 @@ namespace ArthurianAutobattler
                 trt.offsetMax = new Vector2(-1f, 0f);
                 var tmp = txtGo.GetComponent<TextMeshProUGUI>();
                 tmp.alignment = TextAlignmentOptions.MidlineLeft;
-                tmp.enableWordWrapping = false;
+                tmp.textWrappingMode = TextWrappingModes.NoWrap;
                 tmp.overflowMode = TextOverflowModes.Overflow;
                 tmp.raycastTarget = false;
             }

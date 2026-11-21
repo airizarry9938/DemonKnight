@@ -1298,7 +1298,7 @@ namespace ArthurianAutobattler
             nightText.text = GameLoopManager.FormatNightWaveLabel(night, wave);
             // Slightly smaller so "Night N · Wave M (Boss)" fits the HUD slot.
             if (nightText.fontSize > 18f) nightText.fontSize = 18f;
-            nightText.enableWordWrapping = false;
+            nightText.textWrappingMode = TextWrappingModes.NoWrap;
             nightText.overflowMode = TextOverflowModes.Overflow;
 
             // Soft call — compiles even when WaveBossHudView.cs is one Sync behind.
@@ -2436,7 +2436,7 @@ namespace ArthurianAutobattler
             tmp.fontSize = size;
             tmp.color = color;
             tmp.raycastTarget = false;
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             return tmp;
         }
 
