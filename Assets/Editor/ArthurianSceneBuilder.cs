@@ -301,7 +301,7 @@ public static class ArthurianSceneBuilder
         var grid = recipeList.GetComponent<GridLayoutGroup>();
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = 2;
-        grid.cellSize = new Vector2(420f, 96f);
+        grid.cellSize = new Vector2(560f, 156f);
         grid.spacing = new Vector2(16f, 14f);
         grid.padding = new RectOffset(10, 10, 10, 10);
         grid.childAlignment = TextAnchor.UpperCenter;

@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "7ec34cf829329567ac0f941944a3b78f2f52cf2b";
 
-    private const string ExpectedPackageId = "fix-wavebosshud-cs0103";
+    private const string ExpectedPackageId = "legends-columns-wider";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -548,6 +548,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("legends-columns-wider")
                    || body.Contains("force-sync-main-landed")
                    || body.Contains("fix-wavebosshud-cs0103")
                    || body.Contains("warrior-no-train-ranged-night-seq")

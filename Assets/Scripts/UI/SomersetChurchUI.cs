@@ -1048,7 +1048,7 @@ namespace ArthurianAutobattler
             scroll.scrollSensitivity = 40f;
         }
 
-        /// <summary>Legends (Codex) recipes in two columns, not one long stack.</summary>
+        /// <summary>Legends (Codex) recipes in two wide columns so names/recipes aren't truncated.</summary>
         public static void ApplyTwoColumnCodexLayout(Transform recipeList)
         {
             if (recipeList == null) return;
@@ -1060,11 +1060,26 @@ namespace ArthurianAutobattler
 
             var grid = recipeList.GetComponent<GridLayoutGroup>();
             if (grid == null) grid = recipeList.gameObject.AddComponent<GridLayoutGroup>();
+
+            // Fill the Codex scroll width: two columns share available space.
+            float available = 1280f;
+            var parentRt = recipeList.parent as RectTransform;
+            if (parentRt != null && parentRt.rect.width > 80f)
+                available = parentRt.rect.width;
+            else if (recipeList is RectTransform selfRt && selfRt.rect.width > 80f)
+                available = selfRt.rect.width;
+
+            const float spacingX = 20f;
+            const float padTotalX = 28f;
+            float cellW = Mathf.Floor((available - spacingX - padTotalX) / 2f);
+            cellW = Mathf.Clamp(cellW, 560f, 760f);
+            float cellH = 156f;
+
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 2;
-            grid.cellSize = new Vector2(440f, 120f);
-            grid.spacing = new Vector2(16f, 16f);
-            grid.padding = new RectOffset(10, 10, 10, 10);
+            grid.cellSize = new Vector2(cellW, cellH);
+            grid.spacing = new Vector2(spacingX, 18f);
+            grid.padding = new RectOffset(14, 14, 12, 12);
             grid.childAlignment = TextAnchor.UpperCenter;
             grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
             grid.startAxis = GridLayoutGroup.Axis.Horizontal;

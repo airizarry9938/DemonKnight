@@ -93,10 +93,18 @@ namespace ArthurianAutobattler
 
                 var le = row.GetComponent<LayoutElement>();
                 if (le == null) le = row.AddComponent<LayoutElement>();
-                le.minHeight = 110f;
-                le.preferredHeight = 120f;
-                le.minWidth = 400f;
-                le.preferredWidth = 440f;
+                float cellW = 560f;
+                float cellH = 156f;
+                var grid = recipeListContainer.GetComponent<GridLayoutGroup>();
+                if (grid != null)
+                {
+                    cellW = Mathf.Max(560f, grid.cellSize.x);
+                    cellH = Mathf.Max(148f, grid.cellSize.y);
+                }
+                le.minHeight = cellH - 16f;
+                le.preferredHeight = cellH;
+                le.minWidth = cellW - 40f;
+                le.preferredWidth = cellW;
 
                 TextMeshProUGUI[] texts = row.GetComponentsInChildren<TextMeshProUGUI>();
                 Button fuseBtn = row.GetComponentInChildren<Button>();
@@ -125,21 +133,23 @@ namespace ArthurianAutobattler
                     texts[0].text = ready
                         ? $"<color=#7CFF9A>{entry.heroName}  [READY TO FUSE]</color>"
                         : entry.heroName;
-                    texts[0].fontSize = 24f;
+                    texts[0].fontSize = 22f;
                     texts[0].textWrappingMode = TextWrappingModes.Normal;
                     texts[0].overflowMode = TextOverflowModes.Overflow;
                 }
                 if (texts.Length >= 2)
                 {
                     texts[1].text = $"Recipe: {entry.ingredientFormula}";
-                    texts[1].fontSize = 18f;
+                    texts[1].fontSize = 17f;
                     texts[1].textWrappingMode = TextWrappingModes.Normal;
+                    texts[1].overflowMode = TextOverflowModes.Overflow;
                 }
                 if (texts.Length >= 3)
                 {
                     texts[2].text = $"Perk: {entry.combatPerkSummary}";
-                    texts[2].fontSize = 17f;
+                    texts[2].fontSize = 16f;
                     texts[2].textWrappingMode = TextWrappingModes.Normal;
+                    texts[2].overflowMode = TextOverflowModes.Overflow;
                 }
 
                 // Highlight ready cards.
