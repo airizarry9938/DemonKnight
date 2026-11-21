@@ -27,7 +27,7 @@ public static class ArthurianMenuBootstrap
     /// Force Sync often skips upgrading ArthurianSyncFromGitHub — this menu lives here so
     /// a normal Sync of MenuBootstrap still gives Andrew a one-shot download.
     /// </summary>
-    public const string Phase25FetchPinSha = "62c5a33cd9a9295386ea62929effa7cc9eb23af5";
+    public const string Phase25FetchPinSha = "82b08c35d73bb964fcb5d4149ae36d5bd724af1b";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
