@@ -108,6 +108,9 @@ public static class ArthurianMenuBootstrap
             packageGit = verType.GetField("GitHint")?.GetValue(null) as string ?? packageGit;
         }
 
+        string packageIdOnDisk = ReadPackageIdFromDisk() ?? "(missing DemonKnightPackageVersion.cs on disk)";
+        bool packageStale = !string.Equals(packageId, packageIdOnDisk, StringComparison.Ordinal);
+
         string editorDir = Path.Combine(Application.dataPath, "Editor");
         string alignPath = Path.Combine(editorDir, "ArthurianAlignCrowdPews.cs");
         string builderPath = Path.Combine(editorDir, "ArthurianSceneBuilder.cs");
@@ -144,7 +147,11 @@ public static class ArthurianMenuBootstrap
 
         string msg =
             "DemonKnight / Arthurian diagnose\n\n" +
-            $"Package: {packageId} ({packageGit})\n" +
+            $"Package (compiled): {packageId} ({packageGit})\n" +
+            $"Package Id on disk: {packageIdOnDisk}"
+            + (packageStale
+                ? "\n⚠ STALE COMPILE — disk ≠ compiled. Run Arthurian → FORCE Upgrade Sync Hosts From main, wait for compile."
+                : "") + "\n" +
             $"Art Tools pin: {ArtToolsPinSha}\n" +
             $"Assets path:\n{Application.dataPath}\n" +
             $"Expected importer path:\n{modularImporterPath}\n" +
@@ -535,14 +542,135 @@ public static class ArthurianMenuBootstrap
         EditorUtility.RevealInFinder(Application.dataPath);
         EditorUtility.DisplayDialog(
             "DemonKnight Setup",
-            "1) Arthurian → Bootstrap CompatApi + Sync Tools (pinned).\n"
-            + "2) Arthurian → Force Delete+Sync ALL Scripts.\n"
-            + "3) If CS0101 ModularSpriteLibrary: Arthurian → Delete Phase 2–5 Duplicate Standalones\n"
-            + "   (or manually delete Assets/Scripts/Data/ModularSpriteLibrary.cs then recompile).\n"
-            + "4) Diagnose must show delete-phase25-standalones-cs0101 (or newer).\n\n"
+            "1) Arthurian → FORCE Upgrade Sync Hosts From main\n"
+            + "   (or Bootstrap CompatApi + Sync Tools).\n"
+            + "2) Wait for compile. Diagnose Package Id on disk must match compiled.\n"
+            + "3) Arthurian → Force Delete+Sync ALL Scripts.\n"
+            + "4) If CS0101: manually delete Assets/Scripts/Data/ModularSpriteLibrary.cs then recompile.\n"
+            + "5) Diagnose must show force-upgrade-sync-hosts (or newer).\n\n"
             + "Project Assets path:\n" + Application.dataPath,
             "OK");
         Debug.Log("[DemonKnight] Assets path: " + Application.dataPath);
+    }
+
+    /// <summary>
+    /// Lives in MenuBootstrap so skip-self Sync hosts still get a one-click raw@main upgrade
+    /// after MenuBootstrap itself syncs. Does not call ArthurianSyncFromGitHub (may be stale).
+    /// </summary>
+    [MenuItem("Arthurian/FORCE Upgrade Sync Hosts From main", false, 2)]
+    public static void ForceUpgradeSyncHostsFromMain()
+    {
+        // Prefer Sync host implementation when present (single code path).
+        try
+        {
+            var syncType = Type.GetType("ArthurianSyncFromGitHub")
+                           ?? Type.GetType("ArthurianSyncFromGitHub, Assembly-CSharp-Editor");
+            var mi = syncType?.GetMethod("ForceUpgradeSyncHostsMenu",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (mi != null)
+            {
+                mi.Invoke(null, null);
+                return;
+            }
+        }
+        catch { /* fall through to local raw@main */ }
+
+        if (!EditorUtility.DisplayDialog(
+                "FORCE Upgrade Sync Hosts",
+                "Overwrite Sync / MenuBootstrap / PackageVersion from raw @main (cache-busted).\n"
+                + "Use when Diagnose is stuck on sync-keep-editor-menus.",
+                "Overwrite Now", "Cancel"))
+            return;
+
+        string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        string[] hosts =
+        {
+            "Assets/Editor/ArthurianSyncFromGitHub.cs",
+            "Assets/Editor/ArthurianMenuBootstrap.cs",
+            "Assets/Editor/DemonKnightPackageVersion.cs",
+        };
+        int ok = 0;
+        var errors = "";
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        foreach (string rel in hosts)
+        {
+            try
+            {
+                string body = DownloadRawMainOnly(rel);
+                if (string.IsNullOrEmpty(body) || body.Length < 80)
+                    throw new Exception("empty body");
+                string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                if (File.Exists(dest))
+                {
+                    try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                    try { File.Delete(dest); } catch { /* ignore */ }
+                }
+                File.WriteAllText(dest, body);
+                ok++;
+                Debug.Log("[DemonKnight] MenuBootstrap FORCE host " + rel + " (" + body.Length + " bytes)");
+            }
+            catch (Exception ex)
+            {
+                errors += rel + ": " + ex.Message + "\n";
+            }
+        }
+        AssetDatabase.Refresh();
+        string diskId = ReadPackageIdFromDisk() ?? "(unread)";
+        EditorUtility.DisplayDialog(
+            ok >= 3 ? "Sync Hosts Upgraded" : "Sync Hosts Partial",
+            $"Wrote {ok}/3 from raw @main.\nPackage Id on disk: {diskId}\n\n"
+            + "Wait for compile → Diagnose → then Force Delete+Sync.\n"
+            + errors,
+            "OK");
+    }
+
+    static string ReadPackageIdFromDisk()
+    {
+        try
+        {
+            string path = Path.Combine(Application.dataPath, "Editor", "DemonKnightPackageVersion.cs");
+            if (!File.Exists(path)) return null;
+            string text = File.ReadAllText(path);
+            int i = text.IndexOf("public const string Id", StringComparison.Ordinal);
+            if (i < 0) return null;
+            int q1 = text.IndexOf('"', i);
+            int q2 = q1 >= 0 ? text.IndexOf('"', q1 + 1) : -1;
+            return (q1 >= 0 && q2 > q1) ? text.Substring(q1 + 1, q2 - q1 - 1) : null;
+        }
+        catch { return null; }
+    }
+
+    static string DownloadRawMainOnly(string rel)
+    {
+        Exception last = null;
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N");
+            string[] urls =
+            {
+                RawBase + "main/" + rel + "?" + bust,
+                RawBase + "main/" + rel,
+                JsDelivrBase + "main/" + rel + "?" + bust,
+            };
+            foreach (string url in urls)
+            {
+                try
+                {
+                    using var wc = new WebClient();
+                    wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
+                    wc.Headers.Add("User-Agent", "DemonKnight-ForceUpgradeHosts/1.0");
+                    wc.Headers.Add("Cache-Control", "no-cache, no-store");
+                    string body = wc.DownloadString(url);
+                    if (!string.IsNullOrEmpty(body) && body.Length > 80
+                        && !body.Contains("404: Not Found")
+                        && !body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+                        return body;
+                }
+                catch (Exception ex) { last = ex; }
+            }
+        }
+        throw last ?? new Exception("raw@main failed for " + rel);
     }
 
     /// <summary>

@@ -25,7 +25,15 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "0d41f8be0ae00cbaa4c3e97ad750d0e9be7cfd2f";
 
-    private const string ExpectedPackageId = "fix-paperdoll-random-cs0104";
+    private const string ExpectedPackageId = "force-upgrade-sync-hosts";
+
+    /// <summary>Menu hosts that must always overwrite from tip/main — never skip-self, never Fallback pin.</summary>
+    public static readonly string[] SyncHostForceOverwritePaths =
+    {
+        "Assets/Editor/ArthurianSyncFromGitHub.cs",
+        "Assets/Editor/ArthurianMenuBootstrap.cs",
+        "Assets/Editor/DemonKnightPackageVersion.cs",
+    };
 
     /// <summary>
     /// EDITOR InitializeOnLoad — runs even when runtime Assembly-CSharp is CS0101-broken
@@ -219,42 +227,72 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// Chicken-egg fix: overwrite Sync + MenuBootstrap + PackageVersion + CompatApi from a pinned
-    /// commit without requiring ExpectedPackageId to already match.
+    /// ONE-CLICK: overwrite Sync / MenuBootstrap / PackageVersion from raw @main only.
+    /// Never uses FallbackCommitSha (that re-landed sync-keep-editor-menus forever when tip CDN 404'd).
+    /// No skip-self. Minimal sanity — no ExpectedPackageId gate.
     /// </summary>
-    [MenuItem("Arthurian/Bootstrap CompatApi + Sync Tools (pinned)", false, 2)]
+    /// <summary>Invoked by MenuBootstrap menu (single MenuItem — avoids duplicate Arthurian entries).</summary>
+    public static void ForceUpgradeSyncHostsMenu()
+    {
+        if (!EditorUtility.DisplayDialog(
+                "FORCE Upgrade Sync Hosts",
+                "Overwrite from raw.githubusercontent.com …/main (cache-busted):\n\n"
+                + "• ArthurianSyncFromGitHub.cs\n"
+                + "• ArthurianMenuBootstrap.cs\n"
+                + "• DemonKnightPackageVersion.cs\n\n"
+                + "Use when Diagnose is stuck on sync-keep-editor-menus / sync-skip-self.\n"
+                + "After compile, Diagnose must show: " + ExpectedPackageId,
+                "Overwrite Now", "Cancel"))
+            return;
+
+        var errors = new List<string>();
+        int n = ForceOverwriteSyncHostsFromMain(errors);
+        AssetDatabase.Refresh();
+        string diskId = ReadPackageIdFromDisk() ?? "(unread)";
+        EditorUtility.DisplayDialog(
+            n >= 3 ? "Sync Hosts Upgraded" : "Sync Hosts Partial",
+            $"Wrote {n}/3 hosts from raw @main.\n"
+            + $"Package Id on disk now: {diskId}\n"
+            + $"Expected after compile: {ExpectedPackageId}\n\n"
+            + "1) Wait for compile spinner.\n"
+            + "2) Arthurian → Diagnose Project — must show that package id.\n"
+            + "3) Then Force Delete+Sync ALL Scripts.\n"
+            + (errors.Count > 0 ? "\nFailures:\n" + string.Join("\n", errors) : ""),
+            "OK");
+    }
+
+    /// <summary>
+    /// Chicken-egg fix: overwrite Sync + MenuBootstrap + PackageVersion + CompatApi.
+    /// ALWAYS force-overwrites the three menu hosts from raw @main first (never Fallback pin).
+    /// </summary>
+    [MenuItem("Arthurian/Bootstrap CompatApi + Sync Tools (pinned)", false, 3)]
     public static void BootstrapCompatAndSyncTools()
     {
         if (!EditorUtility.DisplayDialog(
                 "DemonKnight Bootstrap",
-                "Overwrite Sync menu hosts + CompatApi from pinned commit " + FallbackCommitSha + " (or tip of main):\n\n" +
-                "• ArthurianSyncFromGitHub.cs (Bootstrap / Force Delete+Sync menus)\n" +
-                "• ArthurianMenuBootstrap.cs (Diagnose menu)\n" +
-                "• DemonKnightPackageVersion.cs\n" +
-                "• DemonKnightCompatApi.cs\n\n" +
-                "Use when menus are missing OR Diagnose shows cs1061-compat-api.",
+                "1) FORCE overwrite Sync / Diagnose / PackageVersion from raw @main\n"
+                + "2) Then pull CompatApi + embeds from tip of main\n\n"
+                + "Diagnose must show: " + ExpectedPackageId + "\n"
+                + "Use when Diagnose is stuck on sync-keep-editor-menus.",
                 "Bootstrap Now", "Cancel"))
             return;
 
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        // Prefer tip of main (landed stack); pin is emergency fallback only.
-        string sha = ResolveMainSha() ?? FallbackCommitSha;
+        string sha = ResolveMainSha() ?? "main";
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
         string[] bootstrap =
         {
+            // Hosts first — but ForceOverwriteSyncHostsFromMain runs before this loop.
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-            // Pull wave boss HUD with bootstrap so night label never CS0103 after partial Sync.
             "Assets/Scripts/UI/WaveBossHudView.cs",
-            // CS0103: PewSeatHoverHighlight + MenuListSortBar are embedded in these.
             "Assets/Scripts/Data/GameDataTypes.cs",
             "Assets/Scripts/UI/PaperDollSeatView.cs",
             "Assets/Scripts/UI/LegendCodexUI.cs",
             "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
             "Assets/Scripts/UI/MenuListSortBar.cs",
-            // Phase 2–5 types embedded in GameDataTypes/PaperDoll/GameLoop/TavernDice — do not bootstrap standalones.
             "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
         };
@@ -263,16 +301,19 @@ public static class ArthurianSyncFromGitHub
         int ok = 0;
         // DA-59 FIRST: Editor path — delete ModularSpriteLibrary.cs before any compile attempt.
         NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
+        // CRITICAL: hosts from raw @main ONLY — never FallbackCommitSha (stale pin trap).
+        ok += ForceOverwriteSyncHostsFromMain(errors);
         try
         {
             for (int i = 0; i < bootstrap.Length; i++)
             {
                 string rel = bootstrap[i];
+                // Already hard-wrote hosts from main — skip re-download via Fallback-prone path.
+                if (IsSyncHostForcePath(rel)) continue;
                 EditorUtility.DisplayProgressBar("DemonKnight Bootstrap", rel, (float)i / bootstrap.Length);
                 try
                 {
                     string body = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
-                    // CompatApi MUST have ResolveLoop after bootstrap.
                     if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase)
                         && !body.Contains("ResolveLoop"))
                         throw new Exception("CompatApi body still missing ResolveLoop (CDN stale)");
@@ -292,15 +333,114 @@ public static class ArthurianSyncFromGitHub
             EditorUtility.ClearProgressBar();
         }
 
-        // Kill any leftover Phase 2–5 standalones (CS0101 against embeds) — before compile.
         NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
         StubPhase25StandalonesOver(projectRoot, errors);
 
         AssetDatabase.Refresh();
-        string msg = $"Bootstrapped {ok}/{bootstrap.Length} @ {sha}.";
+        string diskId = ReadPackageIdFromDisk() ?? "(unread)";
+        string msg = $"Bootstrapped {ok} files (hosts from raw @main). Package on disk: {diskId}.";
         if (errors.Count > 0) msg += "\n\nFailures:\n" + string.Join("\n", errors);
-        else msg += "\n\nWait for compile, then run Force Delete+Sync ALL Scripts.";
+        else msg += "\n\nWait for compile → Diagnose must show `" + ExpectedPackageId
+                    + "` → then Force Delete+Sync ALL Scripts.";
         EditorUtility.DisplayDialog("DemonKnight Bootstrap", msg, "OK");
+    }
+
+    static bool IsSyncHostForcePath(string rel)
+    {
+        foreach (string h in SyncHostForceOverwritePaths)
+            if (string.Equals(h, rel, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Download Sync / MenuBootstrap / PackageVersion from raw @main only (cache-busted).
+    /// Never FallbackCommitSha. Never skip-self. Minimal marker checks only.
+    /// </summary>
+    public static int ForceOverwriteSyncHostsFromMain(List<string> errors = null)
+    {
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        int ok = 0;
+        foreach (string rel in SyncHostForceOverwritePaths)
+        {
+            try
+            {
+                string body = DownloadRawMainOnly(rel, out string source);
+                if (string.IsNullOrEmpty(body) || body.Length < 80)
+                    throw new Exception("empty body from " + source);
+                // Minimal markers — do NOT gate on ExpectedPackageId (that blocked tip upgrades).
+                if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase)
+                    && !(body.Contains("ForceDeleteSyncAll") && body.Contains("BootstrapCompatAndSyncTools")))
+                    throw new Exception("Sync host body missing menus (" + source + ")");
+                if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase)
+                    && !body.Contains("Diagnose Project"))
+                    throw new Exception("MenuBootstrap body missing Diagnose (" + source + ")");
+                if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                    && !body.Contains("public const string Id"))
+                    throw new Exception("PackageVersion body missing Id (" + source + ")");
+
+                string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                WriteReplacing(dest, body, deleteFirst: true);
+                ok++;
+                Debug.Log($"[DemonKnight] FORCE host overwrite {rel} via {source} ({body.Length} bytes)");
+            }
+            catch (Exception ex)
+            {
+                errors?.Add($"{rel}: {ex.Message}");
+                Debug.LogError($"[DemonKnight] FORCE host overwrite FAILED {rel}: {ex.Message}");
+            }
+        }
+        return ok;
+    }
+
+    /// <summary>raw/jsDelivr @main only — never FallbackCommitSha (stale pin trap).</summary>
+    static string DownloadRawMainOnly(string rel, out string source)
+    {
+        Exception last = null;
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N") + "&a=" + attempt;
+            string[] urls =
+            {
+                RawBase + "main/" + rel + "?" + bust,
+                RawBase + "main/" + rel,
+                JsDelivrBase + "main/" + rel + "?" + bust,
+                JsDelivrBase + "main/" + rel,
+            };
+            string[] labels = { "raw@main+bust", "raw@main", "jsdelivr@main+bust", "jsdelivr@main" };
+            for (int i = 0; i < urls.Length; i++)
+            {
+                try
+                {
+                    string body = DownloadString(urls[i]);
+                    if (string.IsNullOrEmpty(body) || body.StartsWith("404")
+                        || body.Contains("404: Not Found")
+                        || body.Contains("Failed to fetch")
+                        || body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+                        throw new Exception("Empty or 404");
+                    source = labels[i] + (attempt > 0 ? $"#retry{attempt}" : "");
+                    return body;
+                }
+                catch (Exception ex) { last = ex; }
+            }
+        }
+        throw last ?? new Exception("raw@main download failed for " + rel);
+    }
+
+    /// <summary>Read PackageVersion Id from disk (Diagnose compiled type can lag).</summary>
+    public static string ReadPackageIdFromDisk()
+    {
+        try
+        {
+            string path = Path.Combine(
+                Directory.GetParent(Application.dataPath)!.FullName,
+                "Assets", "Editor", "DemonKnightPackageVersion.cs");
+            if (!File.Exists(path)) return null;
+            string text = File.ReadAllText(path);
+            var m = Regex.Match(text, @"public\s+const\s+string\s+Id\s*=\s*""([^""]+)""");
+            return m.Success ? m.Groups[1].Value : null;
+        }
+        catch { return null; }
     }
 
     /// <summary>Comment-only stub — no type defs (CS0101-safe overwrite when delete fails).</summary>
@@ -496,6 +636,14 @@ public static class ArthurianSyncFromGitHub
             EditorUtility.DisplayProgressBar("DemonKnight Sync", "Nuking Phase 2–5 CS0101 standalones…", 0f);
             NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
 
+            // NEVER skip-self: overwrite Sync / MenuBootstrap / PackageVersion from raw @main FIRST.
+            // Old hosts used FallbackCommitSha after tip CDN 404 → stuck on sync-keep-editor-menus.
+            EditorUtility.DisplayProgressBar("DemonKnight Sync", "FORCE overwrite Sync hosts from raw @main…", 0f);
+            int hostOk = ForceOverwriteSyncHostsFromMain(errors);
+            Debug.Log($"[DemonKnight] Force Sync host overwrite from main: {hostOk}/3");
+            foreach (string h in SyncHostForceOverwritePaths)
+                if (!okFiles.Contains(h)) okFiles.Add(h);
+
             // BEFORE Force Delete: land embeds + stubs so CS0103 never wins a race.
             EnsureUiHelpersPresent(projectRoot, sha, errors, okFiles);
 
@@ -520,33 +668,23 @@ public static class ArthurianSyncFromGitHub
                 EditorUtility.DisplayProgressBar("DemonKnight Sync", rel + " @ " + sha, (float)i / ScriptPaths.Length);
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 bool protectMenu = NeverBulkDeleteEditorMenus.Contains(rel);
+                bool isForceHost = IsSyncHostForcePath(rel);
 
-                // DA-59: try to upgrade Sync host (old hosts omit Phase 2–5 ScriptPaths).
-                // Keep local only when CDN returns empty/invalid — never leave ScriptPaths stale forever.
-                bool isSyncHost = rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase);
+                // Already hard-wrote Sync/MenuBootstrap/PackageVersion from raw @main — do not
+                // re-download via FallbackCommitSha path (that re-stuck sync-keep-editor-menus).
+                if (isForceHost)
+                {
+                    if (!okFiles.Contains(rel)) okFiles.Add(rel);
+                    continue;
+                }
 
                 try
                 {
-                    // Menu hosts: relax package-id so tip Sync always lands even when local
-                    // ExpectedPackageId lags one Force Sync behind.
-                    string text = DownloadPinned(rel, sha, out string source, relaxPackageId: protectMenu || isSyncHost);
-                    if (!protectMenu && !isSyncHost) ValidateCritical(rel, text);
-                    if (isSyncHost)
-                    {
-                        // Reject empty CDN hits that wiped menus historically (DA-37).
-                        if (string.IsNullOrEmpty(text) || text.Length < 200
-                            || !text.Contains("ForceDeleteSyncAll")
-                            || !text.Contains("BootstrapCompatAndSyncTools"))
-                        {
-                            okFiles.Add(rel);
-                            Debug.LogWarning(
-                                "[DemonKnight] Kept local ArthurianSyncFromGitHub.cs — tip body failed sanity (use Bootstrap).");
-                            continue;
-                        }
-                    }
-                    // Menu hosts: in-place replace only (no delete-first gap).
-                    WriteReplacing(dest, text, deleteFirst: deleteFirst && !protectMenu && !isSyncHost);
-                    VerifyOnDisk(rel, dest, relaxPackageId: protectMenu || isSyncHost);
+                    string text = DownloadPinned(rel, sha, out string source, relaxPackageId: protectMenu);
+                    if (!protectMenu) ValidateCritical(rel, text);
+                    // No skip-self. Menu hosts outside the force-three still replace in place.
+                    WriteReplacing(dest, text, deleteFirst: deleteFirst && !protectMenu);
+                    VerifyOnDisk(rel, dest, relaxPackageId: protectMenu);
                     okFiles.Add(rel);
                     Debug.Log($"[DemonKnight] Synced {rel} via {source}");
 
@@ -556,12 +694,11 @@ public static class ArthurianSyncFromGitHub
                 }
                 catch (Exception ex)
                 {
-                    // Menu hosts: keep local copy on CDN miss — never fail the whole Sync.
-                    if ((protectMenu || isSyncHost) && File.Exists(dest))
+                    if (protectMenu && File.Exists(dest))
                     {
                         okFiles.Add(rel);
                         Debug.LogWarning(
-                            $"[DemonKnight] Kept local {rel} after CDN miss ({ex.Message}). Use Bootstrap to refresh.");
+                            $"[DemonKnight] Kept local {rel} after CDN miss ({ex.Message}). Use FORCE Upgrade Sync Hosts.");
                         continue;
                     }
                     errors.Add($"{rel}: {ex.Message}");
@@ -605,7 +742,9 @@ public static class ArthurianSyncFromGitHub
         }
         else
         {
-            msg += $"\n\nWait for compile. Diagnose must show `{ExpectedPackageId}`.\n"
+            msg += $"\n\nWait for compile. Diagnose must show `{ExpectedPackageId}` "
+                   + $"(disk Id now: {ReadPackageIdFromDisk() ?? "?"}).\n"
+                   + "If still sync-keep-editor-menus: Arthurian → FORCE Upgrade Sync Hosts From main.\n"
                    + "Arthurian menus kept: Bootstrap / Force Delete+Sync / Diagnose.\n"
                    + "Do NOT rebuild the scene.";
         }
@@ -645,28 +784,29 @@ public static class ArthurianSyncFromGitHub
         {
             string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N")
                           + "&a=" + attempt;
+            // Prefer tip SHA + raw@main BEFORE FallbackCommitSha (old pin re-stuck sync-keep-editor-menus).
             string[] urls =
             {
                 RawBase + sha + "/" + rel + "?" + bust,
                 RawBase + sha + "/" + rel,
-                RawBase + FallbackCommitSha + "/" + rel + "?" + bust,
-                RawBase + FallbackCommitSha + "/" + rel,
                 RawBase + "main/" + rel + "?" + bust,
                 RawBase + "main/" + rel,
                 JsDelivrBase + sha + "/" + rel + "?" + bust,
                 JsDelivrBase + sha + "/" + rel,
+                JsDelivrBase + "main/" + rel + "?" + bust,
+                RawBase + FallbackCommitSha + "/" + rel + "?" + bust,
                 JsDelivrBase + FallbackCommitSha + "/" + rel + "?" + bust,
             };
             string[] labels =
             {
                 "raw@" + sha + "+bust",
                 "raw@" + sha,
-                "raw@" + FallbackCommitSha + "+bust",
-                "raw@" + FallbackCommitSha,
                 "raw@main+bust",
                 "raw@main",
                 "jsdelivr@" + sha + "+bust",
                 "jsdelivr@" + sha,
+                "jsdelivr@main+bust",
+                "raw@" + FallbackCommitSha + "+bust",
                 "jsdelivr@" + FallbackCommitSha + "+bust",
             };
 
@@ -1185,20 +1325,17 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("NeverBulkDeleteEditorMenus")
                    && body.Contains("ForceDeleteSyncAll")
                    && body.Contains("BootstrapCompatAndSyncTools")
-                   && body.Contains("EnsureUiHelpersPresent")
-                   && body.Contains("TryFetchPhase25Insurance")
-                   && body.Contains("NukePhase25Standalones")
-                   && body.Contains("StubPhase25StandalonesOver")
-                   && body.Contains("DkEditorNukePhase25StandalonesOnLoad");
+                   && body.Contains("ForceOverwriteSyncHostsFromMain")
+                   && body.Contains("DownloadRawMainOnly")
+                   && body.Contains("SyncHostForceOverwritePaths");
         }
 
         if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("Diagnose Project")
                    && body.Contains("DemonKnightPackageVersion")
-                   && body.Contains("FetchMissingPhase25Scripts")
-                   && body.Contains("Phase25StandaloneKillList")
-                   && body.Contains("Phase25ScriptPaths");
+                   && body.Contains("ForceUpgradeSyncHostsFromMain")
+                   && body.Contains("Package Id on disk");
         }
 
         return true;
