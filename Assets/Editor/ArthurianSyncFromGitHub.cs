@@ -19,11 +19,10 @@ public static class ArthurianSyncFromGitHub
     private const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     private const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
-    /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
-    // Floor: menu-protect cherry-pick onto main (this PR). Prefer ResolveMainSha after merge.
-    private const string FallbackCommitSha = "572155d";
+    /// <summary>Package tip pin — Force Sync prefers this over main until this PR merges.</summary>
+    private const string FallbackCommitSha = "9ffdea2";
 
-    private const string ExpectedPackageId = "fix-boss-dialog-cs0136";
+    private const string ExpectedPackageId = "fix-fusion-serialize-flat-autosave";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -151,7 +150,8 @@ public static class ArthurianSyncFromGitHub
             return;
 
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        string sha = ResolveMainSha() ?? FallbackCommitSha;
+        // Prefer package pin — tip-of-main still lacks NonSerialized/flat fusionParts until merge.
+        string sha = FallbackCommitSha;
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
         string[] bootstrap =
         {
@@ -205,7 +205,8 @@ public static class ArthurianSyncFromGitHub
     public static void RunSync(bool showDialog, bool deleteFirst = true, bool preDeleteAll = false)
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        string sha = ResolveMainSha() ?? FallbackCommitSha;
+        // Prefer package pin — tip-of-main still lacks NonSerialized/flat fusionParts until merge.
+        string sha = FallbackCommitSha;
         Debug.Log($"[DemonKnight] Sync pinning downloads to commit {sha}");
 
         var errors = new List<string>();
@@ -519,6 +520,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-fusion-serialize-intel-costs")
                    || body.Contains("fix-boss-dialog-cs0136")
                    || body.Contains("balance-v2-arthurian-expansion")
                    || body.Contains("autobattle-boss-dialog-video-bg")
@@ -547,6 +549,7 @@ public static class ArthurianSyncFromGitHub
                        || body.Contains("ForceDeleteSyncAll") || body.Contains("ExpectedPackageId");
             // Must keep NeverBulkDelete so Force Sync cannot wipe menus again.
             return (body.Contains(ExpectedPackageId) || body.Contains("DownloadPinned")
+                    || body.Contains("fix-fusion-serialize-intel-costs")
                     || body.Contains("fix-boss-dialog-cs0136")
                     || body.Contains("balance-v2-arthurian-expansion")
                     || body.Contains("autobattle-boss-dialog-video-bg")

@@ -1838,9 +1838,28 @@ namespace ArthurianAutobattler
             int cost = selected.GetFinalHireCost(grudge, discount);
             if (hireButtonLabel != null) hireButtonLabel.text = $"Recruit ({cost}g)";
 
-            if (tier1Button != null) tier1Button.interactable = selected.intelTierUnlocked < 1;
-            if (tier2Button != null) tier2Button.interactable = selected.intelTierUnlocked < 2;
-            if (tier3Button != null) tier3Button.interactable = selected.intelTierUnlocked < 3;
+            if (tier1Button != null)
+            {
+                tier1Button.interactable = selected.intelTierUnlocked < 1;
+                ApplyHudButtonLabel(tier1Button,
+                    selected.intelTierUnlocked >= 1 ? "Scout done" : "Scout (Free)");
+            }
+            if (tier2Button != null)
+            {
+                tier2Button.interactable = selected.intelTierUnlocked < 2;
+                ApplyHudButtonLabel(tier2Button,
+                    selected.intelTierUnlocked >= 2
+                        ? "Investigate done"
+                        : $"Investigate ({RecruitInstance.IntelTier2Cost}g)");
+            }
+            if (tier3Button != null)
+            {
+                tier3Button.interactable = selected.intelTierUnlocked < 3;
+                ApplyHudButtonLabel(tier3Button,
+                    selected.intelTierUnlocked >= 3
+                        ? "Full Report done"
+                        : $"Full Report ({RecruitInstance.IntelTier3Cost}g)");
+            }
             if (hireButton != null) hireButton.interactable = true;
             if (trainTankButton != null) trainTankButton.interactable = Town != null && Town.playerGold >= 15;
             if (trainRangedButton != null) trainRangedButton.interactable = Town != null && Town.playerGold >= 15;

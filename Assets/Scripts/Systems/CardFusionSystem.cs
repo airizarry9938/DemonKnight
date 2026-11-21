@@ -316,9 +316,17 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>Deep clone including nested fusionIngredients (sprites shared by reference).</summary>
-        public static RecruitInstance CloneForFusionMemory(RecruitInstance src)
+        public static RecruitInstance CloneForFusionMemory(RecruitInstance src) =>
+            CloneForFusionMemory(src, 0, null);
+
+        static RecruitInstance CloneForFusionMemory(RecruitInstance src, int depth, HashSet<string> visited)
         {
             if (src == null) return null;
+            if (depth >= 8) return null;
+            visited ??= new HashSet<string>();
+            if (!string.IsNullOrEmpty(src.unitID) && !visited.Add(src.unitID))
+                return null; // break accidental cycles
+
             var c = new RecruitInstance
             {
                 unitID = src.unitID,
@@ -347,7 +355,11 @@ namespace ArthurianAutobattler
             {
                 c.fusionIngredients = new List<RecruitInstance>(src.fusionIngredients.Count);
                 foreach (var ing in src.fusionIngredients)
-                    c.fusionIngredients.Add(CloneForFusionMemory(ing));
+                {
+                    var cloned = CloneForFusionMemory(ing, depth + 1, visited);
+                    if (cloned != null)
+                        c.fusionIngredients.Add(cloned);
+                }
             }
             return c;
         }

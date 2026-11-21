@@ -4,12 +4,13 @@ STOP hand-copying random files.
 1) Compile
 2) Arthurian → Bootstrap CompatApi + Sync Tools (pinned)
 3) Arthurian → Force Delete+Sync ALL Scripts
-4) Diagnose → fix-boss-dialog-cs0136
+4) Diagnose → fix-fusion-serialize-intel-costs
 
-MUST land: Assets/Scripts/Combat/BattleBossDialogUI.cs
-(Sync ScriptPaths + AtomicCritical — fixes CS0103)
+Fixes in this package:
+- Serialization depth cycle (fusionIngredients / WarbandMemberSave) broken
+- Investigate 20g · Full Report 30g · Scout free (stats hidden until clicked)
 
 If menus missing: overwrite ArthurianSyncFromGitHub.cs + ArthurianMenuBootstrap.cs
 from jsDelivr @pinned SHA (never @main), Refresh, then Bootstrap.
 
-See ANDREW-FIX-BOSS-DIALOG-CS0136.md
+See ANDREW-FIX-FUSION-SERIALIZE-INTEL.md
