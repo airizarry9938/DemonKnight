@@ -9,6 +9,67 @@ namespace ArthurianAutobattler
     {
         public static GameLoopManager Instance;
 
+#if UNITY_EDITOR
+        /// <summary>
+        /// DA-59: when embeds land in GameDataTypes/PaperDoll/this file/TavernDice but Sync
+        /// re-downloads full Phase 2–5 standalones from an old pin → CS0101. Force stubs on load.
+        /// </summary>
+        [UnityEditor.InitializeOnLoadMethod]
+        static void DkStubDuplicatePhase25Standalones()
+        {
+            try
+            {
+                string data = Application.dataPath;
+                var stubs = new (string rel, string host, string typeName)[]
+                {
+                    ("Scripts/Data/SpriteAnimClip.cs", "GameDataTypes.cs", "SpriteAnimClip"),
+                    ("Scripts/Data/StageLayoutProfile.cs", "GameDataTypes.cs", "StageLayoutProfile"),
+                    ("Scripts/Data/ModularSpriteLibrary.cs", "GameDataTypes.cs", "ModularSpriteLibrary"),
+                    ("Scripts/UI/ModularSpriteAnimator.cs", "PaperDollSeatView.cs", "ModularSpriteAnimator"),
+                    ("Scripts/Systems/StageParallaxController.cs", "GameLoopManager.cs", "StageParallaxController"),
+                    ("Scripts/Systems/DiceManager.cs", "TavernDiceMinigame.cs", "DiceManager"),
+                };
+                bool any = false;
+                foreach (var s in stubs)
+                {
+                    string path = System.IO.Path.Combine(data, s.rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                    string stub =
+                        "// EMBEDDED in " + s.host + " — DA-59 nuclear Sync fix (CS0101 if type redefined here).\n"
+                        + "// Real type: ArthurianAutobattler." + s.typeName + "\n"
+                        + "// Force Sync may still download this stub; keep it type-definition-free.\n";
+                    bool need = !System.IO.File.Exists(path);
+                    if (!need)
+                    {
+                        string cur = System.IO.File.ReadAllText(path);
+                        need = cur.IndexOf("public class ", System.StringComparison.Ordinal) >= 0
+                               || cur.IndexOf("public partial class ", System.StringComparison.Ordinal) >= 0
+                               || cur.IndexOf("class " + s.typeName, System.StringComparison.Ordinal) >= 0;
+                    }
+                    if (!need) continue;
+                    try
+                    {
+                        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+                        if (System.IO.File.Exists(path))
+                            System.IO.File.SetAttributes(path, System.IO.FileAttributes.Normal);
+                        System.IO.File.WriteAllText(path, stub);
+                        any = true;
+                        Debug.Log("[DemonKnight] DA-59 stubbed duplicate " + s.rel);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogWarning("[DemonKnight] DA-59 stub failed " + s.rel + ": " + ex.Message);
+                    }
+                }
+                if (any)
+                    UnityEditor.AssetDatabase.Refresh();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] DA-59 stub pass skipped: " + ex.Message);
+            }
+        }
+#endif
+
         [Header("Timer Settings")]
         [Tooltip("Town recruitment countdown. Start between 300–600s; perk drafts can shrink toward 180s.")]
         [Range(180f, 600f)]

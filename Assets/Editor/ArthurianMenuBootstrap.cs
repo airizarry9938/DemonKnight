@@ -542,73 +542,101 @@ public static class ArthurianMenuBootstrap
     /// DA-59 hard fix: download ONLY Master Spec Phase 2–5 scripts via absolute raw URLs.
     /// Does not depend on ArthurianSyncFromGitHub ScriptPaths (stale Sync host skips those files).
     /// </summary>
-    [MenuItem("Arthurian/Fetch Missing Phase 2–5 Scripts", false, 4)]
+    [MenuItem("Arthurian/Stub Phase 2–5 Duplicate Standalones", false, 4)]
+    [MenuItem("Arthurian/Fetch Missing Phase 2–5 Scripts", false, 5)]
     public static void FetchMissingPhase25Scripts()
     {
         if (!EditorUtility.DisplayDialog(
-                "Fetch Phase 2–5 Scripts",
-                "Download Master Spec Phase 2–5 foundation scripts by absolute raw GitHub URL:\n\n"
-                + "• SpriteAnimClip / StageLayoutProfile / ModularSpriteLibrary\n"
-                + "• ModularSpriteAnimator / StageParallaxController / DiceManager\n"
-                + "• Art Architect + StageLayoutProfileEnsure\n\n"
-                + "Pin: " + Phase25FetchPinSha + " (also tries tip of main).\n"
-                + "Use when Force Delete+Sync leaves CS0103 for these types.",
-                "Download Now", "Cancel"))
+                "Stub Phase 2–5 Duplicates",
+                "Write type-definition-free stubs for Phase 2–5 standalones so they no longer\n"
+                + "CS0101 against embeds in GameDataTypes / PaperDollSeatView / GameLoopManager / TavernDice.\n\n"
+                + "Also fetches Art Architect editor helpers if missing.\n"
+                + "Use when Force Sync re-downloaded full ModularSpriteLibrary.cs (etc.).",
+                "Stub Now", "Cancel"))
             return;
 
-        int ok = FetchPhase25ScriptsInternal(out string report);
+        int ok = WritePhase25StubsInternal(out string report);
         AssetDatabase.Refresh();
         EditorUtility.DisplayDialog(
-            ok == Phase25ScriptPaths.Length ? "Phase 2–5 Fetch OK" : "Phase 2–5 Fetch Incomplete",
+            ok > 0 ? "Phase 2–5 Stubs OK" : "Phase 2–5 Stubs Incomplete",
             report, "OK");
     }
 
-    /// <summary>Callable from Sync host after Bootstrap upgrades it.</summary>
+    /// <summary>
+    /// DA-59 CS0101 fix: NEVER re-download full Phase 2–5 standalones (old pins still have
+    /// public class bodies). Always write type-definition-free stubs — real types are embedded.
+    /// </summary>
     public static int FetchPhase25ScriptsInternal(out string report)
     {
-        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        return WritePhase25StubsInternal(out report);
+    }
+
+    /// <summary>Hardcoded stubs for Phase 2–5 standalones (embedded elsewhere).</summary>
+    public static int WritePhase25StubsInternal(out string report)
+    {
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
         var errors = new List<string>();
         int ok = 0;
-        string sha = Phase25FetchPinSha;
+        var map = new (string rel, string host, string typeName)[]
+        {
+            ("Assets/Scripts/Data/SpriteAnimClip.cs", "GameDataTypes.cs", "SpriteAnimClip"),
+            ("Assets/Scripts/Data/StageLayoutProfile.cs", "GameDataTypes.cs", "StageLayoutProfile"),
+            ("Assets/Scripts/Data/ModularSpriteLibrary.cs", "GameDataTypes.cs", "ModularSpriteLibrary"),
+            ("Assets/Scripts/UI/ModularSpriteAnimator.cs", "PaperDollSeatView.cs", "ModularSpriteAnimator"),
+            ("Assets/Scripts/Systems/StageParallaxController.cs", "GameLoopManager.cs", "StageParallaxController"),
+            ("Assets/Scripts/Systems/DiceManager.cs", "TavernDiceMinigame.cs", "DiceManager"),
+            // Art tools stay downloadable; not type-duplicated in embeds.
+        };
 
         try
         {
-            for (int i = 0; i < Phase25ScriptPaths.Length; i++)
+            for (int i = 0; i < map.Length; i++)
             {
-                string rel = Phase25ScriptPaths[i];
-                EditorUtility.DisplayProgressBar(
-                    "Phase 2–5 Fetch", rel, (float)i / Phase25ScriptPaths.Length);
+                var e = map[i];
+                EditorUtility.DisplayProgressBar("Phase 2–5 Stubs", e.rel, (float)i / map.Length);
                 try
                 {
-                    string body = DownloadPhase25Absolute(rel, sha, out string source);
-                    if (string.IsNullOrEmpty(body) || body.Length < 40)
-                        throw new Exception("empty body from " + source);
-                    if (body.StartsWith("404", StringComparison.Ordinal)
-                        || body.IndexOf("Not Found", StringComparison.OrdinalIgnoreCase) >= 0)
-                        throw new Exception("404 from " + source);
-                    // Sanity: must declare the expected type name fragment.
-                    string leaf = Path.GetFileNameWithoutExtension(rel);
-                    if (body.IndexOf(leaf, StringComparison.OrdinalIgnoreCase) < 0)
-                        throw new Exception("body missing type name " + leaf + " via " + source);
-
-                    string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                    string dest = Path.Combine(projectRoot, e.rel.Replace('/', Path.DirectorySeparatorChar));
                     Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                    string tmp = dest + ".dk-p25-tmp";
-                    File.WriteAllText(tmp, body);
+                    string stub =
+                        "// EMBEDDED in " + e.host + " — DA-59 nuclear Sync fix (CS0101 if type redefined here).\n"
+                        + "// Real type: ArthurianAutobattler." + e.typeName + "\n"
+                        + "// Force Sync may still download this stub; keep it type-definition-free.\n";
                     if (File.Exists(dest))
                     {
                         try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
-                        try { File.Delete(dest); } catch { /* ignore */ }
                     }
-                    File.Move(tmp, dest);
+                    File.WriteAllText(dest, stub);
                     ok++;
-                    Debug.Log($"[DemonKnight] Phase 2–5 fetched {rel} via {source} ({body.Length} bytes)");
+                    Debug.Log("[DemonKnight] Phase 2–5 stubbed " + e.rel);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{e.rel}: {ex.Message}");
+                }
+            }
+
+            // Still try to fetch Art Architect helpers (not embedded) by absolute URL.
+            foreach (string rel in new[]
+                     {
+                         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+                         "Assets/Editor/ArthurianArtArchitectWindow.cs",
+                     })
+            {
+                try
+                {
+                    string body = DownloadPhase25Absolute(rel, Phase25FetchPinSha, out string source);
+                    if (string.IsNullOrEmpty(body) || body.Length < 40) continue;
+                    if (body.IndexOf("public class ", StringComparison.Ordinal) < 0) continue;
+                    string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                    File.WriteAllText(dest, body);
+                    ok++;
+                    Debug.Log($"[DemonKnight] Phase 2–5 fetched editor helper {rel} via {source}");
                 }
                 catch (Exception ex)
                 {
                     errors.Add($"{rel}: {ex.Message}");
-                    Debug.LogError($"[DemonKnight] Phase 2–5 fetch FAILED {rel}: {ex.Message}");
                 }
             }
         }
@@ -617,11 +645,11 @@ public static class ArthurianMenuBootstrap
             EditorUtility.ClearProgressBar();
         }
 
-        report = $"Fetched {ok}/{Phase25ScriptPaths.Length} Phase 2–5 scripts @ {sha}.\n";
+        report = $"Stubbed/fetched Phase 2–5 paths ({ok} writes). Types live in GameDataTypes / PaperDoll / GameLoop / TavernDice.\n";
         if (errors.Count > 0)
             report += "\nFailures:\n" + string.Join("\n", errors);
         else
-            report += "\nWait for compile. Diagnose must show StageLayoutProfile / DiceManager = YES.";
+            report += "\nWait for compile — CS0101 duplicates should be gone.";
         return ok;
     }
 

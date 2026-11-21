@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "62c5a33cd9a9295386ea62929effa7cc9eb23af5";
 
-    private const string ExpectedPackageId = "embed-phase25-types-nuclear";
+    private const string ExpectedPackageId = "stub-phase25-dupes-cs0101";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -677,7 +677,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("soulsLostThisRun")
                    && body.Contains("DiceManager")
                    && body.Contains("DA-59 EMBEDDED StageParallaxController")
-                   && body.Contains("MicroShake");
+                   && body.Contains("MicroShake")
+                   && body.Contains("DkStubDuplicatePhase25Standalones");
         }
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
