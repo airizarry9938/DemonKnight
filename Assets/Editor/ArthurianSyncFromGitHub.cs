@@ -23,7 +23,7 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    private const string FallbackCommitSha = "3de1502546b9fb2f64274ee5ea25f7601726491b";
+    private const string FallbackCommitSha = "3c0a695cbdd420e0274fdfb2e248bba370ebac32";
 
     private const string ExpectedPackageId = "legends-warband-sort-hp-spd";
 
