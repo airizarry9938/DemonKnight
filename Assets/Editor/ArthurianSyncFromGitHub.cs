@@ -393,38 +393,59 @@ public static class ArthurianSyncFromGitHub
         return ok;
     }
 
-    /// <summary>raw/jsDelivr @main only — never FallbackCommitSha (stale pin trap).</summary>
+    /// <summary>
+    /// Tip SHA (API) + raw@main — never FallbackCommitSha.
+    /// raw@main alone can lag minutes after push; prefer commits/main SHA first.
+    /// </summary>
     static string DownloadRawMainOnly(string rel, out string source)
     {
         Exception last = null;
+        string tip = null;
+        try { tip = ResolveMainSha(); } catch { /* ignore */ }
+
         for (int attempt = 0; attempt < 4; attempt++)
         {
             string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N") + "&a=" + attempt;
-            string[] urls =
+            var urlList = new List<string>();
+            var labelList = new List<string>();
+            if (!string.IsNullOrEmpty(tip))
             {
-                RawBase + "main/" + rel + "?" + bust,
-                RawBase + "main/" + rel,
-                JsDelivrBase + "main/" + rel + "?" + bust,
-                JsDelivrBase + "main/" + rel,
-            };
-            string[] labels = { "raw@main+bust", "raw@main", "jsdelivr@main+bust", "jsdelivr@main" };
-            for (int i = 0; i < urls.Length; i++)
+                urlList.Add(RawBase + tip + "/" + rel + "?" + bust);
+                urlList.Add(RawBase + tip + "/" + rel);
+                urlList.Add(JsDelivrBase + tip + "/" + rel + "?" + bust);
+                labelList.Add("raw@tip+bust");
+                labelList.Add("raw@tip");
+                labelList.Add("jsdelivr@tip+bust");
+            }
+            urlList.Add(RawBase + "main/" + rel + "?" + bust);
+            urlList.Add(RawBase + "main/" + rel);
+            urlList.Add(JsDelivrBase + "main/" + rel + "?" + bust);
+            labelList.Add("raw@main+bust");
+            labelList.Add("raw@main");
+            labelList.Add("jsdelivr@main+bust");
+
+            for (int i = 0; i < urlList.Count; i++)
             {
                 try
                 {
-                    string body = DownloadString(urls[i]);
+                    string body = DownloadString(urlList[i]);
                     if (string.IsNullOrEmpty(body) || body.StartsWith("404")
                         || body.Contains("404: Not Found")
                         || body.Contains("Failed to fetch")
                         || body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
                         throw new Exception("Empty or 404");
-                    source = labels[i] + (attempt > 0 ? $"#retry{attempt}" : "");
+                    // Reject bodies that are clearly the stuck legacy package when upgrading hosts.
+                    if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                        && body.Contains("sync-keep-editor-menus")
+                        && !body.Contains(ExpectedPackageId))
+                        throw new Exception("stale PackageVersion (sync-keep-editor-menus) — retry tip");
+                    source = labelList[i] + (attempt > 0 ? $"#retry{attempt}" : "");
                     return body;
                 }
                 catch (Exception ex) { last = ex; }
             }
         }
-        throw last ?? new Exception("raw@main download failed for " + rel);
+        throw last ?? new Exception("raw tip/main download failed for " + rel);
     }
 
     /// <summary>Read PackageVersion Id from disk (Diagnose compiled type can lag).</summary>

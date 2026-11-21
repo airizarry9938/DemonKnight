@@ -644,15 +644,40 @@ public static class ArthurianMenuBootstrap
     static string DownloadRawMainOnly(string rel)
     {
         Exception last = null;
+        string tip = null;
+        try
+        {
+            using var wc = new WebClient();
+            wc.Headers.Add("User-Agent", "DemonKnight-ForceUpgradeHosts/1.0");
+            string json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/commits/main");
+            int i = json.IndexOf("\"sha\"", StringComparison.Ordinal);
+            if (i >= 0)
+            {
+                int q1 = json.IndexOf('"', i + 5);
+                int q2 = q1 >= 0 ? json.IndexOf('"', q1 + 1) : -1;
+                // API returns "sha": "..." — find value after colon
+                int colon = json.IndexOf(':', i);
+                q1 = colon >= 0 ? json.IndexOf('"', colon + 1) : -1;
+                q2 = q1 >= 0 ? json.IndexOf('"', q1 + 1) : -1;
+                if (q1 >= 0 && q2 > q1 + 30)
+                    tip = json.Substring(q1 + 1, q2 - q1 - 1);
+            }
+        }
+        catch { /* tip optional */ }
+
         for (int attempt = 0; attempt < 4; attempt++)
         {
             string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N");
-            string[] urls =
+            var urls = new List<string>();
+            if (!string.IsNullOrEmpty(tip))
             {
-                RawBase + "main/" + rel + "?" + bust,
-                RawBase + "main/" + rel,
-                JsDelivrBase + "main/" + rel + "?" + bust,
-            };
+                urls.Add(RawBase + tip + "/" + rel + "?" + bust);
+                urls.Add(RawBase + tip + "/" + rel);
+                urls.Add(JsDelivrBase + tip + "/" + rel + "?" + bust);
+            }
+            urls.Add(RawBase + "main/" + rel + "?" + bust);
+            urls.Add(RawBase + "main/" + rel);
+            urls.Add(JsDelivrBase + "main/" + rel + "?" + bust);
             foreach (string url in urls)
             {
                 try
@@ -665,12 +690,19 @@ public static class ArthurianMenuBootstrap
                     if (!string.IsNullOrEmpty(body) && body.Length > 80
                         && !body.Contains("404: Not Found")
                         && !body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Reject stuck legacy package when tip CDN returns stale @main.
+                        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                            && body.Contains("sync-keep-editor-menus")
+                            && !body.Contains("force-upgrade-sync-hosts"))
+                            throw new Exception("stale PackageVersion sync-keep-editor-menus");
                         return body;
+                    }
                 }
                 catch (Exception ex) { last = ex; }
             }
         }
-        throw last ?? new Exception("raw@main failed for " + rel);
+        throw last ?? new Exception("raw tip/main failed for " + rel);
     }
 
     /// <summary>

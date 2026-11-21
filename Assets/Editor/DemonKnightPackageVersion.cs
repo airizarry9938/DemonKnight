@@ -4,6 +4,6 @@ public static class DemonKnightPackageVersion
 {
     public const string Id = "force-upgrade-sync-hosts";
     public const string GitHint = "raw-main-ForceOverwrite-no-FallbackPin-no-skip-self";
-    public const string BuiltUtc = "2026-11-21T21:35:51Z";
+    public const string BuiltUtc = "2026-11-21T21:36:35Z";
 }
 #endif
