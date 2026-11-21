@@ -24,7 +24,7 @@ public static class ArthurianSyncFromGitHub
     // Updated when shipping Sync packages (main tip alone is still older merges).
     private const string FallbackCommitSha = "ac28dad";
 
-    private const string ExpectedPackageId = "pew-hide-prefab-box-images";
+    private const string ExpectedPackageId = "pew-generate-appearance-if-null";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe

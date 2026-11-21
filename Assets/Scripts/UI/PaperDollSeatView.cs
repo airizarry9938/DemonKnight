@@ -27,8 +27,17 @@ namespace ArthurianAutobattler
             var layers = EnsureModularLayers();
             HideNonModularImages(layers);
 
-            if (recruit != null && recruit.appearance != null)
+            if (recruit != null)
+            {
+                // Older TownRNG / Sync copies left appearance unset → solid pew boxes.
+                if (recruit.appearance == null)
+                {
+                    var lib = TownsfolkVisualApplier.Library;
+                    recruit.appearance = TownsfolkAppearance.Generate(
+                        recruit.unitType, recruit.unitID, recruit.pewSeatIndex, lib);
+                }
                 recruit.appearance.BindSeatSalt(recruit.pewSeatIndex);
+            }
 
             TownsfolkVisualApplier.Apply(
                 recruit?.appearance,

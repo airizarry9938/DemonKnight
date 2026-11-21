@@ -17,6 +17,12 @@ namespace ArthurianAutobattler
         public void Apply(RecruitInstance recruit)
         {
             var layers = EnsureLayers();
+            if (recruit != null && recruit.appearance == null)
+            {
+                recruit.appearance = TownsfolkAppearance.Generate(
+                    recruit.unitType, recruit.unitID, recruit.pewSeatIndex,
+                    TownsfolkVisualApplier.Library);
+            }
             if (recruit?.appearance != null)
                 recruit.appearance.BindSeatSalt(recruit.pewSeatIndex);
             TownsfolkVisualApplier.Apply(recruit?.appearance, layers, recruit);

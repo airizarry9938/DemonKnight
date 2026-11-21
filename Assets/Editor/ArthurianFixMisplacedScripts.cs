@@ -28,11 +28,8 @@ public static class ArthurianFixMisplacedScripts
         "ArthurianBattleSpriteSheetSlicerWindow.cs",
         "ArthurianCharacterCatalogSeeder.cs",
         "ArthurianCharacterDatabaseEditor.cs",
-        // Legacy names — keep if someone still has pre-rename copies
-        "ModularSpriteSheetImporterWindow.cs",
-        "BattleSpriteSheetSlicerWindow.cs",
-        "CharacterCatalogSeeder.cs",
-        "CharacterDatabaseEditor.cs",
+        // Legacy unprefixed Art Tools are NOT allowed — delete duplicates that cause
+        // "menu item already exists" and keep wiping/conflicting with Arthurian* copies.
     };
 
     static bool IsAllowedEditorScript(string fileName)
