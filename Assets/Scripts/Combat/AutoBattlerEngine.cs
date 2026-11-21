@@ -32,9 +32,31 @@ namespace ArthurianAutobattler
 
             List<RecruitInstance> combatRoster = new List<RecruitInstance>();
             spriteLookup.Clear();
+            var layout = StageLayoutProfile.Load();
+            layout?.EnsureSlotCounts();
+            int nextSlot = 0;
 
             foreach (var r in recruitedParty)
             {
+                if (r == null) continue;
+                // Phase 5: only deployed units march (cap 52).
+                if (!r.isDeployed) continue;
+                if (nextSlot >= StageLayoutProfile.PlayerBattleCount) break;
+
+                // Sequential formation slots 0..51 (columns of 6 for line-pierce).
+                int slot = nextSlot;
+                nextSlot++;
+
+                int bonusHp = 0, bonusAtk = 0, bonusSpd = 0;
+                if (layout != null && slot >= 0 && slot < layout.playerBattleSlots.Count
+                    && layout.playerBattleSlots[slot] != null)
+                {
+                    var cfg = layout.playerBattleSlots[slot];
+                    bonusHp = cfg.bonusHP;
+                    bonusAtk = cfg.bonusATK;
+                    bonusSpd = cfg.bonusSPD;
+                }
+
                 // Clone stats so permanent run buffs don't double-stack across waves
                 RecruitInstance copy = new RecruitInstance
                 {
@@ -42,14 +64,14 @@ namespace ArthurianAutobattler
                     characterName = r.characterName,
                     unitType = r.unitType,
                     assignedRole = r.assignedRole,
-                    maxHealth = r.maxHealth,
-                    attackDamage = r.attackDamage,
-                    attackSpeed = r.attackSpeed,
+                    maxHealth = r.maxHealth + bonusHp,
+                    attackDamage = r.attackDamage + bonusAtk,
+                    attackSpeed = r.attackSpeed + bonusSpd * 0.1f,
                     primaryTrait = r.primaryTrait,
                     hatedTrait = r.hatedTrait,
                     lovedTrait = r.lovedTrait,
-                    battleSlotIndex = r.battleSlotIndex,
-                    isDeployed = r.isDeployed,
+                    battleSlotIndex = slot,
+                    isDeployed = true,
                     isScouted = r.isScouted,
                     hiddenTraitId = r.hiddenTraitId,
                     veteranRank = r.EffectiveVeteranRank,
@@ -58,6 +80,8 @@ namespace ArthurianAutobattler
                     canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior
                 };
                 copy.isSirenEnchantress = r.isSirenEnchantress;
+                // Keep canonical slot for upkeep / next wave.
+                r.battleSlotIndex = slot;
                 combatRoster.Add(copy);
                 if (r.randomAvatar != null) spriteLookup[r.unitID] = r.randomAvatar;
             }
@@ -68,11 +92,19 @@ namespace ArthurianAutobattler
             ApplyLegendRivalries(combatRoster);
             ApplyUsurpationStarterLegends(combatRoster);
 
+            // Re-stamp unique slots 0..51 after pact clones / mirror so line-pierce columns stay valid.
+            for (int i = 0; i < combatRoster.Count && i < StageLayoutProfile.PlayerBattleCount; i++)
+            {
+                if (combatRoster[i] == null) continue;
+                combatRoster[i].battleSlotIndex = i;
+            }
+
             playerArmy.Clear();
             bool hellfire = SomersetRunes.IsPact(DemonicPactID.HellfireSteel);
 
             foreach (var r in combatRoster)
             {
+                if (r == null) continue;
                 int atk = r.attackDamage;
                 float aps = Mathf.Clamp(r.attackSpeed, 1.0f, 2.0f);
                 if (hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight))
@@ -94,6 +126,7 @@ namespace ArthurianAutobattler
                     currentHealth = r.maxHealth,
                     attackDamage = atk,
                     attacksPerSecond = aps,
+                    battleSlotIndex = r.battleSlotIndex,
                     canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior,
                     cannotBeHealed = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight),
                     maxHpDrainPerSecond = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight)
@@ -628,8 +661,45 @@ namespace ArthurianAutobattler
                 BattlefieldVisualizer.Instance?.SpawnPopup(target, "FEAR!", new Color(0.7f, 0.45f, 0.9f));
             }
 
+            // Phase 5: Wave 3+ elite line-pierce — 35% splash to unit behind (same column, slot+6).
+            if (finalDamage > 0
+                && attacker != null && attacker.isDemon
+                && currentBattleNumber >= 3
+                && IsEliteDemon(attacker)
+                && target != null && !target.isDemon)
+            {
+                ApplyLinePierceSplash(target, finalDamage);
+            }
+
             if (target.currentHealth <= 0) HandleUnitDeath(target);
             return finalDamage;
+        }
+
+        static bool IsEliteDemon(CombatUnit u)
+        {
+            if (u == null || !u.isDemon) return false;
+            string n = u.unitType.ToString();
+            if (n.StartsWith("Boss")) return true;
+            if (u.unitType == UnitType.DemonDreadLord) return true;
+            return u.powerValue >= 12;
+        }
+
+        void ApplyLinePierceSplash(CombatUnit primary, int primaryDamage)
+        {
+            if (primary == null) return;
+            // Columns of frontlineSize (6): unit behind shares slotIndex % 6, index + 6.
+            int behindSlot = primary.battleSlotIndex + frontlineSize;
+            if (behindSlot % frontlineSize != primary.battleSlotIndex % frontlineSize) return;
+            var behind = playerArmy.FirstOrDefault(u =>
+                u != null && u.IsAlive && !u.isDemon && u.battleSlotIndex == behindSlot);
+            if (behind == null) return;
+
+            int splash = Mathf.Max(1, Mathf.RoundToInt(primaryDamage * 0.35f));
+            behind.currentHealth -= splash;
+            BattlefieldVisualizer.Instance?.SpawnPopup(
+                behind, $"PIERCE -{splash}", new Color(1f, 0.55f, 0.2f));
+            if (behind.currentHealth <= 0)
+                HandleUnitDeath(behind);
         }
 
         private void HandleUnitDeath(CombatUnit fallen)
@@ -658,8 +728,16 @@ namespace ArthurianAutobattler
             // Phase 4 — true fatal blow micro-shake.
             StageParallaxController.MicroShake();
 
+            // Phase 5 Shepherd's Vow — combat deaths only (fusions never call here).
             if (!fallen.isDemon)
             {
+                var loop = DemonKnightCompatApi.ResolveLoop() ?? GameLoopManager.Instance;
+                if (loop != null)
+                {
+                    loop.soulsLostThisRun++;
+                    loop.ResolveChurchUI()?.RefreshHUD();
+                }
+
                 foreach (var lancelot in playerArmy.Where(u => u.IsAlive && u.unitType == UnitType.SirLancelot))
                     lancelot.attackDamage += 5;
             }
@@ -689,7 +767,15 @@ namespace ArthurianAutobattler
             BattleBossDialogUI.Hide();
             BattlefieldVisualizer.Instance?.ClearAllActors();
             BattlefieldVisualizer.Instance?.StopBattleVideo();
-            int goldEarned = playerWon ? DemonKnightCompatApi.WaveVictoryGold : DemonKnightCompatApi.WaveLossGold;
+
+            // Phase 5 flock upkeep from the +200g victory base (loss uses consolation, no upkeep).
+            int marched = playerArmy.Count(u => u != null && !u.isDemon);
+            int basePayout = playerWon
+                ? DemonKnightCompatApi.WaveVictoryGold
+                : DemonKnightCompatApi.WaveLossGold;
+            int flockUpkeep = playerWon ? FlockEconomy.ComputeUpkeep(marched) : 0;
+            int netBase = Mathf.Max(0, basePayout - flockUpkeep);
+            int goldEarned = netBase;
             // Balance V2: +10g per surviving marcher.
             int survivors = playerArmy.Count(u => u != null && !u.isDemon && u.IsAlive);
             int bounty = survivors * DemonKnightCompatApi.SurvivorBountyGold;
@@ -701,6 +787,10 @@ namespace ArthurianAutobattler
                 goldEarned += PerkDraftManager.TaxationPerWaveWin;
 
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
+            string flockBreakdown = playerWon
+                ? FlockEconomy.FormatBreakdown(marched, basePayout, flockUpkeep, netBase)
+                : "";
+            if (loop != null) loop.lastFlockUpkeepBreakdown = flockBreakdown;
 
             // Hire-price memory: Balance V2 death penalty is +0 (call kept for compatibility).
             var deadIds = new HashSet<string>();
@@ -763,7 +853,8 @@ namespace ArthurianAutobattler
             {
                 uiGold.playerGold += goldEarned;
                 Debug.LogError(
-                    $"[DemonKnight] Wave gold +{goldEarned}g (won={playerWon}, survivors={survivors}, bounty={bounty}) → purse {uiGold.playerGold}g.");
+                    $"[DemonKnight] Wave gold +{goldEarned}g (won={playerWon}, base={netBase}, upkeep={flockUpkeep}, survivors={survivors}, bounty={bounty}) → purse {uiGold.playerGold}g."
+                    + (string.IsNullOrEmpty(flockBreakdown) ? "" : " " + flockBreakdown));
                 uiGold.UpdateHUD();
             }
             else
@@ -833,7 +924,7 @@ namespace ArthurianAutobattler
                 var merlin = MerlinResurrectionManager.Instance
                              ?? FindFirstObjectByType<MerlinResurrectionManager>();
                 if (merlin != null)
-                    merlin.TriggerWaveVictoryScreen(clearedWave, goldEarned);
+                    merlin.TriggerWaveVictoryScreen(clearedWave, goldEarned, flockBreakdown);
                 else
                 {
                     // Fallback if Merlin missing from scene: bump night and open town.

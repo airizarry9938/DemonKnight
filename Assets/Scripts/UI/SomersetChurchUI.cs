@@ -2146,12 +2146,15 @@ namespace ArthurianAutobattler
                         : $"Full Report ({RecruitInstance.IntelTier3Cost}g)");
             }
             if (hireButton != null) hireButton.interactable = true;
-            if (trainTankButton != null) trainTankButton.interactable = Town != null && Town.playerGold >= 15;
+            var loopTrain = GameLoopManager.Instance;
+            bool canTrainPay = (Town != null && Town.playerGold >= 15)
+                               || (loopTrain != null && loopTrain.trainingVouchers > 0);
+            if (trainTankButton != null) trainTankButton.interactable = canTrainPay;
             if (trainRangedButton != null)
             {
                 // Warriors may move BACK via formation, but cannot Train Ranged / crossbow.
                 bool warriorBlocked = selected != null && !selected.AllowsTrainRangedKit;
-                trainRangedButton.interactable = Town != null && Town.playerGold >= 15 && !warriorBlocked;
+                trainRangedButton.interactable = canTrainPay && !warriorBlocked;
             }
             int mediateCost = GameLoopManager.MediateCostGold;
             if (mediateButton != null)
@@ -2239,15 +2242,21 @@ namespace ArthurianAutobattler
             int cost = RecruitInstance.IntelCostForTier(tier);
             if (Town.playerGold < cost || selected.intelTierUnlocked >= tier) return;
             Town.playerGold -= cost;
-            selected.intelTierUnlocked = tier;
-            GrudgeSaveManager.Instance?.RememberIntel(selected.unitID, tier);
+            // Phase 5: scout + reveal spark + gossip adjacent same pew row.
+            var pool = GameLoopManager.Instance?.currentTownPool;
+            IntelGossip.ApplyIntelPurchase(selected, tier, pool);
+            // Refresh pew tint for gossip neighbors.
+            if (pool != null) PopulatePews(pool);
             RefreshDossier();
             RefreshHUD();
         }
 
         private void Train(CombatRole role)
         {
-            if (selected == null || Town == null || Town.playerGold < 15) return;
+            if (selected == null || Town == null) return;
+            var loop = GameLoopManager.Instance;
+            bool useVoucher = loop != null && loop.trainingVouchers > 0;
+            if (!useVoucher && Town.playerGold < 15) return;
             if (role == CombatRole.BacklineRanged && !selected.AllowsTrainRangedKit)
             {
                 if (dossierDialogue != null)
@@ -2263,9 +2272,19 @@ namespace ArthurianAutobattler
                 RefreshDossier();
                 return;
             }
-            Town.playerGold -= 15;
-            if (dossierDialogue != null)
-                dossierDialogue.text = $"<color=#7CFF9A>Trained as {role} — {bonus}!</color>";
+            if (useVoucher)
+            {
+                loop.trainingVouchers--;
+                if (dossierDialogue != null)
+                    dossierDialogue.text =
+                        $"<color=#7CFF9A>Trained as {role} — {bonus}!</color> (voucher; {loop.trainingVouchers} left)";
+            }
+            else
+            {
+                Town.playerGold -= 15;
+                if (dossierDialogue != null)
+                    dossierDialogue.text = $"<color=#7CFF9A>Trained as {role} — {bonus}!</color>";
+            }
             RefreshDossier();
             RefreshHUD();
         }
@@ -3177,6 +3196,8 @@ namespace ArthurianAutobattler
             }
         }
 
+        TextMeshProUGUI soulsLostHudText;
+
         public void RefreshHUD()
         {
             var town = Town;
@@ -3184,6 +3205,7 @@ namespace ArthurianAutobattler
             if (loop != null) SetNight(loop.currentNight);
             if (goldText != null && town != null) goldText.text = $"Royal Gold: {town.playerGold}g";
             UpdateWarbandHudLabel();
+            RefreshShepherdsVowBadge(loop);
             if (timerText != null && loop != null)
             {
                 if (SomersetRunes.IsTownTimerDisabled())
@@ -3205,6 +3227,60 @@ namespace ArthurianAutobattler
                         ? $"Round (−{GameLoopManager.TavernRoundHireDiscount}g ✓)"
                         : $"Buy Round ({GameLoopManager.TavernRoundCostGold}g)");
             }
+        }
+
+        /// <summary>Phase 5 Shepherd's Vow — Souls Lost badge (gold @ 0, crimson if &gt; 0).</summary>
+        void RefreshShepherdsVowBadge(GameLoopManager loop)
+        {
+            EnsureShepherdsVowHud();
+            if (soulsLostHudText == null) return;
+            int lost = loop != null ? loop.soulsLostThisRun : 0;
+            soulsLostHudText.text = $"Souls Lost: {lost}";
+            if (lost <= 0)
+            {
+                soulsLostHudText.color = new Color(1f, 0.86f, 0.35f, 1f);
+                soulsLostHudText.fontStyle = FontStyles.Bold;
+            }
+            else
+            {
+                soulsLostHudText.color = new Color(0.92f, 0.22f, 0.28f, 1f);
+                soulsLostHudText.fontStyle = FontStyles.Bold;
+            }
+        }
+
+        void EnsureShepherdsVowHud()
+        {
+            if (soulsLostHudText != null) return;
+            Transform hud = transform.Find("HUD_Bar");
+            if (hud == null)
+            {
+                var found = GetComponentsInChildren<Transform>(true);
+                foreach (var t in found)
+                {
+                    if (t != null && t.name == "HUD_Bar") { hud = t; break; }
+                }
+            }
+            if (hud == null) return;
+
+            var existing = hud.Find("SoulsLostBadge");
+            if (existing != null)
+            {
+                soulsLostHudText = existing.GetComponent<TextMeshProUGUI>();
+                if (soulsLostHudText != null) return;
+            }
+
+            var go = new GameObject("SoulsLostBadge", typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(hud, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.62f, 0.15f);
+            rt.anchorMax = new Vector2(0.92f, 0.85f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            soulsLostHudText = go.GetComponent<TextMeshProUGUI>();
+            soulsLostHudText.fontSize = 18f;
+            soulsLostHudText.alignment = TextAlignmentOptions.Center;
+            soulsLostHudText.raycastTarget = false;
+            soulsLostHudText.text = "Souls Lost: 0";
         }
 
         private void Update()

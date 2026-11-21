@@ -362,7 +362,8 @@ namespace ArthurianAutobattler
                 if (art == null)
                     art = ResolveBattleSprite(u.unitType);
                 float scale = ResolveVisualScale(u.unitType);
-                actor.Initialize(u, art, CalculateSlotPosition(true, i), false, scale);
+                int slot = u.battleSlotIndex >= 0 ? u.battleSlotIndex : i;
+                actor.Initialize(u, art, CalculateSlotPosition(true, slot), false, scale);
                 activeActors[u.unitID] = actor;
             }
 
@@ -438,13 +439,27 @@ namespace ArthurianAutobattler
 
         private Vector3 CalculateSlotPosition(bool isPlayer, int index)
         {
+            // Phase 5: prefer StageLayoutProfile numbered slots (52 player / 20 enemy).
+            var profile = StageLayoutProfile.Load();
+            if (profile != null)
+            {
+                profile.EnsureSlotCounts();
+                var list = isPlayer ? profile.playerBattleSlots : profile.enemyBattleSlots;
+                if (list != null && index >= 0 && index < list.Count && list[index] != null)
+                {
+                    var cfg = list[index];
+                    return new Vector3(cfg.position.x, cfg.position.y, 0f);
+                }
+            }
+
             var slots = isPlayer ? resolvedPlayerSlots : resolvedEnemySlots;
             if (slots != null && index >= 0 && index < slots.Length && slots[index] != null)
                 return slots[index].position;
 
             Vector2 origin = isPlayer ? humanOrigin : demonOrigin;
-            int row = index % 3;
-            int col = index / 3;
+            // Columns of 6 (frontlineSize) matching StageLayoutProfile auto-arrange.
+            int col = index / 6;
+            int row = index % 6;
             float xDir = isPlayer ? -1f : 1f;
             return new Vector3(origin.x + (col * colOffset * xDir), origin.y - (row * rowSpacing), 0f);
         }

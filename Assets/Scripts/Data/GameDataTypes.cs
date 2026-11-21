@@ -67,6 +67,9 @@ namespace ArthurianAutobattler
         public int preFloorCost;
         public int floorApplied;
         public int finalCost;
+        /// <summary>Phase 5 scout: gold shaved by 30% (min 5g) after other mods.</summary>
+        public int scoutCut;
+        public bool jackpotFree;
 
         /// <summary>Net vs base hire before Loyalist ÷2 / floor (for dialogue).</summary>
         public int NetModsBeforeLoyalistAndFloor =>
@@ -76,6 +79,12 @@ namespace ArthurianAutobattler
         {
             var sb = new System.Text.StringBuilder();
             sb.Append($"Hire: <b>{finalCost}g</b>  (base {baseHire}g");
+            if (jackpotFree)
+            {
+                sb.Append("; Jackpot FREE");
+                sb.Append(')');
+                return sb.ToString();
+            }
             if (bloodOathApplied)
                 sb.Append($"; Blood-Oath R{bloodOathRank} −{bloodOathRank * 5}g (waived +{rawGrudge}g grudge)");
             else if (rawGrudge != 0)
@@ -88,6 +97,7 @@ namespace ArthurianAutobattler
             if (loyalistHalf) sb.Append("; Loyalist ÷2");
             if (floorApplied > 0 && finalCost == floorApplied && preFloorCost < floorApplied)
                 sb.Append($"; floor ≥{floorApplied}g");
+            if (scoutCut > 0) sb.Append($"; Scout −30% (−{scoutCut}g, min {RecruitInstance.ScoutHireMinGold}g)");
             sb.Append(')');
             return sb.ToString();
         }
@@ -124,6 +134,14 @@ namespace ArthurianAutobattler
 
         /// <summary>Hidden spark id (e.g. "Legend Spark") revealed when scouted.</summary>
         public string hiddenTraitId;
+
+        /// <summary>Dice Jackpot — hire is free regardless of floors / mods.</summary>
+        public bool hireCostForcedZero;
+
+        /// <summary>Master Spec Phase 5 spark id.</summary>
+        public const string LegendSparkId = "Legend Spark";
+        public const float ScoutHireMult = 0.7f;
+        public const int ScoutHireMinGold = 5;
 
         public BodyPosture bodyPosture = BodyPosture.UprightFolded;
         public Sprite bodySprite;
@@ -288,6 +306,14 @@ namespace ArthurianAutobattler
             if (GameLoopManager.Instance != null && GameLoopManager.Instance.tavernRoundHireDiscountActive)
                 b.tavernCut = GameLoopManager.TavernRoundHireDiscount;
 
+            if (hireCostForcedZero)
+            {
+                b.jackpotFree = true;
+                b.preFloorCost = 0;
+                b.finalCost = 0;
+                return b;
+            }
+
             int cost = Mathf.Max(1,
                 b.baseHire + b.effectiveGrudge - b.writDiscount - b.crownCut
                 + b.jealousyTax - b.starDiscount - b.tavernCut);
@@ -296,6 +322,14 @@ namespace ArthurianAutobattler
             // Tier floors after ALL modifiers so Loyalist / Crown / Writ / Tavern
             // cannot undercut band floors on Fresh New Game townsfolk.
             b.finalCost = Mathf.Max(cost, b.floorApplied);
+
+            // Phase 5: scouted → −30% hire (min 5g), applied after floors.
+            if (isScouted)
+            {
+                int afterScout = Mathf.Max(ScoutHireMinGold, Mathf.RoundToInt(b.finalCost * ScoutHireMult));
+                b.scoutCut = Mathf.Max(0, b.finalCost - afterScout);
+                b.finalCost = afterScout;
+            }
             return b;
         }
 
@@ -460,16 +494,21 @@ namespace ArthurianAutobattler
                 info += "\n";
             }
 
-            if (intelTierUnlocked >= 1)
+            if (intelTierUnlocked >= 1 || isScouted)
                 info += $"HP: {maxHealth} | ATK: {attackDamage} | SPD: {attackSpeed:F1}/s\n";
             else
                 info += $"HP: ??? | ATK: ??? (Scout — free)\n";
+
+            if (isScouted && !string.IsNullOrEmpty(hiddenTraitId))
+                info += $"<color=#FFD700>Spark: {hiddenTraitId}</color>\n";
+            else if (!isScouted)
+                info += "Spark: ??? (Scout to reveal)\n";
 
             // Hire add-ons / subtractions — same math as Recruit (Ng).
             info += $"<color=#FFE066>{hire.FormatDossierLines()}</color>\n";
 
             // Battle-only perk / rune effects — only after Scout so HP/ATK deltas do not leak.
-            if (intelTierUnlocked >= 1)
+            if (intelTierUnlocked >= 1 || isScouted)
                 info += FormatBattleBonusLines();
 
             if (intelTierUnlocked >= 2)
@@ -590,6 +629,9 @@ namespace ArthurianAutobattler
         public float maxHpDrainPerSecond = 0f;
         /// <summary>Train Ranged crossbow — allows melee to fire from BACK.</summary>
         public bool canAttackFromBack;
+
+        /// <summary>Formation slot 0..51 — StageLayoutProfile.playerBattleSlots / line-pierce column.</summary>
+        public int battleSlotIndex;
 
         public bool IsAlive => currentHealth > 0;
 
@@ -740,6 +782,72 @@ namespace ArthurianAutobattler
                     }
                 }
             }
+        }
+    }
+
+    /// <summary>Phase 5 — Intel purchase marks scouted + gossip-adjacent pew neighbors.</summary>
+    public static class IntelGossip
+    {
+        public const int PewRowSize = StageLayoutProfile.PewRowSize;
+
+        public static void ApplyIntelPurchase(RecruitInstance target, int tier, List<RecruitInstance> townPool)
+        {
+            if (target == null) return;
+            target.intelTierUnlocked = Mathf.Max(target.intelTierUnlocked, tier);
+            MarkScouted(target);
+            GrudgeSaveManager.Instance?.RememberIntel(target.unitID, target.intelTierUnlocked);
+            GossipAdjacentSameRow(target, townPool);
+        }
+
+        public static void MarkScouted(RecruitInstance r)
+        {
+            if (r == null) return;
+            r.isScouted = true;
+            if (r.intelTierUnlocked < 1) r.intelTierUnlocked = 1;
+        }
+
+        /// <summary>
+        /// Auto-scout pewSeatIndex ±1 within the same pewSeatIndex / 13 row.
+        /// </summary>
+        public static void GossipAdjacentSameRow(RecruitInstance center, List<RecruitInstance> townPool)
+        {
+            if (center == null || townPool == null) return;
+            int row = center.pewSeatIndex / PewRowSize;
+            foreach (var other in townPool)
+            {
+                if (other == null || other == center) continue;
+                if (other.pewSeatIndex / PewRowSize != row) continue;
+                int delta = Mathf.Abs(other.pewSeatIndex - center.pewSeatIndex);
+                if (delta != 1) continue;
+                MarkScouted(other);
+                GrudgeSaveManager.Instance?.RememberIntel(
+                    other.unitID, Mathf.Max(other.intelTierUnlocked, 1));
+            }
+        }
+    }
+
+    /// <summary>Phase 5 — escalating flock upkeep deducted from +200g wave victory gold.</summary>
+    public static class FlockEconomy
+    {
+        public static int ComputeUpkeep(int unitCount)
+        {
+            int n = Mathf.Clamp(unitCount, 0, 52);
+            int upkeep = 0;
+            for (int i = 1; i <= n; i++)
+            {
+                if (i <= 12) continue;
+                if (i <= 20) upkeep += 5;
+                else if (i <= 35) upkeep += 10;
+                else upkeep += 20;
+            }
+            return upkeep;
+        }
+
+        public static string FormatBreakdown(int unitCount, int basePayout, int upkeep, int netBase)
+        {
+            return
+                $"Flock {unitCount}: upkeep −{upkeep}g from +{basePayout}g → net base {netBase}g "
+                + "(1–12:0 · 13–20:5 · 21–35:10 · 36–52:20).";
         }
     }
 }

@@ -77,6 +77,7 @@ public static class ArthurianFixMisplacedScripts
         Add("GameLoopManager.cs", "Scripts/Systems/GameLoopManager.cs");
         Add("TownRNGGenerator.cs", "Scripts/Systems/TownRNGGenerator.cs");
         Add("TavernDiceMinigame.cs", "Scripts/Systems/TavernDiceMinigame.cs");
+        Add("DiceManager.cs", "Scripts/Systems/DiceManager.cs");
         Add("CardFusionSystem.cs", "Scripts/Systems/CardFusionSystem.cs");
         Add("PerkDraftManager.cs", "Scripts/Systems/PerkDraftManager.cs");
         Add("DemonicPactManager.cs", "Scripts/Systems/DemonicPactManager.cs");

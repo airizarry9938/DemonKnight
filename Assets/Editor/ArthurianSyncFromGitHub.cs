@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "b806a24b6794581309f0d516317d9b19dda609e8";
 
-    private const string ExpectedPackageId = "master-spec-phase4-anim-parallax";
+    private const string ExpectedPackageId = "master-spec-phase5-intel-dice-flock";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -80,6 +80,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/RelicManager.cs",
         "Assets/Scripts/Systems/SinRuneManager.cs",
         "Assets/Scripts/Systems/TavernDiceMinigame.cs",
+        "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Scripts/Systems/TownRNGGenerator.cs",
         "Assets/Scripts/UI/SomersetPewLayout.cs",
         "Assets/Scripts/UI/ChurchPewLayout.cs",
@@ -135,6 +136,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
         "Assets/Scripts/Systems/CardFusionSystem.cs",
+        "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
     };
 

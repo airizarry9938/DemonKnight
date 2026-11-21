@@ -144,6 +144,8 @@ namespace ArthurianAutobattler
             foreach (var r in chosen)
                 product.fusionIngredients.Add(CardFusionSystem.CloneForFusionMemory(r));
 
+            CardFusionSystem.ApplyLegendSparkBonus(product, chosen);
+
             party.Add(product);
             StageParallaxController.MicroShake();
             Debug.Log(

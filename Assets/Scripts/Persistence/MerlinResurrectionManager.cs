@@ -443,7 +443,7 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Mid-run wave win: victory message + Next Night (advances night via StartNextTimelineRun).
         /// </summary>
-        public void TriggerWaveVictoryScreen(int waveCleared, int goldEarned)
+        public void TriggerWaveVictoryScreen(int waveCleared, int goldEarned, string flockBreakdown = null)
         {
             if (!gameObject.activeInHierarchy)
                 gameObject.SetActive(true);
@@ -451,8 +451,16 @@ namespace ArthurianAutobattler
             EnsureResurrectionCanvas();
             PromoteVictoryCanvas();
             CullDuplicateEventSystems();
+            if (string.IsNullOrEmpty(flockBreakdown))
+            {
+                var loop = GameLoopManager.Instance;
+                flockBreakdown = loop != null ? loop.lastFlockUpkeepBreakdown : null;
+            }
+            string flockLine = string.IsNullOrEmpty(flockBreakdown)
+                ? ""
+                : $"\n{flockBreakdown}\n";
             string msg =
-                $"<b>VICTORY</b> — Wave {waveCleared} cleared (+{goldEarned}g).\n\n"
+                $"<b>VICTORY</b> — Wave {waveCleared} cleared (+{goldEarned}g).{flockLine}\n"
                 + "The pews hold. Press <b>Next Night</b> to advance, or <b>End Run</b> for the Main Menu.";
             // Buttons once — coroutine must not re-wire (that logged Wire* twice per EndBattle).
             HideLegacyBankPanel();

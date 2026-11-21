@@ -364,12 +364,40 @@ namespace ArthurianAutobattler
             foreach (var r in chosen)
                 product.fusionIngredients.Add(CloneForFusionMemory(r));
 
+            ApplyLegendSparkBonus(product, chosen);
+
             party.Add(product);
             // Phase 4 — Legend fusion micro-shake.
             StageParallaxController.MicroShake();
             Debug.Log(
                 $"[DemonKnight] Fused {product.characterName}: consumed {chosen.Count} ingredient(s), party size now {party.Count}.");
             return true;
+        }
+
+        /// <summary>
+        /// Phase 5: matching "Legend Spark" on ≥2 ingredients → +1 veteranRank and +15% HP/ATK.
+        /// Valid fusions do NOT increment soulsLostThisRun.
+        /// </summary>
+        public static void ApplyLegendSparkBonus(RecruitInstance product, List<RecruitInstance> ingredients)
+        {
+            if (product == null || ingredients == null) return;
+            int sparks = 0;
+            foreach (var ing in ingredients)
+            {
+                if (ing != null
+                    && string.Equals(ing.hiddenTraitId, RecruitInstance.LegendSparkId, System.StringComparison.Ordinal))
+                    sparks++;
+            }
+            if (sparks < 2) return;
+
+            product.AddVeteranRank(1);
+            product.maxHealth = Mathf.RoundToInt(product.maxHealth * 1.15f);
+            product.attackDamage = Mathf.Max(1, Mathf.RoundToInt(product.attackDamage * 1.15f));
+            product.hiddenTraitId = RecruitInstance.LegendSparkId;
+            product.isScouted = true;
+            product.intelTierUnlocked = Mathf.Max(product.intelTierUnlocked, 1);
+            Debug.Log(
+                $"[DemonKnight] Legend Spark fuse bonus on {product.characterName}: +1★ +15% HP/ATK (sparks={sparks}).");
         }
 
         /// <summary>
@@ -443,6 +471,7 @@ namespace ArthurianAutobattler
                 isDeployed = src.isDeployed,
                 isScouted = src.isScouted,
                 hiddenTraitId = src.hiddenTraitId,
+                hireCostForcedZero = src.hireCostForcedZero,
                 modularPoseId = src.modularPoseId,
                 modularOutfitId = src.modularOutfitId,
                 modularHeadId = src.modularHeadId,

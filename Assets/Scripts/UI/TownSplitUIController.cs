@@ -321,8 +321,8 @@ namespace ArthurianAutobattler
             }
 
             playerGold -= cost;
-            selectedRecruit.intelTierUnlocked = tier;
-            GrudgeSaveManager.Instance?.RememberIntel(selectedRecruit.unitID, tier);
+            var pool = GameLoopManager.Instance?.currentTownPool ?? activeTownPool;
+            IntelGossip.ApplyIntelPurchase(selectedRecruit, tier, pool);
             UpdateHUD();
             RefreshDossierUI(GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
@@ -401,7 +401,10 @@ namespace ArthurianAutobattler
 
         public void TrainSelectedRole(CombatRole role)
         {
-            if (selectedRecruit == null || playerGold < 15) return;
+            if (selectedRecruit == null) return;
+            var loop = GameLoopManager.Instance;
+            bool useVoucher = loop != null && loop.trainingVouchers > 0;
+            if (!useVoucher && playerGold < 15) return;
             if (role == CombatRole.BacklineRanged && !selectedRecruit.AllowsTrainRangedKit)
             {
                 if (characterDialogueText != null)
@@ -421,12 +424,17 @@ namespace ArthurianAutobattler
                     : 0);
                 return;
             }
-            playerGold -= 15;
+            if (useVoucher)
+                loop.trainingVouchers--;
+            else
+                playerGold -= 15;
             UpdateHUD();
             RefreshDossierUI(GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
                 : 0);
-            characterDialogueText.text = $"<color=#00FFFF>Trained as {role} — {bonus}!</color>";
+            characterDialogueText.text = useVoucher
+                ? $"<color=#00FFFF>Trained as {role} — {bonus}!</color> (voucher)"
+                : $"<color=#00FFFF>Trained as {role} — {bonus}!</color>";
         }
 
         public void MediateSelectedRecruit()
@@ -603,22 +611,9 @@ namespace ArthurianAutobattler
                 tavernRoundButton?.onClick.AddListener(BuyTavernRound);
             }
 
-            startDiceButton?.onClick.AddListener(() =>
-            {
-                diceGame.StartGame(ref playerGold);
-                UpdateHUD();
-                UpdateDiceUI("Rolled in!");
-            });
-            rollDiceButton?.onClick.AddListener(() => diceGame.RollDie());
-            cashOutButton?.onClick.AddListener(() =>
-            {
-                int gambler = SomersetRunes.GetRank(BankRuneID.Gambler);
-                diceGame.CashOut(ref playerGold);
-                UpdateHUD();
-                UpdateDiceUI(gambler >= 3
-                    ? "Cashed out! <color=#B8E986>Gambler R3: +15s town</color>"
-                    : "Cashed out!");
-            });
+            startDiceButton?.onClick.AddListener(OnStartDiceClicked);
+            rollDiceButton?.onClick.AddListener(OnRollDiceClicked);
+            cashOutButton?.onClick.AddListener(OnCashOutOrCursedWagerClicked);
 
             if (diceGame != null)
             {
@@ -632,17 +627,117 @@ namespace ArthurianAutobattler
                 });
                 diceGame.OnBust.AddListener(() => UpdateDiceUI("<color=red>ROLLED A 1! BUST!</color>"));
             }
+            RefreshDiceButtonLabels();
+        }
+
+        void OnStartDiceClicked()
+        {
+            var dm = DiceManager.Ensure();
+            // Phase 5: spend free stakes roll first when available.
+            if (dm.freeRollsRemaining > 0)
+            {
+                if (dm.TryFreeRoll(cursedWager: false, out string msg))
+                    UpdateDiceUI(msg);
+                else
+                    UpdateDiceUI(dm.lastResultMessage);
+                UpdateHUD();
+                RefreshDiceButtonLabels();
+                return;
+            }
+
+            if (diceGame == null) return;
+            diceGame.StartGame(ref playerGold);
+            UpdateHUD();
+            UpdateDiceUI("Rolled in!");
+            RefreshDiceButtonLabels();
+        }
+
+        void OnRollDiceClicked()
+        {
+            if (diceGame != null && diceGame.isPlaying)
+            {
+                diceGame.RollDie();
+                return;
+            }
+        }
+
+        void OnCashOutOrCursedWagerClicked()
+        {
+            var dm = DiceManager.Ensure();
+            // Cursed Dice relic: wager +1 staged grudge for guaranteed Jackpot on free roll.
+            if (dm.freeRollsRemaining > 0 && dm.HasCursedDiceRelic
+                && (diceGame == null || !diceGame.isPlaying))
+            {
+                if (dm.TryFreeRoll(cursedWager: true, out string msg))
+                    UpdateDiceUI(msg);
+                else
+                    UpdateDiceUI(dm.lastResultMessage);
+                UpdateHUD();
+                RefreshDiceButtonLabels();
+                return;
+            }
+
+            if (diceGame == null || !diceGame.isPlaying) return;
+            int gambler = SomersetRunes.GetRank(BankRuneID.Gambler);
+            diceGame.CashOut(ref playerGold);
+            UpdateHUD();
+            UpdateDiceUI(gambler >= 3
+                ? "Cashed out! <color=#B8E986>Gambler R3: +15s town</color>"
+                : "Cashed out!");
+            RefreshDiceButtonLabels();
         }
 
         private void UpdateDiceUI(string msg)
         {
             if (diceResultText != null) diceResultText.text = msg;
-            if (currentPotText != null) currentPotText.text = $"Pot: {diceGame.currentPot}g";
+            RefreshDiceButtonLabels();
+        }
+
+        void RefreshDiceButtonLabels()
+        {
+            var dm = DiceManager.Ensure();
+            bool antePlaying = diceGame != null && diceGame.isPlaying;
+            if (currentPotText != null)
+            {
+                if (dm.freeRollsRemaining > 0 && !antePlaying)
+                    currentPotText.text = $"Free roll: {dm.freeRollsRemaining}";
+                else
+                    currentPotText.text = $"Pot: {(diceGame != null ? diceGame.currentPot : 0)}g";
+            }
+
             if (startDiceButton != null)
-                startDiceButton.interactable = !diceGame.isPlaying && playerGold >= diceGame.entryFee;
-            if (rollDiceButton != null) rollDiceButton.interactable = diceGame.isPlaying;
+            {
+                if (dm.freeRollsRemaining > 0 && !antePlaying)
+                {
+                    startDiceButton.interactable = true;
+                    SetButtonLabel(startDiceButton, "Free Stakes Roll");
+                }
+                else
+                {
+                    startDiceButton.interactable = !antePlaying
+                        && diceGame != null && playerGold >= diceGame.entryFee;
+                    SetButtonLabel(startDiceButton,
+                        diceGame != null ? $"Start ({diceGame.entryFee}g)" : "Start");
+                }
+            }
+
+            if (rollDiceButton != null)
+                rollDiceButton.interactable = antePlaying;
+
             if (cashOutButton != null)
-                cashOutButton.interactable = diceGame.isPlaying && diceGame.currentPot > 0;
+            {
+                bool cursedFree = dm.freeRollsRemaining > 0 && dm.HasCursedDiceRelic && !antePlaying;
+                if (cursedFree)
+                {
+                    cashOutButton.interactable = true;
+                    SetButtonLabel(cashOutButton, "Cursed Jackpot (+1 grudge)");
+                }
+                else
+                {
+                    cashOutButton.interactable = antePlaying && diceGame != null && diceGame.currentPot > 0;
+                    SetButtonLabel(cashOutButton, "Cash Out");
+                }
+            }
         }
 
         private static void SetButtonLabel(Button button, string label)
@@ -660,6 +755,7 @@ namespace ArthurianAutobattler
                 : 0;
             if (partyCountText != null)
                 partyCountText.text = $"Warband ({count})";
+            RefreshDiceButtonLabels();
             if (tavernRoundButton != null)
             {
                 bool active = GameLoopManager.Instance != null

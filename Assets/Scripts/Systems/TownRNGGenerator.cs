@@ -97,11 +97,15 @@ namespace ArthurianAutobattler
                 randomAvatar = (pool != null && pool.Count > 0) ? pool[Random.Range(0, pool.Count)] : null,
                 intelTierUnlocked = unlockTier1 ? 1 : 0,
                 isSirenEnchantress = lustSiren,
+                // Phase 5: ~12% of pew souls carry a hidden Legend Spark.
+                hiddenTraitId = Random.value < 0.12f ? RecruitInstance.LegendSparkId : null,
                 appearance = TownsfolkAppearance.Generate(type, persistentID, pewSeat, lib)
             };
             // Master Spec Phase 1: base units never carry fusion memory.
             CardFusionSystem.SanitizeBaseUnitFusionFlags(r);
             r.SyncModularIdsFromAppearance();
+            if (unlockTier1)
+                IntelGossip.MarkScouted(r);
 
             // Optional CharacterDefinition portrait when avatar pool is empty.
             if (r.randomAvatar == null)
@@ -119,6 +123,8 @@ namespace ArthurianAutobattler
                 if (remembered > r.intelTierUnlocked)
                     r.intelTierUnlocked = remembered;
             }
+            if (r.intelTierUnlocked >= 1)
+                IntelGossip.MarkScouted(r);
 
             switch (type)
             {

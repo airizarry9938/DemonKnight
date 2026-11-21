@@ -44,6 +44,7 @@ public static class ArthurianSceneBuilder
         var loop = CreateChild<GameLoopManager>(managers, "GameLoopManager");
         var visualizer = CreateChild<BattlefieldVisualizer>(managers, "BattlefieldVisualizer");
         var dice = CreateChild<TavernDiceMinigame>(managers, "TavernDiceMinigame");
+        CreateChild<DiceManager>(managers, "DiceManager");
         CreateChild<RelicManager>(managers, "RelicManager");
         CreateChild<DemonicPactManager>(managers, "DemonicPactManager");
         CreateChild<SinRuneManager>(managers, "SinRuneManager");

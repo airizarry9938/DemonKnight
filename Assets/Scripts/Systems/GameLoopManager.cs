@@ -73,6 +73,15 @@ namespace ArthurianAutobattler
         /// <summary>Balance V2: +10g per living marcher at wave end.</summary>
         public const int SurvivorBountyGold = 10;
 
+        /// <summary>Phase 5 Dice Big Win — free Train purchases.</summary>
+        public int trainingVouchers;
+
+        /// <summary>Phase 5 Shepherd's Vow — combat deaths this run (fusions do not count).</summary>
+        public int soulsLostThisRun;
+
+        /// <summary>Last wave flock upkeep breakdown (Victory UI).</summary>
+        [System.NonSerialized] public string lastFlockUpkeepBreakdown = "";
+
         private Coroutine seatPopulateRoutine;
         private const string NightPrefsKey = "SomersetNight";
         private GamePhase previousPhase;
@@ -241,7 +250,11 @@ namespace ArthurianAutobattler
             lastWaveWon = null;
             mustDisbandPartyAfterCurrentWave = false;
             townSecondsSpentThisPhase = 0f;
+            trainingVouchers = 0;
+            soulsLostThisRun = 0;
+            lastFlockUpkeepBreakdown = "";
             townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+            DiceManager.Ensure().freeRollsRemaining = 0;
 
             if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
             if (battleEngine != null)
@@ -1020,6 +1033,9 @@ namespace ArthurianAutobattler
 
             townUI?.UpdateHUD();
             church?.RefreshHUD();
+            // Master Spec Phase 5: 1 free stakes roll per StartTownRecruitPhase.
+            DiceManager.Ensure().GrantTownPhaseFreeRoll();
+            townUI?.UpdateHUD();
             // Master Spec: redraw veteran ★ after Next Night / StartTownRecruitPhase.
             RedrawVeteranStarIcons();
         }
