@@ -37,8 +37,6 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI rationsBankText;
         public TextMeshProUGUI runeStatusText;
 
-        private bool nextRunButtonWired;
-        private bool endRunButtonWired;
         private Button endRunButton;
         private Button nextNightButton;
         /// <summary>Blocks double AdvanceNight when scene persistent + runtime listeners both fire.</summary>
@@ -146,7 +144,6 @@ namespace ArthurianAutobattler
             nextNightButton.gameObject.SetActive(true);
             if (promoteOverlay)
                 nextNightButton.transform.SetAsLastSibling();
-            nextRunButtonWired = true;
             if (promoteOverlay)
                 Debug.LogError("[DemonKnight] Next Night button wired + visible on victory panel.");
         }
@@ -177,7 +174,6 @@ namespace ArthurianAutobattler
             endRunButton.gameObject.SetActive(true);
             if (promoteOverlay)
                 endRunButton.transform.SetAsLastSibling();
-            endRunButtonWired = true;
         }
 
         /// <summary>Fresh onClick with exactly one runtime listener (no stacking across Sync/domain reloads).</summary>

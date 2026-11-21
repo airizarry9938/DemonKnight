@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "424436b6bdea08e29d267519b2d4e43dc8cdba16";
 
-    private const string ExpectedPackageId = "unit-stats-ur-bottom-dialog";
+    private const string ExpectedPackageId = "fix-cs0103-cs0414-wire-flags";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -655,7 +655,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("StyleVictoryActionButton")
                    && body.Contains("CullDuplicateEventSystems")
                    && body.Contains("BeginVictoryShow")
-                   && body.Contains("BindButtonOnce");
+                   && body.Contains("BindButtonOnce")
+                   && !body.Contains("nextRunButtonWired")
+                   && !body.Contains("endRunButtonWired");
         }
 
         if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
@@ -748,6 +750,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-cs0103-cs0414-wire-flags")
                    || body.Contains("unit-stats-ur-bottom-dialog")
                    || body.Contains("dedupe-victory-wire-eventsystem")
                    || body.Contains("victory-next-night-visible")
