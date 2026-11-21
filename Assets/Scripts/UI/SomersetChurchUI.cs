@@ -2049,7 +2049,8 @@ namespace ArthurianAutobattler
                     parentRt, screen, cam, out Vector2 local))
             {
                 // Upper-right of unit: panel pivot is bottom-left, sit just outside the seat.
-                panelRt.anchoredPosition = local + new Vector2(10f, 8f);
+                // +2 ticks right (~48px) so the panel clears the pew avatar more cleanly.
+                panelRt.anchoredPosition = local + new Vector2(58f, 8f);
             }
 
             ClampPanelToParent(panelRt, parentRt);
@@ -2115,7 +2116,7 @@ namespace ArthurianAutobattler
             WriteBottomDialogue(selected);
 
             int cost = selected.GetFinalHireCost(grudge, discount);
-            if (hireButtonLabel != null) hireButtonLabel.text = $"Recruit ({cost}g)";
+            ApplyRecruitButtonLabel(cost);
 
             if (tier1Button != null)
             {
@@ -2391,10 +2392,21 @@ namespace ArthurianAutobattler
                 int discount = MerlinResurrectionManager.Instance != null
                     ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
                 int hire = selected.GetFinalHireCost(grudge, discount);
-                if (hireButtonLabel != null) hireButtonLabel.text = $"Recruit ({hire}g)";
+                ApplyRecruitButtonLabel(hire);
             }
 
             RefreshHUD();
+        }
+
+        /// <summary>Recruit label: cost then current purse — e.g. "Recruit 10g (120g)".</summary>
+        void ApplyRecruitButtonLabel(int hireCost)
+        {
+            int purse = Town != null ? Town.playerGold : 0;
+            if (hireButtonLabel != null)
+                hireButtonLabel.text = $"Recruit {hireCost}g ({purse}g)";
+            var townHire = Town?.hireButtonText;
+            if (townHire != null && townHire != hireButtonLabel)
+                townHire.text = $"Recruit {hireCost}g ({purse}g)";
         }
 
         /// <summary>Ensure Camelot Crowd (Warband) modal exists, scrolls, and starts closed.</summary>

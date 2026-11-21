@@ -497,7 +497,10 @@ namespace ArthurianAutobattler
             if (dossierStatsText != null)
                 dossierStatsText.text = selectedRecruit.GetDisplayDescription(grudge, discount);
             if (hireButtonText != null)
-                hireButtonText.text = $"Recruit ({selectedRecruit.GetFinalHireCost(grudge, discount)}g)";
+            {
+                int cost = selectedRecruit.GetFinalHireCost(grudge, discount);
+                hireButtonText.text = $"Recruit {cost}g ({playerGold}g)";
+            }
 
             if (tier1RevealButton != null)
             {

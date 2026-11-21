@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "rmb-deselect-legends-atk-sort";
-    public const string GitHint = "RMB-close-stats-LowHP-left-HighLow-Attack-sort";
-    public const string BuiltUtc = "2026-11-21T18:50:00Z";
+    public const string Id = "rmb-close-sort-recruit-purse";
+    public const string GitHint = "RMB-close-LowHP-Attack-sort-panel-right-Recruit-cost-purse";
+    public const string BuiltUtc = "2026-11-21T18:55:00Z";
 }
 #endif

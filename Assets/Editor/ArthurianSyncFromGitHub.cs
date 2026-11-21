@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "f8e2c0a63293399f96ccdbbb69c9f32ddd4d8cf9";
 
-    private const string ExpectedPackageId = "rmb-deselect-legends-atk-sort";
+    private const string ExpectedPackageId = "rmb-close-sort-recruit-purse";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -633,7 +633,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("using System;")
                    && body.Contains("420f, 460f")
                    && body.Contains("onLeftClick: () => ToggleUnitSelectionMenu")
-                   && body.Contains("CloseUnitSelectionMenu");
+                   && body.Contains("CloseUnitSelectionMenu")
+                   && body.Contains("ApplyRecruitButtonLabel")
+                   && body.Contains("Recruit {hireCost}g ({purse}g)")
+                   && body.Contains("58f, 8f");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -760,6 +763,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("rmb-close-sort-recruit-purse")
                    || body.Contains("rmb-deselect-legends-atk-sort")
                    || body.Contains("unit-stats-lmb-taller-panel")
                    || body.Contains("fix-cs0104-object-ambiguous")
