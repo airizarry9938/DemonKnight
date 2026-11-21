@@ -405,7 +405,7 @@ public static class ArthurianSyncFromGitHub
             {
                 string text = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
                 WriteReplacing(dest, text, deleteFirst: false);
-                VerifyOnDisk(rel, dest);
+                VerifyOnDisk(rel, dest, relaxPackageId: true);
                 if (!okFiles.Contains(rel)) okFiles.Add(rel);
                 Debug.LogWarning($"[DemonKnight] Restored menu host {rel} via {source} @ {sha}");
             }
