@@ -24,7 +24,7 @@ public static class ArthurianSyncFromGitHub
     // Updated when shipping Sync packages (main tip alone is still older merges).
     private const string FallbackCommitSha = "38838a2";
 
-    private const string ExpectedPackageId = "art-tools-arthurian-prefix-keep";
+    private const string ExpectedPackageId = "modular-verify-sync-flat-autosave";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe

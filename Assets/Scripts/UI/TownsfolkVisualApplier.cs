@@ -12,8 +12,13 @@ namespace ArthurianAutobattler
             _lib != null ? _lib : (_lib = ModularSpriteLibrary.Load());
 
         static ModularSpriteLibrary _lib;
+        static bool _loggedEmptyLibrary;
 
-        public static void SetLibrary(ModularSpriteLibrary lib) => _lib = lib;
+        public static void SetLibrary(ModularSpriteLibrary lib)
+        {
+            _lib = lib;
+            _loggedEmptyLibrary = false;
+        }
 
         public struct LayerSet
         {
@@ -41,6 +46,19 @@ namespace ArthurianAutobattler
 
             if (!modularReady)
             {
+                if (!_loggedEmptyLibrary)
+                {
+                    _loggedEmptyLibrary = true;
+                    int poses = lib != null && lib.basePoses != null ? lib.basePoses.Length : -1;
+                    int filled = 0;
+                    if (lib?.basePoses != null)
+                        for (int i = 0; i < lib.basePoses.Length; i++)
+                            if (lib.basePoses[i] != null) filled++;
+                    Debug.LogWarning(
+                        "[DemonKnight] Pew boxes = modular library empty at runtime. " +
+                        $"lib={(lib != null ? "found" : "NULL")} posesArray={poses} posesFilled={filled}. " +
+                        "Fix: Arthurian → Art Tools → Verify & Sync Modular Library, then New Game.");
+                }
                 ApplyLegacyFallback(layers, fallback);
                 // Still apply skin tint if we only have a grayscale body from legacy.
                 if (layers.body != null && layers.body.sprite != null)

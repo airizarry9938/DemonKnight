@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Net;
+using ArthurianAutobattler;
 using UnityEditor;
 using UnityEngine;
 
@@ -175,6 +176,85 @@ public static class ArthurianMenuBootstrap
 
         Debug.Log(msg);
         EditorUtility.DisplayDialog("Arthurian Diagnose", msg, "OK");
+    }
+
+    /// <summary>
+    /// Copies filled Art/Modular library into Resources so Play mode pews stop showing boxes.
+    /// </summary>
+    [MenuItem("Arthurian/Art Tools/Verify & Sync Modular Library", false, 38)]
+    public static void VerifyAndSyncModularLibrary()
+    {
+        const string artPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
+        const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
+
+        var art = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(artPath);
+        if (art == null)
+        {
+            // Search any ModularSpriteLibrary under Assets/Art
+            string[] guids = AssetDatabase.FindAssets("t:ModularSpriteLibrary");
+            foreach (string g in guids)
+            {
+                string p = AssetDatabase.GUIDToAssetPath(g);
+                if (p.Replace('\\', '/').IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+                    continue;
+                art = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(p);
+                if (art != null) { Debug.Log("[DemonKnight] Using library at " + p); break; }
+            }
+        }
+
+        if (art == null)
+        {
+            EditorUtility.DisplayDialog(
+                "Modular Library",
+                "No ModularSpriteLibrary found under Assets/Art.\n\n" +
+                "Open Modular Sprite Sheet Importer → Create Library → Import sheets first.",
+                "OK");
+            return;
+        }
+
+        int poses = CountSprites(art.basePoses);
+        int outfits = CountSprites(art.outfits);
+        int heads = art.heads != null ? art.heads.Length : 0;
+
+        string artAssetPath = AssetDatabase.GetAssetPath(art);
+        string resDir = "Assets/Resources/Art/Modular";
+        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+            AssetDatabase.CreateFolder("Assets", "Resources");
+        if (!AssetDatabase.IsValidFolder("Assets/Resources/Art"))
+            AssetDatabase.CreateFolder("Assets/Resources", "Art");
+        if (!AssetDatabase.IsValidFolder(resDir))
+            AssetDatabase.CreateFolder("Assets/Resources/Art", "Modular");
+
+        if (AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath) != null)
+            AssetDatabase.DeleteAsset(resPath);
+        AssetDatabase.CopyAsset(artAssetPath, resPath);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        TownsfolkVisualApplier.SetLibrary(null);
+
+        var res = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath);
+        int resPoses = res != null ? CountSprites(res.basePoses) : 0;
+
+        EditorUtility.DisplayDialog(
+            "Modular Library Synced",
+            $"Source: {artAssetPath}\n" +
+            $"poses {poses}/4 · outfits {outfits}/6 · heads {heads}\n\n" +
+            $"Runtime copy: {resPath}\n" +
+            $"Resources poses filled: {resPoses}\n\n" +
+            (poses == 0
+                ? "SOURCE LIBRARY HAS NO POSE SPRITES — re-run Import with Poses sheet assigned.\n"
+                : "Stop Play → Main Menu → New Game to rebuild pews.\n"),
+            "OK");
+    }
+
+    static int CountSprites(Sprite[] arr)
+    {
+        if (arr == null) return 0;
+        int n = 0;
+        for (int i = 0; i < arr.Length; i++)
+            if (arr[i] != null) n++;
+        return n;
     }
 
     /// <summary>
