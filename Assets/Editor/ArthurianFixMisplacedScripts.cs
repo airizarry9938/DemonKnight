@@ -23,6 +23,11 @@ public static class ArthurianFixMisplacedScripts
         "ArthurianSyncFromGitHub.cs",
         "DemonKnightPackageVersion.cs",
         "SomersetAssetStudioWindow.cs",
+        // Art Tools — must stay in Editor (InitializeOnLoad was deleting these on every compile)
+        "ModularSpriteSheetImporterWindow.cs",
+        "BattleSpriteSheetSlicerWindow.cs",
+        "CharacterCatalogSeeder.cs",
+        "CharacterDatabaseEditor.cs",
     };
 
     /// <summary>
@@ -145,7 +150,7 @@ public static class ArthurianFixMisplacedScripts
             EditorUtility.DisplayDialog(
                 "DemonKnight",
                 $"Cleaned {fixedCount} file(s) out of Assets/Editor/ (and duplicate gameplay copies).\n\n" +
-                "Only Arthurian* / Somerset* tools belong in Editor.\n" +
+                "Editor may keep Arthurian*/Somerset* tools plus Art Tools importers.\n" +
                 "Gameplay scripts belong under Assets/Scripts/.\n\n" +
                 "Wait for compile.",
                 "OK");
