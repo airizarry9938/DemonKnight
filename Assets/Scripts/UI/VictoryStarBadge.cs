@@ -6,13 +6,15 @@ namespace ArthurianAutobattler
 {
     /// <summary>
     /// Visible ★ badge on pew / paper-doll seats for wave-victory experience
-    /// (stacks; −5g hire each). Uses a drawn gold star + count so TMP fonts
-    /// without a ★ glyph still show experience.
+    /// (stacks; −5g hire each). Drawn gold star + count so TMP fonts without a
+    /// ★ glyph still show experience. Anchored inside the seat so pew overlap /
+    /// masks cannot clip it off the top edge.
     /// </summary>
     public static class VictoryStarBadge
     {
         public const string ChildName = "VictoryStars";
         private static Sprite s_starSprite;
+        private static Sprite s_pillSprite;
 
         public static void Apply(Transform seatRoot, RecruitInstance recruit)
         {
@@ -34,16 +36,19 @@ namespace ArthurianAutobattler
                 starImg.sprite = StarSprite();
                 starImg.color = new Color(1f, 0.84f, 0.15f, 1f);
                 starImg.enabled = true;
+                starImg.gameObject.SetActive(true);
             }
             if (label != null)
             {
-                // ASCII-safe count so any TMP font shows; gold ★ in label when glyph exists.
-                label.text = stars <= 1 ? "★" : $"★{stars}";
-                label.color = new Color(1f, 0.92f, 0.35f, 1f);
-                label.fontSize = 13f;
+                // ASCII digits always render; ★ when the TMP font has the glyph.
+                label.text = stars <= 1 ? "★" : $"★×{stars}";
+                label.color = new Color(1f, 0.95f, 0.45f, 1f);
+                label.fontSize = 14f;
                 label.fontStyle = FontStyles.Bold;
-                label.outlineWidth = 0.2f;
-                label.outlineColor = new Color(0.15f, 0.08f, 0f, 1f);
+                label.outlineWidth = 0.25f;
+                label.outlineColor = new Color(0.12f, 0.06f, 0f, 1f);
+                label.enabled = true;
+                label.gameObject.SetActive(true);
             }
 
             root.SetActive(true);
@@ -71,16 +76,31 @@ namespace ArthurianAutobattler
                 go = new GameObject(ChildName, typeof(RectTransform), typeof(Canvas), typeof(CanvasRenderer));
                 go.transform.SetParent(seatRoot, false);
                 var rt = go.GetComponent<RectTransform>();
-                // Top-center, slightly above seat so paper-doll layers don't cover it.
-                rt.anchorMin = new Vector2(0.5f, 1f);
-                rt.anchorMax = new Vector2(0.5f, 1f);
-                rt.pivot = new Vector2(0.5f, 0f);
-                rt.anchoredPosition = new Vector2(0f, 2f);
-                rt.sizeDelta = new Vector2(42f, 18f);
+                // Top-right INSIDE the seat — front pews / masks used to clip the
+                // old above-seat placement, so veterans looked starless.
+                rt.anchorMin = new Vector2(1f, 1f);
+                rt.anchorMax = new Vector2(1f, 1f);
+                rt.pivot = new Vector2(1f, 1f);
+                rt.anchoredPosition = new Vector2(-2f, -2f);
+                rt.sizeDelta = new Vector2(48f, 22f);
 
                 var canvas = go.GetComponent<Canvas>();
                 canvas.overrideSorting = true;
-                canvas.sortingOrder = 80;
+                canvas.sortingOrder = 520;
+
+                // Dark pill so the gold star reads on busy paper-doll art.
+                var bgGo = new GameObject("StarBg", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                bgGo.transform.SetParent(go.transform, false);
+                var bgRt = bgGo.GetComponent<RectTransform>();
+                bgRt.anchorMin = Vector2.zero;
+                bgRt.anchorMax = Vector2.one;
+                bgRt.offsetMin = Vector2.zero;
+                bgRt.offsetMax = Vector2.zero;
+                var bg = bgGo.GetComponent<Image>();
+                bg.sprite = PillSprite();
+                bg.color = new Color(0.08f, 0.05f, 0.02f, 0.82f);
+                bg.raycastTarget = false;
+                bg.type = Image.Type.Sliced;
 
                 // Gold star icon (drawn sprite — visible even if TMP lacks ★).
                 var iconGo = new GameObject("StarIcon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -89,8 +109,8 @@ namespace ArthurianAutobattler
                 irt.anchorMin = new Vector2(0f, 0.5f);
                 irt.anchorMax = new Vector2(0f, 0.5f);
                 irt.pivot = new Vector2(0f, 0.5f);
-                irt.anchoredPosition = new Vector2(1f, 0f);
-                irt.sizeDelta = new Vector2(14f, 14f);
+                irt.anchoredPosition = new Vector2(3f, 0f);
+                irt.sizeDelta = new Vector2(16f, 16f);
                 var img = iconGo.GetComponent<Image>();
                 img.sprite = StarSprite();
                 img.raycastTarget = false;
@@ -102,8 +122,8 @@ namespace ArthurianAutobattler
                 var trt = txtGo.GetComponent<RectTransform>();
                 trt.anchorMin = new Vector2(0f, 0f);
                 trt.anchorMax = new Vector2(1f, 1f);
-                trt.offsetMin = new Vector2(14f, 0f);
-                trt.offsetMax = new Vector2(-1f, 0f);
+                trt.offsetMin = new Vector2(18f, 0f);
+                trt.offsetMax = new Vector2(-2f, 0f);
                 var tmp = txtGo.GetComponent<TextMeshProUGUI>();
                 tmp.alignment = TextAlignmentOptions.MidlineLeft;
                 tmp.textWrappingMode = TextWrappingModes.NoWrap;
@@ -111,12 +131,22 @@ namespace ArthurianAutobattler
                 tmp.raycastTarget = false;
             }
 
-            // Always re-assert sorting / sibling so Bind refresh can't bury the badge.
+            // Migrate legacy above-seat badges (anchor top-center, outside bounds).
+            var migrate = go.GetComponent<RectTransform>();
+            if (migrate != null)
+            {
+                migrate.anchorMin = new Vector2(1f, 1f);
+                migrate.anchorMax = new Vector2(1f, 1f);
+                migrate.pivot = new Vector2(1f, 1f);
+                migrate.anchoredPosition = new Vector2(-2f, -2f);
+                migrate.sizeDelta = new Vector2(48f, 22f);
+            }
+
             var c = go.GetComponent<Canvas>();
             if (c != null)
             {
                 c.overrideSorting = true;
-                c.sortingOrder = 80;
+                c.sortingOrder = 520;
             }
             go.transform.SetAsLastSibling();
             return go;
@@ -145,7 +175,6 @@ namespace ArthurianAutobattler
                     float dx = x - cx;
                     float dy = y - cy;
                     float ang = Mathf.Atan2(dy, dx);
-                    // 5-point star: compare radius to star edge.
                     float a = Mathf.Repeat(ang + Mathf.PI * 0.5f, Mathf.PI * 2f);
                     float sector = Mathf.PI * 2f / 5f;
                     float local = Mathf.Abs(Mathf.Repeat(a + sector * 0.5f, sector) - sector * 0.5f);
@@ -160,6 +189,43 @@ namespace ArthurianAutobattler
             s_starSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 32f);
             s_starSprite.name = "DK_VictoryStar";
             return s_starSprite;
+        }
+
+        private static Sprite PillSprite()
+        {
+            if (s_pillSprite != null) return s_pillSprite;
+            const int size = 16;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            var pixels = new Color[size * size];
+            float radius = (size - 1) * 0.5f;
+            float cx = radius, cy = radius;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - cx;
+                    float dy = y - cy;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    pixels[y * size + x] = d <= radius
+                        ? Color.white
+                        : new Color(1f, 1f, 1f, 0f);
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply(false, false);
+            // 4px border so Image.Type.Sliced can stretch the middle.
+            s_pillSprite = Sprite.Create(
+                tex,
+                new Rect(0, 0, size, size),
+                new Vector2(0.5f, 0.5f),
+                16f,
+                0,
+                SpriteMeshType.FullRect,
+                new Vector4(4f, 4f, 4f, 4f));
+            s_pillSprite.name = "DK_VictoryStarPill";
+            return s_pillSprite;
         }
     }
 }

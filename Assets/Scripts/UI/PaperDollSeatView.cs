@@ -168,6 +168,7 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Prefab avatar buttons often keep a solid-color Image that reads as the old
         /// "box" even after modular Body/Outfit/Head are applied — hide those.
+        /// Never strip victory-star / hover-rim chrome (Bind can refresh twice).
         /// </summary>
         void HideNonModularImages(TownsfolkVisualApplier.LayerSet layers)
         {
@@ -181,10 +182,30 @@ namespace ArthurianAutobattler
                     img.preserveAspect = true;
                     continue;
                 }
+                // Victory ★ badge + pew hover rim must stay visible across Bind refreshes.
+                if (IsProtectedSeatChrome(img))
+                    continue;
                 img.sprite = null;
                 img.enabled = false;
                 img.raycastTarget = false;
             }
+        }
+
+        static bool IsProtectedSeatChrome(Image img)
+        {
+            if (img == null) return false;
+            Transform t = img.transform;
+            while (t != null)
+            {
+                string n = t.name;
+                if (n == VictoryStarBadge.ChildName
+                    || n == "StarIcon"
+                    || n == "StarBg"
+                    || n == "PewHoverRim")
+                    return true;
+                t = t.parent;
+            }
+            return false;
         }
     }
 
@@ -248,12 +269,17 @@ namespace ArthurianAutobattler
 
         void EnsureRim()
         {
-            if (rim != null) return;
-            var existing = transform.Find(RimName);
-            if (existing != null)
+            if (rim == null)
             {
-                rim = existing.GetComponent<Image>();
-                if (rim != null) return;
+                var existing = transform.Find(RimName);
+                if (existing != null)
+                    rim = existing.GetComponent<Image>();
+            }
+            if (rim != null)
+            {
+                rim.enabled = occupied;
+                rim.raycastTarget = false;
+                return;
             }
 
             var go = new GameObject(RimName, typeof(RectTransform), typeof(Image));

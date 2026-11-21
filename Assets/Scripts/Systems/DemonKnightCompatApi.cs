@@ -70,6 +70,25 @@ namespace ArthurianAutobattler
             Debug.LogWarning("[DemonKnight] EnsureDisbandedAfterWave missing — Sync GameLoopManager.cs.");
         }
 
+        /// <summary>Repopulate pews after nuclear disband (private RefreshTownAfterDisband).</summary>
+        public static void RefreshTownAfterDisband(GameLoopManager loop = null)
+        {
+            loop ??= ResolveLoop();
+            if (loop == null) return;
+            if (TryInvoke(loop, "RefreshTownAfterDisband")) return;
+            try
+            {
+                var church = loop.ResolveChurchUI()
+                             ?? UnityEngine.Object.FindFirstObjectByType<SomersetChurchUI>();
+                if (church != null && loop.currentTownPool != null)
+                    church.PopulatePews(loop.currentTownPool);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] RefreshTownAfterDisband fallback failed: " + ex.Message);
+            }
+        }
+
         public static void SetMustDisband(GameLoopManager loop, bool value)
         {
             loop ??= ResolveLoop();

@@ -855,11 +855,15 @@ namespace ArthurianAutobattler
                         if (r == null) continue;
                         r.intelTierUnlocked = Mathf.Max(r.intelTierUnlocked, 3);
                         r.fusionIngredients = null;
+                        // Nuclear path skipped ReturnOneToPew — still grant wave-win ★.
+                        if (waveWon)
+                            r.victoryStars = Mathf.Max(0, r.victoryStars) + 1;
                         if (!string.IsNullOrEmpty(r.unitID))
                             loop.currentTownPool.RemoveAll(t => t != null && t.unitID == r.unitID && t != r);
                         if (!loop.currentTownPool.Contains(r))
                             loop.currentTownPool.Add(r);
                     }
+                    DemonKnightCompatApi.RefreshTownAfterDisband(loop);
                 }
             }
 

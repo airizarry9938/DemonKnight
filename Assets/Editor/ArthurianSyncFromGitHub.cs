@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "752360e5cba2aecc70ed6e6d73720e1a1eaf3179";
 
-    private const string ExpectedPackageId = "fix-cs0117-sanitize-on-fusion";
+    private const string ExpectedPackageId = "restore-victory-star-pew-icons";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -110,6 +110,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Data/GameDataTypes.cs",
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
         "Assets/Scripts/UI/PaperDollSeatView.cs",
+        "Assets/Scripts/UI/VictoryStarBadge.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
@@ -592,7 +593,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("EnsureDisbandedAfterWave")
                    && body.Contains("AutosaveWarband")
                    && body.Contains("mustDisbandPartyAfterCurrentWave")
-                   && body.Contains("AdvanceNightCounterAfterWaveWin");
+                   && body.Contains("AdvanceNightCounterAfterWaveWin")
+                   && body.Contains("r.victoryStars = Mathf.Max(0, r.victoryStars) + 1");
         }
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
@@ -600,11 +602,21 @@ public static class ArthurianSyncFromGitHub
             bool core = body.Contains("ResolveLoop")
                         && body.Contains("AutosaveWarband")
                         && body.Contains("ChurchRewireMarch")
-                        && body.Contains("WaveVictoryGold");
+                        && body.Contains("WaveVictoryGold")
+                        && body.Contains("RefreshTownAfterDisband");
             if (!core) return false;
             // Bootstrap may land an older CompatApi; Force Sync wants the soft HUD helper.
             if (relaxPackageId) return true;
             return body.Contains("RefreshWaveBossHud");
+        }
+
+        if (rel.EndsWith("VictoryStarBadge.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class VictoryStarBadge")
+                   && body.Contains("StarIcon")
+                   && body.Contains("ChildName")
+                   && body.Contains("sortingOrder = 520")
+                   && body.Contains("anchoredPosition = new Vector2(-2f, -2f)");
         }
 
         if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
@@ -656,7 +668,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("waveBoss") // CS0136 fix: no shadowed local `boss`
                    && body.Contains("TriggerWaveVictoryScreen")
                    && body.Contains("endingBattle")
-                   && body.Contains("EndBattleBody");
+                   && body.Contains("EndBattleBody")
+                   && body.Contains("r.victoryStars = Mathf.Max(0, r.victoryStars) + 1")
+                   && body.Contains("RefreshTownAfterDisband");
         }
 
         if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
@@ -707,7 +721,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("IPointerClickHandler")
                    && body.Contains("onClick?.Invoke(recruit)")
                    && body.Contains("SetMenuLocked")
-                   && body.Contains("menuLocked");
+                   && body.Contains("menuLocked")
+                   && body.Contains("VictoryStarBadge.Apply")
+                   && body.Contains("IsProtectedSeatChrome");
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
