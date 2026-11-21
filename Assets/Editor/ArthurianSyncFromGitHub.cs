@@ -22,7 +22,7 @@ public static class ArthurianSyncFromGitHub
     /// <summary>Floor commit with pinned Sync tools. Tip of main is preferred via API.</summary>
     // Package tip pin — Force Sync prefers this over main until Art Tools PRs merge.
     // Updated when shipping Sync packages (main tip alone is still older merges).
-    private const string FallbackCommitSha = "ac28dad";
+    private const string FallbackCommitSha = "da06ad7";
 
     private const string ExpectedPackageId = "pew-generate-appearance-if-null";
 
