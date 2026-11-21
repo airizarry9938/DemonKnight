@@ -46,6 +46,13 @@ public class ArthurianArtArchitectWindow : EditorWindow
     string targetExportFolder = SplicedRootFolder + "/Pose";
     SheetCategory lastExportCategory = SheetCategory.Pose;
 
+    // Save Splices chroma key (#FF00FF) + optional corner detect + magenta defringe
+    static readonly Color MagentaChromaKey = new Color(1f, 0f, 1f, 1f); // #FF00FF
+    Color saveChromaKey = MagentaChromaKey;
+    bool autoDetectCornerColor;
+    float colorTolerance = 0.18f; // 0.01–0.50
+    bool defringeMagentaEdges = true;
+
     // Interactive Manual Box Splicer (default crop tool)
     CropToolMode cropTool = CropToolMode.ManualBox;
     readonly List<RectInt> manualBoxes = new List<RectInt>();
@@ -207,6 +214,19 @@ public class ArthurianArtArchitectWindow : EditorWindow
         clipName = EditorGUILayout.TextField("Clip Name (Idle/Attack/Hit/Death)", clipName);
         clipFps = EditorGUILayout.Slider("FPS", clipFps, 1f, 24f);
         clipLoop = EditorGUILayout.Toggle("Loop", clipLoop);
+
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Save Splices — Chroma Key", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        saveChromaKey = EditorGUILayout.ColorField("Chroma Key", saveChromaKey);
+        if (GUILayout.Button("#FF00FF", GUILayout.Width(70)))
+            saveChromaKey = MagentaChromaKey;
+        EditorGUILayout.EndHorizontal();
+        autoDetectCornerColor = EditorGUILayout.ToggleLeft(
+            "Auto-Detect Corner Color (overrides key from sheet/frame corners)", autoDetectCornerColor);
+        colorTolerance = EditorGUILayout.Slider("Color Tolerance", colorTolerance, 0.01f, 0.50f);
+        defringeMagentaEdges = EditorGUILayout.ToggleLeft(
+            "Defringe Magenta Edges (after key → Color.clear)", defringeMagentaEdges);
 
         int selectedCount = CountSelectedFrames();
         EditorGUILayout.BeginHorizontal();
@@ -963,9 +983,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
         RegisterSpritesIntoLibrary(saved);
         RefreshSplicedPalette(force: true);
         Debug.Log($"[DemonKnight] Saved {saved.Count} splices → {folder} + ModularSpriteLibrary");
+        string keyDesc = autoDetectCornerColor ? "Auto-Corner" : ColorUtility.ToHtmlStringRGB(saveChromaKey);
         EditorUtility.DisplayDialog(
             "Save Splices to Folder",
-            $"Wrote {saved.Count} PNG(s) (Point / Sprite / Bottom-Center)\n→ {folder}\nRegistered into ModularSpriteLibrary.",
+            $"Wrote {saved.Count} PNG(s)\n"
+            + $"Chroma {keyDesc} tol={colorTolerance:0.00}"
+            + (defringeMagentaEdges ? " + magenta defringe" : "") + "\n"
+            + "Importer: Sprite / alphaIsTransparency / FromInput / Point / Uncompressed / Bottom-Center\n"
+            + $"→ {folder}\nRegistered into ModularSpriteLibrary.",
             "OK");
     }
 
@@ -974,12 +999,140 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (src == null || src.texture == null) return null;
         Texture2D readable = ExtractSpriteTexture(src);
         if (readable == null) return null;
+
+        Color key = saveChromaKey;
+        if (autoDetectCornerColor)
+            key = DetectCornerKeyColor(readable);
+        // Always also punch pure #FF00FF when keying (magenta sheets).
+        ApplyChromaKeyClearAndDefringe(readable, key, colorTolerance, defringeMagentaEdges);
+
         File.WriteAllBytes(assetPath, readable.EncodeToPNG());
         UnityEngine.Object.DestroyImmediate(readable);
         AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
         ConfigureSingleSpritePointBottomCenter(assetPath);
         AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
         return AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+    }
+
+    /// <summary>Sample four corners; pick the most saturated / modal corner as chroma key.</summary>
+    static Color DetectCornerKeyColor(Texture2D tex)
+    {
+        if (tex == null) return MagentaChromaKey;
+        int w = tex.width, h = tex.height;
+        if (w < 1 || h < 1) return MagentaChromaKey;
+        Color c0 = tex.GetPixel(0, 0);
+        Color c1 = tex.GetPixel(w - 1, 0);
+        Color c2 = tex.GetPixel(0, h - 1);
+        Color c3 = tex.GetPixel(w - 1, h - 1);
+        // Prefer the corner closest to magenta, else average of similar corners.
+        Color[] corners = { c0, c1, c2, c3 };
+        Color best = c0;
+        float bestMagenta = -1f;
+        for (int i = 0; i < corners.Length; i++)
+        {
+            Color c = corners[i];
+            float mag = (c.r + c.b) * 0.5f - c.g; // magenta-ness
+            if (mag > bestMagenta)
+            {
+                bestMagenta = mag;
+                best = c;
+            }
+        }
+        // If corners agree (within 0.08), average them for a stabler key.
+        float agree = 0f;
+        for (int i = 0; i < corners.Length; i++)
+            agree += ColorRgbDistance(corners[i], best);
+        if (agree / 4f < 0.08f)
+        {
+            best = (c0 + c1 + c2 + c3) * 0.25f;
+            best.a = 1f;
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Pixel pass: near-key → Color.clear; optional magenta edge defringe; mutates tex in place.
+    /// </summary>
+    static void ApplyChromaKeyClearAndDefringe(
+        Texture2D tex, Color key, float tolerance, bool defringeMagenta)
+    {
+        if (tex == null) return;
+        int w = tex.width, h = tex.height;
+        Color[] pixels = tex.GetPixels();
+        float tol = Mathf.Clamp(tolerance, 0.01f, 0.50f);
+
+        // Pass 1: chroma key → Color.clear (also always clear near #FF00FF).
+        for (int i = 0; i < pixels.Length; i++)
+        {
+            Color p = pixels[i];
+            if (p.a < 0.004f) { pixels[i] = Color.clear; continue; }
+            if (ColorRgbDistance(p, key) <= tol
+                || ColorRgbDistance(p, MagentaChromaKey) <= tol)
+                pixels[i] = Color.clear;
+        }
+
+        // Pass 2: defringe magenta edges (semi-magenta pixels next to clear).
+        if (defringeMagenta)
+        {
+            var outPx = (Color[])pixels.Clone();
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x;
+                    Color p = pixels[i];
+                    if (p.a < 0.004f) continue;
+                    if (!IsMagentaFringe(p)) continue;
+                    if (!HasClearNeighbor(pixels, w, h, x, y)) continue;
+                    outPx[i] = DefringeMagentaPixel(p);
+                }
+            }
+            pixels = outPx;
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply(false, false);
+    }
+
+    static bool HasClearNeighbor(Color[] pixels, int w, int h, int x, int y)
+    {
+        for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            if (dx == 0 && dy == 0) continue;
+            int nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            if (pixels[ny * w + nx].a < 0.02f) return true;
+        }
+        return false;
+    }
+
+    static bool IsMagentaFringe(Color p)
+    {
+        // High R+B vs G (magenta cast), still somewhat opaque.
+        float mag = (p.r + p.b) * 0.5f - p.g;
+        return mag > 0.12f && p.r > 0.25f && p.b > 0.25f;
+    }
+
+    static Color DefringeMagentaPixel(Color p)
+    {
+        float excess = Mathf.Max(0f, Mathf.Min(p.r, p.b) - p.g);
+        p.r = Mathf.Clamp01(p.r - excess);
+        p.b = Mathf.Clamp01(p.b - excess);
+        // If almost nothing left but fringe, clear it.
+        float luma = p.r * 0.3f + p.g * 0.59f + p.b * 0.11f;
+        if (luma < 0.04f || (p.r + p.b) * 0.5f - p.g > 0.35f)
+            return Color.clear;
+        // Soften alpha on residual fringe.
+        p.a *= Mathf.Clamp01(1f - excess * 1.5f);
+        if (p.a < 0.05f) return Color.clear;
+        return p;
+    }
+
+    static float ColorRgbDistance(Color a, Color b)
+    {
+        float dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
+        return Mathf.Sqrt(dr * dr + dg * dg + db * db);
     }
 
     static Texture2D ExtractSpriteTexture(Sprite src)
@@ -1022,7 +1175,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (importer == null) return;
         importer.textureType = TextureImporterType.Sprite;
         importer.spriteImportMode = SpriteImportMode.Single;
-        importer.spritePivot = new Vector2(0.5f, 0f);
+        importer.alphaSource = TextureImporterAlphaSource.FromInput;
         importer.alphaIsTransparency = true;
         importer.mipmapEnabled = false;
         importer.filterMode = FilterMode.Point;
@@ -1030,8 +1183,13 @@ public class ArthurianArtArchitectWindow : EditorWindow
         importer.isReadable = true;
         var settings = new TextureImporterSettings();
         importer.ReadTextureSettings(settings);
+        settings.textureType = TextureImporterType.Sprite;
+        settings.spriteMode = (int)SpriteImportMode.Single;
+        settings.alphaSource = TextureImporterAlphaSource.FromInput;
+        settings.alphaIsTransparency = true;
+        settings.filterMode = FilterMode.Point;
         settings.spriteAlignment = (int)SpriteAlignment.BottomCenter;
-        settings.spritePivot = new Vector2(0.5f, 0f);
+        settings.spritePivot = new Vector2(0.5f, 0f); // Bottom-Center
         importer.SetTextureSettings(settings);
         importer.SaveAndReimport();
     }

@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "17a6860a01b22a69bcbe77ed63d55639f6ca3c44";
 
-    private const string ExpectedPackageId = "export-spliced-slot-palette";
+    private const string ExpectedPackageId = "save-splices-chroma-defringe";
 
     /// <summary>Menu hosts that must always overwrite from tip/main — never skip-self, never Fallback pin.</summary>
     public static readonly string[] SyncHostForceOverwritePaths =
@@ -1085,6 +1085,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("Slice Manual Boxes")
                    && body.Contains("Save Splices to Folder")
                    && body.Contains("Target Export Folder")
+                   && body.Contains("ApplyChromaKeyClearAndDefringe")
+                   && body.Contains("defringeMagentaEdges")
+                   && body.Contains("Auto-Detect Corner Color")
                    && body.Contains("Quick Add to Parallax Layer")
                    && body.Contains("previewOrOverrideSprite")
                    && body.Contains("Paper-Doll")
