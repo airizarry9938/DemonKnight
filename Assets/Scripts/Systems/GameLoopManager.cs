@@ -827,8 +827,9 @@ namespace ArthurianAutobattler
             if (tmp != null)
             {
                 tmp.text = label;
-                var bossHud = WaveBossHudView.EnsureNearNightText(tmp);
-                bossHud?.Refresh(CurrentWaveNumber());
+                // Soft call — WaveBossHudView may lag one Force Sync behind (ScriptPaths is compiled).
+                int wave = Instance != null ? Instance.CurrentWaveNumber() : 1;
+                DemonKnightCompatApi.RefreshWaveBossHud(tmp, wave);
             }
         }
 

@@ -163,6 +163,34 @@ namespace ArthurianAutobattler
                 Debug.LogWarning("[DemonKnight] ApplyVideoBackground missing — Sync BattlefieldVisualizer.cs.");
         }
 
+        /// <summary>
+        /// Soft-bind the wave boss portrait next to NightText. Compiles even when
+        /// WaveBossHudView.cs has not landed yet (Force Sync ScriptPaths is compiled in-memory).
+        /// </summary>
+        public static void RefreshWaveBossHud(TextMeshProUGUI nightText, int wave)
+        {
+            if (nightText == null) return;
+            try
+            {
+                Type t = Type.GetType("ArthurianAutobattler.WaveBossHudView, Assembly-CSharp")
+                         ?? Type.GetType("ArthurianAutobattler.WaveBossHudView");
+                if (t == null) return;
+                MethodInfo ensure = t.GetMethod("EnsureNearNightText", StaticPublic, null,
+                    new[] { typeof(TextMeshProUGUI) }, null);
+                if (ensure == null) return;
+                object hud = ensure.Invoke(null, new object[] { nightText });
+                if (hud == null) return;
+                MethodInfo refresh = hud.GetType().GetMethod("Refresh", InstancePublic, null,
+                    new[] { typeof(int) }, null);
+                refresh?.Invoke(hud, new object[] { Mathf.Max(1, wave) });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] RefreshWaveBossHud soft-call failed: " + ex.Message
+                    + " — Force Sync again after compile so WaveBossHudView.cs lands.");
+            }
+        }
+
         static Component FindChurch()
         {
             return (Component)UnityEngine.Object.FindFirstObjectByType<SomersetChurchUI>()

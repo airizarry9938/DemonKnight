@@ -2,8 +2,8 @@
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "force-sync-main-landed";
-    public const string GitHint = "main-stack-warrior-night-art-tools-serialize-intel";
-    public const string BuiltUtc = "2026-11-21T15:20:00Z";
+    public const string Id = "fix-wavebosshud-cs0103";
+    public const string GitHint = "WaveBossHudView-Sync-CS0120-CompatRefresh";
+    public const string BuiltUtc = "2026-11-21T15:25:00Z";
 }
 #endif

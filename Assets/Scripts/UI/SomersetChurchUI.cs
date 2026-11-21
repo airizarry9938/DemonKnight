@@ -1296,8 +1296,8 @@ namespace ArthurianAutobattler
             nightText.enableWordWrapping = false;
             nightText.overflowMode = TextOverflowModes.Overflow;
 
-            var bossHud = WaveBossHudView.EnsureNearNightText(nightText);
-            bossHud?.Refresh(wave);
+            // Soft call — compiles even when WaveBossHudView.cs is one Sync behind.
+            DemonKnightCompatApi.RefreshWaveBossHud(nightText, wave);
         }
 
         private Transform FindHudBar()

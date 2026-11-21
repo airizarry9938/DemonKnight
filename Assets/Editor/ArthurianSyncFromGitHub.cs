@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "7d49c8ba0823916f331e28d5c56dbb4bfad42219";
 
-    private const string ExpectedPackageId = "force-sync-main-landed";
+    private const string ExpectedPackageId = "fix-wavebosshud-cs0103";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -51,6 +51,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
+        // Wave boss HUD — keep early so night label Sync never references a missing type.
+        "Assets/Scripts/UI/WaveBossHudView.cs",
         "Assets/Scripts/Combat/AutoBattlerEngine.cs",
         "Assets/Scripts/Combat/BattlefieldVisualizer.cs",
         "Assets/Scripts/Combat/BattleBossDialogUI.cs",
@@ -81,7 +83,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         "Assets/Scripts/UI/TownsfolkPortraitView.cs",
-        "Assets/Scripts/UI/WaveBossHudView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
@@ -106,6 +107,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
+        "Assets/Scripts/UI/WaveBossHudView.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/MainMenuUI.cs",
@@ -174,6 +176,8 @@ public static class ArthurianSyncFromGitHub
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
+            // Pull wave boss HUD with bootstrap so night label never CS0103 after partial Sync.
+            "Assets/Scripts/UI/WaveBossHudView.cs",
         };
 
         var errors = new List<string>();
@@ -481,10 +485,14 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("ResolveLoop")
-                   && body.Contains("AutosaveWarband")
-                   && body.Contains("ChurchRewireMarch")
-                   && body.Contains("WaveVictoryGold");
+            bool core = body.Contains("ResolveLoop")
+                        && body.Contains("AutosaveWarband")
+                        && body.Contains("ChurchRewireMarch")
+                        && body.Contains("WaveVictoryGold");
+            if (!core) return false;
+            // Bootstrap may land an older CompatApi; Force Sync wants the soft HUD helper.
+            if (relaxPackageId) return true;
+            return body.Contains("RefreshWaveBossHud");
         }
 
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -529,12 +537,19 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("ShowForBoss") && body.Contains("IsBlockingCombat");
         }
 
+        if (rel.EndsWith("WaveBossHudView.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("EnsureNearNightText") && body.Contains("class WaveBossHudView");
+        }
+
         if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))
         {
             // Accept current OR previous good ids so old Sync / bootstrap can land the file.
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("force-sync-main-landed")
+                   || body.Contains("fix-wavebosshud-cs0103")
                    || body.Contains("warrior-no-train-ranged-night-seq")
                    || body.Contains("pew-generate-appearance-if-null")
                    || body.Contains("art-tools-runtime-deps")
