@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "0fb6dc5bd7c648bf94aec556a7a893c130f6e0f1";
 
-    private const string ExpectedPackageId = "master-spec-phase1-2";
+    private const string ExpectedPackageId = "master-spec-phase3-art-architect";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -99,6 +99,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianModularSpriteSheetImporterWindow.cs",
         "Assets/Editor/ArthurianBattleSpriteSheetSlicerWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianCharacterDatabaseEditor.cs",
         "Assets/Editor/ArthurianCharacterCatalogSeeder.cs",
         "Assets/Data/Characters/README.md",
@@ -115,6 +116,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
         "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+        "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
@@ -656,6 +659,24 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("class SpriteAnimClip")
                    && body.Contains("framesPerSecond")
                    && body.Contains("List<Sprite> frames");
+        }
+
+        if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class ArthurianArtArchitectWindow")
+                   && body.Contains("Art & Stage Architect")
+                   && body.Contains("Sheet Splicer")
+                   && body.Contains("Paper-Doll")
+                   && body.Contains("Auto-Arrange 52 Overflow Formation")
+                   && body.Contains("RegisterAnimClip")
+                   && body.Contains("Save as CharacterDefinition");
+        }
+
+        if (rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class ModularSpriteLibrary")
+                   && body.Contains("RegisterAnimClip")
+                   && body.Contains("ModularAnimRegistration");
         }
 
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))

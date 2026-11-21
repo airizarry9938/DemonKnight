@@ -12,6 +12,15 @@ namespace ArthurianAutobattler
         public bool isHair = true;
     }
 
+    /// <summary>One registered multi-frame clip on a modular part category.</summary>
+    [Serializable]
+    public class ModularAnimRegistration
+    {
+        [Tooltip("Pose, Outfit, Head, Weapon, or EnemyBoss.")]
+        public string category = "Pose";
+        public SpriteAnimClip clip = new SpriteAnimClip();
+    }
+
     /// <summary>
     /// Sprite arrays for modular townsfolk. Body poses are grayscale (skin-tinted);
     /// outfits are pre-colored with transparent skin cutouts; heads are hair (tint)
@@ -34,10 +43,47 @@ namespace ArthurianAutobattler
         [Header("Props — index 0 = None")]
         public Sprite[] props = Array.Empty<Sprite>();
 
+        [Header("Animation clips (Art Architect / ModularSpriteAnimator)")]
+        [Tooltip("Registered Idle/Attack/Hit/Death clips keyed by part category.")]
+        public List<ModularAnimRegistration> animClips = new List<ModularAnimRegistration>();
+
         public int HeadCount => heads != null ? heads.Length : 0;
         public int PropCount => props != null ? props.Length : 0;
         public int PoseCount => basePoses != null ? basePoses.Length : 0;
         public int OutfitCount => outfits != null ? outfits.Length : 0;
+
+        /// <summary>Upsert a clip by category + clipName (Pose/Outfit/Head/Weapon/EnemyBoss).</summary>
+        public void RegisterAnimClip(string category, SpriteAnimClip clip)
+        {
+            if (clip == null || string.IsNullOrEmpty(clip.clipName)) return;
+            animClips ??= new List<ModularAnimRegistration>();
+            string cat = string.IsNullOrEmpty(category) ? "Pose" : category;
+            for (int i = 0; i < animClips.Count; i++)
+            {
+                var e = animClips[i];
+                if (e == null) continue;
+                if (!string.Equals(e.category, cat, StringComparison.OrdinalIgnoreCase)) continue;
+                if (e.clip == null || !string.Equals(e.clip.clipName, clip.clipName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                e.clip = clip;
+                return;
+            }
+            animClips.Add(new ModularAnimRegistration { category = cat, clip = clip });
+        }
+
+        public SpriteAnimClip FindAnimClip(string category, string clipName)
+        {
+            if (animClips == null) return null;
+            for (int i = 0; i < animClips.Count; i++)
+            {
+                var e = animClips[i];
+                if (e?.clip == null) continue;
+                if (!string.Equals(e.category, category, StringComparison.OrdinalIgnoreCase)) continue;
+                if (string.Equals(e.clip.clipName, clipName, StringComparison.OrdinalIgnoreCase))
+                    return e.clip;
+            }
+            return null;
+        }
 
         public static ModularSpriteLibrary Load()
         {
