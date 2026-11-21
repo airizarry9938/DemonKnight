@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "be80e61381aede74c87ba5499b3786035e9fa738";
 
-    private const string ExpectedPackageId = "fix-stagelayoutprofile-cs0103";
+    private const string ExpectedPackageId = "sync-phase2-5-mustrestore";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -48,11 +48,17 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
-        // StageLayoutProfile BEFORE GameDataTypes — never leave GameDataTypes compiling alone (CS0103).
+        // === Master Spec Phase 2–5 foundations FIRST (CS0103 if consumers land alone) ===
         "Assets/Scripts/Data/SpriteAnimClip.cs",
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+        "Assets/Scripts/Systems/StageParallaxController.cs",
+        "Assets/Scripts/Systems/DiceManager.cs",
+        "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArtArchitectWindow.cs",
+        // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
@@ -67,7 +73,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/FloatingCombatText.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
         "Assets/Scripts/Data/TownsfolkAppearance.cs",
-        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
         "Assets/Scripts/Data/Characters/CharacterDefinition.cs",
         "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
         "Assets/Scripts/Data/SomersetRunes.cs",
@@ -81,7 +86,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/RelicManager.cs",
         "Assets/Scripts/Systems/SinRuneManager.cs",
         "Assets/Scripts/Systems/TavernDiceMinigame.cs",
-        "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Scripts/Systems/TownRNGGenerator.cs",
         "Assets/Scripts/UI/SomersetPewLayout.cs",
         "Assets/Scripts/UI/ChurchPewLayout.cs",
@@ -91,8 +95,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         "Assets/Scripts/UI/TownsfolkPortraitView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
-        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
-        "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianAlignCrowdPews.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
@@ -102,8 +104,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/SomersetAssetStudioWindow.cs",
         "Assets/Editor/ArthurianModularSpriteSheetImporterWindow.cs",
         "Assets/Editor/ArthurianBattleSpriteSheetSlicerWindow.cs",
-        "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
-        "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianCharacterDatabaseEditor.cs",
         "Assets/Editor/ArthurianCharacterCatalogSeeder.cs",
         "Assets/Data/Characters/README.md",
@@ -115,16 +115,19 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // StageLayoutProfile before GameDataTypes (DA-59 CS0103 after Sync).
+        // Phase 2–5 foundations — must land or Sync reports INCOMPLETE.
+        "Assets/Scripts/Data/SpriteAnimClip.cs",
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+        "Assets/Scripts/Systems/StageParallaxController.cs",
+        "Assets/Scripts/Systems/DiceManager.cs",
+        "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
-        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
-        "Assets/Editor/ArthurianArtArchitectWindow.cs",
-        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
-        "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
@@ -134,22 +137,32 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/Combat/AutoBattlerEngine.cs",
         "Assets/Scripts/Combat/BattlefieldVisualizer.cs",
+        "Assets/Scripts/Combat/UnitVisualActor.cs",
         "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
         "Assets/Scripts/Systems/CardFusionSystem.cs",
-        "Assets/Scripts/Systems/DiceManager.cs",
         "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
     };
 
     /// <summary>
     /// Always write these first + restore after Force Delete. Embeds live in PaperDoll/LegendCodex;
     /// stubs overwrite leftover standalone full copies (CS0101).
+    /// Phase 2–5 scripts are here so Force Delete cannot wipe them if a later CDN miss fails.
     /// </summary>
     private static readonly string[] MustRestoreUiHelpers =
     {
+        // Phase 2–5 foundations (DA-59 — Sync CS0103 cascade).
+        "Assets/Scripts/Data/SpriteAnimClip.cs",
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/Data/ModularSpriteLibrary.cs",
+        "Assets/Scripts/UI/ModularSpriteAnimator.cs",
+        "Assets/Scripts/Systems/StageParallaxController.cs",
+        "Assets/Scripts/Systems/DiceManager.cs",
+        "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArtArchitectWindow.cs",
+        // Embed hosts + stubs.
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
@@ -612,7 +625,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("AdvanceNightCounterAfterWaveWin")
                    && body.Contains("AwardWaveVictoryVeteranRanks")
                    && body.Contains("RedrawVeteranStarIcons")
-                   && body.Contains("StartTownRecruitPhase");
+                   && body.Contains("StartTownRecruitPhase")
+                   && body.Contains("soulsLostThisRun")
+                   && body.Contains("DiceManager");
         }
 
         if (rel.EndsWith("DemonKnightCompatApi.cs", StringComparison.OrdinalIgnoreCase))
@@ -650,7 +665,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("battleSlotIndex")
                    && body.Contains("isDeployed")
                    && body.Contains("modularPoseId")
-                   && body.Contains("EffectiveVeteranRank");
+                   && body.Contains("EffectiveVeteranRank")
+                   && body.Contains("class IntelGossip")
+                   && body.Contains("class FlockEconomy")
+                   && body.Contains("PewRowSize = 13");
         }
 
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
@@ -729,7 +747,10 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("endingBattle")
                    && body.Contains("EndBattleBody")
                    && body.Contains("AwardWaveVictoryVeteranRanks")
-                   && body.Contains("RefreshTownAfterDisband");
+                   && body.Contains("RefreshTownAfterDisband")
+                   && body.Contains("StageLayoutProfile")
+                   && body.Contains("FlockEconomy")
+                   && body.Contains("ApplyLinePierceSplash");
         }
 
         if (rel.EndsWith("CardFusionSystem.cs", StringComparison.OrdinalIgnoreCase))
@@ -803,9 +824,33 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("0.15f");
         }
 
+        if (rel.EndsWith("DiceManager.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class DiceManager")
+                   && body.Contains("GrantTownPhaseFreeRoll")
+                   && body.Contains("TryFreeRoll")
+                   && body.Contains("CursedDiceOfCaerleon")
+                   && body.Contains("hireCostForcedZero");
+        }
+
+        if (rel.EndsWith("ArthurianStageLayoutProfileEnsure.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class ArthurianStageLayoutProfileEnsure")
+                   && body.Contains("StageLayoutProfile.asset");
+        }
+
+        if (rel.EndsWith("UnitVisualActor.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class UnitVisualActor")
+                   && body.Contains("ModularSpriteAnimator");
+        }
+
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("DemonKnightCompatApi") && body.Contains("PewSeatHoverHighlight");
+            return body.Contains("DemonKnightCompatApi")
+                   && body.Contains("PewSeatHoverHighlight")
+                   && body.Contains("DiceManager")
+                   && body.Contains("Free Stakes Roll");
         }
 
         if (rel.EndsWith("LegendCodexUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -836,11 +881,8 @@ public static class ArthurianSyncFromGitHub
                        @"CanFuse\s*\([^)]*\)[\s\S]{0,200}?HasUnitType\s*\(\s*party\s*,\s*def\.unitType\s*\)");
         }
 
-        if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("LegendCodexUI.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("MainMenuUI.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("PerkDraftManager.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("MerlinResurrectionManager.cs", StringComparison.OrdinalIgnoreCase))
+        if (rel.EndsWith("MainMenuUI.cs", StringComparison.OrdinalIgnoreCase)
+            || rel.EndsWith("PerkDraftManager.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("DemonKnightCompatApi");
         }
@@ -849,7 +891,8 @@ public static class ArthurianSyncFromGitHub
         {
             return body.Contains("ResolveArenaBindings")
                    && body.Contains("ApplyBackgroundArt")
-                   && body.Contains("ApplyVideoBackground");
+                   && body.Contains("ApplyVideoBackground")
+                   && body.Contains("StageLayoutProfile");
         }
 
         if (rel.EndsWith("BattleBossDialogUI.cs", StringComparison.OrdinalIgnoreCase))
