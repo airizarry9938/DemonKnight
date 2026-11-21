@@ -244,16 +244,28 @@ namespace ArthurianAutobattler
                 {
                     RecruitInstance captured = recruit;
                     GameObject capturedObj = btnObj;
-                    System.Action showInfo = () => SelectRecruit(captured, capturedObj);
-                    btn.onClick.AddListener(() => showInfo());
-                    // Instant hover → dossier (no delay).
-                    PewSeatHoverHighlight.Ensure(btnObj, true, showInfo);
+                    var church = FindFirstObjectByType<SomersetChurchUI>()
+                                 ?? (SomersetChurchUI)FindFirstObjectByType<ChurchStageUIController>();
+                    // LMB kept for town-grid hire select; hover = bottom quotes only; RMB = menu.
+                    btn.onClick.AddListener(() => SelectRecruit(captured, capturedObj));
+                    PewSeatHoverHighlight.Ensure(
+                        btnObj, true,
+                        onHoverInfo: () =>
+                        {
+                            if (church != null) church.ShowHoverPreview(captured);
+                            else SelectRecruit(captured, capturedObj);
+                        },
+                        onRightClick: () =>
+                        {
+                            if (church != null) church.ToggleUnitSelectionMenu(captured);
+                            else SelectRecruit(captured, capturedObj);
+                        });
                 }
                 else
-                    PewSeatHoverHighlight.Ensure(btnObj, false, null);
+                    PewSeatHoverHighlight.Ensure(btnObj, false, null, null);
             }
             else
-                PewSeatHoverHighlight.Ensure(btnObj, recruit != null, null);
+                PewSeatHoverHighlight.Ensure(btnObj, recruit != null, null, null);
         }
 
         public void SelectRecruit(RecruitInstance recruit, GameObject btnObj)

@@ -115,13 +115,15 @@ namespace ArthurianAutobattler
             if (GameLoopManager.Instance != null)
                 SetNight(GameLoopManager.Instance.currentNight);
 
-            // Dice/codex/warband start closed. Dossier bottom panel stays visible.
+            // Dice/codex/warband start closed. Selection menu starts closed;
+            // bottom dialogue strip stays visible for hover quotes.
             diceModalUserOpen = false;
             warbandModalUserOpen = false;
             CloseFloatingModals();
             ForceNamedTavernDicePanelsInactive();
             HideAllDicePanelsHard();
-            if (dossierModal != null) dossierModal.SetActive(true);
+            if (dossierModal != null) dossierModal.SetActive(false);
+            EnsureBottomDialogueStrip();
         }
 
         private System.Collections.IEnumerator RelayoutHudNextFrame()
@@ -932,26 +934,9 @@ namespace ArthurianAutobattler
                 rt.SetAsLastSibling();
             }
 
+            // Andrew: remove Legends title panel.
             var title = codexModal.transform.Find("CodexTitle");
-            if (title != null)
-            {
-                var titleRt = title as RectTransform;
-                if (titleRt != null)
-                {
-                    titleRt.anchorMin = new Vector2(0.05f, 1f);
-                    titleRt.anchorMax = new Vector2(0.95f, 1f);
-                    titleRt.pivot = new Vector2(0.5f, 1f);
-                    titleRt.anchoredPosition = new Vector2(0f, -18f);
-                    titleRt.sizeDelta = new Vector2(0f, 48f);
-                }
-                var titleTmp = title.GetComponent<TextMeshProUGUI>();
-                if (titleTmp != null)
-                {
-                    titleTmp.fontSize = 36f;
-                    titleTmp.alignment = TextAlignmentOptions.Center;
-                    titleTmp.textWrappingMode = TextWrappingModes.NoWrap;
-                }
-            }
+            if (title != null) title.gameObject.SetActive(false);
 
             EnsureCodexScrollViewport(codexModal.transform);
 
@@ -1756,7 +1741,9 @@ namespace ArthurianAutobattler
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
                 {
-                    if (recruit != null) view.Bind(recruit, OnSeatClicked);
+                    if (recruit != null)
+                        view.Bind(recruit, onLeftClick: null, onHover: () => ShowHoverPreview(recruit),
+                            onRightClick: () => ToggleUnitSelectionMenu(recruit));
                     else view.BindEmpty();
                     seats.Add(view);
                 }
@@ -1773,18 +1760,16 @@ namespace ArthurianAutobattler
                         colors.highlightedColor = new Color(0.95f, 0.9f, 0.55f, 1f);
                         colors.selectedColor = new Color(0.85f, 0.78f, 0.4f, 1f);
                         btn.colors = colors;
-                        if (recruit != null)
-                        {
-                            RecruitInstance captured = recruit;
-                            System.Action showInfo = () => OnSeatClicked(captured);
-                            btn.onClick.AddListener(() => showInfo());
-                            PewSeatHoverHighlight.Ensure(go, true, showInfo);
-                        }
-                        else
-                            PewSeatHoverHighlight.Ensure(go, false, null);
+                    }
+                    if (recruit != null)
+                    {
+                        RecruitInstance captured = recruit;
+                        PewSeatHoverHighlight.Ensure(go, true,
+                            onHoverInfo: () => ShowHoverPreview(captured),
+                            onRightClick: () => ToggleUnitSelectionMenu(captured));
                     }
                     else
-                        PewSeatHoverHighlight.Ensure(go, recruit != null, null);
+                        PewSeatHoverHighlight.Ensure(go, false, null, null);
                 }
             }
 
@@ -1822,26 +1807,117 @@ namespace ArthurianAutobattler
             _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
         };
 
-        private void OnSeatClicked(RecruitInstance recruit)
+        /// <summary>
+        /// Hover only: bottom dialogue + NPC quotes. Does NOT open the selection menu
+        /// and does NOT lock hire selection — player can keep hovering freely.
+        /// </summary>
+        public void ShowHoverPreview(RecruitInstance recruit)
         {
             if (recruit == null) return;
             AutoWireDossierFromTownUI();
+            EnsureBottomDialogueStrip();
+            WriteBottomDialogue(recruit);
+        }
+
+        /// <summary>
+        /// Right-click toggles the unit selection menu (hire / train / intel).
+        /// </summary>
+        public void ToggleUnitSelectionMenu(RecruitInstance recruit)
+        {
+            if (recruit == null) return;
+            AutoWireDossierFromTownUI();
+
+            bool alreadyOpenOnThis = dossierModal != null
+                                     && dossierModal.activeSelf
+                                     && selected == recruit;
+            if (alreadyOpenOnThis)
+            {
+                if (dossierModal != null) dossierModal.SetActive(false);
+                Debug.Log($"[DemonKnight] Unit menu CLOSED for {recruit.characterName} (RMB).");
+                return;
+            }
 
             selected = recruit;
             if (dossierModal != null)
             {
                 dossierModal.SetActive(true);
-                dossierModal.transform.SetAsLastSibling(); // draw above pew seats
+                dossierModal.transform.SetAsLastSibling();
+            }
+            RefreshDossier();
+            WriteBottomDialogue(recruit);
+            Town?.SelectRecruit(recruit, null);
+            Debug.Log($"[DemonKnight] Unit menu OPEN for {recruit.characterName} (RMB, pew {recruit.pewSeatIndex}).");
+        }
+
+        /// <summary>Legacy LMB path — prefer RMB for selection menu; still opens menu if used.</summary>
+        private void OnSeatClicked(RecruitInstance recruit) => ToggleUnitSelectionMenu(recruit);
+
+        void WriteBottomDialogue(RecruitInstance recruit)
+        {
+            if (recruit == null) return;
+            int grudge = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(recruit.unitID) : 0;
+            int discount = MerlinResurrectionManager.Instance != null
+                ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
+
+            if (dossierDialogue != null)
+                dossierDialogue.text = recruit.FormatHireDialogue(grudge, discount);
+            if (gossipText != null)
+                gossipText.text = BuildGossip(recruit);
+        }
+
+        /// <summary>Always-on bottom strip for dialogue + NPC quotes (independent of selection menu).</summary>
+        void EnsureBottomDialogueStrip()
+        {
+            AutoWireDossierFromTownUI();
+            // Prefer existing wired texts; if they live under a closed modal, keep a HUD strip.
+            if (dossierDialogue != null && gossipText != null)
+            {
+                dossierDialogue.gameObject.SetActive(true);
+                gossipText.gameObject.SetActive(true);
+                return;
             }
 
-            RefreshDossier();
+            var hud = transform as RectTransform;
+            if (hud == null) return;
+            Transform strip = transform.Find("ChurchBottomDialogue");
+            if (strip == null)
+            {
+                var go = new GameObject("ChurchBottomDialogue", typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(transform, false);
+                strip = go.transform;
+                var srt = go.GetComponent<RectTransform>();
+                srt.anchorMin = new Vector2(0.08f, 0.02f);
+                srt.anchorMax = new Vector2(0.92f, 0.14f);
+                srt.offsetMin = Vector2.zero;
+                srt.offsetMax = Vector2.zero;
+                go.GetComponent<Image>().color = new Color(0.06f, 0.07f, 0.09f, 0.88f);
 
-            // Also drive the town dossier path (same Panel_Dossier texts).
-            var town = Town;
-            if (town != null)
-                town.SelectRecruit(recruit, null);
+                var dlgGo = new GameObject("Dialogue", typeof(RectTransform), typeof(TextMeshProUGUI));
+                dlgGo.transform.SetParent(strip, false);
+                var drt = dlgGo.GetComponent<RectTransform>();
+                drt.anchorMin = new Vector2(0.02f, 0.45f);
+                drt.anchorMax = new Vector2(0.98f, 0.95f);
+                drt.offsetMin = Vector2.zero;
+                drt.offsetMax = Vector2.zero;
+                dossierDialogue = dlgGo.GetComponent<TextMeshProUGUI>();
+                dossierDialogue.fontSize = 20f;
+                dossierDialogue.color = new Color(0.95f, 0.9f, 0.75f);
+                dossierDialogue.alignment = TextAlignmentOptions.TopLeft;
 
-            Debug.Log($"[DemonKnight] Selected {recruit.characterName} (pew seat {recruit.pewSeatIndex}).");
+                var gGo = new GameObject("Gossip", typeof(RectTransform), typeof(TextMeshProUGUI));
+                gGo.transform.SetParent(strip, false);
+                var grt = gGo.GetComponent<RectTransform>();
+                grt.anchorMin = new Vector2(0.02f, 0.05f);
+                grt.anchorMax = new Vector2(0.98f, 0.45f);
+                grt.offsetMin = Vector2.zero;
+                grt.offsetMax = Vector2.zero;
+                gossipText = gGo.GetComponent<TextMeshProUGUI>();
+                gossipText.fontSize = 16f;
+                gossipText.color = new Color(0.75f, 0.82f, 0.9f);
+                gossipText.alignment = TextAlignmentOptions.TopLeft;
+            }
+            strip.gameObject.SetActive(true);
         }
 
         private void RefreshDossier()
@@ -2186,27 +2262,9 @@ namespace ArthurianAutobattler
                 rt.SetAsLastSibling();
             }
 
+            // Andrew: remove Warband title panel.
             var title = warbandModal.transform.Find("WarbandTitle");
-            if (title == null)
-            {
-                var titleGo = new GameObject("WarbandTitle", typeof(RectTransform), typeof(TextMeshProUGUI));
-                titleGo.transform.SetParent(warbandModal.transform, false);
-                title = titleGo.transform;
-                var trt = title as RectTransform;
-                trt.anchorMin = new Vector2(0.05f, 1f);
-                trt.anchorMax = new Vector2(0.95f, 1f);
-                trt.pivot = new Vector2(0.5f, 1f);
-                trt.anchoredPosition = new Vector2(0f, -16f);
-                trt.sizeDelta = new Vector2(0f, 44f);
-            }
-            var titleTmp = title.GetComponent<TextMeshProUGUI>();
-            if (titleTmp != null)
-            {
-                titleTmp.text = "CAMELOT CROWD — CURRENT WARBAND";
-                titleTmp.fontSize = 28f;
-                titleTmp.alignment = TextAlignmentOptions.Center;
-                titleTmp.color = new Color(0.92f, 0.88f, 0.78f);
-            }
+            if (title != null) title.gameObject.SetActive(false);
 
             EnsureFormationDiagram(warbandModal.transform);
             EnsureWarbandSortBar();

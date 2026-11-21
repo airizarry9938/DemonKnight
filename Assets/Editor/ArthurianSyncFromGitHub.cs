@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "03b56236ae6b5f89c2cc93ef18dffb8bb9ab3f24";
 
-    private const string ExpectedPackageId = "sortbar-raise-hover-instant";
+    private const string ExpectedPackageId = "sync-skip-self-hover-rmb";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -280,11 +280,24 @@ public static class ArthurianSyncFromGitHub
                 string rel = ScriptPaths[i];
                 EditorUtility.DisplayProgressBar("DemonKnight Sync", rel + " @ " + sha, (float)i / ScriptPaths.Length);
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                bool protectMenu = NeverBulkDeleteEditorMenus.Contains(rel);
+
+                // Permanent fix (DA-37 / e42119b): NEVER Force-Sync overwrite the Sync host.
+                // CDN Empty/404 on ArthurianSyncFromGitHub.cs was reporting 37/38 while the
+                // running menus stayed fine. Upgrade Sync tools via Bootstrap only.
+                if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase)
+                    && File.Exists(dest))
+                {
+                    okFiles.Add(rel);
+                    Debug.Log(
+                        "[DemonKnight] Kept local ArthurianSyncFromGitHub.cs (Force Sync skips self-overwrite; use Bootstrap to upgrade).");
+                    continue;
+                }
+
                 try
                 {
                     // Menu hosts: relax package-id so tip Sync always lands even when local
                     // ExpectedPackageId lags one Force Sync behind.
-                    bool protectMenu = NeverBulkDeleteEditorMenus.Contains(rel);
                     string text = DownloadPinned(rel, sha, out string source, relaxPackageId: protectMenu);
                     if (!protectMenu) ValidateCritical(rel, text);
                     // Menu hosts: in-place replace only (no delete-first gap).
@@ -295,6 +308,14 @@ public static class ArthurianSyncFromGitHub
                 }
                 catch (Exception ex)
                 {
+                    // Menu hosts: keep local copy on CDN miss — never fail the whole Sync.
+                    if (protectMenu && File.Exists(dest))
+                    {
+                        okFiles.Add(rel);
+                        Debug.LogWarning(
+                            $"[DemonKnight] Kept local {rel} after CDN miss ({ex.Message}). Use Bootstrap to refresh.");
+                        continue;
+                    }
                     errors.Add($"{rel}: {ex.Message}");
                     Debug.LogError($"[DemonKnight] Sync FAILED {rel}: {ex.Message}");
                 }
@@ -597,7 +618,9 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("RewireMarchButton")
                    && body.Contains("ForceNamedTavernDicePanelsInactive")
                    && body.Contains("forceEqualHudSlots")
-                   && body.Contains("MenuListSortBar");
+                   && body.Contains("MenuListSortBar")
+                   && body.Contains("ShowHoverPreview")
+                   && body.Contains("ToggleUnitSelectionMenu");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -648,7 +671,9 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("class PaperDollSeatView")
                    && body.Contains("class PewSeatHoverHighlight")
                    && body.Contains("IPointerEnterHandler")
-                   && body.Contains("onHoverInfo");
+                   && body.Contains("onHoverInfo")
+                   && body.Contains("onRightClick")
+                   && body.Contains("IPointerClickHandler");
         }
 
         if (rel.EndsWith("TownSplitUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -707,6 +732,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("sync-skip-self-hover-rmb")
                    || body.Contains("sortbar-raise-hover-instant")
                    || body.Contains("embed-hover-sortbar-cs0103")
                    || body.Contains("fix-hover-sortbar-sync-cs0103")
@@ -765,8 +791,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ForceDeleteSyncAll")
                    && body.Contains("BootstrapCompatAndSyncTools")
                    && body.Contains("EnsureUiHelpersPresent")
-                   && body.Contains("IsMustRestoreUiHelper")
-                   && body.Contains("embed-hover-sortbar-cs0103");
+                   && body.Contains("Kept local ArthurianSyncFromGitHub");
         }
 
         if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase))

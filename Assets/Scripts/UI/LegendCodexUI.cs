@@ -89,7 +89,9 @@ namespace ArthurianAutobattler
             EnsureRecipesFromDatabase();
             FillRecipeSortStats();
             MenuListSortBar.SortRecipes(allRecipes, legendsSortMode);
-            RefreshFusionPreview(party);
+            // Legends list only — hide party fusion preview strip (party info).
+            if (fusionPreviewRoot != null)
+                fusionPreviewRoot.gameObject.SetActive(false);
 
             foreach (var entry in allRecipes)
             {
@@ -297,19 +299,10 @@ namespace ArthurianAutobattler
                 },
                 new Vector2(0.04f, 0.905f),
                 new Vector2(0.96f, 0.965f));
-            // Keep fusion preview below the sort chips when present.
             if (fusionPreviewRoot != null)
-            {
-                var frt = fusionPreviewRoot as RectTransform;
-                if (frt != null)
-                {
-                    frt.anchorMin = new Vector2(0f, 1f);
-                    frt.anchorMax = new Vector2(1f, 1f);
-                    frt.pivot = new Vector2(0.5f, 1f);
-                    frt.anchoredPosition = new Vector2(0f, -78f);
-                    frt.sizeDelta = new Vector2(-24f, 72f);
-                }
-            }
+                fusionPreviewRoot.gameObject.SetActive(false);
+            var title = codexPanel.transform.Find("CodexTitle");
+            if (title != null) title.gameObject.SetActive(false);
         }
 
         void EnsureRecipesFromDatabase()

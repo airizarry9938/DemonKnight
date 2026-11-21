@@ -23,7 +23,18 @@ namespace ArthurianAutobattler
 
         static bool _loggedFirstBind;
 
-        public void Bind(RecruitInstance recruit, System.Action<RecruitInstance> onClick)
+        /// <summary>Legacy: left-click = select. Prefer the hover/RMB overload.</summary>
+        public void Bind(RecruitInstance recruit, System.Action<RecruitInstance> onClick) =>
+            Bind(recruit, onLeftClick: onClick, onHover: null, onRightClick: onClick);
+
+        /// <summary>
+        /// Hover → bottom dialogue only (no lock). RMB → selection menu. LMB optional.
+        /// </summary>
+        public void Bind(
+            RecruitInstance recruit,
+            Action onLeftClick,
+            Action onHover,
+            Action onRightClick)
         {
             Bound = recruit;
             var layers = EnsureModularLayers();
@@ -81,18 +92,19 @@ namespace ArthurianAutobattler
             seatButton.interactable = true;
             if (seatButton.targetGraphic == null && layers.body != null)
                 seatButton.targetGraphic = layers.body;
-            // ColorTint alone is weak on modular layers — rim hover is the clear signal.
             var colors = seatButton.colors;
             colors.highlightedColor = new Color(0.95f, 0.9f, 0.55f, 1f);
             colors.selectedColor = new Color(0.85f, 0.78f, 0.4f, 1f);
             seatButton.colors = colors;
             seatButton.onClick.RemoveAllListeners();
-            seatButton.onClick.AddListener(() => onClick?.Invoke(recruit));
+            if (onLeftClick != null)
+                seatButton.onClick.AddListener(() => onLeftClick());
 
-            // Hover shows unit info immediately (same dossier path as click — no delay).
-            RecruitInstance captured = recruit;
-            Action showInfo = () => onClick?.Invoke(captured);
-            PewSeatHoverHighlight.Ensure(gameObject, recruit != null, showInfo);
+            PewSeatHoverHighlight.Ensure(
+                gameObject,
+                recruit != null,
+                onHoverInfo: onHover,
+                onRightClick: onRightClick);
             VictoryStarBadge.Apply(transform, recruit);
         }
 
@@ -117,7 +129,7 @@ namespace ArthurianAutobattler
                 seatButton.onClick.RemoveAllListeners();
                 seatButton.interactable = false;
             }
-            PewSeatHoverHighlight.Ensure(gameObject, false, null);
+            PewSeatHoverHighlight.Ensure(gameObject, false, null, null);
         }
 
         TownsfolkVisualApplier.LayerSet EnsureModularLayers()
@@ -177,7 +189,7 @@ namespace ArthurianAutobattler
     /// AtomicCritical UI file (standalone PewSeatHoverHighlight.cs was missing on Downloads).
     /// </summary>
     [DisallowMultipleComponent]
-    public class PewSeatHoverHighlight : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+    public class PewSeatHoverHighlight : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
         const string RimName = "PewHoverRim";
         static readonly Vector3 HoverScale = new Vector3(1.08f, 1.08f, 1f);
@@ -189,20 +201,26 @@ namespace ArthurianAutobattler
         bool hovering;
         bool occupied = true;
         Action onHoverInfo;
+        Action onRightClick;
 
-        public static PewSeatHoverHighlight Ensure(GameObject go, bool isOccupied, Action onHoverInfo = null)
+        public static PewSeatHoverHighlight Ensure(
+            GameObject go,
+            bool isOccupied,
+            Action onHoverInfo = null,
+            Action onRightClick = null)
         {
             if (go == null) return null;
             var h = go.GetComponent<PewSeatHoverHighlight>();
             if (h == null) h = go.AddComponent<PewSeatHoverHighlight>();
-            h.Configure(isOccupied, onHoverInfo);
+            h.Configure(isOccupied, onHoverInfo, onRightClick);
             return h;
         }
 
-        public void Configure(bool isOccupied, Action onHoverInfo = null)
+        public void Configure(bool isOccupied, Action onHoverInfo = null, Action onRightClick = null)
         {
             occupied = isOccupied;
             this.onHoverInfo = onHoverInfo;
+            this.onRightClick = onRightClick;
             if (!hovering) baseScale = transform.localScale;
             EnsureRim();
             Apply(false);
@@ -242,7 +260,7 @@ namespace ArthurianAutobattler
             if (!occupied) return;
             hovering = true;
             Apply(true);
-            // Instant unit info — fire on enter with no wait / coroutine delay.
+            // Bottom dialogue only — never opens selection menu / never locks hire select.
             onHoverInfo?.Invoke();
         }
 
@@ -250,6 +268,13 @@ namespace ArthurianAutobattler
         {
             hovering = false;
             Apply(false);
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (!occupied) return;
+            if (eventData != null && eventData.button == PointerEventData.InputButton.Right)
+                onRightClick?.Invoke();
         }
 
         void OnDisable()
