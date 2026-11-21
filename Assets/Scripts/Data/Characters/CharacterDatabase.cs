@@ -118,7 +118,7 @@ namespace ArthurianAutobattler
             if (def == null || !def.HasFusionRecipe || party == null) return false;
             // Allow multiple of the same legend (e.g. second Priest) whenever ingredients remain.
             // Never gate on HasUnitType / party already containing the product.
-            SanitizeBaseUnitFusionFlags(party);
+            CardFusionSystem.SanitizeBaseUnitFusionFlags(party);
             bool ok = TryPickIngredients(party, def.fusionRecipe, out _);
             if (!ok)
                 LogFuseBlocked(def, party);
@@ -129,7 +129,7 @@ namespace ArthurianAutobattler
         {
             product = null;
             if (def == null || party == null || !def.HasFusionRecipe) return false;
-            SanitizeBaseUnitFusionFlags(party);
+            CardFusionSystem.SanitizeBaseUnitFusionFlags(party);
             if (!TryPickIngredients(party, def.fusionRecipe, out var chosen))
             {
                 LogFuseBlocked(def, party);
@@ -149,32 +149,6 @@ namespace ArthurianAutobattler
                 $"[DemonKnight] Fused {product.characterName} via CharacterDatabase: consumed {chosen.Count}, party={party.Count} " +
                 $"(product already in party before fuse was OK — multi-fuse allowed).");
             return true;
-        }
-
-        /// <summary>
-        /// Pew townsfolk must never carry fusionIngredients — that made IsFusedLegend true and
-        /// skipped them as Peasant/Warrior/Knight ingredients (blocked second Priest).
-        /// </summary>
-        public static void SanitizeBaseUnitFusionFlags(List<RecruitInstance> party)
-        {
-            if (party == null) return;
-            for (int i = 0; i < party.Count; i++)
-            {
-                var r = party[i];
-                if (r == null) continue;
-                if (r.unitType == UnitType.Peasant
-                    || r.unitType == UnitType.Warrior
-                    || r.unitType == UnitType.Knight)
-                {
-                    if (r.fusionIngredients != null && r.fusionIngredients.Count > 0)
-                    {
-                        Debug.LogWarning(
-                            $"[DemonKnight] Cleared bogus fusionIngredients on base unit " +
-                            $"{r.characterName} ({r.unitType}) — was blocking multi-fuse.");
-                        r.fusionIngredients = null;
-                    }
-                }
-            }
         }
 
         static void LogFuseBlocked(CharacterDefinition def, List<RecruitInstance> party)

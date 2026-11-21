@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "3058fc01e109673435dea7a324a3e548ea28692a";
 
-    private const string ExpectedPackageId = "victory-nextnight-multifuse-priest";
+    private const string ExpectedPackageId = "fix-cs0117-sanitize-on-fusion";
 
     /// <summary>
     /// Never bulk-delete these before re-download. Force Delete+Sync used to wipe
@@ -122,6 +122,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/BattleBossDialogUI.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
+        "Assets/Scripts/Systems/CardFusionSystem.cs",
+        "Assets/Scripts/Data/Characters/CharacterDatabase.cs",
     };
 
     /// <summary>
@@ -661,7 +663,8 @@ public static class ArthurianSyncFromGitHub
         {
             return body.Contains("CanFuseLegacy")
                    && body.Contains("CountType(p, UnitType.Peasant) >= 2")
-                   && body.Contains("SanitizeBaseUnitFusionFlags")
+                   && body.Contains("public static void SanitizeBaseUnitFusionFlags")
+                   && !body.Contains("CharacterDatabase.SanitizeBaseUnitFusionFlags")
                    && !body.Contains("!HasType(p, UnitType.Priest)")
                    && !body.Contains("!HasType(p, UnitType.Merlin)");
         }
@@ -733,8 +736,8 @@ public static class ArthurianSyncFromGitHub
             // Priest/legend fuse: ingredients-only — no HasUnitType one-product lock.
             return body.Contains("TryPickIngredients")
                    && body.Contains("CreateLegendRecruit")
-                   && body.Contains("SanitizeBaseUnitFusionFlags")
                    && body.Contains("LogFuseBlocked")
+                   && body.Contains("CardFusionSystem.SanitizeBaseUnitFusionFlags")
                    && !Regex.IsMatch(
                        body,
                        @"CanFuse\s*\([^)]*\)[\s\S]{0,200}?HasUnitType\s*\(\s*party\s*,\s*def\.unitType\s*\)");
@@ -772,6 +775,7 @@ public static class ArthurianSyncFromGitHub
             if (relaxPackageId)
                 return body.Contains("public const string Id");
             return body.Contains(ExpectedPackageId)
+                   || body.Contains("fix-cs0117-sanitize-on-fusion")
                    || body.Contains("victory-nextnight-multifuse-priest")
                    || body.Contains("rmb-anywhere-sort-chip-order")
                    || body.Contains("rmb-close-sort-recruit-purse")

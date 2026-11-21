@@ -57,7 +57,7 @@ namespace ArthurianAutobattler
 
         public bool CanFuseType(UnitType type, List<RecruitInstance> p)
         {
-            CharacterDatabase.SanitizeBaseUnitFusionFlags(p);
+            SanitizeBaseUnitFusionFlags(p);
             var db = CharacterDatabase.Load();
             var def = db?.GetByUnitType(type);
             if (def != null && def.HasFusionRecipe)
@@ -75,7 +75,7 @@ namespace ArthurianAutobattler
 
         public bool FuseType(UnitType type, List<RecruitInstance> p)
         {
-            CharacterDatabase.SanitizeBaseUnitFusionFlags(p);
+            SanitizeBaseUnitFusionFlags(p);
             var db = CharacterDatabase.Load();
             var def = db?.GetByUnitType(type);
             if (def != null && def.HasFusionRecipe)
@@ -95,6 +95,32 @@ namespace ArthurianAutobattler
                 return false;
             }
             return FuseLegacy(type, p);
+        }
+
+        /// <summary>
+        /// Lives on CardFusionSystem so Force Sync cannot CS0117 when CharacterDatabase.cs
+        /// lags one pass behind (Andrew: CardFusionSystem called missing DB method).
+        /// </summary>
+        public static void SanitizeBaseUnitFusionFlags(List<RecruitInstance> party)
+        {
+            if (party == null) return;
+            for (int i = 0; i < party.Count; i++)
+            {
+                var r = party[i];
+                if (r == null) continue;
+                if (r.unitType == UnitType.Peasant
+                    || r.unitType == UnitType.Warrior
+                    || r.unitType == UnitType.Knight)
+                {
+                    if (r.fusionIngredients != null && r.fusionIngredients.Count > 0)
+                    {
+                        Debug.LogWarning(
+                            $"[DemonKnight] Cleared bogus fusionIngredients on base unit " +
+                            $"{r.characterName} ({r.unitType}) — was blocking multi-fuse.");
+                        r.fusionIngredients = null;
+                    }
+                }
+            }
         }
 
         public bool CanFusePriest(List<RecruitInstance> p) => CanFuseType(UnitType.Priest, p);
