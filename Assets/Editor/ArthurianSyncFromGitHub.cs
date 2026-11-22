@@ -23,13 +23,13 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    private const string FallbackCommitSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
+    private const string FallbackCommitSha = "c414818b5bb591cd644e0f70a1c7bb16903f9ccf";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// </summary>
-    public const string HardTipCommitSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
+    public const string HardTipCommitSha = "c414818b5bb591cd644e0f70a1c7bb16903f9ccf";
 
     private const string ExpectedPackageId = "runtime-single-sprite";
 

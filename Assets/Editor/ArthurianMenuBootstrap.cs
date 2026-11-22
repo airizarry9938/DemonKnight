@@ -773,7 +773,7 @@ public static class ArthurianMenuBootstrap
     /// Known-good tip with LooksLikeHttpFailureBody + OnLoad PackageVersion (≥500B).
     /// Update when shipping break-glass tips. Used when Sync tip-resolve is stuck.
     /// </summary>
-    public const string BreakGlassTipSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
+    public const string BreakGlassTipSha = "c414818b5bb591cd644e0f70a1c7bb16903f9ccf";
 
     /// <summary>
     /// Lives in MenuBootstrap so skip-self Sync hosts still get a one-click upgrade.

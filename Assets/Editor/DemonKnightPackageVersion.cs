@@ -14,7 +14,7 @@ public static class DemonKnightPackageVersion
     public const string BuiltUtc = "2026-11-22T02:53:56Z";
 
     /// <summary>Hard tip known to contain LooksLikeHttpFailureBody Sync + OnLoad PackageVersion.</summary>
-    public const string HardTipSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
+    public const string HardTipSha = "c414818b5bb591cd644e0f70a1c7bb16903f9ccf";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
