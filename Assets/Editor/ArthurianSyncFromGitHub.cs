@@ -65,7 +65,6 @@ public static class ArthurianSyncFromGitHub
         "fix-wave-advance-stuck",
         "legends-fullwidth-column",
         "fix-hud-wave-match",
-        "fix-wave-advance-stuck",
     };
 
     /// <summary>
