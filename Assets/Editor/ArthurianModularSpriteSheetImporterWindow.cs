@@ -25,12 +25,16 @@ public class ArthurianModularSpriteSheetImporterWindow : EditorWindow
     bool pointFilter = true;
     Vector2 scroll;
 
-    // Single MenuItem only — DemonKnight/ alias removed (duplicate MenuItem / nested zip copies).
-    [MenuItem("Arthurian/Art Tools/Modular Sprite Sheet Importer", false, 41)]
+    // Menu removed — paperdoll multi-layer import retired. Use Art & Stage Architect (single Sprite).
+    // Keep class so Force Sync / Install paths do not 404; Open redirects.
     public static void Open()
     {
-        var win = GetWindow<ArthurianModularSpriteSheetImporterWindow>("Modular Sprite Importer");
-        win.minSize = new Vector2(520, 480);
+        EditorUtility.DisplayDialog(
+            "Modular Importer Retired",
+            "Multi-layer Pose/Outfit/Head import is removed.\n\n" +
+            "Use Arthurian → Art & Stage Architect → Tab 1 (Category: Sprite).",
+            "Open Architect");
+        ArthurianArtArchitectWindow.Open();
     }
 
     void OnEnable()

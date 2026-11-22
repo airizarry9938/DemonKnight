@@ -193,7 +193,7 @@ public static class ArthurianMenuBootstrap
             msg +=
                 "Art tools READY — do NOT Install again.\n" +
                 "Open the windows (not Install):\n" +
-                "• Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
+                "• Arthurian → Art & Stage Architect (Tab 1 · Sprite)\n" +
                 "• Arthurian → Art Tools → Battle Sprite Sheet Slicer\n" +
                 "DemonKnight menu is an optional alias for the same windows.\n";
         }
@@ -333,7 +333,7 @@ public static class ArthurianMenuBootstrap
             $"Runtime copy: {resPath}\n" +
             $"Resources poses filled: {resPoses}\n" +
             (usedPlaceholders
-                ? "Seeded PLACEHOLDER poses (no sheets imported yet).\nImport real sheets via Modular Sprite Sheet Importer when ready.\n"
+                ? "Seeded PLACEHOLDER poses (no sheets imported yet).\nImport real sprites via Art & Stage Architect → Tab 1 when ready.\n"
                 : "") +
             "Stop Play → Main Menu → New Game to rebuild pews.";
 
@@ -577,9 +577,9 @@ public static class ArthurianMenuBootstrap
                 "Importer scripts are already compiled.\n\n" +
                 "Do NOT Install again.\n\n" +
                 "Open:\n" +
-                "• Arthurian → Art Tools → Modular Sprite Sheet Importer\n" +
+                "• Arthurian → Art & Stage Architect (Tab 1 · Sprite)\n" +
                 "• Arthurian → Art Tools → Battle Sprite Sheet Slicer\n\n" +
-                "If those still look like Install, run Arthurian → Diagnose Project.",
+                "If menus look wrong, run Arthurian → Diagnose Project.",
                 "OK");
             return;
         }
@@ -665,7 +665,7 @@ public static class ArthurianMenuBootstrap
             + "1) Wait for the bottom-right compile spinner to finish.\n"
             + "2) Console must show 0 red errors.\n"
             + "3) Then open (NOT Install):\n"
-            + "   Arthurian → Art Tools → Modular Sprite Sheet Importer\n"
+            + "   Arthurian → Art & Stage Architect (Tab 1 · Sprite)\n"
             + "   Arthurian → Art Tools → Battle Sprite Sheet Slicer\n\n"
             + "DemonKnight menu may blink once during compile — that is normal.\n"
             + (string.IsNullOrEmpty(errors) ? "" : "Errors:\n" + errors),

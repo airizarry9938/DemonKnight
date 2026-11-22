@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "b65683d41b7c56eb865710b5804cfa58e4267ea0";
 
-    private const string ExpectedPackageId = "console-modular-stagelayout-menus";
+    private const string ExpectedPackageId = "single-sprite-no-paperdoll";
 
     /// <summary>Menu hosts that must always overwrite from tip/main — never skip-self, never Fallback pin.</summary>
     public static readonly string[] SyncHostForceOverwritePaths =

@@ -9,18 +9,19 @@ using UnityEngine;
 /// <summary>
 /// Master Spec Phase 3 — Art &amp; Stage Architect.
 /// Menu: Arthurian → Art &amp; Stage Architect
-/// Tabs: Sheet Splicer &amp; Animation Builder | Paper-Doll Generator | Numbered Stage Placer
+/// Tabs: Sheet Splicer &amp; Animation Builder | Numbered Stage Placer
+/// Single sprite category only (no paperdoll / multi-layer body·outfit·head).
 /// </summary>
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
     const string SplicedRootFolder = "Assets/Art/Spliced";
-    const string CharactersFolder = "Assets/Resources/Characters";
+    const string SpriteCategory = "Sprite";
+    const string DefaultExportFolder = SplicedRootFolder + "/" + SpriteCategory;
     const string StageProfilePath = "Assets/Resources/StageLayoutProfile.asset";
 
-    enum ArchitectTab { Splicer, PaperDoll, StagePlacer }
-    enum SheetCategory { Pose, Outfit, Head, Weapon, EnemyBoss }
+    enum ArchitectTab { Splicer, StagePlacer }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
     enum BattleSlotSide { Player, Enemy }
     enum CropToolMode { ManualBox, GridCrop, AutoIsland }
@@ -31,7 +32,6 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     // ── Tab 1: Splicer ─────────────────────────────────────────────────────
     Texture2D sheetTexture;
-    SheetCategory sheetCategory = SheetCategory.Pose;
     ModularSpriteLibrary targetLibrary;
     Color keyColor = new Color(28f / 255f, 37f / 255f, 50f / 255f, 1f);
     float keyTolerance = 18f;
@@ -43,8 +43,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     float clipFps = 6f;
     bool clipLoop = true;
     string sliceOutputFolder = DefaultSliceFolder;
-    string targetExportFolder = SplicedRootFolder + "/Pose";
-    SheetCategory lastExportCategory = SheetCategory.Pose;
+    string targetExportFolder = DefaultExportFolder;
 
     // Save Splices chroma key (#FF00FF) + optional corner detect + magenta defringe
     static readonly Color MagentaChromaKey = new Color(1f, 0f, 1f, 1f); // #FF00FF
@@ -71,22 +70,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const float HandlePx = 8f;
     static Texture2D _checkerTex;
 
-    // ── Tab 2: Paper-Doll ──────────────────────────────────────────────────
-    int poseIndex;
-    int outfitIndex;
-    int headIndex;
-    int weaponIndex;
-    Color skinTint = new Color(0.96f, 0.82f, 0.70f, 1f);
-    Color hairTint = new Color(0.12f, 0.10f, 0.10f, 1f);
-    Color armorTint = Color.white;
-    bool previewPlaying;
-    double previewStartTime;
-    int previewFrame;
-    string saveCharacterId = "townsfolk_custom";
-    string saveDisplayName = "Custom Townsfolk";
-    UnitType saveUnitType = UnitType.Peasant;
-
-    // ── Tab 3: Stage Placer ────────────────────────────────────────────────
+    // ── Tab 2: Stage Placer ────────────────────────────────────────────────
     StageLayoutProfile stageProfile;
     StageViewMode stageView = StageViewMode.SomersetChurch;
     BattleSlotSide battleSide = BattleSlotSide.Player;
@@ -97,9 +81,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     Vector2 parallaxScroll;
     Vector2 paletteScroll;
     readonly List<Sprite> splicedPalette = new List<Sprite>();
-    readonly List<CharacterDefinition> characterPalette = new List<CharacterDefinition>();
     Sprite paletteSelectedSprite;
-    CharacterDefinition paletteSelectedCharacter;
     double lastPaletteRefresh;
 
     [MenuItem("Arthurian/Art & Stage Architect", false, 35)]
@@ -121,18 +103,6 @@ public class ArthurianArtArchitectWindow : EditorWindow
                            ?? StageLayoutProfile.Load();
         stageProfile?.EnsureSlotCounts();
         SyncDefaultExportFolder();
-        EditorApplication.update += OnEditorUpdate;
-    }
-
-    void OnDisable()
-    {
-        EditorApplication.update -= OnEditorUpdate;
-    }
-
-    void OnEditorUpdate()
-    {
-        if (!previewPlaying || tab != ArchitectTab.PaperDoll) return;
-        Repaint();
     }
 
     void OnGUI()
@@ -142,7 +112,6 @@ public class ArthurianArtArchitectWindow : EditorWindow
         switch (tab)
         {
             case ArchitectTab.Splicer: DrawSplicerTab(); break;
-            case ArchitectTab.PaperDoll: DrawPaperDollTab(); break;
             case ArchitectTab.StagePlacer: DrawStagePlacerTab(); break;
         }
         EditorGUILayout.EndScrollView();
@@ -153,9 +122,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
         if (GUILayout.Toggle(tab == ArchitectTab.Splicer, "1 · Sheet Splicer & Animation", EditorStyles.toolbarButton))
             tab = ArchitectTab.Splicer;
-        if (GUILayout.Toggle(tab == ArchitectTab.PaperDoll, "2 · Paper-Doll Generator", EditorStyles.toolbarButton))
-            tab = ArchitectTab.PaperDoll;
-        if (GUILayout.Toggle(tab == ArchitectTab.StagePlacer, "3 · Stage Placer & Parallax", EditorStyles.toolbarButton))
+        if (GUILayout.Toggle(tab == ArchitectTab.StagePlacer, "2 · Stage Placer & Parallax", EditorStyles.toolbarButton))
             tab = ArchitectTab.StagePlacer;
         EditorGUILayout.EndHorizontal();
     }
@@ -169,18 +136,20 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUILayout.LabelField("Sheet Splicer & Animation Builder", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Drop a sprite sheet → Auto-Prepare → crop with Manual Box (default), Grid, or Auto-Island → " +
-            "Create Animation Clip into ModularSpriteLibrary. Manual: LMB drag green boxes; select gold + handles.",
+            "Save Splices / Create Animation Clip (single Sprite category). Manual: LMB drag green boxes; select gold + handles.",
             MessageType.Info);
 
         sheetTexture = (Texture2D)EditorGUILayout.ObjectField("Sprite Sheet", sheetTexture, typeof(Texture2D), false);
-        EditorGUI.BeginChangeCheck();
-        sheetCategory = (SheetCategory)EditorGUILayout.EnumPopup("Category", sheetCategory);
-        if (EditorGUI.EndChangeCheck() || string.IsNullOrEmpty(targetExportFolder))
+        EditorGUILayout.LabelField("Category", SpriteCategory);
+        EditorGUILayout.HelpBox(
+            "One sprite category only — crop/export full sprites (no body / outfit / head layers).",
+            MessageType.None);
+        if (string.IsNullOrEmpty(targetExportFolder))
             SyncDefaultExportFolder();
         targetLibrary = (ModularSpriteLibrary)EditorGUILayout.ObjectField(
             "ModularSpriteLibrary", targetLibrary, typeof(ModularSpriteLibrary), false);
         targetExportFolder = EditorGUILayout.TextField("Target Export Folder", targetExportFolder);
-        EditorGUILayout.LabelField($"Default: {SplicedRootFolder}/{sheetCategory}", EditorStyles.miniLabel);
+        EditorGUILayout.LabelField($"Default: {DefaultExportFolder}", EditorStyles.miniLabel);
         sliceOutputFolder = EditorGUILayout.TextField("Working Slice Folder", sliceOutputFolder);
         keyColor = EditorGUILayout.ColorField("Key Color", keyColor);
         keyTolerance = EditorGUILayout.Slider("Key Tolerance", keyTolerance, 0f, 64f);
@@ -918,20 +887,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     void SyncDefaultExportFolder()
     {
-        string expectedPrev = $"{SplicedRootFolder}/{lastExportCategory}";
-        string expectedNow = $"{SplicedRootFolder}/{sheetCategory}";
         string cur = (targetExportFolder ?? "").Replace('\\', '/').TrimEnd('/');
-        if (string.IsNullOrEmpty(cur) || cur == expectedPrev || IsCategoryExportFolder(cur)
-            || cur == SplicedRootFolder)
-            targetExportFolder = expectedNow;
-        lastExportCategory = sheetCategory;
+        // Migrate old paperdoll category folders → single Sprite export root.
+        if (string.IsNullOrEmpty(cur) || cur == SplicedRootFolder || IsLegacyCategoryExportFolder(cur))
+            targetExportFolder = DefaultExportFolder;
     }
 
-    static bool IsCategoryExportFolder(string path)
+    static bool IsLegacyCategoryExportFolder(string path)
     {
         if (string.IsNullOrEmpty(path)) return false;
         string n = path.Replace('\\', '/').TrimEnd('/');
-        foreach (SheetCategory c in (SheetCategory[])Enum.GetValues(typeof(SheetCategory)))
+        string[] legacy = { "Pose", "Outfit", "Head", "Weapon", "EnemyBoss", SpriteCategory };
+        foreach (string c in legacy)
             if (string.Equals(n, $"{SplicedRootFolder}/{c}", StringComparison.OrdinalIgnoreCase))
                 return true;
         return false;
@@ -941,7 +908,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         SyncDefaultExportFolder();
         string folder = string.IsNullOrWhiteSpace(targetExportFolder)
-            ? $"{SplicedRootFolder}/{sheetCategory}"
+            ? DefaultExportFolder
             : targetExportFolder.Replace('\\', '/').TrimEnd('/');
         EnsureFolder(folder);
 
@@ -962,7 +929,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         for (int i = 0; i < frames.Count; i++)
         {
             Sprite src = frames[i];
-            string assetPath = $"{folder}/{baseName}_{sheetCategory}_{i:00}.png";
+            string assetPath = $"{folder}/{baseName}_{SpriteCategory}_{i:00}.png";
             Sprite written = WriteSpritePngPointBottomCenter(src, assetPath);
             if (written != null) saved.Add(written);
         }
@@ -1203,7 +1170,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (targetLibrary == null) return;
         Undo.RecordObject(targetLibrary, "Register Spliced Sprites");
         foreach (var sp in sprites)
-            AssignStaticAppend(sheetCategory, sp);
+            AssignStaticAppend(sp);
 
         string name = string.IsNullOrWhiteSpace(clipName) ? SpriteAnimClip.Idle : clipName.Trim();
         var clip = new SpriteAnimClip
@@ -1213,65 +1180,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
             loop = clipLoop,
             frames = new List<Sprite>(sprites)
         };
-        targetLibrary.RegisterAnimClip(sheetCategory.ToString(), clip);
+        targetLibrary.RegisterAnimClip(SpriteCategory, clip);
         EditorUtility.SetDirty(targetLibrary);
         AssetDatabase.SaveAssets();
         SyncLibraryToResources();
     }
 
-    void AssignStaticAppend(SheetCategory cat, Sprite sp)
+    /// <summary>Single-sprite workflow: store in basePoses so pews / Verify still resolve a filled library.</summary>
+    void AssignStaticAppend(Sprite sp)
     {
         if (sp == null || targetLibrary == null) return;
         targetLibrary.EnsureSizedArrays();
-        switch (cat)
-        {
-            case SheetCategory.Pose:
-                targetLibrary.basePoses = AppendSprite(targetLibrary.basePoses, sp);
-                break;
-            case SheetCategory.Outfit:
-                targetLibrary.outfits = AppendSprite(targetLibrary.outfits, sp);
-                break;
-            case SheetCategory.Head:
-            {
-                var list = new List<Sprite>();
-                var hair = new List<bool>();
-                if (targetLibrary.heads != null)
-                {
-                    for (int i = 0; i < targetLibrary.heads.Length; i++)
-                    {
-                        if (targetLibrary.heads[i]?.sprite != null)
-                        {
-                            list.Add(targetLibrary.heads[i].sprite);
-                            hair.Add(targetLibrary.heads[i].isHair);
-                        }
-                    }
-                }
-                list.Add(sp);
-                hair.Add(true);
-                targetLibrary.AssignHeadsFromSprites(list, hair);
-                break;
-            }
-            case SheetCategory.Weapon:
-            {
-                // props[0] stays empty (no weapon); append after.
-                var list = new List<Sprite> { null };
-                if (targetLibrary.props != null)
-                {
-                    for (int i = 1; i < targetLibrary.props.Length; i++)
-                    {
-                        if (targetLibrary.props[i] == null) continue;
-                        if (targetLibrary.props[i] == sp) return;
-                        list.Add(targetLibrary.props[i]);
-                    }
-                }
-                list.Add(sp);
-                targetLibrary.props = list.ToArray();
-                break;
-            }
-            case SheetCategory.EnemyBoss:
-                // No dedicated array — clip registration covers EnemyBoss.
-                break;
-        }
+        targetLibrary.basePoses = AppendSprite(targetLibrary.basePoses, sp);
     }
 
     static Sprite[] AppendSprite(Sprite[] arr, Sprite sp)
@@ -1312,190 +1232,30 @@ public class ArthurianArtArchitectWindow : EditorWindow
             frames = frames
         };
         Undo.RecordObject(targetLibrary, "Register Anim Clip");
-        targetLibrary.RegisterAnimClip(sheetCategory.ToString(), clip);
+        targetLibrary.RegisterAnimClip(SpriteCategory, clip);
 
-        // Also push first frame into static library slots when empty (Pose/Outfit/Head/Weapon).
-        AssignStaticIfEmpty(sheetCategory, frames[0]);
+        // Also push first frame into basePoses when empty (single-sprite pew library).
+        AssignStaticIfEmpty(frames[0]);
 
         EditorUtility.SetDirty(targetLibrary);
         AssetDatabase.SaveAssets();
         SyncLibraryToResources();
-        Debug.Log($"[DemonKnight] Registered [{sheetCategory}] clip '{name}' ({frames.Count} frames).");
+        Debug.Log($"[DemonKnight] Registered [{SpriteCategory}] clip '{name}' ({frames.Count} frames).");
         EditorUtility.DisplayDialog(
             "Animation Clip",
-            $"Registered [{sheetCategory}] {name}\n{frames.Count} frames @ {clipFps:0.#} fps\n→ {AssetDatabase.GetAssetPath(targetLibrary)}",
+            $"Registered [{SpriteCategory}] {name}\n{frames.Count} frames @ {clipFps:0.#} fps\n→ {AssetDatabase.GetAssetPath(targetLibrary)}",
             "OK");
     }
 
-    void AssignStaticIfEmpty(SheetCategory cat, Sprite first)
+    void AssignStaticIfEmpty(Sprite first)
     {
         if (first == null || targetLibrary == null) return;
         targetLibrary.EnsureSizedArrays();
-        switch (cat)
-        {
-            case SheetCategory.Pose:
-                if (targetLibrary.basePoses[0] == null) targetLibrary.basePoses[0] = first;
-                break;
-            case SheetCategory.Outfit:
-                if (targetLibrary.outfits[0] == null) targetLibrary.outfits[0] = first;
-                break;
-            case SheetCategory.Head:
-                if (targetLibrary.heads == null || targetLibrary.heads.Length == 0)
-                    targetLibrary.AssignHeadsFromSprites(new List<Sprite> { first }, new List<bool> { true });
-                break;
-            case SheetCategory.Weapon:
-                if (targetLibrary.props == null || targetLibrary.props.Length <= 1)
-                    targetLibrary.props = new[] { (Sprite)null, first };
-                break;
-        }
+        if (targetLibrary.basePoses[0] == null) targetLibrary.basePoses[0] = first;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Tab 2 — Paper-Doll Unit Generator & Live Animator
-    // ═══════════════════════════════════════════════════════════════════════
-
-    void DrawPaperDollTab()
-    {
-        EditorGUILayout.LabelField("Paper-Doll Unit Generator & Live Animator", EditorStyles.boldLabel);
-        targetLibrary = (ModularSpriteLibrary)EditorGUILayout.ObjectField(
-            "ModularSpriteLibrary", targetLibrary, typeof(ModularSpriteLibrary), false);
-        if (targetLibrary == null)
-        {
-            EditorGUILayout.HelpBox("Assign a ModularSpriteLibrary (or create via Art Tools importer).", MessageType.Warning);
-            if (GUILayout.Button("Create / Load Default Library"))
-                EnsureLibraryAsset();
-            return;
-        }
-        targetLibrary.EnsureSizedArrays();
-
-        int poseMax = Mathf.Max(0, targetLibrary.PoseCount - 1);
-        int outfitMax = Mathf.Max(0, targetLibrary.OutfitCount - 1);
-        int headMax = Mathf.Max(0, targetLibrary.HeadCount - 1);
-        int propMax = Mathf.Max(0, targetLibrary.PropCount - 1);
-
-        poseIndex = poseMax >= 0 ? EditorGUILayout.IntSlider("Pose", poseIndex, 0, poseMax) : 0;
-        outfitIndex = outfitMax >= 0 ? EditorGUILayout.IntSlider("Outfit", outfitIndex, 0, outfitMax) : 0;
-        headIndex = headMax >= 0 ? EditorGUILayout.IntSlider("Head", headIndex, 0, headMax) : 0;
-        weaponIndex = propMax >= 0 ? EditorGUILayout.IntSlider("Weapon / Prop", weaponIndex, 0, propMax) : 0;
-        skinTint = EditorGUILayout.ColorField("Skin Tint", skinTint);
-        hairTint = EditorGUILayout.ColorField("Hair Tint", hairTint);
-        armorTint = EditorGUILayout.ColorField("Armor Tint", armorTint);
-
-        EditorGUILayout.Space(6);
-        Rect preview = GUILayoutUtility.GetRect(180, 220, GUILayout.ExpandWidth(false));
-        EditorGUI.DrawRect(preview, new Color(0.12f, 0.11f, 0.14f, 1f));
-        DrawPaperDollPreview(preview);
-
-        EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button(previewPlaying ? "Pause" : "Play", GUILayout.Height(28), GUILayout.Width(80)))
-        {
-            previewPlaying = !previewPlaying;
-            if (previewPlaying) previewStartTime = EditorApplication.timeSinceStartup;
-        }
-        if (GUILayout.Button("Randomize Unit", GUILayout.Height(28)))
-            RandomizeUnit();
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.Space(8);
-        EditorGUILayout.LabelField("Save as CharacterDefinition", EditorStyles.boldLabel);
-        saveCharacterId = EditorGUILayout.TextField("Character Id", saveCharacterId);
-        saveDisplayName = EditorGUILayout.TextField("Display Name", saveDisplayName);
-        saveUnitType = (UnitType)EditorGUILayout.EnumPopup("Unit Type", saveUnitType);
-        if (GUILayout.Button("Save as CharacterDefinition → Resources/Characters", GUILayout.Height(34)))
-            SaveAsCharacterDefinition();
-    }
-
-    void DrawPaperDollPreview(Rect area)
-    {
-        if (targetLibrary == null) return;
-        Sprite pose = ResolvePreviewSprite(SheetCategory.Pose, poseIndex, targetLibrary.GetPose(poseIndex));
-        Sprite outfit = ResolvePreviewSprite(SheetCategory.Outfit, outfitIndex, targetLibrary.GetOutfit(outfitIndex));
-        Sprite head = ResolvePreviewSprite(SheetCategory.Head, headIndex, targetLibrary.GetHead(headIndex));
-        Sprite weapon = ResolvePreviewSprite(SheetCategory.Weapon, weaponIndex, targetLibrary.GetProp(weaponIndex));
-
-        if (previewPlaying)
-        {
-            var idle = targetLibrary.FindAnimClip("Pose", SpriteAnimClip.Idle);
-            float fps = idle != null ? Mathf.Max(0.1f, idle.framesPerSecond) : 6f;
-            previewFrame = Mathf.FloorToInt((float)(EditorApplication.timeSinceStartup - previewStartTime) * fps);
-        }
-
-        Rect inner = new Rect(area.x + 20f, area.y + 10f, area.width - 40f, area.height - 20f);
-        if (pose != null) DrawSprite(inner, pose, skinTint);
-        if (outfit != null) DrawSprite(inner, outfit, armorTint);
-        if (head != null)
-        {
-            bool hair = targetLibrary.HeadIsHair(headIndex);
-            DrawSprite(inner, head, hair ? hairTint : Color.white);
-        }
-        if (weapon != null) DrawSprite(inner, weapon, Color.white);
-    }
-
-    Sprite ResolvePreviewSprite(SheetCategory cat, int index, Sprite fallback)
-    {
-        if (!previewPlaying || targetLibrary == null) return fallback;
-        var clip = targetLibrary.FindAnimClip(cat.ToString(), SpriteAnimClip.Idle);
-        if (clip == null || clip.FrameCount == 0) return fallback;
-        int f = previewFrame % clip.FrameCount;
-        return clip.FrameAt(f) ?? fallback;
-    }
-
-    void RandomizeUnit()
-    {
-        if (targetLibrary == null) return;
-        targetLibrary.EnsureSizedArrays();
-        poseIndex = targetLibrary.PoseCount > 0 ? UnityEngine.Random.Range(0, targetLibrary.PoseCount) : 0;
-        outfitIndex = targetLibrary.OutfitCount > 0 ? UnityEngine.Random.Range(0, targetLibrary.OutfitCount) : 0;
-        headIndex = targetLibrary.HeadCount > 0 ? UnityEngine.Random.Range(0, targetLibrary.HeadCount) : 0;
-        weaponIndex = targetLibrary.PropCount > 1 ? UnityEngine.Random.Range(0, targetLibrary.PropCount) : 0;
-        int skin = UnityEngine.Random.Range(0, TownsfolkAppearance.SkinToneCount);
-        int hair = UnityEngine.Random.Range(0, TownsfolkAppearance.HairColorCount);
-        skinTint = TownsfolkAppearance.SkinTones[skin];
-        hairTint = TownsfolkAppearance.HairColors[hair];
-        armorTint = Color.white;
-        saveUnitType = outfitIndex <= 1 ? UnitType.Peasant
-            : outfitIndex <= 3 ? UnitType.Warrior : UnitType.Knight;
-        saveDisplayName = $"{saveUnitType} {UnityEngine.Random.Range(100, 999)}";
-        saveCharacterId = $"townsfolk_{saveUnitType.ToString().ToLowerInvariant()}_{UnityEngine.Random.Range(1000, 9999)}";
-        Repaint();
-    }
-
-    void SaveAsCharacterDefinition()
-    {
-        EnsureFolder(CharactersFolder);
-        string id = string.IsNullOrWhiteSpace(saveCharacterId)
-            ? $"townsfolk_{Guid.NewGuid().ToString("N").Substring(0, 8)}"
-            : saveCharacterId.Trim();
-        string assetPath = $"{CharactersFolder}/{id}.asset";
-        var existing = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(assetPath);
-        CharacterDefinition def = existing != null ? existing : CreateInstance<CharacterDefinition>();
-        def.characterId = id;
-        def.displayName = string.IsNullOrWhiteSpace(saveDisplayName) ? id : saveDisplayName.Trim();
-        def.unitType = saveUnitType;
-        def.category = CharacterCategory.Legend;
-        def.role = saveUnitType == UnitType.Peasant || saveUnitType == UnitType.Priest
-            ? CharacterCombatRole.Backline
-            : CharacterCombatRole.Tank;
-        def.baseHP = saveUnitType == UnitType.Knight ? 130 : saveUnitType == UnitType.Warrior ? 55 : 28;
-        def.baseATK = saveUnitType == UnitType.Knight ? 16 : saveUnitType == UnitType.Warrior ? 8 : 4;
-        def.baseAPS = 1.5f;
-        def.portraitSprite = targetLibrary != null ? targetLibrary.GetHead(headIndex) : null;
-        def.battleSprite = targetLibrary != null ? targetLibrary.GetPose(poseIndex) : null;
-        def.visualScale = 1f;
-
-        if (existing == null)
-            AssetDatabase.CreateAsset(def, assetPath);
-        else
-            EditorUtility.SetDirty(def);
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        EditorGUIUtility.PingObject(def);
-        Debug.Log($"[DemonKnight] Saved CharacterDefinition → {assetPath}");
-        EditorUtility.DisplayDialog("CharacterDefinition", $"Saved\n{assetPath}", "OK");
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // Tab 3 — Numbered Stage Placer & Moving Background Editor
+    // Tab 2 — Numbered Stage Placer & Moving Background Editor
     // ═══════════════════════════════════════════════════════════════════════
 
     void DrawStagePlacerTab()
@@ -1670,8 +1430,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
 
         EditorGUILayout.Space(4);
-        EditorGUI.BeginDisabledGroup(paletteSelectedSprite == null && paletteSelectedCharacter == null);
-        if (GUILayout.Button("Assign Palette Selection → Slot", GUILayout.Height(26)))
+        EditorGUI.BeginDisabledGroup(paletteSelectedSprite == null);
+        if (GUILayout.Button("Assign Palette Sprite → Slot", GUILayout.Height(26)))
             AssignPaletteToSelectedSlot();
         EditorGUI.EndDisabledGroup();
         EditorGUI.BeginDisabledGroup(ResolveSlotPreviewSprite(s) == null && paletteSelectedSprite == null);
@@ -1679,7 +1439,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             QuickAddPreviewToParallax(ResolveSlotPreviewSprite(s) ?? paletteSelectedSprite);
         EditorGUI.EndDisabledGroup();
 
-        if (GUILayout.Button("Clear Slot Preview / Character"))
+        if (GUILayout.Button("Clear Slot Preview"))
         {
             Undo.RecordObject(stageProfile, "Clear Slot Preview");
             s.previewOrOverrideSprite = null;
@@ -1697,39 +1457,24 @@ public class ArthurianArtArchitectWindow : EditorWindow
     Sprite ResolveSlotPreviewSprite(SlotTransformConfig s)
     {
         if (s == null) return null;
-        if (s.previewOrOverrideSprite != null) return s.previewOrOverrideSprite;
-        if (string.IsNullOrEmpty(s.assignedCharacterId)) return null;
-        RefreshCharacterPaletteIfNeeded();
-        for (int i = 0; i < characterPalette.Count; i++)
-        {
-            var c = characterPalette[i];
-            if (c != null && c.characterId == s.assignedCharacterId)
-                return c.portraitSprite != null ? c.portraitSprite : c.battleSprite;
-        }
-        return null;
+        return s.previewOrOverrideSprite;
     }
 
     void DrawSplicedAndCharacterPalette()
     {
         RefreshSplicedPalette();
-        RefreshCharacterPaletteIfNeeded();
 
-        EditorGUILayout.LabelField("Spliced Art + Character Palette", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Spliced Sprite Palette", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            $"Sprites from {SplicedRootFolder}/… and CharacterDefinitions from {CharactersFolder}. " +
-            "Click a tile, then Assign to the selected slot (live handle preview). Quick Add → parallax layer.",
+            $"Single-type sprites from {SplicedRootFolder}/ (default {DefaultExportFolder}). " +
+            "Click a tile, then Assign to the selected slot. Quick Add → parallax layer.",
             MessageType.None);
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Refresh Palette", GUILayout.Width(120)))
-        {
             RefreshSplicedPalette(force: true);
-            RefreshCharacterPaletteIfNeeded(force: true);
-        }
         if (paletteSelectedSprite != null)
             EditorGUILayout.LabelField($"Sprite: {paletteSelectedSprite.name}", EditorStyles.miniLabel);
-        else if (paletteSelectedCharacter != null)
-            EditorGUILayout.LabelField($"Character: {paletteSelectedCharacter.characterId}", EditorStyles.miniLabel);
         else
             EditorGUILayout.LabelField("Nothing selected", EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
@@ -1737,10 +1482,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         paletteScroll = EditorGUILayout.BeginScrollView(paletteScroll, GUILayout.Height(120));
         const float thumb = 48f;
         int cols = Mathf.Max(1, Mathf.FloorToInt((position.width - 40f) / (thumb + 6f)));
-        EditorGUILayout.LabelField($"Spliced ({splicedPalette.Count})", EditorStyles.miniBoldLabel);
+        EditorGUILayout.LabelField($"Sprites ({splicedPalette.Count})", EditorStyles.miniBoldLabel);
         DrawSpritePaletteRow(splicedPalette, cols, thumb);
-        EditorGUILayout.LabelField($"Characters ({characterPalette.Count})", EditorStyles.miniBoldLabel);
-        DrawCharacterPaletteRow(cols, thumb);
         EditorGUILayout.EndScrollView();
     }
 
@@ -1748,7 +1491,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         if (sprites == null || sprites.Count == 0)
         {
-            EditorGUILayout.LabelField("  (empty)", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("  (empty — Save Splices from Tab 1)", EditorStyles.miniLabel);
             return;
         }
         EditorGUILayout.BeginHorizontal();
@@ -1768,72 +1511,21 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition))
             {
                 paletteSelectedSprite = sp;
-                paletteSelectedCharacter = null;
                 Event.current.Use();
                 Repaint();
             }
         }
         EditorGUILayout.EndHorizontal();
-    }
-
-    void DrawCharacterPaletteRow(int cols, float thumb)
-    {
-        if (characterPalette.Count == 0)
-        {
-            EditorGUILayout.LabelField("  (no CharacterDefinitions yet)", EditorStyles.miniLabel);
-            return;
-        }
-        EditorGUILayout.BeginHorizontal();
-        for (int i = 0; i < characterPalette.Count; i++)
-        {
-            if (i > 0 && i % cols == 0)
-            {
-                EditorGUILayout.EndHorizontal();
-                EditorGUILayout.BeginHorizontal();
-            }
-            var def = characterPalette[i];
-            Sprite sp = def != null ? (def.portraitSprite ?? def.battleSprite) : null;
-            Rect r = GUILayoutUtility.GetRect(thumb, thumb, GUILayout.Width(thumb), GUILayout.Height(thumb));
-            if (sp != null) DrawSprite(r, sp, Color.white);
-            else EditorGUI.DrawRect(r, new Color(0.25f, 0.22f, 0.18f));
-            bool sel = def != null && def == paletteSelectedCharacter;
-            if (sel) DrawRectOutline(r, new Color(1f, 0.85f, 0.2f), 2f);
-            GUI.Label(new Rect(r.x, r.yMax - 12f, r.width, 12f),
-                def != null ? Truncate(def.characterId, 8) : "?", EditorStyles.miniLabel);
-            if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition))
-            {
-                paletteSelectedCharacter = def;
-                paletteSelectedSprite = sp;
-                Event.current.Use();
-                Repaint();
-            }
-        }
-        EditorGUILayout.EndHorizontal();
-    }
-
-    static string Truncate(string s, int max)
-    {
-        if (string.IsNullOrEmpty(s) || s.Length <= max) return s ?? "";
-        return s.Substring(0, max - 1) + "…";
     }
 
     void AssignPaletteToSelectedSlot()
     {
         var slots = ActiveSlots();
         if (slots == null || selectedSlot < 0 || selectedSlot >= slots.Count) return;
+        if (paletteSelectedSprite == null) return;
         var s = slots[selectedSlot];
         Undo.RecordObject(stageProfile, "Assign Palette To Slot");
-        if (paletteSelectedCharacter != null)
-        {
-            s.assignedCharacterId = paletteSelectedCharacter.characterId;
-            s.previewOrOverrideSprite = paletteSelectedCharacter.portraitSprite
-                                        ?? paletteSelectedCharacter.battleSprite
-                                        ?? paletteSelectedSprite;
-        }
-        else if (paletteSelectedSprite != null)
-        {
-            s.previewOrOverrideSprite = paletteSelectedSprite;
-        }
+        s.previewOrOverrideSprite = paletteSelectedSprite;
         EditorUtility.SetDirty(stageProfile);
         Repaint();
     }
@@ -1878,22 +1570,6 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (sp != null) splicedPalette.Add(sp);
         }
         splicedPalette.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
-    }
-
-    void RefreshCharacterPaletteIfNeeded(bool force = false)
-    {
-        if (!force && characterPalette.Count > 0 && EditorApplication.timeSinceStartup - lastPaletteRefresh < 2.0)
-            return;
-        characterPalette.Clear();
-        if (!AssetDatabase.IsValidFolder(CharactersFolder)) return;
-        string[] guids = AssetDatabase.FindAssets("t:CharacterDefinition", new[] { CharactersFolder });
-        foreach (string guid in guids)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            var def = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(path);
-            if (def != null) characterPalette.Add(def);
-        }
-        characterPalette.Sort((a, b) => string.CompareOrdinal(a.characterId, b.characterId));
     }
 
     void AutoArrangeOverflowFormation()
