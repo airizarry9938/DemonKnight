@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "legends-lore-portrait";
+    public const string TipPackageId = "architect-legend-pew-portraits";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -41,7 +41,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (legends-lore-portrait)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (architect-legend-pew-portraits)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -130,8 +130,9 @@ public static class DemonKnightTipEscape
             "fix-wave-advance-stuck",
             "legends-fullwidth-column",
             "fix-hud-wave-match",
-        "lore-boss-wave-order",
-        "merlin-lore-narrative",
+            "lore-boss-wave-order",
+            "merlin-lore-narrative",
+            "legends-lore-portrait",
         };
         foreach (string s in stale)
         {
@@ -176,7 +177,8 @@ public static class DemonKnightTipEscape
                     throw new Exception("Architect still calls PackageVersion.Wipe* (CS0117)");
                 if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
-                        || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0))
+                        || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0))
                     throw new Exception("GameDataTypes missing embedded Appliers");
                 if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                     || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))

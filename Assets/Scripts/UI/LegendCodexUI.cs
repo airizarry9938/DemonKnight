@@ -256,7 +256,16 @@ namespace ArthurianAutobattler
         static Sprite ResolveLegendPortrait(CodexRecipeEntry entry)
         {
             if (entry == null) return null;
+            // 1) Architect Tab 5 · Legend / Pew Portraits assignment
+            try
+            {
+                Sprite assigned = LegendPewPortraitApplier.GetLegendFace(entry.resultingType);
+                if (assigned != null) return assigned;
+            }
+            catch { /* soft-fail */ }
+            // 2) Scene/CodexRecipe heroPortrait field
             if (entry.heroPortrait != null) return entry.heroPortrait;
+            // 3) CharacterDatabase catalog (also consults Architect)
             try
             {
                 var db = CharacterDatabase.Load();

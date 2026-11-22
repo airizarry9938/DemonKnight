@@ -78,6 +78,13 @@ namespace ArthurianAutobattler
 
         public Sprite GetPortrait(UnitType type)
         {
+            // Architect Tab 5 legend face assignment wins when present.
+            try
+            {
+                Sprite assigned = LegendPewPortraitApplier.GetLegendFace(type);
+                if (assigned != null) return assigned;
+            }
+            catch { /* soft-fail to catalog */ }
             var def = GetByUnitType(type);
             if (def == null) return null;
             return def.portraitSprite != null ? def.portraitSprite : def.battleSprite;

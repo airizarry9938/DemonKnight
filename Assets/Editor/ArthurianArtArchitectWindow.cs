@@ -11,13 +11,13 @@ using UnityEngine.Video;
 /// <summary>
 /// Master Spec Phase 3 — Art &amp; Stage Architect.
 /// Menu: Arthurian → Art &amp; Stage Architect
-/// Tabs: Sheet Splicer | Stage Placer | Scene Backgrounds | Class Sprites / Unit Pools
+/// Tabs: Sheet Splicer | Stage Placer | Scene Backgrounds | Class Sprites / Unit Pools | Legend / Pew Portraits
 /// Single sprite category only (no paperdoll / multi-layer body·outfit·head).
 /// </summary>
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "legends-lore-portrait";
+    public const string UiBuildId = "architect-legend-pew-portraits";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -27,6 +27,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const string StageProfilePath = "Assets/Resources/StageLayoutProfile.asset";
     const string SceneBgProfilePath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolProfilePath = "Assets/Resources/ClassSpritePoolProfile.asset";
+    const string LegendPewProfilePath = "Assets/Resources/LegendPewPortraitProfile.asset";
     /// <summary>Same art as SomersetChurchUI / SomersetPewLayout (play stage).</summary>
     const string ChurchBackgroundPath = "Assets/Art/Backgrounds/SomersetChurchInterior.jpg";
     /// <summary>Reference pixel size of SomersetChurchInterior (play layout tuned to this).</summary>
@@ -35,12 +36,13 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// <summary>Must match SomersetChurchUI.baseSeatSize tip (play pew sprite size).</summary>
     static readonly Vector2 PlayPewBaseSize = new Vector2(88f, 112f);
 
-    enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites }
+    enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
     enum BattleSlotSide { Player, Enemy }
     enum CropToolMode { ManualBox, GridCrop, AutoIsland }
     enum BoxPivotMode { BottomCenter, Center, Custom }
     enum ClassPoolKind { Peasant, Warrior, Knight }
+    enum PewFacePoolKind { Peasant, Warrior, Knight }
 
     ArchitectTab tab;
     Vector2 scroll;
@@ -51,6 +53,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
     Vector2 classPoolScroll;
     ClassPoolKind selectedClassPool = ClassPoolKind.Peasant;
     Sprite classPoolAddSprite;
+    LegendPewPortraitProfile legendPewProfile;
+    Vector2 legendPewScroll;
+    Vector2 legendSlotScroll;
+    PewFacePoolKind selectedPewFacePool = PewFacePoolKind.Peasant;
+    Sprite pewFaceAddSprite;
+    int legendPewSection; // 0 = Legends, 1 = Townsfolk pew faces
 
     // ── Tab 1: Splicer ─────────────────────────────────────────────────────
     Texture2D sheetTexture;
@@ -128,7 +136,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         win.minSize = new Vector2(780, 560);
         win.Show();
         win.Focus();
-        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 4 tabs.");
+        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 5 tabs.");
     }
 
     public static void CloseAllArchitectWindows()
@@ -161,6 +169,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         sceneBgProfile?.EnsureDefaultEntries();
         classPoolProfile = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
         classPoolProfile?.EnsureLists();
+        legendPewProfile = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
+        legendPewProfile?.EnsureSlotsAndLists();
         SyncDefaultExportFolder();
         EditorApplication.playModeStateChanged -= OnArchitectPlayModeChanged;
         EditorApplication.playModeStateChanged += OnArchitectPlayModeChanged;
@@ -172,6 +182,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         PersistStageProfile("OnDisable");
         PersistSceneBgProfile("OnDisable");
         PersistClassPoolProfile("OnDisable");
+        PersistLegendPewProfile("OnDisable");
     }
 
     void OnArchitectPlayModeChanged(PlayModeStateChange state)
@@ -182,6 +193,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             PersistStageProfile("PlayMode:" + state);
             PersistSceneBgProfile("PlayMode:" + state);
             PersistClassPoolProfile("PlayMode:" + state);
+            PersistLegendPewProfile("PlayMode:" + state);
         }
     }
 
@@ -195,6 +207,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             case ArchitectTab.StagePlacer: DrawStagePlacerTab(); break;
             case ArchitectTab.SceneBackgrounds: DrawSceneBackgroundsTab(); break;
             case ArchitectTab.ClassSprites: DrawClassSpritesTab(); break;
+            case ArchitectTab.LegendPewPortraits: DrawLegendPewPortraitsTab(); break;
         }
         EditorGUILayout.EndScrollView();
     }
@@ -210,6 +223,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
             tab = ArchitectTab.SceneBackgrounds;
         if (GUILayout.Toggle(tab == ArchitectTab.ClassSprites, "4 · Class Sprites / Unit Pools", EditorStyles.toolbarButton))
             tab = ArchitectTab.ClassSprites;
+        if (GUILayout.Toggle(tab == ArchitectTab.LegendPewPortraits, "5 · Legend / Pew Portraits", EditorStyles.toolbarButton))
+            tab = ArchitectTab.LegendPewPortraits;
         GUILayout.FlexibleSpace();
         GUILayout.Label(UiBuildId, EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
@@ -273,6 +288,21 @@ public class ArthurianArtArchitectWindow : EditorWindow
         try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
     }
 
+    void PersistLegendPewProfile(string reason)
+    {
+        if (legendPewProfile == null) return;
+        if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(legendPewProfile)))
+        {
+            legendPewProfile = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
+            if (legendPewProfile == null) return;
+        }
+        SyncLegendPewAssetPaths(legendPewProfile);
+        EditorUtility.SetDirty(legendPewProfile);
+        AssetDatabase.SaveAssets();
+        try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
+        try { CharacterDatabase.InvalidateCache(); } catch { /* ignore */ }
+    }
+
     static void SyncClassPoolAssetPaths(ClassSpritePoolProfile p)
     {
         if (p == null) return;
@@ -280,6 +310,24 @@ public class ArthurianArtArchitectWindow : EditorWindow
         SyncPathList(p.peasantSprites, p.peasantAssetPaths);
         SyncPathList(p.warriorSprites, p.warriorAssetPaths);
         SyncPathList(p.knightSprites, p.knightAssetPaths);
+    }
+
+    static void SyncLegendPewAssetPaths(LegendPewPortraitProfile p)
+    {
+        if (p == null) return;
+        p.EnsureSlotsAndLists();
+        SyncPathList(p.peasantFaceProfiles, p.peasantFaceAssetPaths);
+        SyncPathList(p.warriorFaceProfiles, p.warriorFaceAssetPaths);
+        SyncPathList(p.knightFaceProfiles, p.knightFaceAssetPaths);
+        if (p.legendPortraits == null) return;
+        for (int i = 0; i < p.legendPortraits.Count; i++)
+        {
+            var e = p.legendPortraits[i];
+            if (e == null) continue;
+            if (e.facePortrait == null) { e.assetPath = ""; continue; }
+            string ap = AssetDatabase.GetAssetPath(e.facePortrait);
+            if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
+        }
     }
 
     static void SyncPathList(List<Sprite> sprites, List<string> paths)
@@ -2203,6 +2251,250 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 Undo.RecordObject(classPoolProfile, "Add Palette Click to Class Pool");
                 pool.Add(sp);
                 PersistClassPoolProfile("PaletteClickClassPool");
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.EndScrollView();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Tab 5 — Legend face portraits + townsfolk pew face/body profiles
+    // ═══════════════════════════════════════════════════════════════════════
+
+    void DrawLegendPewPortraitsTab()
+    {
+        EditorGUILayout.LabelField("Legend / Pew Portraits", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Assign face portraits per playable Legend (14; Merlin soft slot kept but unused in Codex). "
+            + "Separate townsfolk pew face/body profile pools for Peasant / Warrior / Knight — "
+            + "distinct from Tab 4 Class Sprites (full-body). "
+            + "Legends FacePortraitFrame + church pews resolve assigned art at runtime. "
+            + "Persists on " + LegendPewProfilePath + ".",
+            MessageType.Info);
+
+        legendPewProfile = (LegendPewPortraitProfile)EditorGUILayout.ObjectField(
+            "LegendPewPortraitProfile", legendPewProfile, typeof(LegendPewPortraitProfile), false);
+        if (legendPewProfile == null
+            || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(legendPewProfile)))
+        {
+            if (GUILayout.Button("Ensure Legend Pew Portrait Profile Asset"))
+                legendPewProfile = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
+            if (legendPewProfile == null) return;
+        }
+        legendPewProfile.EnsureSlotsAndLists();
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Save LegendPewPortraitProfile", GUILayout.Height(26)))
+            PersistLegendPewProfile("SaveButton");
+        if (GUILayout.Button("Ping Asset", GUILayout.Width(90)))
+        {
+            Selection.activeObject = legendPewProfile;
+            EditorGUIUtility.PingObject(legendPewProfile);
+        }
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField(
+            "Asset: " + AssetDatabase.GetAssetPath(legendPewProfile), EditorStyles.miniLabel);
+        EditorGUILayout.LabelField(
+            $"Assigned legends {legendPewProfile.CountAssignedLegendFaces()}/14 · "
+            + $"Pew faces P={legendPewProfile.CountUsablePewFaces(UnitType.Peasant)} "
+            + $"W={legendPewProfile.CountUsablePewFaces(UnitType.Warrior)} "
+            + $"K={legendPewProfile.CountUsablePewFaces(UnitType.Knight)}",
+            EditorStyles.miniLabel);
+
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        if (GUILayout.Toggle(legendPewSection == 0, "Legends (14 + Merlin soft)", EditorStyles.toolbarButton))
+            legendPewSection = 0;
+        if (GUILayout.Toggle(legendPewSection == 1, "Townsfolk pew faces", EditorStyles.toolbarButton))
+            legendPewSection = 1;
+        EditorGUILayout.EndHorizontal();
+
+        if (legendPewSection == 0)
+            DrawLegendPortraitSlots();
+        else
+            DrawTownsfolkPewFacePools();
+    }
+
+    void DrawLegendPortraitSlots()
+    {
+        EditorGUILayout.HelpBox(
+            "One face sprite per playable Legend. Empty → soft grey FacePortrait placeholder "
+            + "(CharacterDatabase / battleSprite fallback still tried). Merlin is soft-optional.",
+            MessageType.None);
+
+        legendSlotScroll = EditorGUILayout.BeginScrollView(legendSlotScroll, GUILayout.MinHeight(360f));
+        var slots = legendPewProfile.legendPortraits;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var entry = slots[i];
+            if (entry == null) continue;
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.BeginHorizontal();
+            string label = string.IsNullOrEmpty(entry.displayName)
+                ? entry.unitType.ToString()
+                : entry.displayName;
+            if (entry.softOptional) label += "  [soft]";
+            EditorGUILayout.LabelField(label, EditorStyles.boldLabel, GUILayout.Width(220f));
+            EditorGUI.BeginChangeCheck();
+            entry.facePortrait = (Sprite)EditorGUILayout.ObjectField(
+                entry.facePortrait, typeof(Sprite), false, GUILayout.Height(72f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(legendPewProfile, "Assign Legend Face Portrait");
+                PersistLegendPewProfile("EditLegendFace");
+            }
+            if (GUILayout.Button("Clear", GUILayout.Width(52), GUILayout.Height(72f)))
+            {
+                Undo.RecordObject(legendPewProfile, "Clear Legend Face Portrait");
+                entry.facePortrait = null;
+                entry.assetPath = "";
+                PersistLegendPewProfile("ClearLegendFace");
+            }
+            EditorGUILayout.EndHorizontal();
+            if (entry.facePortrait != null)
+            {
+                Rect prev = GUILayoutUtility.GetRect(56f, 56f, GUILayout.ExpandWidth(false));
+                DrawSprite(prev, entry.facePortrait, Color.white);
+                EditorGUILayout.LabelField(entry.facePortrait.name, EditorStyles.miniLabel);
+            }
+            else if (paletteSelectedSprite != null && GUILayout.Button("Use selected palette sprite", GUILayout.Width(200)))
+            {
+                Undo.RecordObject(legendPewProfile, "Palette → Legend Face");
+                entry.facePortrait = paletteSelectedSprite;
+                PersistLegendPewProfile("PaletteLegendFace");
+            }
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndScrollView();
+
+        DrawLegendPewPaletteQuickAdd(forLegendSlots: true);
+    }
+
+    void DrawTownsfolkPewFacePools()
+    {
+        EditorGUILayout.HelpBox(
+            "Townsfolk pew face/body profile pools — used by church pews + dossier before Tab 4 "
+            + "full-body ClassSpritePool. Same deterministic unitID pick. Empty → ClassSpritePool / StageLayout fallback.",
+            MessageType.None);
+
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        if (GUILayout.Toggle(selectedPewFacePool == PewFacePoolKind.Peasant, "Peasant", EditorStyles.toolbarButton))
+            selectedPewFacePool = PewFacePoolKind.Peasant;
+        if (GUILayout.Toggle(selectedPewFacePool == PewFacePoolKind.Warrior, "Warrior", EditorStyles.toolbarButton))
+            selectedPewFacePool = PewFacePoolKind.Warrior;
+        if (GUILayout.Toggle(selectedPewFacePool == PewFacePoolKind.Knight, "Knight", EditorStyles.toolbarButton))
+            selectedPewFacePool = PewFacePoolKind.Knight;
+        EditorGUILayout.EndHorizontal();
+
+        List<Sprite> pool = selectedPewFacePool switch
+        {
+            PewFacePoolKind.Warrior => legendPewProfile.warriorFaceProfiles,
+            PewFacePoolKind.Knight => legendPewProfile.knightFaceProfiles,
+            _ => legendPewProfile.peasantFaceProfiles
+        };
+
+        EditorGUILayout.BeginHorizontal();
+        pewFaceAddSprite = (Sprite)EditorGUILayout.ObjectField(
+            "Add Sprite", pewFaceAddSprite, typeof(Sprite), false);
+        EditorGUI.BeginDisabledGroup(pewFaceAddSprite == null);
+        if (GUILayout.Button("Add to pool", GUILayout.Width(110)))
+        {
+            Undo.RecordObject(legendPewProfile, "Add Pew Face Profile");
+            pool.Add(pewFaceAddSprite);
+            pewFaceAddSprite = null;
+            PersistLegendPewProfile("AddPewFace");
+        }
+        EditorGUI.EndDisabledGroup();
+        if (GUILayout.Button("Add selected palette", GUILayout.Width(150))
+            && paletteSelectedSprite != null)
+        {
+            Undo.RecordObject(legendPewProfile, "Add Palette to Pew Face Pool");
+            pool.Add(paletteSelectedSprite);
+            PersistLegendPewProfile("AddPalettePewFace");
+        }
+        EditorGUILayout.EndHorizontal();
+
+        if (GUILayout.Button("Clear this pool", GUILayout.Width(140)))
+        {
+            if (EditorUtility.DisplayDialog(
+                    "Clear pew face pool",
+                    "Remove all sprites from the " + selectedPewFacePool + " pew face pool?",
+                    "Clear", "Cancel"))
+            {
+                Undo.RecordObject(legendPewProfile, "Clear Pew Face Pool");
+                pool.Clear();
+                PersistLegendPewProfile("ClearPewFacePool");
+            }
+        }
+
+        legendPewScroll = EditorGUILayout.BeginScrollView(legendPewScroll, GUILayout.MinHeight(280f));
+        if (pool.Count == 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Pool empty — pews keep Tab 4 ClassSpritePool / StageLayout fallbacks.",
+                MessageType.Warning);
+        }
+        for (int i = 0; i < pool.Count; i++)
+        {
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.BeginHorizontal();
+            EditorGUI.BeginChangeCheck();
+            pool[i] = (Sprite)EditorGUILayout.ObjectField(
+                "#" + i, pool[i], typeof(Sprite), false, GUILayout.Height(64f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(legendPewProfile, "Edit Pew Face Profile");
+                PersistLegendPewProfile("EditPewFace");
+            }
+            if (GUILayout.Button("×", GUILayout.Width(28), GUILayout.Height(64f)))
+            {
+                Undo.RecordObject(legendPewProfile, "Remove Pew Face Profile");
+                pool.RemoveAt(i);
+                PersistLegendPewProfile("RemovePewFace");
+                i--;
+            }
+            EditorGUILayout.EndHorizontal();
+            if (i >= 0 && i < pool.Count && pool[i] != null)
+            {
+                Rect prev = GUILayoutUtility.GetRect(48f, 48f, GUILayout.ExpandWidth(false));
+                DrawSprite(prev, pool[i], Color.white);
+                EditorGUILayout.LabelField(pool[i].name, EditorStyles.miniLabel);
+            }
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndScrollView();
+
+        DrawLegendPewPaletteQuickAdd(forLegendSlots: false);
+    }
+
+    void DrawLegendPewPaletteQuickAdd(bool forLegendSlots)
+    {
+        EditorGUILayout.Space(8);
+        EditorGUILayout.LabelField("Spliced palette (quick pick)", EditorStyles.boldLabel);
+        RefreshSplicedPalette();
+        paletteScroll = EditorGUILayout.BeginScrollView(paletteScroll, GUILayout.Height(120f));
+        EditorGUILayout.BeginHorizontal();
+        for (int i = 0; i < splicedPalette.Count; i++)
+        {
+            Sprite sp = splicedPalette[i];
+            if (sp == null) continue;
+            Rect r = GUILayoutUtility.GetRect(56f, 56f, GUILayout.Width(56f), GUILayout.Height(56f));
+            if (Event.current.type == EventType.Repaint)
+                DrawSprite(r, sp, Color.white);
+            if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+            {
+                paletteSelectedSprite = sp;
+                if (!forLegendSlots && legendPewProfile != null)
+                {
+                    List<Sprite> pool = selectedPewFacePool switch
+                    {
+                        PewFacePoolKind.Warrior => legendPewProfile.warriorFaceProfiles,
+                        PewFacePoolKind.Knight => legendPewProfile.knightFaceProfiles,
+                        _ => legendPewProfile.peasantFaceProfiles
+                    };
+                    Undo.RecordObject(legendPewProfile, "Palette Click → Pew Face");
+                    pool.Add(sp);
+                    PersistLegendPewProfile("PaletteClickPewFace");
+                }
             }
         }
         EditorGUILayout.EndHorizontal();

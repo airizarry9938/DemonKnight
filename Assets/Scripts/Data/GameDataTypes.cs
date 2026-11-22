@@ -1338,6 +1338,211 @@ namespace ArthurianAutobattler
         }
     }
 
+    /// <summary>One Legend face-portrait slot (Architect Tab 5).</summary>
+    [Serializable]
+    public class LegendPortraitEntry
+    {
+        public UnitType unitType;
+        public string displayName;
+        public Sprite facePortrait;
+        public string assetPath;
+        [Tooltip("Merlin and other soft slots stay in the list but are not required for playable Codex.")]
+        public bool softOptional;
+    }
+
+    /// <summary>
+    /// Architect legend face portraits + townsfolk pew face/body profile pools.
+    /// Distinct from ClassSpritePoolProfile (full-body class pools). Resources path:
+    /// LegendPewPortraitProfile.
+    /// </summary>
+    [CreateAssetMenu(fileName = "LegendPewPortraitProfile", menuName = "DemonKnight/Legend Pew Portrait Profile")]
+    public class LegendPewPortraitProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "LegendPewPortraitProfile";
+
+        /// <summary>14 playable legends + soft Merlin slot (last).</summary>
+        public static readonly UnitType[] CanonicalLegendSlots =
+        {
+            UnitType.SirKay,
+            UnitType.SirBedivere,
+            UnitType.LadyGuinevere,
+            UnitType.ArchPriestOfGlastonbury,
+            UnitType.SirGawain,
+            UnitType.SirTristan,
+            UnitType.SirLancelot,
+            UnitType.KingArthur,
+            UnitType.SirGalahad,
+            UnitType.SirPercival,
+            UnitType.Nimue,
+            UnitType.Mordred,
+            UnitType.MorganLeFay,
+            UnitType.TheGreenKnight,
+            UnitType.Merlin, // soft — out of playable Codex pool
+        };
+
+        public List<LegendPortraitEntry> legendPortraits = new List<LegendPortraitEntry>();
+
+        [Header("Townsfolk pew face/body profiles (distinct from ClassSpritePool full-body)")]
+        public List<Sprite> peasantFaceProfiles = new List<Sprite>();
+        public List<Sprite> warriorFaceProfiles = new List<Sprite>();
+        public List<Sprite> knightFaceProfiles = new List<Sprite>();
+
+        public List<string> peasantFaceAssetPaths = new List<string>();
+        public List<string> warriorFaceAssetPaths = new List<string>();
+        public List<string> knightFaceAssetPaths = new List<string>();
+
+        public static LegendPewPortraitProfile Load()
+        {
+            LegendPewPortraitProfile p = null;
+            try { p = Resources.Load<LegendPewPortraitProfile>(ResourcesPath); }
+            catch { /* missing script — fall through */ }
+            if (p != null)
+            {
+                p.EnsureSlotsAndLists();
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<LegendPewPortraitProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureSlotsAndLists();
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset */ }
+            p = CreateInstance<LegendPewPortraitProfile>();
+            p.name = "LegendPewPortraitProfile_Runtime";
+            p.EnsureSlotsAndLists();
+            return p;
+        }
+
+        public void EnsureSlotsAndLists()
+        {
+            legendPortraits ??= new List<LegendPortraitEntry>();
+            peasantFaceProfiles ??= new List<Sprite>();
+            warriorFaceProfiles ??= new List<Sprite>();
+            knightFaceProfiles ??= new List<Sprite>();
+            peasantFaceAssetPaths ??= new List<string>();
+            warriorFaceAssetPaths ??= new List<string>();
+            knightFaceAssetPaths ??= new List<string>();
+
+            for (int i = 0; i < CanonicalLegendSlots.Length; i++)
+            {
+                UnitType want = CanonicalLegendSlots[i];
+                LegendPortraitEntry found = null;
+                for (int j = 0; j < legendPortraits.Count; j++)
+                {
+                    if (legendPortraits[j] != null && legendPortraits[j].unitType == want)
+                    {
+                        found = legendPortraits[j];
+                        break;
+                    }
+                }
+                if (found == null)
+                {
+                    found = new LegendPortraitEntry
+                    {
+                        unitType = want,
+                        displayName = DefaultDisplayName(want),
+                        softOptional = want == UnitType.Merlin
+                    };
+                    legendPortraits.Add(found);
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(found.displayName))
+                        found.displayName = DefaultDisplayName(want);
+                    found.softOptional = want == UnitType.Merlin;
+                }
+            }
+        }
+
+        public static string DefaultDisplayName(UnitType t) => t switch
+        {
+            UnitType.KingArthur => "King Arthur",
+            UnitType.SirLancelot => "Sir Lancelot",
+            UnitType.MorganLeFay => "Morgan le Fay",
+            UnitType.LadyOfTheLake => "Lady of the Lake",
+            UnitType.SirGawain => "Sir Gawain",
+            UnitType.SirGalahad => "Sir Galahad",
+            UnitType.SirTristan => "Sir Tristan",
+            UnitType.SirPercival => "Sir Percival",
+            UnitType.SirKay => "Sir Kay",
+            UnitType.SirBedivere => "Sir Bedivere",
+            UnitType.LadyGuinevere => "Lady Guinevere",
+            UnitType.Guinevere => "Lady Guinevere",
+            UnitType.ArchPriestOfGlastonbury => "Arch-Priest of Glastonbury",
+            UnitType.Priest => "Arch-Priest of Glastonbury",
+            UnitType.TheGreenKnight => "The Green Knight",
+            UnitType.Merlin => "Merlin (soft)",
+            _ => t.ToString()
+        };
+
+        /// <summary>Normalize aliases so Guinevere/Priest map onto canonical slots.</summary>
+        public static UnitType NormalizeLegendSlot(UnitType type) => type switch
+        {
+            UnitType.Guinevere => UnitType.LadyGuinevere,
+            UnitType.Priest => UnitType.ArchPriestOfGlastonbury,
+            _ => type
+        };
+
+        public LegendPortraitEntry FindLegendEntry(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            UnitType want = NormalizeLegendSlot(type);
+            for (int i = 0; i < legendPortraits.Count; i++)
+            {
+                var e = legendPortraits[i];
+                if (e != null && e.unitType == want) return e;
+            }
+            return null;
+        }
+
+        public Sprite GetLegendFace(UnitType type)
+        {
+            var e = FindLegendEntry(type);
+            return e != null ? e.facePortrait : null;
+        }
+
+        public List<Sprite> GetPewFacePool(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantFaceProfiles,
+                UnitType.Warrior => warriorFaceProfiles,
+                UnitType.Knight => knightFaceProfiles,
+                _ => null
+            };
+        }
+
+        public int CountUsablePewFaces(UnitType type)
+        {
+            var pool = GetPewFacePool(type);
+            if (pool == null) return 0;
+            int n = 0;
+            for (int i = 0; i < pool.Count; i++)
+                if (pool[i] != null) n++;
+            return n;
+        }
+
+        public int CountAssignedLegendFaces()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            for (int i = 0; i < legendPortraits.Count; i++)
+            {
+                var e = legendPortraits[i];
+                if (e != null && e.facePortrait != null && !e.softOptional) n++;
+            }
+            return n;
+        }
+    }
 
     [Serializable]
     public class ModularHeadEntry
@@ -1916,6 +2121,106 @@ namespace ArthurianAutobattler
                 }
                 return (int)h;
             }
+        }
+    }
+
+    /// <summary>
+    /// Resolves Architect LegendPewPortraitProfile assignments for Legends FacePortrait
+    /// and townsfolk pew face/body profiles. Soft-fails when empty — callers keep
+    /// CharacterDatabase / ClassSpritePool / StageLayout fallbacks.
+    /// Embedded in GameDataTypes (PR #33 Force Sync CS0103 lesson — no standalone applier file).
+    /// </summary>
+    public static class LegendPewPortraitApplier
+    {
+        static LegendPewPortraitProfile _cache;
+
+        public static void InvalidateCache() => _cache = null;
+
+        public static LegendPewPortraitProfile Profile
+        {
+            get
+            {
+                if (_cache == null)
+                {
+                    try { _cache = LegendPewPortraitProfile.Load(); }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning("[DemonKnight] LegendPewPortraitProfile.Load soft-fail: " + ex.Message);
+                        return null;
+                    }
+                }
+                return _cache;
+            }
+        }
+
+        /// <summary>Architect-assigned face sprite for a Legend (null = use CharacterDatabase).</summary>
+        public static Sprite GetLegendFace(UnitType type)
+        {
+            try
+            {
+                var profile = Profile;
+                return profile != null ? profile.GetLegendFace(type) : null;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] LegendPewPortraitApplier.GetLegendFace soft-fail: " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Pick a townsfolk pew face/body profile from the Architect pools
+        /// (distinct from ClassSpritePool full-body). Deterministic by unitID.
+        /// </summary>
+        public static Sprite PickPewProfile(RecruitInstance recruit)
+        {
+            if (recruit == null) return null;
+            return PickPewProfile(recruit.unitType, recruit.unitID, recruit.characterName, recruit.pewSeatIndex);
+        }
+
+        public static Sprite PickPewProfile(UnitType type, string unitId, string characterName = null, int pewSeatIndex = 0)
+        {
+            try
+            {
+                var profile = Profile;
+                if (profile == null) return null;
+                List<Sprite> pool = profile.GetPewFacePool(type);
+                if (pool == null || pool.Count == 0) return null;
+
+                int usable = 0;
+                for (int i = 0; i < pool.Count; i++)
+                    if (pool[i] != null) usable++;
+                if (usable == 0) return null;
+
+                int seed = ClassSpritePoolApplier.StableHash(
+                    !string.IsNullOrEmpty(unitId) ? "pewface:" + unitId
+                    : (!string.IsNullOrEmpty(characterName) ? "pewface:" + characterName + "#" + pewSeatIndex
+                    : "pewface:" + type + "#" + pewSeatIndex));
+                int want = Math.Abs(seed) % usable;
+                int seen = 0;
+                for (int i = 0; i < pool.Count; i++)
+                {
+                    if (pool[i] == null) continue;
+                    if (seen == want) return pool[i];
+                    seen++;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] LegendPewPortraitApplier.PickPewProfile soft-fail: " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Pew visual resolve: Architect face/body profile pools first, then ClassSpritePool full-body.
+        /// </summary>
+        public static Sprite ResolvePewVisual(RecruitInstance recruit)
+        {
+            Sprite face = PickPewProfile(recruit);
+            if (face != null) return face;
+            return ClassSpritePoolApplier.PickForRecruit(recruit);
         }
     }
 
