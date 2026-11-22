@@ -6,8 +6,8 @@ using UnityEngine;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Persistent 15-Legend meta-progression. JsonUtility save at
-    /// Application.persistentDataPath/legend_unlocks.json.
+    /// Persistent playable-Legend meta-progression (Merlin is narrative-only, not in pool).
+    /// JsonUtility save at Application.persistentDataPath/legend_unlocks.json.
     /// Unlocks never come from Perks / Demonic Pacts / Sin Runes.
     /// </summary>
     public class LegendUnlockManager : MonoBehaviour
@@ -36,7 +36,6 @@ namespace ArthurianAutobattler
             "KingArthur",
             "SirGalahad",
             "SirPercival",
-            "Merlin",
             "Nimue",
             "Mordred",
             "MorganLeFay",
@@ -189,7 +188,7 @@ namespace ArthurianAutobattler
             _ => type.ToString()
         };
 
-        /// <summary>True when this unit type is one of the 15 gated legends.</summary>
+        /// <summary>True when this unit type is a gated playable legend (Merlin excluded).</summary>
         public static bool IsGatedLegend(UnitType type)
         {
             switch (type)
@@ -206,7 +205,6 @@ namespace ArthurianAutobattler
                 case UnitType.KingArthur:
                 case UnitType.SirGalahad:
                 case UnitType.SirPercival:
-                case UnitType.Merlin:
                 case UnitType.Nimue:
                 case UnitType.Mordred:
                 case UnitType.MorganLeFay:
@@ -216,6 +214,10 @@ namespace ArthurianAutobattler
                     return false;
             }
         }
+
+        /// <summary>Playable fusion/codex pool — Merlin stays UnitType but is not summonable.</summary>
+        public static bool IsPlayableLegend(UnitType type) =>
+            type != UnitType.Merlin && IsGatedLegend(type);
 
         public static string LoreFor(string legendId) => legendId switch
         {
@@ -240,7 +242,7 @@ namespace ArthurianAutobattler
             "SirPercival" =>
                 "Raised in the Welsh woods knowing nothing of knights, he walked into Camelot in rough clothes and became a Grail hero.",
             "Merlin" =>
-                "A prophet and master wizard born of a demon father, bound to guide Arthur's bloodline through death and rebirth.",
+                "Missing from Somerset. A prophet born of a demon father — bound to Arthur's bloodline, yet absent from the pews and the fusion circle.",
             "Nimue" =>
                 "An enchantress from Avalon who gave Arthur Excalibur and its magic scabbard, which stops its wearer from ever bleeding to death.",
             "Mordred" =>
@@ -260,7 +262,7 @@ namespace ArthurianAutobattler
             "KingArthur" => "Locked: Endure all nights and claim victory.",
             "SirGalahad" => "Locked: Reach the fifth night without losing a single soul.",
             "SirPercival" => "Locked: Awaken the hidden spark inside a Darkhorse recruit.",
-            "Merlin" => "Locked: Uncover or fuse a rare Golden Egg.",
+            "Merlin" => "Missing — Merlin cannot be fused or summoned.",
             "Nimue" => "Locked: Fuse a Grail-Touched soul or complete five fusions in one run.",
             "Mordred" => "Locked: Carry three or more bitter grudges to the end of a run.",
             "MorganLeFay" => "Locked: Win a battle burdened by three grudges or a flawed recruit.",
@@ -337,8 +339,7 @@ namespace ArthurianAutobattler
             HiddenPotentialSystem.MigrateLegacySpark(r);
             if (r.secretArchetype == SecretArchetype.Darkhorse)
                 Unlock("SirPercival", $"awakened Darkhorse ({r.hiddenTraitId})");
-            if (r.secretArchetype == SecretArchetype.GoldenEgg)
-                Unlock("Merlin", $"awakened Golden Egg ({r.hiddenTraitId})");
+            // Golden Egg no longer unlocks Merlin (narrative-only / missing).
             // Legacy string-only path.
             NotifyHiddenPotentialAwakened(r.hiddenTraitId);
         }
@@ -349,8 +350,7 @@ namespace ArthurianAutobattler
             if (string.Equals(hiddenTraitId, RecruitInstance.DarkhorseId, StringComparison.Ordinal)
                 || string.Equals(hiddenTraitId, RecruitInstance.LegendSparkId, StringComparison.Ordinal))
                 Unlock("SirPercival", $"awakened {hiddenTraitId}");
-            if (string.Equals(hiddenTraitId, RecruitInstance.GoldenEggId, StringComparison.Ordinal))
-                Unlock("Merlin", "awakened Golden Egg");
+            // Golden Egg does not unlock Merlin (removed from playable pool).
         }
 
         public void NotifyHiddenPotentialAscended(RecruitInstance r)
@@ -358,8 +358,7 @@ namespace ArthurianAutobattler
             if (r == null) return;
             if (r.secretArchetype == SecretArchetype.Darkhorse)
                 Unlock("SirPercival", "ascended Darkhorse recruit");
-            if (r.secretArchetype == SecretArchetype.GoldenEgg)
-                Unlock("Merlin", "ascended Golden Egg");
+            // Golden Egg ascent no longer unlocks Merlin.
             if (r.hiddenTraitId == HiddenPotentialSystem.TraitGrailTouched
                 || string.Equals(r.hiddenTraitId, RecruitInstance.GrailTouchedId, StringComparison.Ordinal))
                 Unlock("Nimue", "ascended Grail-Touched soul");
@@ -398,8 +397,7 @@ namespace ArthurianAutobattler
 
             if (hadDarkhorse)
                 Unlock("SirPercival", "ascended/fused Darkhorse recruit");
-            if (hadGolden)
-                Unlock("Merlin", "fused Golden Egg");
+            // hadGolden: Merlin removed from playable pool — no unlock.
             if (hadGrail)
                 Unlock("Nimue", "fused Grail-Touched soul");
         }

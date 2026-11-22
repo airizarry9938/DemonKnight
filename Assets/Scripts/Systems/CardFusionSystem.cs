@@ -58,6 +58,8 @@ namespace ArthurianAutobattler
         public bool CanFuseType(UnitType type, List<RecruitInstance> p)
         {
             SanitizeBaseUnitFusionFlags(p);
+            // Merlin is narrative-only — never fuse/summon from the playable pool.
+            if (type == UnitType.Merlin) return false;
             if (!IsFusionUnlocked(type)) return false;
             var db = CharacterDatabase.Load();
             var def = db?.GetByUnitType(type);
@@ -77,6 +79,11 @@ namespace ArthurianAutobattler
         public bool FuseType(UnitType type, List<RecruitInstance> p)
         {
             SanitizeBaseUnitFusionFlags(p);
+            if (type == UnitType.Merlin)
+            {
+                Debug.LogWarning("[DemonKnight] Fuse blocked — Merlin is missing (not in playable legend pool).");
+                return false;
+            }
             if (!IsFusionUnlocked(type))
             {
                 Debug.LogWarning(
@@ -146,7 +153,7 @@ namespace ArthurianAutobattler
         public bool CanFusePriest(List<RecruitInstance> p) => CanFuseType(UnitType.Priest, p);
         public bool CanFuseCaptain(List<RecruitInstance> p) => CanFuseType(UnitType.Captain, p);
         public bool CanFuseKingArthur(List<RecruitInstance> p) => CanFuseType(UnitType.KingArthur, p);
-        public bool CanFuseMerlin(List<RecruitInstance> p) => CanFuseType(UnitType.Merlin, p);
+        public bool CanFuseMerlin(List<RecruitInstance> p) => false;
         public bool CanFuseLancelot(List<RecruitInstance> p) => CanFuseType(UnitType.SirLancelot, p);
         public bool CanFuseMorganLeFay(List<RecruitInstance> p) => CanFuseType(UnitType.MorganLeFay, p);
         public bool CanFuseLadyOfTheLake(List<RecruitInstance> p) => CanFuseType(UnitType.LadyOfTheLake, p);
@@ -162,7 +169,7 @@ namespace ArthurianAutobattler
         public bool FusePriest(List<RecruitInstance> p) => FuseType(UnitType.Priest, p);
         public bool FuseCaptain(List<RecruitInstance> p) => FuseType(UnitType.Captain, p);
         public bool FuseKingArthur(List<RecruitInstance> p) => FuseType(UnitType.KingArthur, p);
-        public bool FuseMerlin(List<RecruitInstance> p) => FuseType(UnitType.Merlin, p);
+        public bool FuseMerlin(List<RecruitInstance> p) => false;
         public bool FuseLancelot(List<RecruitInstance> p) => FuseType(UnitType.SirLancelot, p);
         public bool FuseMorganLeFay(List<RecruitInstance> p) => FuseType(UnitType.MorganLeFay, p);
         public bool FuseLadyOfTheLake(List<RecruitInstance> p) => FuseType(UnitType.LadyOfTheLake, p);
@@ -205,8 +212,7 @@ namespace ArthurianAutobattler
             UnitType.Captain => CountType(p, UnitType.Warrior) >= 2,
             UnitType.KingArthur => CountType(p, UnitType.Knight) >= 2
                                   && CountType(p, UnitType.Captain) >= 1,
-            UnitType.Merlin => CountType(p, UnitType.Priest) >= 2
-                               && CountType(p, UnitType.Knight) >= 1,
+            UnitType.Merlin => false, // narrative-only — not fuseable
             UnitType.SirLancelot => CountType(p, UnitType.Knight) >= 2
                                     && CountType(p, UnitType.Warrior) >= 1
                                     && p != null && p.Any(u => u != null && u.unitType == UnitType.Knight && u.primaryTrait == TraitTag.Noble),
@@ -254,10 +260,7 @@ namespace ArthurianAutobattler
                 () => CreateHero("hero_arthur", "King Arthur", UnitType.KingArthur, kingArthurSprite, 290, 34, 1.9f, TraitTag.Loyalist, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight, 2),
                 new IngredientPick(r => r.unitType == UnitType.Captain, 1)),
-            UnitType.Merlin => TryFuse(p, x => CanFuseLegacy(UnitType.Merlin, x),
-                () => CreateHero("hero_merlin", "Merlin the Archmage", UnitType.Merlin, merlinSprite, 195, 30, 1.5f, TraitTag.Zealot, CombatRole.BacklineRanged),
-                new IngredientPick(r => r.unitType == UnitType.Priest, 2),
-                new IngredientPick(r => r.unitType == UnitType.Knight, 1)),
+            UnitType.Merlin => false,
             UnitType.SirLancelot => TryFuse(p, x => CanFuseLegacy(UnitType.SirLancelot, x),
                 () => CreateHero("hero_lancelot", "Sir Lancelot", UnitType.SirLancelot, lancelotSprite, 240, 29, 2.0f, TraitTag.Noble, CombatRole.FrontlineTank),
                 new IngredientPick(r => r.unitType == UnitType.Knight && r.primaryTrait == TraitTag.Noble, 1),

@@ -56,6 +56,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-wave-advance-stuck",
         "legends-fullwidth-column",
         "fix-hud-wave-match",
+        "merlin-lore-narrative",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]

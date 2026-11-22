@@ -100,6 +100,8 @@ namespace ArthurianAutobattler
                 : new List<RecruitInstance>();
 
             EnsureRecipesFromDatabase();
+            if (allRecipes != null)
+                allRecipes.RemoveAll(e => e == null || e.resultingType == UnitType.Merlin);
             FillRecipeSortStats();
             MenuListSortBar.SortRecipes(allRecipes, legendsSortMode);
             // Legends list only — hide party fusion preview strip (party info).
@@ -362,6 +364,8 @@ namespace ArthurianAutobattler
             foreach (var def in db.legends)
             {
                 if (def == null || !def.HasFusionRecipe) continue;
+                // Merlin is narrative-only — never list in playable Codex.
+                if (def.unitType == UnitType.Merlin) continue;
                 string id = LegendUnlockManager.LegendIdFor(def.unitType);
                 allRecipes.Add(new CodexRecipeEntry
                 {

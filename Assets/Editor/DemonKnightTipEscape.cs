@@ -130,6 +130,7 @@ public static class DemonKnightTipEscape
             "fix-wave-advance-stuck",
             "legends-fullwidth-column",
             "fix-hud-wave-match",
+            "merlin-lore-narrative",
         };
         foreach (string s in stale)
         {

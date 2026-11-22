@@ -65,6 +65,7 @@ public static class ArthurianSyncFromGitHub
         "fix-wave-advance-stuck",
         "legends-fullwidth-column",
         "fix-hud-wave-match",
+        "merlin-lore-narrative",
     };
 
     /// <summary>
@@ -1655,6 +1656,7 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("force-sync-appliers-hardfix")
                    || body.Contains("sheet-splicer-chroma-despill")
                    || body.Contains("fix-hud-wave-match")
+                   || body.Contains("merlin-lore-narrative")
                    || body.Contains("lore-boss-wave-order");
         }
 
