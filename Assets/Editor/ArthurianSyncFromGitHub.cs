@@ -24,16 +24,16 @@ public static class ArthurianSyncFromGitHub
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
     // Pre-ship pin = tip before this PR; ship commit bumps both to feature SHA.
-    private const string FallbackCommitSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
+    private const string FallbackCommitSha = "65af3385fa3033e4dde41b09129feb4eb0c508cb";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
+    public const string HardTipCommitSha = "65af3385fa3033e4dde41b09129feb4eb0c508cb";
 
-    private const string ExpectedPackageId = "force-sync-appliers-hardfix";
+    private const string ExpectedPackageId = "sheet-splicer-chroma-despill";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -60,6 +60,7 @@ public static class ArthurianSyncFromGitHub
         "class-sprite-pools",
         "assign-only-runtime",
         "sync-keep-editor-menus",
+        "force-sync-appliers-hardfix",
     };
 
     /// <summary>
@@ -1642,7 +1643,8 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("sync-complete-replace")
                    || body.Contains("class-sprite-pools")
                    || body.Contains("fix-scene-bg-applier-cs0103")
-                   || body.Contains("force-sync-appliers-hardfix");
+                   || body.Contains("force-sync-appliers-hardfix")
+                   || body.Contains("sheet-splicer-chroma-despill");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
