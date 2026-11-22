@@ -16,7 +16,7 @@ public static class DemonKnightPackageVersion
     public const string BuiltUtc = "2026-11-22T03:35:50Z";
 
     /// <summary>Fallback SHA only — OnLoad prefers API tip + raw@main first.</summary>
-    public const string HardTipSha = "a35193efd12fb0d95789893b4cd9ae670614c339";
+    public const string HardTipSha = "a32a5bc7e8169ea0dfad42caaf04fee85b583432";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
