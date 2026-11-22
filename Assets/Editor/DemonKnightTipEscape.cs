@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "lore-boss-wave-order";
+    public const string TipPackageId = "legends-lore-portrait";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -41,7 +41,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (lore-boss-wave-order)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (legends-lore-portrait)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -130,7 +130,8 @@ public static class DemonKnightTipEscape
             "fix-wave-advance-stuck",
             "legends-fullwidth-column",
             "fix-hud-wave-match",
-            "merlin-lore-narrative",
+        "lore-boss-wave-order",
+        "merlin-lore-narrative",
         };
         foreach (string s in stale)
         {
