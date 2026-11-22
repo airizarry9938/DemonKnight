@@ -66,6 +66,17 @@ namespace ArthurianAutobattler
             return stagedGrudges.TryGetValue(unitID, out int penalty) ? penalty : 0;
         }
 
+        /// <summary>Count distinct souls with a positive (bitter) staged grudge.</summary>
+        public int CountPositiveStagedGrudges()
+        {
+            int n = 0;
+            foreach (var kvp in stagedGrudges)
+            {
+                if (kvp.Value > 0) n++;
+            }
+            return n;
+        }
+
         /// <summary>
         /// Hire-price memory: ONLY army members who died raise cost.
         /// partyLostWar no longer taxes survivors (Andrew design).

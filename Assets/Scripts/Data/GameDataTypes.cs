@@ -11,7 +11,8 @@ namespace ArthurianAutobattler
         Peasant, Warrior, Knight,
         Priest, Captain,
         KingArthur, Merlin, SirLancelot, MorganLeFay, LadyOfTheLake, SirGawain, Mordred, SirGalahad,
-        SirTristan, SirPercival, SirKay, SirBedivere, Guinevere,
+        SirTristan, SirPercival, SirKay, SirBedivere, Guinevere, LadyGuinevere,
+        ArchPriestOfGlastonbury, Nimue, TheGreenKnight,
         DemonImp, DemonHellhound, DemonDreadLord, SirenEnchantress,
         BossBlackKnight, BossVortigern, BossGreenKnight, BossAccolon,
         BossMeleagant, BossKingLot, BossQuestingBeast, BossNimue
@@ -138,8 +139,14 @@ namespace ArthurianAutobattler
         /// <summary>Dice Jackpot — hire is free regardless of floors / mods.</summary>
         public bool hireCostForcedZero;
 
-        /// <summary>Master Spec Phase 5 spark id.</summary>
+        /// <summary>Master Spec Phase 5 spark id (Darkhorse-class).</summary>
         public const string LegendSparkId = "Legend Spark";
+        /// <summary>Hidden Potential — Percival unlock when awakened/ascended.</summary>
+        public const string DarkhorseId = "Darkhorse";
+        /// <summary>Hidden Potential — Merlin unlock when awakened/fused.</summary>
+        public const string GoldenEggId = "Golden Egg";
+        /// <summary>Hidden Potential — Nimue unlock when fused.</summary>
+        public const string GrailTouchedId = "GrailTouched";
         public const float ScoutHireMult = 0.7f;
         public const int ScoutHireMinGold = 5;
 
@@ -348,7 +355,9 @@ namespace ArthurianAutobattler
                    || t == UnitType.MorganLeFay || t == UnitType.LadyOfTheLake || t == UnitType.SirGawain
                    || t == UnitType.Mordred || t == UnitType.SirGalahad || t == UnitType.Priest
                    || t == UnitType.Captain || t == UnitType.SirTristan || t == UnitType.SirPercival
-                   || t == UnitType.SirKay || t == UnitType.SirBedivere || t == UnitType.Guinevere;
+                   || t == UnitType.SirKay || t == UnitType.SirBedivere || t == UnitType.Guinevere
+                   || t == UnitType.LadyGuinevere || t == UnitType.ArchPriestOfGlastonbury
+                   || t == UnitType.Nimue || t == UnitType.TheGreenKnight;
         }
 
         /// <summary>
@@ -441,6 +450,9 @@ namespace ArthurianAutobattler
             UnitType.LadyOfTheLake => true,
             UnitType.SirTristan => true,
             UnitType.Guinevere => true,
+            UnitType.LadyGuinevere => true,
+            UnitType.ArchPriestOfGlastonbury => true,
+            UnitType.Nimue => true,
             UnitType.SirenEnchantress => true,
             _ => false
         };
@@ -627,6 +639,9 @@ namespace ArthurianAutobattler
         public float charmedTimer = 0f;
         public bool cannotBeHealed = false;
         public float maxHpDrainPerSecond = 0f;
+        /// <summary>Nimue MartyrsWard — survive first lethal at 1 HP.</summary>
+        public bool martyrsWard;
+        public bool martyrsWardUsed;
         /// <summary>Train Ranged crossbow — allows melee to fire from BACK.</summary>
         public bool canAttackFromBack;
 
@@ -806,8 +821,12 @@ namespace ArthurianAutobattler
         public static void MarkScouted(RecruitInstance r)
         {
             if (r == null) return;
+            bool wasScouted = r.isScouted;
             r.isScouted = true;
             if (r.intelTierUnlocked < 1) r.intelTierUnlocked = 1;
+            // Awaken Hidden Potential once the spark is revealed to the player.
+            if (!wasScouted && !string.IsNullOrEmpty(r.hiddenTraitId))
+                LegendUnlockManager.Ensure()?.NotifyHiddenPotentialAwakened(r.hiddenTraitId);
         }
 
         /// <summary>

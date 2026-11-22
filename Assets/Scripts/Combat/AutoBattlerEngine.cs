@@ -113,6 +113,27 @@ namespace ArthurianAutobattler
                     aps = 2.0f;
                 }
 
+                // Sir Percival: +15% ATK per wave survived (victory stars).
+                if (r.unitType == UnitType.SirPercival && r.victoryStars > 0)
+                    atk = Mathf.Max(1, Mathf.RoundToInt(atk * (1f + 0.15f * r.victoryStars)));
+
+                // Sir Tristan: canAttackFromBack + 25% SPD.
+                if (r.unitType == UnitType.SirTristan)
+                {
+                    r.canAttackFromBack = true;
+                    aps = Mathf.Min(3.0f, aps * 1.25f);
+                }
+
+                // Mordred: +15% ATK per positive staged grudge.
+                if (r.unitType == UnitType.Mordred)
+                {
+                    int grudges = GrudgeSaveManager.Instance != null
+                        ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
+                        : 0;
+                    if (grudges > 0)
+                        atk = Mathf.Max(1, Mathf.RoundToInt(atk * (1f + 0.15f * grudges)));
+                }
+
                 CombatUnit cu = new CombatUnit
                 {
                     unitID = r.unitID,
@@ -127,7 +148,8 @@ namespace ArthurianAutobattler
                     attackDamage = atk,
                     attacksPerSecond = aps,
                     battleSlotIndex = r.battleSlotIndex,
-                    canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior,
+                    canAttackFromBack = (r.canAttackFromBack && r.unitType != UnitType.Warrior)
+                                       || r.unitType == UnitType.SirTristan,
                     cannotBeHealed = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight),
                     maxHpDrainPerSecond = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight)
                         ? r.maxHealth * 0.05f : 0f
@@ -135,6 +157,8 @@ namespace ArthurianAutobattler
                 cu.ResetAttackCooldown();
                 playerArmy.Add(cu);
             }
+
+            _combatTurnIndex = 0;
 
             demonArmy = hordeGenerator.GenerateHordeForBattle(currentBattleNumber);
             ApplyEndlessHourglassPressure(demonArmy);
@@ -291,8 +315,89 @@ namespace ArthurianAutobattler
                              u.primaryTrait == TraitTag.Coward || u.primaryTrait == TraitTag.Drunkard))
                     ally.attacksPerSecond = Mathf.Max(0.7f, ally.attacksPerSecond - 0.3f);
             }
+
+            ApplyFifteenLegendPassives();
         }
 
+        /// <summary>15-Legend combat passives from legend-unlocks-brief.</summary>
+        void ApplyFifteenLegendPassives()
+        {
+            bool anyOtherLegend(CombatUnit self) =>
+                playerArmy.Any(u => u != null && u != self && u.IsAlive && RecruitInstance.IsLegendUnit(u.unitType));
+
+            // Sir Kay: +20% ATK when no other Legend deployed.
+            foreach (var kay in playerArmy.Where(u => u.unitType == UnitType.SirKay && u.IsAlive))
+            {
+                if (!anyOtherLegend(kay))
+                    kay.attackDamage = Mathf.Max(1, Mathf.RoundToInt(kay.attackDamage * 1.20f));
+            }
+
+            // Lady Guinevere: heal all allies in her row 10% max HP at battle start.
+            foreach (var g in playerArmy.Where(u =>
+                         (u.unitType == UnitType.Guinevere || u.unitType == UnitType.LadyGuinevere) && u.IsAlive))
+            {
+                bool front = g.IsFrontRow;
+                foreach (var ally in playerArmy.Where(a => a.IsAlive && a.IsFrontRow == front))
+                {
+                    int heal = Mathf.Max(1, Mathf.RoundToInt(ally.maxHealth * 0.10f));
+                    ally.currentHealth = Mathf.Min(ally.maxHealth, ally.currentHealth + heal);
+                    BattlefieldVisualizer.Instance?.SpawnPopup(ally, $"+{heal}", Color.green);
+                }
+            }
+
+            // Arch Priest: +15% max HP to adjacent allies (battleSlotIndex ± 1).
+            foreach (var priest in playerArmy.Where(u =>
+                         (u.unitType == UnitType.Priest || u.unitType == UnitType.ArchPriestOfGlastonbury)
+                         && u.IsAlive))
+            {
+                foreach (var ally in playerArmy.Where(a =>
+                             a.IsAlive && a != priest
+                             && Mathf.Abs(a.battleSlotIndex - priest.battleSlotIndex) == 1))
+                {
+                    int bonus = Mathf.Max(1, Mathf.RoundToInt(ally.maxHealth * 0.15f));
+                    ally.maxHealth += bonus;
+                    ally.currentHealth += bonus;
+                }
+            }
+
+            // King Arthur: +15% ATK and +15% HP to all deployed allies (Round Table).
+            if (playerArmy.Any(u => u.unitType == UnitType.KingArthur && u.IsAlive))
+            {
+                foreach (var ally in playerArmy.Where(a => a.IsAlive))
+                {
+                    ally.attackDamage = Mathf.Max(1, Mathf.RoundToInt(ally.attackDamage * 1.15f));
+                    int hpBonus = Mathf.Max(1, Mathf.RoundToInt(ally.maxHealth * 0.15f));
+                    ally.maxHealth += hpBonus;
+                    ally.currentHealth += hpBonus;
+                }
+            }
+
+            // Nimue: MartyrsWard to nearest frontline ally.
+            foreach (var nimue in playerArmy.Where(u => u.unitType == UnitType.Nimue && u.IsAlive))
+            {
+                var nearest = playerArmy
+                    .Where(a => a.IsAlive && a.IsFrontRow && a != nimue)
+                    .OrderBy(a => Mathf.Abs(a.battleSlotIndex - nimue.battleSlotIndex))
+                    .FirstOrDefault();
+                if (nearest != null)
+                {
+                    nearest.martyrsWard = true;
+                    BattlefieldVisualizer.Instance?.SpawnPopup(nearest, "WARD!", new Color(0.6f, 0.9f, 1f));
+                }
+            }
+
+            // Morgan le Fay: −15% enemy frontline ATK at combat start.
+            if (playerArmy.Any(u => u.unitType == UnitType.MorganLeFay && u.IsAlive))
+            {
+                foreach (var foe in demonArmy.Where(d => d != null && d.IsAlive))
+                {
+                    // Horde has no formation; treat first frontlineSize as front.
+                    foe.attackDamage = Mathf.Max(1, Mathf.RoundToInt(foe.attackDamage * 0.85f));
+                }
+            }
+        }
+
+        int _combatTurnIndex;
         private float _postAttackPauseTimer;
 
         private void Update()
@@ -359,8 +464,24 @@ namespace ArthurianAutobattler
                 // Demons MUST target FRONT before BACK — pass all living humans into the filter.
                 struck |= ProcessSideActions(actingDemons, GetFrontRowTargets(allHumans), dt);
             }
-            if (struck && attackResolvePause > 0f)
-                _postAttackPauseTimer = attackResolvePause;
+            if (struck)
+            {
+                _combatTurnIndex++;
+                ApplyGreenKnightTurnRegen();
+                if (attackResolvePause > 0f)
+                    _postAttackPauseTimer = attackResolvePause;
+            }
+        }
+
+        void ApplyGreenKnightTurnRegen()
+        {
+            foreach (var gk in playerArmy.Where(u => u != null && u.IsAlive && u.unitType == UnitType.TheGreenKnight))
+            {
+                int regen = Mathf.Max(1, Mathf.RoundToInt(gk.maxHealth * 0.08f));
+                if (gk.currentHealth >= gk.maxHealth) continue;
+                gk.currentHealth = Mathf.Min(gk.maxHealth, gk.currentHealth + regen);
+                BattlefieldVisualizer.Instance?.SpawnPopup(gk, $"+{regen}", new Color(0.4f, 0.9f, 0.4f));
+            }
         }
 
         private void TrySirenCharmTicks(float dt)
@@ -471,7 +592,9 @@ namespace ArthurianAutobattler
         private void ExecuteUnitAction(CombatUnit attacker, List<CombatUnit> allies, List<CombatUnit> enemies)
         {
             int dmg = attacker.attackDamage;
-            if (attacker.unitType == UnitType.SirGawain && attacker.battleElapsed <= 8.0f) dmg *= 2;
+            // Sir Gawain Morning Sun: +35% ATK first 3 combat turns (replaces old 8s double).
+            if (attacker.unitType == UnitType.SirGawain && _combatTurnIndex < 3)
+                dmg = Mathf.Max(1, Mathf.RoundToInt(dmg * 1.35f));
 
             // When demons strike, `enemies` is already FRONT-only (until front is wiped).
             // When humans strike demons, pick among the living demon pool as given.
@@ -527,9 +650,13 @@ namespace ArthurianAutobattler
                         DealDamage(attacker, t, dmg);
                     break;
                 case UnitType.Merlin:
-                    foreach (var t in enemies.Where(e => e != null && e.IsAlive))
-                        DealDamage(attacker, t, dmg);
+                {
+                    // Merlin: hit 3 random enemies at 65% ATK each.
+                    int bolt = Mathf.Max(1, Mathf.RoundToInt(dmg * 0.65f));
+                    foreach (var t in enemies.Where(e => e != null && e.IsAlive).OrderBy(_ => Random.value).Take(3))
+                        DealDamage(attacker, t, bolt);
                     break;
+                }
                 case UnitType.MorganLeFay:
                 {
                     var hexTarget = PickRandomTarget(enemies);
@@ -608,6 +735,20 @@ namespace ArthurianAutobattler
                     }
                     break;
                 }
+                case UnitType.SirLancelot:
+                {
+                    var lanTarget = PickRandomTarget(enemies);
+                    if (lanTarget == null) break;
+                    int lanDmg = dmg;
+                    // +30% ATK +20% SPD vs enemy with higher max HP.
+                    if (lanTarget.maxHealth > attacker.maxHealth)
+                    {
+                        lanDmg = Mathf.Max(1, Mathf.RoundToInt(dmg * 1.30f));
+                        attacker.attacksPerSecond = Mathf.Min(3.0f, attacker.attacksPerSecond * 1.20f);
+                    }
+                    DealDamage(attacker, lanTarget, lanDmg);
+                    break;
+                }
                 default:
                 {
                     // Backline Ranged / crossbow: snipe weakest among legal targets.
@@ -639,12 +780,49 @@ namespace ArthurianAutobattler
                 finalDamage = Mathf.Max(1, finalDamage / 2);
             }
 
+            // Sir Bedivere: +25% damage reduction when solo in his row.
+            if (target.unitType == UnitType.SirBedivere && target.IsAlive)
+            {
+                bool solo = !playerArmy.Any(a =>
+                    a != null && a.IsAlive && a != target && a.IsFrontRow == target.IsFrontRow);
+                if (solo)
+                    finalDamage = Mathf.Max(1, Mathf.RoundToInt(finalDamage * 0.75f));
+            }
+
+            // The Green Knight: cannot be one-shot above 50% HP.
+            if (target.unitType == UnitType.TheGreenKnight
+                && target.currentHealth > target.maxHealth / 2
+                && finalDamage >= target.currentHealth)
+            {
+                finalDamage = Mathf.Max(1, target.currentHealth - 1);
+                BattlefieldVisualizer.Instance?.SpawnPopup(target, "ENDURE!", new Color(0.3f, 0.8f, 0.3f));
+            }
+
             if (target.shieldHealth > 0)
             {
                 int absorbed = Mathf.Min(target.shieldHealth, finalDamage);
                 target.shieldHealth -= absorbed;
                 finalDamage -= absorbed;
                 BattlefieldVisualizer.Instance?.SpawnPopup(target, $"SHIELD -{absorbed}", Color.cyan);
+            }
+
+            // Sir Galahad: redirect 25% lethal damage from adjacent allies to self, then halve it.
+            if (!target.isDemon
+                && target.currentHealth - finalDamage <= 0
+                && target.unitType != UnitType.SirGalahad)
+            {
+                var galahad = playerArmy.FirstOrDefault(a =>
+                    a != null && a.IsAlive && a.unitType == UnitType.SirGalahad
+                    && Mathf.Abs(a.battleSlotIndex - target.battleSlotIndex) == 1);
+                if (galahad != null)
+                {
+                    int redirected = Mathf.Max(1, Mathf.RoundToInt(finalDamage * 0.25f));
+                    int halved = Mathf.Max(1, redirected / 2);
+                    finalDamage -= redirected;
+                    galahad.currentHealth -= halved;
+                    BattlefieldVisualizer.Instance?.SpawnPopup(galahad, $"WARD -{halved}", new Color(1f, 0.85f, 0.4f));
+                    if (galahad.currentHealth <= 0) HandleUnitDeath(galahad);
+                }
             }
 
             target.currentHealth -= finalDamage;
@@ -710,6 +888,15 @@ namespace ArthurianAutobattler
                 fallen.currentHealth = Mathf.RoundToInt(fallen.maxHealth * 0.40f);
                 fallen.attackDamage += 10;
                 BattlefieldVisualizer.Instance?.SpawnPopup(fallen, "REVIVED!", Color.yellow);
+                return;
+            }
+
+            // Nimue MartyrsWard: survive first lethal at 1 HP.
+            if (!fallen.isDemon && fallen.martyrsWard && !fallen.martyrsWardUsed)
+            {
+                fallen.martyrsWardUsed = true;
+                fallen.currentHealth = 1;
+                BattlefieldVisualizer.Instance?.SpawnPopup(fallen, "MARTYR!", new Color(0.6f, 0.9f, 1f));
                 return;
             }
 
@@ -832,6 +1019,20 @@ namespace ArthurianAutobattler
                         surviving.Add(u.unitID);
                 }
                 DemonKnightCompatApi.AwardWaveVictoryVeteranRanks(loop, surviving);
+
+                int staged = GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
+                    : 0;
+                var unlockMgr = LegendUnlockManager.Ensure();
+                unlockMgr?.NotifyWaveCleared(
+                    currentBattleNumber,
+                    loop != null ? loop.soulsLostThisRun : 0);
+                // Liability / grudge Morgan unlock — use marched roster before disband.
+                var marched = new List<RecruitInstance>();
+                if (loop?.recruitedParty != null)
+                    marched.AddRange(loop.recruitedParty);
+                unlockMgr?.NotifyWaveWonWithParty(marched, staged);
+                unlockMgr?.MarkCursedDiceOwnedThisRun();
             }
 
             // PER-WAVE disband — EVERY EndBattle (win OR lose). Loud + nuclear clear.
@@ -883,6 +1084,11 @@ namespace ArthurianAutobattler
 
             if (playerWon && currentBattleNumber >= finalBossWave)
             {
+                LegendUnlockManager.Ensure()?.NotifyFullRunVictory();
+                int endGrudges = GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
+                    : 0;
+                LegendUnlockManager.Ensure()?.NotifyRunEnded(endGrudges);
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
                     currentBattleNumber, true,
                     $"VICTORY — Nimue falls on Wave {currentBattleNumber}. (+{goldEarned}g)\n\n"
@@ -891,6 +1097,10 @@ namespace ArthurianAutobattler
             else if (!playerWon)
             {
                 int wavesCleared = Mathf.Max(0, currentBattleNumber - 1);
+                int endGrudges = GrudgeSaveManager.Instance != null
+                    ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
+                    : 0;
+                LegendUnlockManager.Ensure()?.NotifyRunEnded(endGrudges);
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
                     wavesCleared, false,
                     $"DEFEAT — The warband fell on Wave {currentBattleNumber}. (+{goldEarned}g consolation)\n"

@@ -17,6 +17,8 @@ namespace ArthurianAutobattler
         public int sortHp;
         public float sortSpeed;
         public int sortAttack;
+        public string loreDescription;
+        public string unlockRiddle;
     }
 
     public class LegendCodexUI : MonoBehaviour
@@ -120,10 +122,20 @@ namespace ArthurianAutobattler
                 TextMeshProUGUI[] texts = row.GetComponentsInChildren<TextMeshProUGUI>();
                 Button fuseBtn = row.GetComponentInChildren<Button>();
                 Image[] images = row.GetComponentsInChildren<Image>();
-                bool ready = CheckRecipeReady(entry.resultingType, party);
+                string legendId = LegendUnlockManager.LegendIdFor(entry.resultingType);
+                bool gated = LegendUnlockManager.IsGatedLegend(entry.resultingType);
+                bool unlocked = !gated || LegendUnlockManager.Ensure().IsLegendUnlocked(legendId);
+                bool ready = unlocked && CheckRecipeReady(entry.resultingType, party);
+
+                string lore = entry.loreDescription;
+                if (string.IsNullOrWhiteSpace(lore))
+                    lore = LegendUnlockManager.LoreFor(legendId);
+                string riddle = entry.unlockRiddle;
+                if (string.IsNullOrWhiteSpace(riddle))
+                    riddle = LegendUnlockManager.RiddleFor(legendId);
 
                 // Portrait: prefer first Image that isn't the row background / button.
-                if (entry.heroPortrait != null && images != null)
+                if (images != null)
                 {
                     foreach (var img in images)
                     {
@@ -132,44 +144,67 @@ namespace ArthurianAutobattler
                         if (img.gameObject == row) continue;
                         if (img.GetComponentInParent<Button>() == fuseBtn && img.transform.parent == fuseBtn.transform)
                             continue;
-                        img.sprite = entry.heroPortrait;
-                        img.preserveAspect = true;
-                        img.color = ready ? Color.white : new Color(1f, 1f, 1f, 0.55f);
+                        if (unlocked && entry.heroPortrait != null)
+                        {
+                            img.sprite = entry.heroPortrait;
+                            img.preserveAspect = true;
+                            img.color = ready ? Color.white : new Color(1f, 1f, 1f, 0.85f);
+                        }
+                        else
+                        {
+                            // Locked silhouette #1E1E24
+                            img.sprite = entry.heroPortrait;
+                            img.preserveAspect = true;
+                            img.color = new Color(0x1E / 255f, 0x1E / 255f, 0x24 / 255f, 1f);
+                        }
                         break;
                     }
                 }
 
                 if (texts.Length >= 1)
                 {
-                    texts[0].text = ready
-                        ? $"<color=#7CFF9A>{entry.heroName}  [READY TO FUSE]</color>"
-                        : entry.heroName;
+                    if (!unlocked)
+                        texts[0].text = $"<color=#888899>{entry.heroName}  [LOCKED]</color>";
+                    else if (ready)
+                        texts[0].text = $"<color=#7CFF9A>{entry.heroName}  [READY TO FUSE]</color>";
+                    else
+                        texts[0].text = entry.heroName;
                     texts[0].fontSize = 22f;
                     texts[0].textWrappingMode = TextWrappingModes.Normal;
                     texts[0].overflowMode = TextOverflowModes.Overflow;
                 }
                 if (texts.Length >= 2)
                 {
-                    texts[1].text = $"Recipe: {entry.ingredientFormula}";
+                    texts[1].text = unlocked
+                        ? $"Recipe: {entry.ingredientFormula}"
+                        : "Recipe: ???";
                     texts[1].fontSize = 17f;
                     texts[1].textWrappingMode = TextWrappingModes.Normal;
                     texts[1].overflowMode = TextOverflowModes.Overflow;
                 }
                 if (texts.Length >= 3)
                 {
-                    texts[2].text = $"Perk: {entry.combatPerkSummary}";
+                    if (!unlocked)
+                        texts[2].text = string.IsNullOrEmpty(riddle) ? "Locked." : riddle;
+                    else
+                        texts[2].text = string.IsNullOrEmpty(lore)
+                            ? $"Perk: {entry.combatPerkSummary}"
+                            : lore;
                     texts[2].fontSize = 16f;
                     texts[2].textWrappingMode = TextWrappingModes.Normal;
                     texts[2].overflowMode = TextOverflowModes.Overflow;
                 }
 
-                // Highlight ready cards.
+                // Highlight ready / locked cards.
                 var bg = row.GetComponent<Image>();
                 if (bg != null)
                 {
-                    bg.color = ready
-                        ? new Color(0.16f, 0.28f, 0.18f, 0.98f)
-                        : new Color(0.12f, 0.14f, 0.18f, 0.95f);
+                    if (!unlocked)
+                        bg.color = new Color(0x1E / 255f, 0x1E / 255f, 0x24 / 255f, 0.98f);
+                    else if (ready)
+                        bg.color = new Color(0.16f, 0.28f, 0.18f, 0.98f);
+                    else
+                        bg.color = new Color(0.12f, 0.14f, 0.18f, 0.95f);
                 }
 
                 if (fuseBtn != null)
@@ -177,7 +212,7 @@ namespace ArthurianAutobattler
                     UnitType type = entry.resultingType;
                     fuseBtn.interactable = ready;
                     var label = fuseBtn.GetComponentInChildren<TextMeshProUGUI>();
-                    if (label != null) label.text = ready ? "Fuse" : "Locked";
+                    if (label != null) label.text = !unlocked ? "Locked" : (ready ? "Fuse" : "Need");
                     fuseBtn.onClick.RemoveAllListeners();
                     fuseBtn.onClick.AddListener(() => ExecuteFusion(type));
                 }
@@ -315,6 +350,7 @@ namespace ArthurianAutobattler
             foreach (var def in db.legends)
             {
                 if (def == null || !def.HasFusionRecipe) continue;
+                string id = LegendUnlockManager.LegendIdFor(def.unitType);
                 allRecipes.Add(new CodexRecipeEntry
                 {
                     heroName = string.IsNullOrEmpty(def.displayName) ? def.unitType.ToString() : def.displayName,
@@ -326,7 +362,13 @@ namespace ArthurianAutobattler
                     resultingType = def.unitType,
                     sortHp = def.baseHP,
                     sortSpeed = def.baseAPS,
-                    sortAttack = def.baseATK
+                    sortAttack = def.baseATK,
+                    loreDescription = string.IsNullOrWhiteSpace(def.loreDescription)
+                        ? LegendUnlockManager.LoreFor(id)
+                        : def.loreDescription,
+                    unlockRiddle = string.IsNullOrWhiteSpace(def.unlockRiddle)
+                        ? LegendUnlockManager.RiddleFor(id)
+                        : def.unlockRiddle
                 });
             }
         }

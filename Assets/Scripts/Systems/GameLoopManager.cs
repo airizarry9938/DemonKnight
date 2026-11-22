@@ -321,6 +321,9 @@ namespace ArthurianAutobattler
             lastFlockUpkeepBreakdown = "";
             townTimeLimit = UnityEngine.Random.Range(300f, 600f);
             DiceManager.Ensure().freeRollsRemaining = 0;
+            // Meta unlocks persist; only per-run counters reset.
+            LegendUnlockManager.Ensure()?.ResetRunCounters();
+            LegendUnlockManager.Ensure()?.LoadOrCreate();
 
             if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
             if (battleEngine != null)
