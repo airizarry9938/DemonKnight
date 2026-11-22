@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "class-sprite-pools";
-    public const string GitHint = "architect-class-sprite-pools-pew-pick";
-    public const string BuiltUtc = "2026-11-22T19:45:00Z";
+    public const string Id = "force-sync-appliers-hardfix";
+    public const string GitHint = "embed-appliers-in-gamedatatypes-force-sync";
+    public const string BuiltUtc = "2026-11-22T19:30:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "ebe377af772cc967fc080c09f2c3e38f10b94a4d";
+    public const string HardTipSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -77,6 +77,10 @@ public static class DemonKnightPackageVersion
                 {
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
+                    // Applier embed host FIRST — CS0103 hard fix under stale Sync.
+                    "Assets/Scripts/Data/GameDataTypes.cs",
+                    "Assets/Scripts/UI/SceneBackgroundApplier.cs",
+                    "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
                     "Assets/Editor/ArthurianMenuBootstrap.cs",
                     "Assets/Editor/ArthurianArtArchitectWindow.cs",
@@ -99,6 +103,20 @@ public static class DemonKnightPackageVersion
                             if (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0)
                                 throw new Exception("rejected breakglass PackageVersion");
                         }
+                        if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
+                            && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0))
+                            throw new Exception("GameDataTypes missing embedded Appliers");
+                        // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
+                        if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
+                            || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) >= 0
+                                || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) >= 0)
+                                throw new Exception("rejected full Applier standalone (want stub → GameDataTypes embed)");
+                            if (body.IndexOf("GameDataTypes.cs", StringComparison.Ordinal) < 0)
+                                throw new Exception("Applier stub missing GameDataTypes embed marker");
+                        }
                         string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                         try
@@ -119,6 +137,8 @@ public static class DemonKnightPackageVersion
                         Debug.LogWarning($"[DemonKnight] PackageVersion OnLoad miss {rel}: {ex.Message}");
                     }
                 }
+                // Belt: stub any leftover full Applier standalones after tip pull.
+                try { ArthurianSyncFromGitHub.StubApplierStandalonesOver(root, null); } catch { /* Sync type may be stale */ }
                 if (ok > 0) AssetDatabase.Refresh();
             }
             catch (Exception ex)
@@ -190,6 +210,7 @@ public static class DemonKnightPackageVersion
             "hidden-potential-bloodline",
             "architect-persist-scene-bg",
             "fix-scene-bg-applier-cs0103",
+            "class-sprite-pools",
         };
         foreach (string s in stale)
         {

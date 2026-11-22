@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "class-sprite-pools";
+    public const string TipPackageId = "force-sync-appliers-hardfix";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -24,9 +24,10 @@ public static class DemonKnightTipEscape
         "Assets/Editor/DemonKnightPackageVersion.cs",
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
+        // Embed host BEFORE stubs — Appliers live in GameDataTypes (force-sync-appliers-hardfix).
+        "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
-        "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -39,7 +40,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (class-sprite-pools)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (force-sync-appliers-hardfix)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -121,6 +122,8 @@ public static class DemonKnightTipEscape
             "legend-unlocks-meta",
             "hidden-potential-bloodline",
             "architect-persist-scene-bg",
+            "fix-scene-bg-applier-cs0103",
+            "class-sprite-pools",
         };
         foreach (string s in stale)
         {
@@ -163,6 +166,17 @@ public static class DemonKnightTipEscape
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
                     throw new Exception("Architect still calls PackageVersion.Wipe* (CS0117)");
+                if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0))
+                    throw new Exception("GameDataTypes missing embedded Appliers");
+                if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
+                    || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) >= 0)
+                        throw new Exception("rejected full Applier standalone (want stub)");
+                }
                 string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 try

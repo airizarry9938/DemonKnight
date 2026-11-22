@@ -23,16 +23,17 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    private const string FallbackCommitSha = "1f51ac6a0ecc1eac3faa3a5086602c41292c5119";
+    // Pre-ship pin = tip before this PR; ship commit bumps both to feature SHA.
+    private const string FallbackCommitSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "1f51ac6a0ecc1eac3faa3a5086602c41292c5119";
+    public const string HardTipCommitSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
 
-    private const string ExpectedPackageId = "class-sprite-pools";
+    private const string ExpectedPackageId = "force-sync-appliers-hardfix";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -56,6 +57,7 @@ public static class ArthurianSyncFromGitHub
         "hidden-potential-bloodline",
         "architect-persist-scene-bg",
         "fix-scene-bg-applier-cs0103",
+        "class-sprite-pools",
         "assign-only-runtime",
         "sync-keep-editor-menus",
     };
@@ -63,6 +65,7 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// Always overwrite from tip/main — never skip-self, never Fallback pin.
     /// TipEscape FIRST so even partial FORCE lands the escape hatch.
+    /// GameDataTypes carries EMBEDDED Appliers — land before Force Delete wipe.
     /// </summary>
     public static readonly string[] SyncHostForceOverwritePaths =
     {
@@ -72,6 +75,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        // Embed host for SceneBackgroundApplier + ClassSpritePoolApplier (CS0103 hard fix).
+        "Assets/Scripts/Data/GameDataTypes.cs",
     };
 
     /// <summary>
@@ -85,9 +90,10 @@ public static class ArthurianSyncFromGitHub
         {
             string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
             int n = NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: null);
-            if (n > 0)
+            int a = StubApplierStandalonesOver(projectRoot, errors: null);
+            if (n > 0 || a > 0)
             {
-                Debug.Log($"[DemonKnight] DA-59 Editor OnLoad nuked {n} Phase 2–5 standalone(s) (CS0101).");
+                Debug.Log($"[DemonKnight] Editor OnLoad nuked Phase25={n} stubbed Appliers={a} (CS0101 guard).");
                 EditorApplication.delayCall += () => AssetDatabase.Refresh();
             }
         }
@@ -125,10 +131,9 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/DemonKnightTipEscape.cs",
-        // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
-        // SceneBackgroundApplier MUST land before Battle/UI/Merlin consumers (Force Delete race).
+        // Applier TYPES are EMBEDDED in GameDataTypes.cs (force-sync-appliers-hardfix).
+        // These paths are stubs only — overwrite leftovers to prevent CS0101.
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
-        // ClassSpritePoolApplier before Church / TownSplit / Townsfolk consumers (PR #31 lesson).
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
@@ -190,6 +195,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         // Phase 2–5 types embedded in hosts below — no standalone downloads.
         "Assets/Scripts/Data/GameDataTypes.cs",
+        // Stub paths only — real Appliers live in GameDataTypes (AtomicCritical via embed host).
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
@@ -222,10 +228,10 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private static readonly string[] MustRestoreUiHelpers =
     {
+        // PRIMARY Applier embed host — must survive every Force Delete (DA-59 + hardfix).
         "Assets/Scripts/Data/GameDataTypes.cs",
-        // SceneBackgroundApplier before LegendCodex/MainMenu/Church consumers (CS0103 Force Delete race).
+        // Stub paths — rewrite leftovers so CS0101 cannot win against GameDataTypes embeds.
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
-        // ClassSpritePoolApplier before Church/Town consumers (Force Delete race — PR #31 lesson).
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
@@ -247,6 +253,16 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/Systems/DiceManager.cs",
+    };
+
+    /// <summary>
+    /// Applier standalones must be stubs (types embedded in GameDataTypes).
+    /// Full class bodies here → CS0101 against the embed.
+    /// </summary>
+    public static readonly string[] ApplierStandaloneStubPaths =
+    {
+        "Assets/Scripts/UI/SceneBackgroundApplier.cs",
+        "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
     };
 
     [MenuItem("Arthurian/Sync All Scripts From GitHub", false, 0)]
@@ -440,6 +456,10 @@ public static class ArthurianSyncFromGitHub
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && !IsTipArchitectBody(body))
                     throw new Exception("Architect body still paperdoll / missing Sprite category (" + source + ")");
+                if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0))
+                    throw new Exception("GameDataTypes missing embedded Appliers (" + source + ")");
 
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 // Always delete+rewrite Architect — never leave a stale paperdoll body.
@@ -451,6 +471,8 @@ public static class ArthurianSyncFromGitHub
                 WriteReplacing(dest, body, deleteFirst: true);
                 ok++;
                 Debug.Log($"[DemonKnight] FORCE host overwrite {rel} via {source} ({body.Length} bytes)");
+                if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
+                    StubApplierStandalonesOver(projectRoot, errors);
             }
             catch (Exception ex)
             {
@@ -727,6 +749,56 @@ public static class ArthurianSyncFromGitHub
         }
         // Prefer delete after stub write so no ghost files remain.
         NukePhase25Standalones(projectRoot, writeStubIfNeeded: false, errors: errors);
+        n += StubApplierStandalonesOver(projectRoot, errors);
+        return n;
+    }
+
+    static string ApplierStandaloneStub(string rel)
+    {
+        string name = Path.GetFileName(rel);
+        return "// Types live in GameDataTypes.cs (Force Sync embed — avoids CS0103 when this\n"
+               + "// standalone path is wiped by Force Delete under a stale compiled Sync host).\n"
+               + "// This stub overwrites any leftover full copy so we never get CS0101 duplicates.\n"
+               + "// Was: " + name + "\n"
+               + "namespace ArthurianAutobattler\n{\n}\n";
+    }
+
+    /// <summary>
+    /// Hard-overwrite Applier standalones with type-free stubs so embeds in GameDataTypes win.
+    /// Called on Editor OnLoad, after GameDataTypes Sync, and after Force Delete ensure.
+    /// </summary>
+    public static int StubApplierStandalonesOver(string projectRoot = null, List<string> errors = null)
+    {
+        projectRoot ??= Directory.GetParent(Application.dataPath)!.FullName;
+        int n = 0;
+        foreach (string rel in ApplierStandaloneStubPaths)
+        {
+            try
+            {
+                string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                bool rewrite = true;
+                if (File.Exists(dest))
+                {
+                    try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                    string cur = File.ReadAllText(dest);
+                    // Already a stub (no class body) — leave unless it somehow still defines the type.
+                    if (cur.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
+                        && cur.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
+                        && cur.IndexOf("GameDataTypes.cs", StringComparison.Ordinal) >= 0)
+                        rewrite = false;
+                }
+                if (!rewrite) continue;
+                File.WriteAllText(dest, ApplierStandaloneStub(rel));
+                n++;
+                Debug.Log($"[DemonKnight] Stubbed Applier standalone {rel} (embed lives in GameDataTypes)");
+            }
+            catch (Exception ex)
+            {
+                errors?.Add($"{rel} (applier-stub): {ex.Message}");
+                Debug.LogWarning($"[DemonKnight] Could not stub Applier {rel}: {ex.Message}");
+            }
+        }
         return n;
     }
 
@@ -783,6 +855,8 @@ public static class ArthurianSyncFromGitHub
 
             // BEFORE Force Delete: land embeds + stubs so CS0103 never wins a race.
             EnsureUiHelpersPresent(projectRoot, sha, errors, okFiles);
+            // Belt: even if MustRestore arrays are stale in a mid-upgrade host, stub Appliers now.
+            StubApplierStandalonesOver(projectRoot, errors);
 
             if (preDeleteAll)
             {
@@ -793,10 +867,13 @@ public static class ArthurianSyncFromGitHub
                     if (NeverBulkDeleteEditorMenus.Contains(rel)) continue;
                     // Keep embed hosts + stubs across Force Delete wipe.
                     if (IsMustRestoreUiHelper(rel)) continue;
+                    // Never wipe GameDataTypes even if somehow missing from MustRestore (Applier embed).
+                    if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)) continue;
                     TryDeleteFile(Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar)));
                 }
                 // Force Delete must not leave Phase 2–5 standalones either.
                 NukePhase25Standalones(projectRoot, writeStubIfNeeded: false, errors: errors);
+                StubApplierStandalonesOver(projectRoot, errors);
             }
 
             for (int i = 0; i < ScriptPaths.Length; i++)
@@ -849,6 +926,9 @@ public static class ArthurianSyncFromGitHub
             EnsureUiHelpersPresent(projectRoot, sha, errors, okFiles);
             // DA-59: nuke again after ensure (GameDataTypes restore may race with old pin leftovers).
             StubPhase25StandalonesOver(projectRoot, errors);
+            // Hard guarantee: Applier stubs on disk; types in GameDataTypes.
+            StubApplierStandalonesOver(projectRoot, errors);
+            HardRestoreApplierEmbedHost(projectRoot, sha, errors, okFiles);
             TryFetchPhase25Insurance(errors, okFiles);
         }
         finally
@@ -1087,13 +1167,48 @@ public static class ArthurianSyncFromGitHub
                 if (!okFiles.Contains(rel)) okFiles.Add(rel);
                 Debug.Log($"[DemonKnight] Ensured UI helper/embed {rel} via {source} @ {sha}");
                 if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
+                {
                     StubPhase25StandalonesOver(projectRoot, errors);
+                    StubApplierStandalonesOver(projectRoot, errors);
+                }
             }
             catch (Exception ex)
             {
                 errors.Add($"{rel} (ui helper ensure): {ex.Message}");
                 Debug.LogError($"[DemonKnight] Could not ensure UI helper {rel}: {ex.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Last-resort: re-download GameDataTypes (+ rewrite Applier stubs) after every Force Sync.
+    /// Independent of MustRestore array contents so a stale compiled Sync still cannot leave
+    /// Battle/Merlin/Church call sites without SceneBackgroundApplier / ClassSpritePoolApplier.
+    /// </summary>
+    static void HardRestoreApplierEmbedHost(
+        string projectRoot,
+        string sha,
+        List<string> errors,
+        List<string> okFiles)
+    {
+        const string gdt = "Assets/Scripts/Data/GameDataTypes.cs";
+        try
+        {
+            string dest = Path.Combine(projectRoot, gdt.Replace('/', Path.DirectorySeparatorChar));
+            string text = DownloadPinned(gdt, sha, out string source, relaxPackageId: true);
+            if (text.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
+                || text.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0)
+                throw new Exception("GameDataTypes missing embedded Appliers (" + source + ")");
+            WriteReplacing(dest, text, deleteFirst: true);
+            VerifyOnDisk(gdt, dest, relaxPackageId: true);
+            if (!okFiles.Contains(gdt)) okFiles.Add(gdt);
+            StubApplierStandalonesOver(projectRoot, errors);
+            Debug.Log($"[DemonKnight] HardRestore Applier embed host via {source} @ {sha}");
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"{gdt} (applier hard-restore): {ex.Message}");
+            Debug.LogError($"[DemonKnight] HardRestore Applier embed FAILED: {ex.Message}");
         }
     }
 
@@ -1241,26 +1356,25 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolProfile")
                    && body.Contains("peasantSprites")
                    && body.Contains("warriorSprites")
-                   && body.Contains("knightSprites");
+                   && body.Contains("knightSprites")
+                   // force-sync-appliers-hardfix — Appliers embedded here (not standalones).
+                   && body.Contains("class SceneBackgroundApplier")
+                   && body.Contains("ApplyToUiHost")
+                   && body.Contains("class ClassSpritePoolApplier")
+                   && body.Contains("PickForRecruit")
+                   && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers");
         }
 
         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("class SceneBackgroundApplier")
-                   && body.Contains("ApplyToUiHost")
-                   && body.Contains("ApplyToSpriteRenderer")
-                   && body.Contains("InvalidateCache")
-                   && body.Contains("SceneBackgroundProfile");
+            // Stub only — real class is embedded in GameDataTypes.cs.
+            return body.Contains("GameDataTypes.cs") && !body.Contains("class SceneBackgroundApplier");
         }
 
         if (rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("class ClassSpritePoolApplier")
-                   && body.Contains("PickForRecruit")
-                   && body.Contains("PickForClass")
-                   && body.Contains("StableHash")
-                   && body.Contains("ClassSpritePoolProfile")
-                   && body.Contains("InvalidateCache");
+            // Stub only — real class is embedded in GameDataTypes.cs.
+            return body.Contains("GameDataTypes.cs") && !body.Contains("class ClassSpritePoolApplier");
         }
 
         // Phase 2–5 standalones are NOT synced — reject any download that would redefine embeds.
@@ -1525,7 +1639,10 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("hire-once-unfuse-disband")
                    || body.Contains("hud-esc-legends-warband-pace")
                    || body.Contains("sync-pin-jsdelivr")
-                   || body.Contains("sync-complete-replace");
+                   || body.Contains("sync-complete-replace")
+                   || body.Contains("class-sprite-pools")
+                   || body.Contains("fix-scene-bg-applier-cs0103")
+                   || body.Contains("force-sync-appliers-hardfix");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
