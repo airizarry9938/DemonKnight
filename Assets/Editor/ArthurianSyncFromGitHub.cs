@@ -23,9 +23,15 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    private const string FallbackCommitSha = "9c3426178b2fe758a7a424502f7b4576d336af4f";
+    private const string FallbackCommitSha = "5ca91be93a08bf24ece8a800d3b506a373ba0679";
 
-    private const string ExpectedPackageId = "architect-disk-tip-proof";
+    /// <summary>
+    /// Hard tip for FORCE host overwrite. Update every ship.
+    /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
+    /// </summary>
+    public const string HardTipCommitSha = "5ca91be93a08bf24ece8a800d3b506a373ba0679";
+
+    private const string ExpectedPackageId = "architect-breakglass-hosts";
 
     /// <summary>
     /// Always overwrite from tip/main — never skip-self, never Fallback pin.
@@ -384,9 +390,14 @@ public static class ArthurianSyncFromGitHub
                 if (rel.EndsWith("ArthurianMenuBootstrap.cs", StringComparison.OrdinalIgnoreCase)
                     && !body.Contains("Diagnose Project"))
                     throw new Exception("MenuBootstrap body missing Diagnose (" + source + ")");
-                if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
-                    && !body.Contains("public const string Id"))
-                    throw new Exception("PackageVersion body missing Id (" + source + ")");
+                if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!body.Contains("public const string Id"))
+                        throw new Exception("PackageVersion body missing Id (" + source + ")");
+                    if (body.Length < 500)
+                        throw new Exception("PackageVersion too small " + body.Length + "B from " + source
+                                            + " (want OnLoad break-glass ≥500B)");
+                }
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && !IsTipArchitectBody(body))
                     throw new Exception("Architect body still paperdoll / missing Sprite category (" + source + ")");
@@ -412,35 +423,32 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// Tip SHA (API) + raw@main — never FallbackCommitSha.
-    /// raw@main alone can lag minutes after push; prefer commits/main SHA first.
+    /// FORCE host download: API tip + HardTipCommitSha + main. Rejects 381B PackageVersion.
     /// </summary>
     static string DownloadRawMainOnly(string rel, out string source)
     {
         Exception last = null;
-        string tip = null;
-        try { tip = ResolveMainSha(); } catch { /* ignore */ }
+        string tip = ResolveMainSha() ?? HardTipCommitSha;
+        if (string.IsNullOrEmpty(tip) || tip.Length < 7) tip = HardTipCommitSha;
 
         for (int attempt = 0; attempt < 4; attempt++)
         {
             string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N") + "&a=" + attempt;
             var urlList = new List<string>();
             var labelList = new List<string>();
-            if (!string.IsNullOrEmpty(tip))
+            // Hard tip SHA first (known good OnLoad PackageVersion), then API tip, then main.
+            string[] shas = string.Equals(tip, HardTipCommitSha, StringComparison.OrdinalIgnoreCase)
+                ? new[] { HardTipCommitSha, "main" }
+                : new[] { HardTipCommitSha, tip, "main" };
+            foreach (string sha in shas)
             {
-                urlList.Add(RawBase + tip + "/" + rel + "?" + bust);
-                urlList.Add(RawBase + tip + "/" + rel);
-                urlList.Add(JsDelivrBase + tip + "/" + rel + "?" + bust);
-                labelList.Add("raw@tip+bust");
-                labelList.Add("raw@tip");
-                labelList.Add("jsdelivr@tip+bust");
+                urlList.Add(RawBase + sha + "/" + rel + "?" + bust);
+                labelList.Add("raw@" + sha + "+bust");
+                urlList.Add(RawBase + sha + "/" + rel);
+                labelList.Add("raw@" + sha);
+                urlList.Add(JsDelivrBase + sha + "/" + rel + "?" + bust);
+                labelList.Add("jsdelivr@" + sha + "+bust");
             }
-            urlList.Add(RawBase + "main/" + rel + "?" + bust);
-            urlList.Add(RawBase + "main/" + rel);
-            urlList.Add(JsDelivrBase + "main/" + rel + "?" + bust);
-            labelList.Add("raw@main+bust");
-            labelList.Add("raw@main");
-            labelList.Add("jsdelivr@main+bust");
 
             for (int i = 0; i < urlList.Count; i++)
             {
@@ -449,12 +457,18 @@ public static class ArthurianSyncFromGitHub
                     string body = DownloadString(urlList[i]);
                     if (LooksLikeHttpFailureBody(body))
                         throw new Exception("Empty or 404 (len=" + (body == null ? 0 : body.Length) + ")");
-                    // Reject bodies that are clearly the stuck legacy package when upgrading hosts.
-                    if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
-                        && body.Contains("sync-keep-editor-menus")
-                        && !body.Contains(ExpectedPackageId))
-                        throw new Exception("stale PackageVersion (sync-keep-editor-menus) — retry tip");
-                    source = labelList[i] + (attempt > 0 ? $"#retry{attempt}" : "");
+                    if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 381-byte pre-OnLoad PackageVersion is the stuck FORCE symptom — reject.
+                        if (body.Length < 500)
+                            throw new Exception("PackageVersion too small (" + body.Length
+                                + "B) — stale tip SHA; need OnLoad break-glass ≥500B");
+                        if (!body.Contains("public const string Id"))
+                            throw new Exception("PackageVersion missing Id");
+                        if (body.Contains("sync-keep-editor-menus") && !body.Contains(ExpectedPackageId))
+                            throw new Exception("stale PackageVersion (sync-keep-editor-menus)");
+                    }
+                    source = labelList[i] + (attempt > 0 ? "#retry" + attempt : "");
                     return body;
                 }
                 catch (Exception ex) { last = ex; }
@@ -833,21 +847,27 @@ public static class ArthurianSyncFromGitHub
                 msg, "OK");
     }
 
-    /// <summary>Resolve tip SHA of main so jsDelivr is commit-pinned (never @main).</summary>
-    private static string ResolveMainSha()
+    /// <summary>Resolve tip SHA via GitHub API commits/main. Never returns null — HardTipCommitSha fallback.</summary>
+    public static string ResolveMainSha()
     {
         try
         {
             string json = DownloadString("https://api.github.com/repos/" + Repo + "/commits/main");
-            var m = Regex.Match(json, "\"sha\"\\s*:\\s*\"([0-9a-f]{40})\"");
-            // Full SHA for jsDelivr pin (short SHAs can miss on some CDN edges).
-            if (m.Success) return m.Groups[1].Value;
+            var m = Regex.Match(json, "^\\s*\\{\\s*\"sha\"\\s*:\\s*\"([0-9a-f]{40})\"", RegexOptions.Singleline);
+            if (!m.Success)
+                m = Regex.Match(json, "\"sha\"\\s*:\\s*\"([0-9a-f]{40})\"");
+            if (m.Success)
+            {
+                Debug.Log("[DemonKnight] ResolveMainSha API tip=" + m.Groups[1].Value);
+                return m.Groups[1].Value;
+            }
+            Debug.LogWarning("[DemonKnight] ResolveMainSha: no sha in API JSON — HardTipCommitSha");
         }
         catch (Exception ex)
         {
-            Debug.LogWarning("[DemonKnight] Could not resolve main SHA via API: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] ResolveMainSha API failed: " + ex.Message + " — HardTipCommitSha");
         }
-        return null;
+        return HardTipCommitSha;
     }
 
     private static string DownloadPinned(string rel, string sha, out string source, bool relaxPackageId)

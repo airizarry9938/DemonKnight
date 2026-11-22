@@ -9,18 +9,19 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "architect-disk-tip-proof";
-    public const string GitHint = "fix-404-false-positive-force-architect-disk";
-    public const string BuiltUtc = "2026-11-22T02:39:47Z";
+    public const string Id = "architect-breakglass-hosts";
+    public const string GitHint = "hard-tip-sha-reject-381B-breakglass-menu";
+    public const string BuiltUtc = "2026-11-22T02:48:25Z";
+
+    /// <summary>Hard tip known to contain LooksLikeHttpFailureBody Sync + OnLoad PackageVersion.</summary>
+    public const string HardTipSha = "5ca91be93a08bf24ece8a800d3b506a373ba0679";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
 
     /// <summary>
-    /// Chicken-egg: old FORCE Upgrade rejected Sync/Bootstrap downloads because
-    /// body.Contains("404: Not Found") matched those files' own source. Once this
-    /// PackageVersion tip compiles, pull Sync + Bootstrap + Architect with a
-    /// length-gated 404 check so the real tip hosts can land.
+    /// After this file compiles (even via manual paste / FORCE of PackageVersion only),
+    /// pull Sync+Bootstrap+Architect from HardTipSha then main — never depends on stale Sync validate.
     /// </summary>
     [InitializeOnLoadMethod]
     static void DkForceTipHostsIfFalsePositiveStuck()
@@ -32,28 +33,41 @@ public static class DemonKnightPackageVersion
             {
                 string root = Directory.GetParent(Application.dataPath)!.FullName;
                 string syncPath = Path.Combine(root, "Assets", "Editor", "ArthurianSyncFromGitHub.cs");
-                if (!File.Exists(syncPath)) return;
-                string syncBody = File.ReadAllText(syncPath);
-                bool stuck = syncBody.IndexOf("body.Contains(\"404: Not Found\")", StringComparison.Ordinal) >= 0
-                             && syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0;
-                bool archStale = true;
                 string archPath = Path.Combine(root, "Assets", "Editor", "ArthurianArtArchitectWindow.cs");
+                bool need = !File.Exists(syncPath);
+                if (File.Exists(syncPath))
+                {
+                    string syncBody = File.ReadAllText(syncPath);
+                    need = syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0
+                           || (syncBody.IndexOf("body.Contains(\"404: Not Found\")", StringComparison.Ordinal) >= 0
+                               && syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0)
+                           || syncBody.IndexOf("HardTipCommitSha", StringComparison.Ordinal) < 0;
+                }
+                bool archStale = !File.Exists(archPath);
                 if (File.Exists(archPath))
                 {
                     string a = File.ReadAllText(archPath);
                     archStale = a.IndexOf("Paper-Doll Unit Generator", StringComparison.Ordinal) >= 0
                                 || a.IndexOf("enum SheetCategory", StringComparison.Ordinal) >= 0
                                 || a.IndexOf("UiBuildId", StringComparison.Ordinal) < 0
-                                || a.IndexOf("SpriteCategory", StringComparison.Ordinal) < 0;
+                                || a.IndexOf("SpriteCategory", StringComparison.Ordinal) < 0
+                                || a.IndexOf(Id, StringComparison.Ordinal) < 0;
                 }
-                if (!stuck && !archStale) return;
+                // Also refresh hosts when our own Id is tip but Sync ExpectedPackageId lags.
+                if (!need && !archStale && File.Exists(syncPath))
+                {
+                    string syncBody = File.ReadAllText(syncPath);
+                    if (syncBody.IndexOf(Id, StringComparison.Ordinal) < 0)
+                        need = true;
+                }
+                if (!need && !archStale) return;
 
                 Debug.LogWarning(
-                    "[DemonKnight] PackageVersion OnLoad: pulling tip Sync/Bootstrap/Architect "
-                    + "(stuck 404-false-positive and/or stale Architect).");
+                    "[DemonKnight] PackageVersion OnLoad: break-glass pull Sync/Bootstrap/Architect "
+                    + "from HardTipSha=" + HardTipSha + " (+ main).");
 
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-                string tip = TryResolveTipSha() ?? "main";
+                string tip = TryResolveTipSha() ?? HardTipSha;
                 string[] rels =
                 {
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -69,6 +83,9 @@ public static class DemonKnightPackageVersion
                         string body = DownloadTip(rel, tip);
                         if (string.IsNullOrEmpty(body) || body.Length < 80 || IsTiny404(body))
                             throw new Exception("bad body");
+                        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                            && body.Length < 500)
+                            throw new Exception("PackageVersion too small " + body.Length);
                         string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                         try
@@ -118,43 +135,53 @@ public static class DemonKnightPackageVersion
             wc.Headers.Add("User-Agent", "DemonKnight-PackageVersion-OnLoad/" + Id);
             wc.Headers.Add("Accept", "application/vnd.github.v3+json");
             string json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/commits/main");
-            int i = json.IndexOf("\"sha\"", StringComparison.Ordinal);
-            if (i < 0) return null;
-            int q1 = json.IndexOf('"', i + 5);
-            int q2 = json.IndexOf('"', q1 + 1);
-            if (q1 < 0 || q2 < 0) return null;
-            string sha = json.Substring(q1 + 1, q2 - q1 - 1);
-            return sha.Length == 40 ? sha : null;
+            // Root commit sha only.
+            if (json.Length > 50 && json.TrimStart().StartsWith("{", StringComparison.Ordinal))
+            {
+                int colon = json.IndexOf(':');
+                int q1 = colon >= 0 ? json.IndexOf('"', colon + 1) : -1;
+                int q2 = q1 >= 0 ? json.IndexOf('"', q1 + 1) : -1;
+                if (q1 >= 0 && q2 == q1 + 41)
+                {
+                    string sha = json.Substring(q1 + 1, 40);
+                    if (System.Text.RegularExpressions.Regex.IsMatch(sha, "^[0-9a-f]{40}$"))
+                        return sha;
+                }
+            }
         }
-        catch { return null; }
+        catch { /* ignore */ }
+        return null;
     }
 
     static string DownloadTip(string rel, string tip)
     {
         string bust = "t=" + DateTime.UtcNow.Ticks;
-        string[] urls =
-        {
-            RawBase + tip + "/" + rel + "?" + bust,
-            RawBase + tip + "/" + rel,
-            RawBase + "main/" + rel + "?" + bust,
-            RawBase + "main/" + rel,
-            "https://cdn.jsdelivr.net/gh/" + Repo + "@" + tip + "/" + rel + "?" + bust,
-            "https://cdn.jsdelivr.net/gh/" + Repo + "@main/" + rel + "?" + bust,
-        };
+        // Hard tip FIRST (known good), then API tip, then main.
+        string[] shas = { HardTipSha, tip, "main" };
         Exception last = null;
-        foreach (string url in urls)
+        foreach (string sha in shas)
         {
-            try
+            if (string.IsNullOrEmpty(sha)) continue;
+            string[] urls =
             {
-                using var wc = new WebClient();
-                wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
-                wc.Headers.Add("User-Agent", "DemonKnight-PackageVersion-OnLoad/" + Id);
-                wc.Headers.Add("Cache-Control", "no-cache, no-store");
-                string body = wc.DownloadString(url);
-                if (!IsTiny404(body) && body.Length > 80) return body;
-                last = new Exception("tiny/404 from " + url);
+                RawBase + sha + "/" + rel + "?" + bust,
+                RawBase + sha + "/" + rel,
+                "https://cdn.jsdelivr.net/gh/" + Repo + "@" + sha + "/" + rel + "?" + bust,
+            };
+            foreach (string url in urls)
+            {
+                try
+                {
+                    using var wc = new WebClient();
+                    wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
+                    wc.Headers.Add("User-Agent", "DemonKnight-PackageVersion-OnLoad/" + Id);
+                    wc.Headers.Add("Cache-Control", "no-cache, no-store");
+                    string body = wc.DownloadString(url);
+                    if (!IsTiny404(body) && body.Length > 80) return body;
+                    last = new Exception("tiny/404 from " + url);
+                }
+                catch (Exception ex) { last = ex; }
             }
-            catch (Exception ex) { last = ex; }
         }
         throw last ?? new Exception("download failed " + rel);
     }

@@ -153,6 +153,7 @@ public static class ArthurianMenuBootstrap
                 ? "\n⚠ STALE COMPILE — disk ≠ compiled. Run Arthurian → FORCE Upgrade Sync Hosts From main, wait for compile."
                 : "") + "\n" +
             ArthurianSyncFromGitHub.ArchitectTipMarkersReport() + "\n" +
+            PackageVersionDiskReport() + "\n" +
             $"Art Tools pin: {ArtToolsPinSha}\n" +
             $"Assets path:\n{Application.dataPath}\n" +
             $"Expected importer path:\n{modularImporterPath}\n" +
@@ -769,12 +770,34 @@ public static class ArthurianMenuBootstrap
     }
 
     /// <summary>
-    /// Lives in MenuBootstrap so skip-self Sync hosts still get a one-click raw@main upgrade
-    /// after MenuBootstrap itself syncs. Does not call ArthurianSyncFromGitHub (may be stale).
+    /// Known-good tip with LooksLikeHttpFailureBody + OnLoad PackageVersion (≥500B).
+    /// Update when shipping break-glass tips. Used when Sync tip-resolve is stuck.
+    /// </summary>
+    public const string BreakGlassTipSha = "5ca91be93a08bf24ece8a800d3b506a373ba0679";
+
+    /// <summary>
+    /// Lives in MenuBootstrap so skip-self Sync hosts still get a one-click upgrade.
+    /// Break-glass FIRST when PackageVersion is tiny / Sync lacks LooksLikeHttpFailureBody —
+    /// never trust stale Sync ForceOverwrite (lands 381B PackageVersion).
     /// </summary>
     [MenuItem("Arthurian/FORCE Upgrade Sync Hosts From main", false, 2)]
     public static void ForceUpgradeSyncHostsFromMain()
     {
+        if (NeedsBreakGlassHostPull())
+        {
+            if (!EditorUtility.DisplayDialog(
+                    "FORCE Upgrade (Break-Glass)",
+                    "Local Sync/PackageVersion looks stuck (tiny PackageVersion or old 404 check).\n\n"
+                    + "Will download Sync / Bootstrap / PackageVersion / Architect from hard tip SHA:\n"
+                    + BreakGlassTipSha + "\n(+ raw@main fallback).\n\n"
+                    + "Does NOT use stale Sync tip-resolve.",
+                    "Break-Glass Now", "Cancel"))
+                return;
+            string report = BreakGlassForceHostsFromHardTip();
+            EditorUtility.DisplayDialog("Break-Glass Hosts", report, "OK");
+            return;
+        }
+
         // Prefer Sync host implementation when present (single code path).
         try
         {
@@ -788,32 +811,73 @@ public static class ArthurianMenuBootstrap
                 return;
             }
         }
-        catch { /* fall through to local raw@main */ }
+        catch { /* fall through */ }
 
+        string report2 = BreakGlassForceHostsFromHardTip();
+        EditorUtility.DisplayDialog("Break-Glass Hosts", report2, "OK");
+    }
+
+    /// <summary>Menu for Andrew when FORCE still stuck — same as break-glass path.</summary>
+    [MenuItem("Arthurian/Break-Glass Pull Tip Hosts (hard SHA)", false, 2)]
+    public static void BreakGlassPullTipHostsMenu()
+    {
         if (!EditorUtility.DisplayDialog(
-                "FORCE Upgrade Sync Hosts",
-                "Overwrite Sync / MenuBootstrap / PackageVersion from raw @main (cache-busted).\n"
-                + "Use when Diagnose is stuck on sync-keep-editor-menus.",
-                "Overwrite Now", "Cancel"))
+                "Break-Glass Pull Tip Hosts",
+                "Force-download Sync + Bootstrap + PackageVersion + Architect from:\n"
+                + "raw.githubusercontent.com/…/" + BreakGlassTipSha + "/…\n"
+                + "and raw@main. Bypasses Sync tip-resolve entirely.",
+                "Download Now", "Cancel"))
             return;
+        EditorUtility.DisplayDialog("Break-Glass Hosts", BreakGlassForceHostsFromHardTip(), "OK");
+    }
 
+    static bool NeedsBreakGlassHostPull()
+    {
+        try
+        {
+            string root = Directory.GetParent(Application.dataPath)!.FullName;
+            string pv = Path.Combine(root, "Assets", "Editor", "DemonKnightPackageVersion.cs");
+            if (!File.Exists(pv)) return true;
+            long len = new FileInfo(pv).Length;
+            if (len < 500) return true; // 381B stuck tip
+            string sync = Path.Combine(root, "Assets", "Editor", "ArthurianSyncFromGitHub.cs");
+            if (!File.Exists(sync)) return true;
+            string body = File.ReadAllText(sync);
+            if (body.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0) return true;
+            if (body.IndexOf("body.Contains(\"404: Not Found\")", StringComparison.Ordinal) >= 0
+                && body.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0)
+                return true;
+            string id = ReadPackageIdFromDisk() ?? "";
+            if (id == "architect-force-tip-ui" || id == "single-sprite-no-paperdoll")
+                return true;
+            return false;
+        }
+        catch { return true; }
+    }
+
+    /// <summary>Download hosts by hard SHA URL — no Sync validate, length-gated 404 only.</summary>
+    public static string BreakGlassForceHostsFromHardTip()
+    {
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
         string[] hosts =
         {
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
+            "Assets/Editor/ArthurianArtArchitectWindow.cs",
         };
         int ok = 0;
-        var errors = "";
-        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine("Break-glass tip SHA: " + BreakGlassTipSha);
         foreach (string rel in hosts)
         {
             try
             {
-                string body = DownloadRawMainOnly(rel);
-                if (string.IsNullOrEmpty(body) || body.Length < 80)
-                    throw new Exception("empty body");
+                string body = DownloadHardTipOrMain(rel, BreakGlassTipSha);
+                if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                    && body.Length < 500)
+                    throw new Exception("PackageVersion still tiny " + body.Length + "B");
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 if (File.Exists(dest))
@@ -823,21 +887,68 @@ public static class ArthurianMenuBootstrap
                 }
                 File.WriteAllText(dest, body);
                 ok++;
-                Debug.Log("[DemonKnight] MenuBootstrap FORCE host " + rel + " (" + body.Length + " bytes)");
+                log.AppendLine($"OK {rel} ({body.Length} bytes)");
+                Debug.Log($"[DemonKnight] Break-glass wrote {rel} ({body.Length} bytes)");
             }
             catch (Exception ex)
             {
-                errors += rel + ": " + ex.Message + "\n";
+                log.AppendLine($"FAIL {rel}: {ex.Message}");
+                Debug.LogError($"[DemonKnight] Break-glass FAIL {rel}: {ex.Message}");
             }
         }
         AssetDatabase.Refresh();
         string diskId = ReadPackageIdFromDisk() ?? "(unread)";
-        EditorUtility.DisplayDialog(
-            ok >= 3 ? "Sync Hosts Upgraded" : "Sync Hosts Partial",
-            $"Wrote {ok}/3 from raw @main.\nPackage Id on disk: {diskId}\n\n"
-            + "Wait for compile → Diagnose → then Force Delete+Sync.\n"
-            + errors,
-            "OK");
+        long pvLen = 0;
+        try
+        {
+            string pv = Path.Combine(projectRoot, "Assets", "Editor", "DemonKnightPackageVersion.cs");
+            if (File.Exists(pv)) pvLen = new FileInfo(pv).Length;
+        }
+        catch { /* ignore */ }
+        log.AppendLine($"Wrote {ok}/{hosts.Length}. Package Id on disk: {diskId} ({pvLen} bytes)");
+        log.AppendLine("Wait compile → Diagnose → reopen Art & Stage Architect.");
+        return log.ToString();
+    }
+
+    static string DownloadHardTipOrMain(string rel, string tipSha)
+    {
+        string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N");
+        string[] urls =
+        {
+            RawBase + tipSha + "/" + rel + "?" + bust,
+            RawBase + tipSha + "/" + rel,
+            RawBase + "main/" + rel + "?" + bust,
+            RawBase + "main/" + rel,
+            JsDelivrBase + tipSha + "/" + rel + "?" + bust,
+            JsDelivrBase + "main/" + rel + "?" + bust,
+        };
+        Exception last = null;
+        foreach (string url in urls)
+        {
+            try
+            {
+                using var wc = new WebClient();
+                wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
+                wc.Headers.Add("User-Agent", "DemonKnight-BreakGlass/1.0");
+                wc.Headers.Add("Cache-Control", "no-cache, no-store");
+                string body = wc.DownloadString(url);
+                if (IsTinyHttpFailure(body) || body.Length < 80) throw new Exception("tiny/404");
+                return body;
+            }
+            catch (Exception ex) { last = ex; }
+        }
+        throw last ?? new Exception("download failed " + rel);
+    }
+
+    static bool IsTinyHttpFailure(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return true;
+        if (body.Length >= 512) return false;
+        string t = body.TrimStart();
+        return t.StartsWith("404", StringComparison.Ordinal)
+               || t.IndexOf("404: Not Found", StringComparison.OrdinalIgnoreCase) >= 0
+               || t.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase)
+               || t.StartsWith("<html", StringComparison.OrdinalIgnoreCase);
     }
 
     static string ReadPackageIdFromDisk()
@@ -854,6 +965,25 @@ public static class ArthurianMenuBootstrap
             return (q1 >= 0 && q2 > q1) ? text.Substring(q1 + 1, q2 - q1 - 1) : null;
         }
         catch { return null; }
+    }
+
+    /// <summary>Diagnose proof: on-disk PackageVersion byte length + Id (catch 381B stuck tip).</summary>
+    public static string PackageVersionDiskReport()
+    {
+        try
+        {
+            string path = Path.Combine(Application.dataPath, "Editor", "DemonKnightPackageVersion.cs");
+            if (!File.Exists(path))
+                return "PackageVersion on disk: MISSING (0 bytes) Id=(none)";
+            long len = new FileInfo(path).Length;
+            string id = ReadPackageIdFromDisk() ?? "(unparsed)";
+            string tipHint = len < 500 ? " ⚠ TINY — stale tip SHA / need break-glass ≥500B" : "";
+            return $"PackageVersion on disk: {len} bytes Id={id}{tipHint}";
+        }
+        catch (Exception ex)
+        {
+            return "PackageVersion on disk: ERROR " + ex.Message;
+        }
     }
 
     static string DownloadRawMainOnly(string rel)
