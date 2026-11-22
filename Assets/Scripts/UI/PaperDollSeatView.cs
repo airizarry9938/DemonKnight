@@ -115,10 +115,8 @@ namespace ArthurianAutobattler
             seatButton.interactable = true;
             if (seatButton.targetGraphic == null && layers.body != null)
                 seatButton.targetGraphic = layers.body;
-            var colors = seatButton.colors;
-            colors.highlightedColor = new Color(0.95f, 0.9f, 0.55f, 1f);
-            colors.selectedColor = new Color(0.85f, 0.78f, 0.4f, 1f);
-            seatButton.colors = colors;
+            // No ColorTint wash — PewSeatHoverHighlight draws an outline so art stays readable.
+            seatButton.transition = Selectable.Transition.None;
             seatButton.onClick.RemoveAllListeners();
             if (onLeftClick != null)
                 seatButton.onClick.AddListener(() => onLeftClick());
@@ -272,14 +270,20 @@ namespace ArthurianAutobattler
     /// <summary>
     /// Embedded in PaperDollSeatView.cs so Force Sync always lands the type with an
     /// AtomicCritical UI file (standalone PewSeatHoverHighlight.cs was missing on Downloads).
+    /// Hover/select = thin gold outline frame (not an opaque fill) so the avatar stays visible.
     /// </summary>
     [DisallowMultipleComponent]
     public class PewSeatHoverHighlight : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
         const string RimName = "PewHoverRim";
-        static readonly Vector3 HoverScale = new Vector3(1.08f, 1.08f, 1f);
-        static readonly Color RimIdle = new Color(0.95f, 0.85f, 0.45f, 0f);
-        static readonly Color RimHover = new Color(0.95f, 0.88f, 0.35f, 0.85f);
+        const int OutlineTexSize = 32;
+        const int OutlineThickness = 3;
+        static readonly Vector3 HoverScale = new Vector3(1.06f, 1.06f, 1f);
+        static readonly Color RimIdle = new Color(1f, 0.92f, 0.40f, 0f);
+        static readonly Color RimHover = new Color(1f, 0.92f, 0.35f, 1f);
+        static readonly Color RimSelected = new Color(1f, 0.82f, 0.20f, 1f);
+
+        static Sprite s_outlineSprite;
 
         Image rim;
         Vector3 baseScale = Vector3.one;
@@ -335,25 +339,75 @@ namespace ArthurianAutobattler
                 if (existing != null)
                     rim = existing.GetComponent<Image>();
             }
-            if (rim != null)
+            if (rim == null)
             {
-                rim.enabled = occupied;
-                rim.raycastTarget = false;
-                return;
+                var go = new GameObject(RimName, typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(transform, false);
+                // Behind body art: border sits in the 6px halo outside the sprite rect.
+                go.transform.SetAsFirstSibling();
+                var rt = go.GetComponent<RectTransform>();
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = new Vector2(-6f, -6f);
+                rt.offsetMax = new Vector2(6f, 6f);
+                rim = go.GetComponent<Image>();
             }
 
-            var go = new GameObject(RimName, typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(transform, false);
-            go.transform.SetAsFirstSibling();
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = new Vector2(-6f, -6f);
-            rt.offsetMax = new Vector2(6f, 6f);
-            rim = go.GetComponent<Image>();
-            rim.color = RimIdle;
+            // Upgrade legacy solid-fill rims → sliced outline (transparent center).
+            ApplyOutlineStyle(rim);
+            rim.enabled = occupied;
             rim.raycastTarget = false;
-            rim.sprite = null;
+            if (rim.color.a > 0.01f && !hovering && !menuLocked)
+                rim.color = RimIdle;
+        }
+
+        static void ApplyOutlineStyle(Image img)
+        {
+            if (img == null) return;
+            img.sprite = GetOutlineSprite();
+            img.type = Image.Type.Sliced;
+            img.preserveAspect = false;
+            img.fillCenter = false; // belt-and-suspenders: never paint opaque center
+            img.pixelsPerUnitMultiplier = 1f;
+        }
+
+        /// <summary>Runtime 9-slice white border; tinted via Image.color. Center stays clear.</summary>
+        static Sprite GetOutlineSprite()
+        {
+            if (s_outlineSprite != null) return s_outlineSprite;
+
+            var tex = new Texture2D(OutlineTexSize, OutlineTexSize, TextureFormat.RGBA32, false)
+            {
+                name = "PewHoverOutlineTex",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            var clear = new Color(1f, 1f, 1f, 0f);
+            var solid = Color.white;
+            int t = OutlineThickness;
+            for (int y = 0; y < OutlineTexSize; y++)
+            {
+                for (int x = 0; x < OutlineTexSize; x++)
+                {
+                    bool edge = x < t || y < t || x >= OutlineTexSize - t || y >= OutlineTexSize - t;
+                    tex.SetPixel(x, y, edge ? solid : clear);
+                }
+            }
+            tex.Apply(false, false); // keep readable for Sprite.Create
+
+            // border = L/B/R/T in pixels for Image.Type.Sliced
+            s_outlineSprite = Sprite.Create(
+                tex,
+                new Rect(0f, 0f, OutlineTexSize, OutlineTexSize),
+                new Vector2(0.5f, 0.5f),
+                100f,
+                0,
+                SpriteMeshType.FullRect,
+                new Vector4(t, t, t, t));
+            s_outlineSprite.name = "PewHoverOutline";
+            return s_outlineSprite;
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -393,7 +447,8 @@ namespace ArthurianAutobattler
             if (rim != null)
             {
                 rim.enabled = occupied;
-                rim.color = lit ? RimHover : RimIdle;
+                if (!lit) rim.color = RimIdle;
+                else rim.color = menuLocked ? RimSelected : RimHover;
             }
             transform.localScale = lit ? HoverScale : baseScale;
         }

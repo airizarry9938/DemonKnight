@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-architect-pool-apply";
+    const string TipPackageId = "sprite-outline-highlight";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -61,6 +61,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "merlin-lore-narrative",
         "legends-lore-portrait",
         "architect-legend-pew-portraits",
+        "fix-architect-pool-apply",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]

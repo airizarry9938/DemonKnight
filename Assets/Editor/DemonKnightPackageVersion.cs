@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-architect-pool-apply";
-    public const string GitHint = "fix-architect-pool-apply-layout-pools";
-    public const string BuiltUtc = "2026-11-22T23:10:00Z";
+    public const string Id = "sprite-outline-highlight";
+    public const string GitHint = "sprite-outline-highlight-pew-rim";
+    public const string BuiltUtc = "2026-11-22T23:23:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "cabf49fa45d691f5305979feccc80e99d24123ea";
+    public const string HardTipSha = "b7ba01077ff3780ca6dee79c2c912f31ddfd286c";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -221,6 +221,7 @@ public static class DemonKnightPackageVersion
             "lore-boss-wave-order",
             "legends-lore-portrait",
             "architect-legend-pew-portraits",
+            "fix-architect-pool-apply",
         };
         foreach (string s in stale)
         {

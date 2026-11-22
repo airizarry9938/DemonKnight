@@ -31,9 +31,9 @@ public static class ArthurianSyncFromGitHub
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
+    public const string HardTipCommitSha = "b7ba01077ff3780ca6dee79c2c912f31ddfd286c";
 
-    private const string ExpectedPackageId = "fix-architect-pool-apply";
+    private const string ExpectedPackageId = "sprite-outline-highlight";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -69,6 +69,7 @@ public static class ArthurianSyncFromGitHub
         "merlin-lore-narrative",
         "legends-lore-portrait",
         "architect-legend-pew-portraits",
+        "fix-architect-pool-apply",
     };
 
     /// <summary>
@@ -1673,6 +1674,7 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("lore-boss-wave-order")
                    || body.Contains("legends-lore-portrait")
                    || body.Contains("architect-legend-pew-portraits")
+                   || body.Contains("sprite-outline-highlight")
                    || body.Contains("fix-architect-pool-apply");
         }
 
