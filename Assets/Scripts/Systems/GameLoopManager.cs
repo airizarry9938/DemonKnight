@@ -976,8 +976,18 @@ namespace ArthurianAutobattler
             else
                 r.appearance.BindSeatSalt(r.pewSeatIndex);
             if (lib != null)
-            {
                 TownsfolkVisualApplier.SetLibrary(lib);
+
+            // Architect Tab 4/5 pools first — then ModularSpriteLibrary poses / inspector avatar pools.
+            Sprite architect = LegendPewPortraitApplier.ResolvePewVisual(r);
+            if (architect != null && TownsfolkVisualApplier.IsUsablePewSprite(architect))
+            {
+                r.bodySprite = architect;
+                r.headSprite = null;
+                r.randomAvatar = architect;
+            }
+            else if (lib != null)
+            {
                 // Single-sprite runtime — body only (Architect Category Sprite → basePoses).
                 var pose = lib.GetPose(r.appearance.poseIndex);
                 if (pose != null)

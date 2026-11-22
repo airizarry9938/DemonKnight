@@ -17,7 +17,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "architect-legend-pew-portraits";
+    public const string UiBuildId = "fix-architect-pool-apply";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -163,17 +163,41 @@ public class ArthurianArtArchitectWindow : EditorWindow
                             ?? ModularSpriteLibrary.Load();
         // NEVER StageLayoutProfile.Load() here — that CreateInstance fallback is not an asset
         // and SetDirty/SaveAssets will not persist seat sprites across sessions.
-        stageProfile = ArthurianStageLayoutProfileEnsure.EnsureAsset();
-        stageProfile?.EnsureSlotCounts();
-        sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
-        sceneBgProfile?.EnsureDefaultEntries();
-        classPoolProfile = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
-        classPoolProfile?.EnsureLists();
-        legendPewProfile = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
-        legendPewProfile?.EnsureSlotsAndLists();
+        ReloadProfilesFromDisk("OnEnable");
         SyncDefaultExportFolder();
         EditorApplication.playModeStateChanged -= OnArchitectPlayModeChanged;
         EditorApplication.playModeStateChanged += OnArchitectPlayModeChanged;
+    }
+
+    /// <summary>
+    /// Always re-Ensure from disk so Tab 2/4/5 show current saved layout + pools
+    /// (not a stale CreateInstance stand-in). Rematerialize Missing sprites from path backups.
+    /// </summary>
+    void ReloadProfilesFromDisk(string reason)
+    {
+        stageProfile = ArthurianStageLayoutProfileEnsure.EnsureAsset();
+        stageProfile?.EnsureSlotCounts();
+        if (stageProfile != null && stageProfile.churchPewSlots != null)
+            EnsureChurchSlotsSeededFromPlayLayout(stageProfile.churchPewSlots);
+
+        sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
+        sceneBgProfile?.EnsureDefaultEntries();
+
+        classPoolProfile = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
+        classPoolProfile?.EnsureLists();
+        int poolRestored = classPoolProfile != null ? classPoolProfile.RematerializeSpritesFromPaths() : 0;
+
+        legendPewProfile = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
+        legendPewProfile?.EnsureSlotsAndLists();
+        int faceRestored = legendPewProfile != null ? legendPewProfile.RematerializeSpritesFromPaths() : 0;
+
+        try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
+        try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
+        try { SomersetChurchUI.InvalidateChurchAssignCache(); } catch { /* ignore */ }
+
+        if (poolRestored > 0 || faceRestored > 0)
+            Debug.Log(
+                $"[DemonKnight] Architect reload ({reason}): rematerialized pools={poolRestored} faces={faceRestored}.");
     }
 
     void OnDisable()
@@ -277,11 +301,24 @@ public class ArthurianArtArchitectWindow : EditorWindow
     void PersistClassPoolProfile(string reason)
     {
         if (classPoolProfile == null) return;
-        if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(classPoolProfile)))
+        string path = AssetDatabase.GetAssetPath(classPoolProfile);
+        if (string.IsNullOrEmpty(path))
         {
-            classPoolProfile = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
-            if (classPoolProfile == null) return;
+            // Non-asset CreateInstance stand-in — copy lists into disk asset (Stage Persist lesson).
+            var disk = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
+            if (disk != null && !ReferenceEquals(disk, classPoolProfile))
+            {
+                CopyClassPoolLists(classPoolProfile, disk);
+                classPoolProfile = disk;
+                path = AssetDatabase.GetAssetPath(classPoolProfile);
+                Debug.LogWarning(
+                    "[DemonKnight] Architect was editing a non-asset ClassSpritePoolProfile — copied into "
+                    + path + " (" + reason + ").");
+            }
         }
+        if (classPoolProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(classPoolProfile)))
+            return;
+        classPoolProfile.RematerializeSpritesFromPaths();
         SyncClassPoolAssetPaths(classPoolProfile);
         EditorUtility.SetDirty(classPoolProfile);
         AssetDatabase.SaveAssets();
@@ -291,16 +328,76 @@ public class ArthurianArtArchitectWindow : EditorWindow
     void PersistLegendPewProfile(string reason)
     {
         if (legendPewProfile == null) return;
-        if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(legendPewProfile)))
+        string path = AssetDatabase.GetAssetPath(legendPewProfile);
+        if (string.IsNullOrEmpty(path))
         {
-            legendPewProfile = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
-            if (legendPewProfile == null) return;
+            var disk = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
+            if (disk != null && !ReferenceEquals(disk, legendPewProfile))
+            {
+                CopyLegendPewLists(legendPewProfile, disk);
+                legendPewProfile = disk;
+                path = AssetDatabase.GetAssetPath(legendPewProfile);
+                Debug.LogWarning(
+                    "[DemonKnight] Architect was editing a non-asset LegendPewPortraitProfile — copied into "
+                    + path + " (" + reason + ").");
+            }
         }
+        if (legendPewProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(legendPewProfile)))
+            return;
+        legendPewProfile.RematerializeSpritesFromPaths();
         SyncLegendPewAssetPaths(legendPewProfile);
         EditorUtility.SetDirty(legendPewProfile);
         AssetDatabase.SaveAssets();
         try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
         try { CharacterDatabase.InvalidateCache(); } catch { /* ignore */ }
+    }
+
+    static void CopyClassPoolLists(ClassSpritePoolProfile from, ClassSpritePoolProfile to)
+    {
+        if (from == null || to == null) return;
+        from.EnsureLists();
+        to.EnsureLists();
+        to.peasantSprites = new List<Sprite>(from.peasantSprites);
+        to.warriorSprites = new List<Sprite>(from.warriorSprites);
+        to.knightSprites = new List<Sprite>(from.knightSprites);
+        to.peasantAssetPaths = new List<string>(from.peasantAssetPaths);
+        to.warriorAssetPaths = new List<string>(from.warriorAssetPaths);
+        to.knightAssetPaths = new List<string>(from.knightAssetPaths);
+    }
+
+    static void CopyLegendPewLists(LegendPewPortraitProfile from, LegendPewPortraitProfile to)
+    {
+        if (from == null || to == null) return;
+        from.EnsureSlotsAndLists();
+        to.EnsureSlotsAndLists();
+        to.peasantFaceProfiles = new List<Sprite>(from.peasantFaceProfiles);
+        to.warriorFaceProfiles = new List<Sprite>(from.warriorFaceProfiles);
+        to.knightFaceProfiles = new List<Sprite>(from.knightFaceProfiles);
+        to.peasantFaceAssetPaths = new List<string>(from.peasantFaceAssetPaths);
+        to.warriorFaceAssetPaths = new List<string>(from.warriorFaceAssetPaths);
+        to.knightFaceAssetPaths = new List<string>(from.knightFaceAssetPaths);
+        if (from.legendPortraits == null) return;
+        to.legendPortraits ??= new List<LegendPortraitEntry>();
+        for (int i = 0; i < from.legendPortraits.Count; i++)
+        {
+            var src = from.legendPortraits[i];
+            if (src == null) continue;
+            var dest = to.FindLegendEntry(src.unitType);
+            if (dest == null)
+            {
+                dest = new LegendPortraitEntry
+                {
+                    unitType = src.unitType,
+                    displayName = src.displayName,
+                    softOptional = src.softOptional
+                };
+                to.legendPortraits.Add(dest);
+            }
+            dest.facePortrait = src.facePortrait;
+            dest.assetPath = src.assetPath;
+            dest.displayName = src.displayName;
+            dest.softOptional = src.softOptional;
+        }
     }
 
     static void SyncClassPoolAssetPaths(ClassSpritePoolProfile p)
@@ -324,7 +421,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         {
             var e = p.legendPortraits[i];
             if (e == null) continue;
-            if (e.facePortrait == null) { e.assetPath = ""; continue; }
+            // Keep assetPath backup when face is temporarily Missing — never wipe.
+            if (e.facePortrait == null) continue;
             string ap = AssetDatabase.GetAssetPath(e.facePortrait);
             if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
         }
@@ -334,11 +432,15 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         if (sprites == null || paths == null) return;
         while (paths.Count < sprites.Count) paths.Add("");
+        // Keep path backups for trailing Missing slots — do not Truncate paths below sprites.
+        // Only trim paths when sprites were intentionally removed (shorter list).
         if (paths.Count > sprites.Count)
             paths.RemoveRange(sprites.Count, paths.Count - sprites.Count);
         for (int i = 0; i < sprites.Count; i++)
         {
-            if (sprites[i] == null) { paths[i] = ""; continue; }
+            // CRITICAL: never wipe path backups when sprite is temporarily Missing
+            // (reimport / Force Sync). RematerializeSpritesFromPaths restores from paths.
+            if (sprites[i] == null) continue;
             string ap = AssetDatabase.GetAssetPath(sprites[i]);
             if (!string.IsNullOrEmpty(ap)) paths[i] = ap;
         }
@@ -1623,8 +1725,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
             + "Sprite pools by Peasant/Warrior/Knight. Ensure remaps script GUID / transplants "
             + "YAML — never wipes seat guides. Empty seats stay empty (no auto-fill).",
             MessageType.Info);
+        EditorGUILayout.BeginHorizontal();
         stageProfile = (StageLayoutProfile)EditorGUILayout.ObjectField(
             "StageLayoutProfile", stageProfile, typeof(StageLayoutProfile), false);
+        if (GUILayout.Button("Reload from disk", GUILayout.Width(120)))
+            ReloadProfilesFromDisk("ReloadButton");
+        EditorGUILayout.EndHorizontal();
         if (stageProfile == null
             || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(stageProfile)))
         {
@@ -1635,6 +1741,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (stageProfile == null) return;
         }
         stageProfile.EnsureSlotCounts();
+        if (stageProfile.churchPewSlots != null)
+            EnsureChurchSlotsSeededFromPlayLayout(stageProfile.churchPewSlots);
         EditorGUILayout.LabelField(
             $"Assigned pew sprites: {ArthurianStageLayoutProfileEnsure.CountAssignedSprites(stageProfile)} / 52  ·  asset={AssetDatabase.GetAssetPath(stageProfile)}",
             EditorStyles.miniLabel);

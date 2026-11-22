@@ -1094,18 +1094,62 @@ namespace ArthurianAutobattler
             }
         }
 
+        /// <summary>
+        /// Play-normalized 0–1 church seat (matches SomersetPewLayout defaults).
+        /// World-space defaults (-6..6) were ignored by PopulatePews, so Stage Placer
+        /// edits never showed in Play until Architect re-seeded — fixed here.
+        /// </summary>
         static SlotTransformConfig ChurchPewDefault(int i)
         {
-            int row = i / PewRowSize;
-            int col = i % PewRowSize;
+            Vector2 norm = DefaultChurchNormalizedPosition(i);
             return new SlotTransformConfig
             {
                 slotNumber = i,
-                position = new Vector2(-6f + col * 1.0f, 2.5f - row * 1.2f),
+                position = norm,
                 scale = Vector2.one,
                 aspectMultiplier = Vector2.one,
-                sortingOrder = -Mathf.RoundToInt((2.5f - row * 1.2f) * 10f)
+                sortingOrder = -Mathf.RoundToInt(norm.y * 100f)
             };
+        }
+
+        /// <summary>Normalized 0–1 pew seat matching SomersetPewLayout.CreateDefaultPews capacities.</summary>
+        public static Vector2 DefaultChurchNormalizedPosition(int globalSeatIndex)
+        {
+            // Mirror SomersetPewLayout.CreateDefaultPews (v4) — keep in sync.
+            float[][] colXByRow =
+            {
+                new[] { 0.220f, 0.500f, 0.780f },
+                new[] { 0.226f, 0.500f, 0.775f },
+                new[] { 0.232f, 0.500f, 0.770f },
+                new[] { 0.238f, 0.500f, 0.765f }
+            };
+            float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
+            float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.120f };
+            int[,] caps =
+            {
+                { 5, 5, 5 },
+                { 4, 5, 4 },
+                { 4, 4, 4 },
+                { 4, 4, 4 }
+            };
+
+            int remaining = Mathf.Clamp(globalSeatIndex, 0, ChurchPewCount - 1);
+            for (int row = 0; row < 4; row++)
+            {
+                for (int col = 0; col < 3; col++)
+                {
+                    int cap = Mathf.Max(1, caps[row, col]);
+                    if (remaining < cap)
+                    {
+                        float t = cap == 1 ? 0.5f : remaining / (float)(cap - 1);
+                        float x = colXByRow[row][col]
+                                  + Mathf.Lerp(-rowSpread[row] * 0.5f, rowSpread[row] * 0.5f, t);
+                        return new Vector2(x, rowY[row]);
+                    }
+                    remaining -= cap;
+                }
+            }
+            return new Vector2(0.5f, 0.5f);
         }
 
         /// <summary>Staggered columns of 6 (frontlineSize = 6) — matches Phase 3 auto-arrange math.</summary>
@@ -1275,6 +1319,9 @@ namespace ArthurianAutobattler
         public List<string> warriorAssetPaths = new List<string>();
         public List<string> knightAssetPaths = new List<string>();
 
+        /// <summary>True when this is a CreateInstance stand-in (not a Resources asset).</summary>
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
         public static ClassSpritePoolProfile Load()
         {
             ClassSpritePoolProfile p = null;
@@ -1283,6 +1330,7 @@ namespace ArthurianAutobattler
             if (p != null)
             {
                 p.EnsureLists();
+                p.isRuntimeStandIn = false;
                 return p;
             }
             try
@@ -1294,6 +1342,7 @@ namespace ArthurianAutobattler
                     {
                         if (all[i] == null) continue;
                         all[i].EnsureLists();
+                        all[i].isRuntimeStandIn = false;
                         return all[i];
                     }
                 }
@@ -1301,6 +1350,7 @@ namespace ArthurianAutobattler
             catch { /* broken Resources asset */ }
             p = CreateInstance<ClassSpritePoolProfile>();
             p.name = "ClassSpritePoolProfile_Runtime";
+            p.isRuntimeStandIn = true;
             p.EnsureLists();
             return p;
         }
@@ -1313,6 +1363,75 @@ namespace ArthurianAutobattler
             peasantAssetPaths ??= new List<string>();
             warriorAssetPaths ??= new List<string>();
             knightAssetPaths ??= new List<string>();
+        }
+
+        /// <summary>
+        /// Restore Missing sprite refs from path backups (editor AssetDatabase).
+        /// Never wipe path backups when sprites are temporarily null — Persist syncs
+        /// paths only when a live sprite is present.
+        /// </summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureLists();
+            int n = 0;
+            n += RematerializeList(peasantSprites, peasantAssetPaths);
+            n += RematerializeList(warriorSprites, warriorAssetPaths);
+            n += RematerializeList(knightSprites, knightAssetPaths);
+            return n;
+        }
+
+        public static int RematerializeList(List<Sprite> sprites, List<string> paths)
+        {
+            if (sprites == null || paths == null) return 0;
+            int restored = 0;
+            int count = Mathf.Max(sprites.Count, paths.Count);
+            while (sprites.Count < count) sprites.Add(null);
+            while (paths.Count < count) paths.Add("");
+            for (int i = 0; i < count; i++)
+            {
+                if (sprites[i] != null) continue;
+                if (string.IsNullOrEmpty(paths[i])) continue;
+                Sprite sp = TryLoadSpriteAtPath(paths[i]);
+                if (sp == null) continue;
+                sprites[i] = sp;
+                restored++;
+            }
+            return restored;
+        }
+
+        public static Sprite TryLoadSpriteAtPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+#if UNITY_EDITOR
+            try
+            {
+                var sp = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (sp != null) return sp;
+                // Texture with multiple sprites — take first sub-asset Sprite.
+                var objs = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+                if (objs != null)
+                {
+                    for (int i = 0; i < objs.Length; i++)
+                        if (objs[i] is Sprite s) return s;
+                }
+            }
+            catch { /* ignore */ }
+#endif
+            // Runtime: only Resources-relative paths work without AssetDatabase.
+            try
+            {
+                string res = path;
+                int idx = path.IndexOf("Resources/", System.StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                {
+                    res = path.Substring(idx + "Resources/".Length);
+                    int dot = res.LastIndexOf('.');
+                    if (dot > 0) res = res.Substring(0, dot);
+                    return Resources.Load<Sprite>(res);
+                }
+            }
+            catch { /* ignore */ }
+            return null;
         }
 
         public List<Sprite> GetPool(UnitType type)
@@ -1391,6 +1510,8 @@ namespace ArthurianAutobattler
         public List<string> warriorFaceAssetPaths = new List<string>();
         public List<string> knightFaceAssetPaths = new List<string>();
 
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
         public static LegendPewPortraitProfile Load()
         {
             LegendPewPortraitProfile p = null;
@@ -1399,6 +1520,7 @@ namespace ArthurianAutobattler
             if (p != null)
             {
                 p.EnsureSlotsAndLists();
+                p.isRuntimeStandIn = false;
                 return p;
             }
             try
@@ -1410,6 +1532,7 @@ namespace ArthurianAutobattler
                     {
                         if (all[i] == null) continue;
                         all[i].EnsureSlotsAndLists();
+                        all[i].isRuntimeStandIn = false;
                         return all[i];
                     }
                 }
@@ -1417,8 +1540,33 @@ namespace ArthurianAutobattler
             catch { /* broken Resources asset */ }
             p = CreateInstance<LegendPewPortraitProfile>();
             p.name = "LegendPewPortraitProfile_Runtime";
+            p.isRuntimeStandIn = true;
             p.EnsureSlotsAndLists();
             return p;
+        }
+
+        /// <summary>Restore Missing face/pool sprites from path backups (editor + Resources).</summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            n += ClassSpritePoolProfile.RematerializeList(peasantFaceProfiles, peasantFaceAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(warriorFaceProfiles, warriorFaceAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(knightFaceProfiles, knightFaceAssetPaths);
+            if (legendPortraits != null)
+            {
+                for (int i = 0; i < legendPortraits.Count; i++)
+                {
+                    var e = legendPortraits[i];
+                    if (e == null || e.facePortrait != null) continue;
+                    if (string.IsNullOrEmpty(e.assetPath)) continue;
+                    Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(e.assetPath);
+                    if (sp == null) continue;
+                    e.facePortrait = sp;
+                    n++;
+                }
+            }
+            return n;
         }
 
         public void EnsureSlotsAndLists()
@@ -2049,9 +2197,24 @@ namespace ArthurianAutobattler
         {
             get
             {
+                // Never keep an empty CreateInstance stand-in forever — retry Resources.Load
+                // (Enter Play Mode without domain reload / Ensure remap after Force Sync).
+                if (_cache != null && _cache.isRuntimeStandIn && _cache.CountUsable(UnitType.Peasant)
+                    + _cache.CountUsable(UnitType.Warrior) + _cache.CountUsable(UnitType.Knight) == 0)
+                    _cache = null;
+
                 if (_cache == null)
                 {
-                    try { _cache = ClassSpritePoolProfile.Load(); }
+                    try
+                    {
+                        _cache = ClassSpritePoolProfile.Load();
+                        if (_cache != null)
+                        {
+                            int restored = _cache.RematerializeSpritesFromPaths();
+                            if (restored > 0)
+                                Debug.Log($"[DemonKnight] ClassSpritePool rematerialized {restored} sprite(s) from path backups.");
+                        }
+                    }
                     catch (Exception ex)
                     {
                         Debug.LogWarning("[DemonKnight] ClassSpritePoolProfile.Load soft-fail: " + ex.Message);
@@ -2077,7 +2240,11 @@ namespace ArthurianAutobattler
             try
             {
                 var profile = Profile;
-                if (profile == null) return null;
+                if (profile == null || profile.isRuntimeStandIn)
+                {
+                    // Soft-fail empty stand-in — callers keep StageLayout / solid fallbacks.
+                    if (profile == null || profile.CountUsable(type) == 0) return null;
+                }
                 List<Sprite> pool = profile.GetPool(type);
                 if (pool == null || pool.Count == 0) return null;
 
@@ -2140,9 +2307,25 @@ namespace ArthurianAutobattler
         {
             get
             {
+                if (_cache != null && _cache.isRuntimeStandIn
+                    && _cache.CountUsablePewFaces(UnitType.Peasant)
+                    + _cache.CountUsablePewFaces(UnitType.Warrior)
+                    + _cache.CountUsablePewFaces(UnitType.Knight) == 0
+                    && _cache.CountAssignedLegendFaces() == 0)
+                    _cache = null;
+
                 if (_cache == null)
                 {
-                    try { _cache = LegendPewPortraitProfile.Load(); }
+                    try
+                    {
+                        _cache = LegendPewPortraitProfile.Load();
+                        if (_cache != null)
+                        {
+                            int restored = _cache.RematerializeSpritesFromPaths();
+                            if (restored > 0)
+                                Debug.Log($"[DemonKnight] LegendPewPortrait rematerialized {restored} sprite(s) from path backups.");
+                        }
+                    }
                     catch (Exception ex)
                     {
                         Debug.LogWarning("[DemonKnight] LegendPewPortraitProfile.Load soft-fail: " + ex.Message);
@@ -2215,12 +2398,15 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Pew visual resolve: Architect face/body profile pools first, then ClassSpritePool full-body.
+        /// Skips paperdoll Pose_/Outfit_/Head_ placeholders.
         /// </summary>
         public static Sprite ResolvePewVisual(RecruitInstance recruit)
         {
             Sprite face = PickPewProfile(recruit);
-            if (face != null) return face;
-            return ClassSpritePoolApplier.PickForRecruit(recruit);
+            if (face != null && TownsfolkVisualApplier.IsUsablePewSprite(face)) return face;
+            Sprite body = ClassSpritePoolApplier.PickForRecruit(recruit);
+            if (body != null && TownsfolkVisualApplier.IsUsablePewSprite(body)) return body;
+            return null;
         }
     }
 
