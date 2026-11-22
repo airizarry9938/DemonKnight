@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "church-bg-pew-preview";
+    public const string TipPackageId = "fix-seatshow-cs0436";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -22,19 +22,21 @@ public static class DemonKnightTipEscape
     static readonly string[] HostRels =
     {
         "Assets/Editor/DemonKnightPackageVersion.cs",
+        // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
+        "Assets/Scripts/UI/SomersetPewLayout.cs",
+        "Assets/Scripts/UI/SomersetChurchUI.cs",
+        "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianFixMisplacedScripts.cs",
         "Assets/Editor/DemonKnightTipEscape.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
-        "Assets/Scripts/UI/SomersetChurchUI.cs",
-        "Assets/Scripts/UI/SomersetPewLayout.cs",
-        "Assets/Scripts/UI/TownSplitUIController.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (church-bg-pew-preview)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-seatshow-cs0436)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -109,6 +111,7 @@ public static class DemonKnightTipEscape
             "architect-no-bootstrap-clear",
             "breakglass-local-wipe",
             "pew-3rows-chroma-scale",
+            "church-bg-pew-preview",
         };
         foreach (string s in stale)
         {
@@ -188,6 +191,13 @@ public static class DemonKnightTipEscape
         {
             log.AppendLine("Pew rebuild later: " + ex.Message);
         }
+
+        try
+        {
+            int nuked = DemonKnightPackageVersion.NukeDuplicatePackageVersionOutsideEditor();
+            if (nuked > 0) log.AppendLine("Nuked " + nuked + " duplicate PackageVersion (CS0436).");
+        }
+        catch (Exception ex) { log.AppendLine("PV nuke: " + ex.Message); }
 
         AssetDatabase.Refresh();
         EditorPrefs.SetString(PrefsKey, DateTime.UtcNow.ToString("o"));

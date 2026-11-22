@@ -862,7 +862,7 @@ public static class ArthurianMenuBootstrap
                 "FORCE Upgrade → Tip Escape",
                 "Pull PackageVersion / Sync / Bootstrap / Architect / TipEscape / PaperDoll\n"
                 + "from GitHub tip of main (never HardTip).\n\n"
-                + "Diagnose after compile must show: church-bg-pew-preview\n"
+                + "Diagnose after compile must show: fix-seatshow-cs0436\n"
                 + "(compiled Id == disk Id).",
                 "Escape Now", "Cancel"))
             return;
@@ -906,15 +906,15 @@ public static class ArthurianMenuBootstrap
         {
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
+            "Assets/Scripts/UI/SomersetPewLayout.cs",
+            "Assets/Scripts/UI/SomersetChurchUI.cs",
+            "Assets/Scripts/UI/TownSplitUIController.cs",
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
             "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
             "Assets/Scripts/UI/PaperDollSeatView.cs",
             "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
-            "Assets/Scripts/UI/SomersetChurchUI.cs",
-            "Assets/Scripts/UI/SomersetPewLayout.cs",
-            "Assets/Scripts/UI/TownSplitUIController.cs",
         };
         int ok = 0;
         foreach (string rel in rels)
@@ -945,7 +945,7 @@ public static class ArthurianMenuBootstrap
                 if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
                         || body.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0)
-                    && body.IndexOf("church-bg-pew-preview", StringComparison.Ordinal) < 0)
+                    && body.IndexOf("fix-seatshow-cs0436", StringComparison.Ordinal) < 0)
                     throw new Exception("stale PackageVersion body");
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
@@ -968,7 +968,7 @@ public static class ArthurianMenuBootstrap
         }
         AssetDatabase.Refresh();
         log.AppendLine($"Wrote {ok}/{rels.Length}. Wait compile → click FORCE again if TipEscape menu missing.");
-        log.AppendLine("Diagnose must show church-bg-pew-preview compiled=disk.");
+        log.AppendLine("Diagnose must show fix-seatshow-cs0436 compiled=disk.");
         return log.ToString();
     }
 
@@ -982,8 +982,8 @@ public static class ArthurianMenuBootstrap
                 + "• TipEscape + PackageVersion + Sync + Bootstrap + Architect\n"
                 + "• SomersetChurchUI + SomersetPewLayout (3-row / scale)\n"
                 + "• PaperDoll + TownsfolkVisualApplier\n\n"
-                + "After compile: Diagnose = church-bg-pew-preview\n"
-                + "Architect title shows church-bg-pew-preview + church pew preview.",
+                + "After compile: Diagnose = fix-seatshow-cs0436\n"
+                + "Architect title shows fix-seatshow-cs0436 + church pew preview.",
                 "Download Tip Now", "Cancel"))
             return;
         EditorUtility.DisplayDialog("Break-Glass Hosts", BreakGlassForceHostsFromHardTip(), "OK");
@@ -1031,17 +1031,19 @@ public static class ArthurianMenuBootstrap
         {
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
+            // PewLayout BEFORE Architect so SeatShowsSprite exists if Architect still calls it.
+            "Assets/Scripts/UI/SomersetPewLayout.cs",
+            "Assets/Scripts/UI/SomersetChurchUI.cs",
+            "Assets/Scripts/UI/TownSplitUIController.cs",
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
             "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
-            "Assets/Scripts/UI/SomersetChurchUI.cs",
-            "Assets/Scripts/UI/SomersetPewLayout.cs",
-            "Assets/Scripts/UI/TownSplitUIController.cs",
+            "Assets/Editor/ArthurianFixMisplacedScripts.cs",
             "Assets/Scripts/UI/PaperDollSeatView.cs",
             "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         };
-        const string wantId = "church-bg-pew-preview";
+        const string wantId = "fix-seatshow-cs0436";
         int ok = 0;
         var log = new System.Text.StringBuilder();
         log.AppendLine("Break-Glass atomic tip pull (tip/main FIRST, HardTip last)");
@@ -1086,6 +1088,7 @@ public static class ArthurianMenuBootstrap
                 Debug.LogError($"[DemonKnight] Break-glass FAIL {rel}: {ex.Message}");
             }
         }
+        try { DemonKnightPackageVersion.NukeDuplicatePackageVersionOutsideEditor(); } catch { /* ignore */ }
         AssetDatabase.Refresh();
         string diskId = ReadPackageIdFromDisk() ?? "(unread)";
         long pvLen = 0;
@@ -1096,8 +1099,10 @@ public static class ArthurianMenuBootstrap
         }
         catch { /* ignore */ }
         bool tipEscapeOnDisk = File.Exists(Path.Combine(projectRoot, "Assets", "Editor", "DemonKnightTipEscape.cs"));
+        bool pewLayoutOnDisk = File.Exists(Path.Combine(projectRoot, "Assets", "Scripts", "UI", "SomersetPewLayout.cs"));
         log.AppendLine($"Wrote {ok}/{hosts.Length}. Package Id on disk: {diskId} ({pvLen} bytes)");
         log.AppendLine("TipEscape.cs on disk: " + (tipEscapeOnDisk ? "YES → Escape menu after compile" : "NO"));
+        log.AppendLine("SomersetPewLayout.cs on disk: " + (pewLayoutOnDisk ? "YES (SeatShowsSprite)" : "NO"));
         log.AppendLine("Wait compile → Diagnose (" + wantId + ") → !!! Escape to Tip if still stale.");
         return log.ToString();
     }
@@ -1158,7 +1163,7 @@ public static class ArthurianMenuBootstrap
                     if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                         && (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0
                             || body.IndexOf("Id = \"architect-disk-tip-proof\"", StringComparison.Ordinal) >= 0)
-                        && body.IndexOf("church-bg-pew-preview", StringComparison.Ordinal) < 0)
+                        && body.IndexOf("fix-seatshow-cs0436", StringComparison.Ordinal) < 0)
                     {
                         last = new Exception("stale PackageVersion from " + sha);
                         continue;

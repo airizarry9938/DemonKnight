@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "church-bg-pew-preview";
-    public const string GitHint = "church-bg-preview-play-pew-scale";
-    public const string BuiltUtc = "2026-11-22T10:49:00Z";
+    public const string Id = "fix-seatshow-cs0436";
+    public const string GitHint = "fix-seatshowsprite-cs0436-pv-dedupe";
+    public const string BuiltUtc = "2026-11-22T10:55:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "2d66513a365507263cd04a948b135dc2da56f04e";
@@ -34,6 +34,9 @@ public static class DemonKnightPackageVersion
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             try
             {
+                // CS0436: PackageVersion must live ONLY under Assets/Editor (not Scripts/).
+                NukeDuplicatePackageVersionOutsideEditor();
+
                 LastWipeReport = WipeModularPaperdollAssets();
                 Debug.Log("[DemonKnight] PackageVersion OnLoad library wipe:\n" + LastWipeReport);
 
@@ -73,6 +76,7 @@ public static class DemonKnightPackageVersion
                 string[] rels =
                 {
                     "Assets/Editor/DemonKnightTipEscape.cs",
+                    "Assets/Scripts/UI/SomersetPewLayout.cs",
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
                     "Assets/Editor/ArthurianMenuBootstrap.cs",
                     "Assets/Editor/ArthurianArtArchitectWindow.cs",
@@ -124,6 +128,45 @@ public static class DemonKnightPackageVersion
         };
     }
 
+    /// <summary>
+    /// CS0436: type in both Assembly-CSharp and Assembly-CSharp-Editor when a copy
+    /// lands under Assets/Scripts (or elsewhere). Keep only Assets/Editor/.
+    /// </summary>
+    public static int NukeDuplicatePackageVersionOutsideEditor()
+    {
+        int n = 0;
+        try
+        {
+            string assets = Application.dataPath;
+            string canonical = Path.GetFullPath(Path.Combine(assets, "Editor", "DemonKnightPackageVersion.cs"));
+            foreach (string path in Directory.GetFiles(assets, "DemonKnightPackageVersion.cs", SearchOption.AllDirectories))
+            {
+                if (path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) continue;
+                string full = Path.GetFullPath(path);
+                if (string.Equals(full, canonical, StringComparison.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    File.SetAttributes(full, FileAttributes.Normal);
+                    File.Delete(full);
+                    string meta = full + ".meta";
+                    if (File.Exists(meta)) File.Delete(meta);
+                    n++;
+                    Debug.LogWarning("[DemonKnight] Deleted duplicate PackageVersion (CS0436): " + full);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[DemonKnight] Could not delete duplicate PackageVersion " + full + ": " + ex.Message);
+                }
+            }
+            if (n > 0) AssetDatabase.Refresh();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] NukeDuplicatePackageVersionOutsideEditor: " + ex.Message);
+        }
+        return n;
+    }
+
     static bool ContainsStaleMarker(string body)
     {
         if (string.IsNullOrEmpty(body)) return true;
@@ -140,6 +183,7 @@ public static class DemonKnightPackageVersion
             "architect-no-bootstrap-clear",
             "breakglass-local-wipe",
             "pew-3rows-chroma-scale",
+            "church-bg-pew-preview",
         };
         foreach (string s in stale)
         {

@@ -161,6 +161,19 @@ public static class ArthurianFixMisplacedScripts
         fixedCount += RemoveDuplicateGameplayCopies(assets, "SomersetRunes.cs",
             Path.Combine(assets, "Scripts", "Data", "SomersetRunes.cs"));
 
+        // CS0436: DemonKnightPackageVersion must NOT exist under Scripts/ (Editor-only type).
+        string editorPv = Path.Combine(assets, "Editor", "DemonKnightPackageVersion.cs");
+        foreach (string path in Directory.GetFiles(assets, "DemonKnightPackageVersion.cs", SearchOption.AllDirectories))
+        {
+            if (path.EndsWith(".meta")) continue;
+            string full = Path.GetFullPath(path);
+            if (string.Equals(full, Path.GetFullPath(editorPv), System.StringComparison.OrdinalIgnoreCase))
+                continue;
+            DeleteFileAndMeta(full);
+            Debug.LogWarning($"[DemonKnight] Deleted duplicate PackageVersion (CS0436): {full}");
+            fixedCount++;
+        }
+
         if (fixedCount > 0)
         {
             AssetDatabase.Refresh();

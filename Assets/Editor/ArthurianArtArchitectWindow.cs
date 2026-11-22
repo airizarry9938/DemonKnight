@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "church-bg-pew-preview";
+    public const string UiBuildId = "fix-seatshow-cs0436";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -1588,7 +1588,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
         foreach (int seatIndex in order)
         {
-            if (!SomersetPewLayout.SeatShowsSprite(seatIndex)) continue;
+            if (!SeatShowsSpriteSafe(seatIndex)) continue;
 
             Vector2 norm = GetPlayNormalizedSeatPosition(anchors, seatIndex);
             // Normalized 0,0 = bottom-left (play); GUI y grows downward.
@@ -1636,6 +1636,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
             new Rect(canvas.x + 6f, canvas.yMax - 18f, canvas.width - 12f, 16f),
             "Play pew scale · 3 sprite rows · church bg (drag disabled — layout from SomersetPewLayout)",
             EditorStyles.miniLabel);
+    }
+
+    /// <summary>
+    /// Local copy of SomersetPewLayout.SeatShowsSprite — avoids CS0117 when tip Architect
+    /// compiles before tip PewLayout lands (Break-Glass partial / stale Downloads).
+    /// </summary>
+    static bool SeatShowsSpriteSafe(int pewSeatIndex)
+    {
+        const int total = 52;
+        const int rowSize = 13;
+        const int visualRows = 3;
+        return (Mathf.Clamp(pewSeatIndex, 0, total - 1) / rowSize) < visualRows;
     }
 
     static Vector2 GetPlayNormalizedSeatPosition(PewAnchor[] pews, int globalSeatIndex)
@@ -1759,7 +1771,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         int drawn = 0;
         for (int seat = 0; seat < SomersetPewLayout.TotalSeats; seat++)
         {
-            if (!SomersetPewLayout.SeatShowsSprite(seat)) continue;
+            if (!SeatShowsSpriteSafe(seat)) continue;
             Vector2 norm = GetPlayNormalizedSeatPosition(anchors, seat);
             Vector2 screen = new Vector2(
                 content.x + norm.x * content.width,
