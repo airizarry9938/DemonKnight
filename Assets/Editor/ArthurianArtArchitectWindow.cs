@@ -705,7 +705,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 pivot = pivot
             };
         }
+#pragma warning disable CS0618 // TextureImporter.spritesheet — keep until ISpriteEditorDataProvider migrate
         importer.spritesheet = metas;
+#pragma warning restore CS0618
         importer.SaveAndReimport();
     }
 
@@ -2200,7 +2202,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 idx++;
             }
         }
+#pragma warning disable CS0618 // TextureImporter.spritesheet — keep until ISpriteEditorDataProvider migrate
         importer.spritesheet = metas.ToArray();
+#pragma warning restore CS0618
         importer.SaveAndReimport();
     }
 
@@ -2227,7 +2231,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 pivot = new Vector2(0.5f, 0.5f)
             };
         }
+#pragma warning disable CS0618 // TextureImporter.spritesheet — keep until ISpriteEditorDataProvider migrate
         importer.spritesheet = metas;
+#pragma warning restore CS0618
         importer.SaveAndReimport();
     }
 

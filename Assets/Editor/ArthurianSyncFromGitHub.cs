@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "272b6ccf9fecad9348370600a5ff667f5ae046d9";
 
-    private const string ExpectedPackageId = "save-splices-chroma-defringe";
+    private const string ExpectedPackageId = "console-modular-stagelayout-menus";
 
     /// <summary>Menu hosts that must always overwrite from tip/main — never skip-self, never Fallback pin.</summary>
     public static readonly string[] SyncHostForceOverwritePaths =
@@ -743,7 +743,30 @@ public static class ArthurianSyncFromGitHub
         ArthurianFixMisplacedScripts.Run();
         // After FixMisplaced (old compiled maps may re-drop standalones) — nuke again BEFORE refresh/compile.
         NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
+        ArthurianMenuBootstrap.DedupeArtToolScripts();
         AssetDatabase.Refresh();
+
+        // Post-Sync: seed ModularSpriteLibrary + recreate StageLayoutProfile (stale GUID after embed).
+        string modularReport = null;
+        try
+        {
+            modularReport = ArthurianMenuBootstrap.VerifyAndSyncModularLibraryInternal(showDialog: false);
+            Debug.Log("[DemonKnight] Post-Sync modular verify:\n" + modularReport);
+        }
+        catch (Exception ex)
+        {
+            errors.Add("Verify & Sync Modular Library: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] Post-Sync modular verify failed: " + ex.Message);
+        }
+        try
+        {
+            ArthurianStageLayoutProfileEnsure.EnsureAsset();
+        }
+        catch (Exception ex)
+        {
+            errors.Add("Ensure StageLayoutProfile: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] Post-Sync StageLayout ensure failed: " + ex.Message);
+        }
 
         var missingCritical = new List<string>();
         foreach (string rel in AtomicCritical)
@@ -767,7 +790,11 @@ public static class ArthurianSyncFromGitHub
                    + $"(disk Id now: {ReadPackageIdFromDisk() ?? "?"}).\n"
                    + "If still sync-keep-editor-menus: Arthurian → FORCE Upgrade Sync Hosts From main.\n"
                    + "Arthurian menus kept: Bootstrap / Force Delete+Sync / Diagnose.\n"
+                   + "Modular library + StageLayoutProfile auto-verified after Sync.\n"
+                   + "Stop Play → New Game to rebuild pews.\n"
                    + "Do NOT rebuild the scene.";
+            if (!string.IsNullOrEmpty(modularReport))
+                msg += "\n\n" + modularReport;
         }
 
         Debug.Log("[DemonKnight] " + msg);

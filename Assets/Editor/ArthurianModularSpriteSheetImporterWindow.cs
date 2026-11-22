@@ -25,10 +25,8 @@ public class ArthurianModularSpriteSheetImporterWindow : EditorWindow
     bool pointFilter = true;
     Vector2 scroll;
 
-    // Owned only by this window — ArthurianMenuBootstrap must NOT register the same path
-    // (duplicate MenuItems made Install pop every time and flickered the DemonKnight menu).
+    // Single MenuItem only — DemonKnight/ alias removed (duplicate MenuItem / nested zip copies).
     [MenuItem("Arthurian/Art Tools/Modular Sprite Sheet Importer", false, 41)]
-    [MenuItem("DemonKnight/Modular Sprite Sheet Importer", false, 41)]
     public static void Open()
     {
         var win = GetWindow<ArthurianModularSpriteSheetImporterWindow>("Modular Sprite Importer");

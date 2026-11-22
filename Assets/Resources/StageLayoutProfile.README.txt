@@ -1,0 +1,1 @@
+StageLayoutProfile.asset is recreated locally by Arthurian → Ensure Stage Layout Profile (and automatically after Force Sync / editor load). Do not commit a YAML that still references the old standalone StageLayoutProfile.cs GUID.

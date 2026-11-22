@@ -231,18 +231,28 @@ public static class ArthurianMenuBootstrap
     }
 
     /// <summary>
-    /// Copies filled Art/Modular library into Resources so Play mode pews stop showing boxes.
+    /// Creates/fills ModularSpriteLibrary under Art + copies to Resources so Play mode pews work.
+    /// Empty poses (posesArray=4 posesFilled=0) get placeholder sprites when no sheets imported.
     /// </summary>
     [MenuItem("Arthurian/Art Tools/Verify & Sync Modular Library", false, 38)]
     public static void VerifyAndSyncModularLibrary()
     {
+        string report = VerifyAndSyncModularLibraryInternal(showDialog: true);
+        Debug.Log("[DemonKnight] " + report);
+    }
+
+    /// <summary>Callable from Force Sync without a dialog.</summary>
+    public static string VerifyAndSyncModularLibraryInternal(bool showDialog)
+    {
         const string artPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
         const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
+
+        EnsureFolderPath("Assets/Art/Modular");
+        EnsureFolderPath("Assets/Resources/Art/Modular");
 
         var art = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(artPath);
         if (art == null)
         {
-            // Search any ModularSpriteLibrary under Assets/Art
             string[] guids = AssetDatabase.FindAssets("t:ModularSpriteLibrary");
             foreach (string g in guids)
             {
@@ -256,48 +266,215 @@ public static class ArthurianMenuBootstrap
 
         if (art == null)
         {
-            EditorUtility.DisplayDialog(
-                "Modular Library",
-                "No ModularSpriteLibrary found under Assets/Art.\n\n" +
-                "Open Modular Sprite Sheet Importer → Create Library → Import sheets first.",
-                "OK");
-            return;
+            art = ScriptableObject.CreateInstance<ModularSpriteLibrary>();
+            art.EnsureSizedArrays();
+            AssetDatabase.CreateAsset(art, artPath);
+            Debug.Log("[DemonKnight] Created empty ModularSpriteLibrary at " + artPath);
+        }
+
+        art.EnsureSizedArrays();
+        bool usedPlaceholders = CountSprites(art.basePoses) == 0;
+        if (usedPlaceholders)
+        {
+            art.EnsurePlaceholderSpritesIfEmpty();
+            // Persist placeholders as textures under the library so Resources copy keeps refs.
+            BakePlaceholderSpritesIntoProject(art, "Assets/Art/Modular/Placeholders");
+            EditorUtility.SetDirty(art);
+            AssetDatabase.SaveAssets();
         }
 
         int poses = CountSprites(art.basePoses);
         int outfits = CountSprites(art.outfits);
         int heads = art.heads != null ? art.heads.Length : 0;
-
         string artAssetPath = AssetDatabase.GetAssetPath(art);
-        string resDir = "Assets/Resources/Art/Modular";
-        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
-            AssetDatabase.CreateFolder("Assets", "Resources");
-        if (!AssetDatabase.IsValidFolder("Assets/Resources/Art"))
-            AssetDatabase.CreateFolder("Assets/Resources", "Art");
-        if (!AssetDatabase.IsValidFolder(resDir))
-            AssetDatabase.CreateFolder("Assets/Resources/Art", "Modular");
 
         if (AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath) != null)
             AssetDatabase.DeleteAsset(resPath);
         AssetDatabase.CopyAsset(artAssetPath, resPath);
+        // Also copy placeholder textures folder if present.
+        if (AssetDatabase.IsValidFolder("Assets/Art/Modular/Placeholders"))
+        {
+            EnsureFolderPath("Assets/Resources/Art/Modular/Placeholders");
+            string[] texGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/Art/Modular/Placeholders" });
+            foreach (string g in texGuids)
+            {
+                string src = AssetDatabase.GUIDToAssetPath(g);
+                string name = Path.GetFileName(src);
+                string dst = "Assets/Resources/Art/Modular/Placeholders/" + name;
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(dst) != null)
+                    AssetDatabase.DeleteAsset(dst);
+                AssetDatabase.CopyAsset(src, dst);
+            }
+        }
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
         TownsfolkVisualApplier.SetLibrary(null);
+        ArthurianStageLayoutProfileEnsure.EnsureAsset();
 
         var res = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath);
+        if (res != null)
+        {
+            res.EnsureSizedArrays();
+            if (CountSprites(res.basePoses) == 0)
+            {
+                // CopyAsset can drop ephemeral refs — re-seed + bake under Resources.
+                res.EnsurePlaceholderSpritesIfEmpty();
+                BakePlaceholderSpritesIntoProject(res, "Assets/Resources/Art/Modular/Placeholders");
+                EditorUtility.SetDirty(res);
+                AssetDatabase.SaveAssets();
+            }
+        }
         int resPoses = res != null ? CountSprites(res.basePoses) : 0;
 
-        EditorUtility.DisplayDialog(
-            "Modular Library Synced",
+        string report =
             $"Source: {artAssetPath}\n" +
-            $"poses {poses}/4 · outfits {outfits}/6 · heads {heads}\n\n" +
+            $"poses {poses}/4 · outfits {outfits}/6 · heads {heads}\n" +
             $"Runtime copy: {resPath}\n" +
-            $"Resources poses filled: {resPoses}\n\n" +
-            (poses == 0
-                ? "SOURCE LIBRARY HAS NO POSE SPRITES — re-run Import with Poses sheet assigned.\n"
-                : "Stop Play → Main Menu → New Game to rebuild pews.\n"),
-            "OK");
+            $"Resources poses filled: {resPoses}\n" +
+            (usedPlaceholders
+                ? "Seeded PLACEHOLDER poses (no sheets imported yet).\nImport real sheets via Modular Sprite Sheet Importer when ready.\n"
+                : "") +
+            "Stop Play → Main Menu → New Game to rebuild pews.";
+
+        if (showDialog)
+            EditorUtility.DisplayDialog("Modular Library Synced", report, "OK");
+        return report;
+    }
+
+    static void EnsureFolderPath(string folder)
+    {
+        if (string.IsNullOrEmpty(folder) || AssetDatabase.IsValidFolder(folder)) return;
+        string[] parts = folder.Replace('\\', '/').Split('/');
+        string cur = parts[0];
+        for (int i = 1; i < parts.Length; i++)
+        {
+            string next = cur + "/" + parts[i];
+            if (!AssetDatabase.IsValidFolder(next))
+                AssetDatabase.CreateFolder(cur, parts[i]);
+            cur = next;
+        }
+    }
+
+    /// <summary>Write runtime placeholder sprites to disk so Resources copy keeps valid refs.</summary>
+    static void BakePlaceholderSpritesIntoProject(ModularSpriteLibrary lib, string folder)
+    {
+        if (lib == null) return;
+        EnsureFolderPath(folder);
+        void Bake(ref Sprite sp, string fileName)
+        {
+            if (sp == null || sp.texture == null) return;
+            string path = folder + "/" + fileName + ".png";
+            File.WriteAllBytes(path, sp.texture.EncodeToPNG());
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            var imp = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (imp != null)
+            {
+                imp.textureType = TextureImporterType.Sprite;
+                imp.spriteImportMode = SpriteImportMode.Single;
+                imp.filterMode = FilterMode.Point;
+                imp.textureCompression = TextureImporterCompression.Uncompressed;
+                imp.alphaIsTransparency = true;
+                imp.alphaSource = TextureImporterAlphaSource.FromInput;
+                var settings = new TextureImporterSettings();
+                imp.ReadTextureSettings(settings);
+                settings.spriteAlignment = (int)SpriteAlignment.BottomCenter;
+                settings.spritePivot = new Vector2(0.5f, 0f);
+                settings.alphaIsTransparency = true;
+                settings.alphaSource = TextureImporterAlphaSource.FromInput;
+                imp.SetTextureSettings(settings);
+                imp.SaveAndReimport();
+            }
+            var loaded = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (loaded != null) sp = loaded;
+        }
+
+        if (lib.basePoses != null)
+            for (int i = 0; i < lib.basePoses.Length; i++)
+                Bake(ref lib.basePoses[i], $"Pose_{i}");
+        if (lib.outfits != null)
+            for (int i = 0; i < lib.outfits.Length; i++)
+                Bake(ref lib.outfits[i], $"Outfit_{i}");
+        if (lib.heads != null)
+            for (int i = 0; i < lib.heads.Length; i++)
+                if (lib.heads[i] != null)
+                    Bake(ref lib.heads[i].sprite, $"Head_{i}");
+        if (lib.props != null)
+            for (int i = 0; i < lib.props.Length; i++)
+                if (lib.props[i] != null)
+                    Bake(ref lib.props[i], $"Prop_{i}");
+    }
+
+    [InitializeOnLoadMethod]
+    static void DkAutoVerifyModularOnLoad()
+    {
+        EditorApplication.delayCall += () =>
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            try
+            {
+                const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
+                var res = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath);
+                int filled = res != null ? CountSprites(res.basePoses) : 0;
+                if (res == null || filled == 0)
+                {
+                    Debug.Log("[DemonKnight] Auto Verify & Sync Modular Library (Resources missing/empty).");
+                    VerifyAndSyncModularLibraryInternal(showDialog: false);
+                }
+                DedupeArtToolScripts();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] Auto modular verify skipped: " + ex.Message);
+            }
+        };
+    }
+
+    /// <summary>Delete nested/duplicate Art Tools .cs that cause MenuItem already exists.</summary>
+    public static void DedupeArtToolScripts()
+    {
+        string editorDir = Path.Combine(Application.dataPath, "Editor");
+        string[] names =
+        {
+            "ArthurianModularSpriteSheetImporterWindow.cs",
+            "ArthurianBattleSpriteSheetSlicerWindow.cs",
+        };
+        string canonicalImporter = Path.Combine(editorDir, names[0]);
+        string canonicalSlicer = Path.Combine(editorDir, names[1]);
+        try
+        {
+            foreach (var hit in Directory.GetFiles(editorDir, names[0], SearchOption.AllDirectories))
+            {
+                if (string.Equals(hit, canonicalImporter, StringComparison.OrdinalIgnoreCase)) continue;
+                TryDeleteEditorScript(hit);
+            }
+            foreach (var hit in Directory.GetFiles(editorDir, names[1], SearchOption.AllDirectories))
+            {
+                if (string.Equals(hit, canonicalSlicer, StringComparison.OrdinalIgnoreCase)) continue;
+                TryDeleteEditorScript(hit);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] Art Tools dedupe: " + ex.Message);
+        }
+    }
+
+    static void TryDeleteEditorScript(string fullPath)
+    {
+        string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        string rel = "Assets" + fullPath.Substring(Application.dataPath.Length).Replace('\\', '/');
+        Debug.LogWarning("[DemonKnight] Removing duplicate Art Tools script: " + rel);
+        if (!AssetDatabase.DeleteAsset(rel))
+        {
+            try
+            {
+                File.SetAttributes(fullPath, FileAttributes.Normal);
+                File.Delete(fullPath);
+                if (File.Exists(fullPath + ".meta")) File.Delete(fullPath + ".meta");
+            }
+            catch { /* ignore */ }
+        }
     }
 
     static int CountSprites(Sprite[] arr)

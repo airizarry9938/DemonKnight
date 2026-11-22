@@ -937,19 +937,29 @@ namespace ArthurianAutobattler
 
         public static StageLayoutProfile Load()
         {
-            var p = Resources.Load<StageLayoutProfile>(ResourcesPath);
+            StageLayoutProfile p = null;
+            try { p = Resources.Load<StageLayoutProfile>(ResourcesPath); }
+            catch { /* missing MonoScript GUID after embed — fall through */ }
             if (p != null)
             {
                 p.EnsureSlotCounts();
                 return p;
             }
-            var all = Resources.LoadAll<StageLayoutProfile>("");
-            if (all != null && all.Length > 0)
+            try
             {
-                all[0].EnsureSlotCounts();
-                return all[0];
+                var all = Resources.LoadAll<StageLayoutProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureSlotCounts();
+                        return all[i];
+                    }
+                }
             }
-            // Runtime fallback when the Resources asset is not yet imported.
+            catch { /* broken Resources asset */ }
+            // Runtime fallback when the Resources asset has a stale script GUID (Force Sync embed).
             p = CreateInstance<StageLayoutProfile>();
             p.name = "StageLayoutProfile_Runtime";
             p.EnsureSlotCounts();
@@ -1116,11 +1126,117 @@ namespace ArthurianAutobattler
 
         public static ModularSpriteLibrary Load()
         {
-            var lib = Resources.Load<ModularSpriteLibrary>(ResourcesPath);
-            if (lib != null) return lib;
-            // Fallbacks: any ModularSpriteLibrary in Resources.
-            var all = Resources.LoadAll<ModularSpriteLibrary>("");
-            return all != null && all.Length > 0 ? all[0] : null;
+            ModularSpriteLibrary lib = null;
+            try { lib = Resources.Load<ModularSpriteLibrary>(ResourcesPath); }
+            catch { /* missing script / broken asset */ }
+            if (lib == null)
+            {
+                try
+                {
+                    var all = Resources.LoadAll<ModularSpriteLibrary>("");
+                    if (all != null && all.Length > 0) lib = all[0];
+                }
+                catch { /* ignore */ }
+            }
+            if (lib == null)
+            {
+                // Runtime fallback so pews are never empty after Force Sync with no Resources asset.
+                lib = CreateInstance<ModularSpriteLibrary>();
+                lib.name = "ModularSpriteLibrary_Runtime";
+            }
+            lib.EnsureSizedArrays();
+            lib.EnsurePlaceholderSpritesIfEmpty();
+            return lib;
+        }
+
+        /// <summary>
+        /// When poses/outfits were never imported (posesArray=4 posesFilled=0), bake simple
+        /// placeholder sprites so pew Bind is not all-NULL after New Game.
+        /// </summary>
+        public void EnsurePlaceholderSpritesIfEmpty()
+        {
+            EnsureSizedArrays();
+            int filled = 0;
+            if (basePoses != null)
+                for (int i = 0; i < basePoses.Length; i++)
+                    if (basePoses[i] != null) filled++;
+            if (filled > 0) return;
+
+            // Grayscale body poses (skin-tintable)
+            for (int i = 0; i < 4; i++)
+                if (basePoses[i] == null)
+                    basePoses[i] = MakePlaceholderSprite($"DK_Pose_{i}", 48, 64, new Color(0.75f, 0.75f, 0.78f, 1f), bodySilhouette: true);
+
+            if (outfits == null || outfits.Length < 6)
+                Array.Resize(ref outfits, 6);
+            Color[] outfitCols =
+            {
+                new Color(0.55f, 0.45f, 0.35f), new Color(0.50f, 0.42f, 0.32f),
+                new Color(0.35f, 0.40f, 0.55f), new Color(0.30f, 0.35f, 0.50f),
+                new Color(0.55f, 0.50f, 0.35f), new Color(0.60f, 0.52f, 0.30f)
+            };
+            for (int i = 0; i < 6; i++)
+                if (outfits[i] == null)
+                    outfits[i] = MakePlaceholderSprite($"DK_Outfit_{i}", 48, 64, outfitCols[i], bodySilhouette: true);
+
+            if (heads == null || heads.Length < 4)
+            {
+                var hs = new ModularHeadEntry[4];
+                for (int i = 0; i < 4; i++)
+                {
+                    hs[i] = new ModularHeadEntry
+                    {
+                        sprite = MakePlaceholderSprite($"DK_Head_{i}", 32, 32, new Color(0.2f, 0.15f, 0.12f), bodySilhouette: false),
+                        isHair = true
+                    };
+                }
+                heads = hs;
+            }
+
+            if (props == null || props.Length < 2)
+            {
+                props = new Sprite[2];
+                props[0] = null;
+                props[1] = MakePlaceholderSprite("DK_Prop_1", 16, 28, new Color(0.6f, 0.55f, 0.4f), bodySilhouette: false);
+            }
+        }
+
+        static Sprite MakePlaceholderSprite(string name, int w, int h, Color fill, bool bodySilhouette)
+        {
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                name = name + "_Tex",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                bool inside;
+                if (bodySilhouette)
+                {
+                    // Simple capsule torso
+                    float nx = (x + 0.5f) / w * 2f - 1f;
+                    float ny = (y + 0.5f) / h * 2f - 1f;
+                    float torso = (nx * nx) / 0.35f + ((ny + 0.1f) * (ny + 0.1f)) / 0.85f;
+                    float head = (nx * nx) / 0.18f + ((ny - 0.55f) * (ny - 0.55f)) / 0.18f;
+                    inside = torso <= 1f || head <= 1f;
+                }
+                else
+                {
+                    float nx = (x + 0.5f) / w * 2f - 1f;
+                    float ny = (y + 0.5f) / h * 2f - 1f;
+                    inside = nx * nx + ny * ny <= 0.85f;
+                }
+                pixels[y * w + x] = inside ? fill : Color.clear;
+            }
+            tex.SetPixels(pixels);
+            tex.Apply(false, false);
+            var sp = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0f), 32f);
+            sp.name = name;
+            return sp;
         }
 
         public Sprite GetPose(int poseIndex)

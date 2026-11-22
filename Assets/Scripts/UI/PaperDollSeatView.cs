@@ -364,7 +364,6 @@ namespace ArthurianAutobattler
         ModularSpriteLibrary library;
         RecruitInstance boundRecruit;
         bool uiMode;
-        bool battleMode;
 
         AnimState state = AnimState.Idle;
         float stateTime;
@@ -391,7 +390,6 @@ namespace ArthurianAutobattler
         {
             if (seat == null) return;
             uiMode = true;
-            battleMode = false;
             boundRecruit = recruit;
             library = TownsfolkVisualApplier.Library ?? ModularSpriteLibrary.Load();
             bodyImg = seat.bodyLayer;
@@ -411,7 +409,6 @@ namespace ArthurianAutobattler
         {
             if (actor == null) return;
             uiMode = false;
-            battleMode = true;
             boundRecruit = null;
             library = ModularSpriteLibrary.Load();
             bodySr = actor.spriteRenderer;
