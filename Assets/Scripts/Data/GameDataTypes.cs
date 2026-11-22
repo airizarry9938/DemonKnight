@@ -1170,6 +1170,71 @@ namespace ArthurianAutobattler
             // Leave outfits/heads/props empty — runtime never applies them.
         }
 
+        /// <summary>
+        /// Wipe paperdoll Outfit/Head/Prop arrays and non-Sprite anim clips.
+        /// Keeps basePoses (Architect Category Sprite). Call from Verify / Clear menu.
+        /// </summary>
+        public int ClearPaperdollLayersKeepSprites()
+        {
+            int cleared = 0;
+            if (outfits != null)
+            {
+                for (int i = 0; i < outfits.Length; i++)
+                    if (outfits[i] != null) { outfits[i] = null; cleared++; }
+                outfits = Array.Empty<Sprite>();
+            }
+            if (heads != null)
+            {
+                cleared += heads.Length;
+                heads = Array.Empty<ModularHeadEntry>();
+            }
+            if (props != null)
+            {
+                for (int i = 0; i < props.Length; i++)
+                    if (props[i] != null) cleared++;
+                props = Array.Empty<Sprite>();
+            }
+            if (animClips != null && animClips.Count > 0)
+            {
+                var keep = new List<ModularAnimRegistration>();
+                for (int i = 0; i < animClips.Count; i++)
+                {
+                    var e = animClips[i];
+                    if (e == null) continue;
+                    // Keep only Architect Category "Sprite" clips (drop Pose/Outfit/Head/Weapon stacks).
+                    if (string.Equals(e.category, "Sprite", StringComparison.OrdinalIgnoreCase))
+                        keep.Add(e);
+                    else
+                        cleared++;
+                }
+                animClips = keep;
+            }
+            EnsureSizedArrays();
+            return cleared;
+        }
+
+        /// <summary>True when library still has paperdoll outfits/heads or legacy Pose/Outfit clips.</summary>
+        public bool HasPaperdollResidue()
+        {
+            if (outfits != null)
+                for (int i = 0; i < outfits.Length; i++)
+                    if (outfits[i] != null) return true;
+            if (heads != null && heads.Length > 0)
+                for (int i = 0; i < heads.Length; i++)
+                    if (heads[i] != null && heads[i].sprite != null) return true;
+            if (animClips != null)
+            {
+                for (int i = 0; i < animClips.Count; i++)
+                {
+                    var e = animClips[i];
+                    if (e == null || string.IsNullOrEmpty(e.category)) continue;
+                    if (!string.Equals(e.category, "Sprite", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+            return false;
+        }
+
         static Sprite MakePlaceholderSprite(string name, int w, int h, Color fill, bool bodySilhouette)
         {
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
@@ -1245,8 +1310,8 @@ namespace ArthurianAutobattler
         {
             if (basePoses == null || basePoses.Length < 4)
                 Array.Resize(ref basePoses, 4);
-            if (outfits == null || outfits.Length < 6)
-                Array.Resize(ref outfits, 6);
+            // Single-sprite: do not force 6 outfit slots (paperdoll leftover).
+            if (outfits == null) outfits = Array.Empty<Sprite>();
             if (heads == null) heads = Array.Empty<ModularHeadEntry>();
             if (props == null) props = Array.Empty<Sprite>();
         }

@@ -28,10 +28,22 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
+    /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
     public const string HardTipCommitSha = "c414818b5bb591cd644e0f70a1c7bb16903f9ccf";
 
-    private const string ExpectedPackageId = "runtime-single-sprite";
+    private const string ExpectedPackageId = "single-sprite-play-wipe";
+
+    /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
+    public static readonly string[] StalePackageIds =
+    {
+        "architect-disk-tip-proof",
+        "architect-breakglass-hosts",
+        "architect-force-tip-ui",
+        "single-sprite-no-paperdoll",
+        "runtime-single-sprite", // superseded — lacked library wipe + main-first FORCE
+        "sync-keep-editor-menus",
+    };
 
     /// <summary>
     /// Always overwrite from tip/main — never skip-self, never Fallback pin.
@@ -423,23 +435,27 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// FORCE host download: API tip + HardTipCommitSha + main. Rejects 381B PackageVersion.
+    /// FORCE host download: API tip + raw@main FIRST, HardTip last.
+    /// Rejects 381B PackageVersion and known-stale package Ids (architect-disk-tip-proof, …).
     /// </summary>
     static string DownloadRawMainOnly(string rel, out string source)
     {
         Exception last = null;
-        string tip = ResolveMainSha() ?? HardTipCommitSha;
-        if (string.IsNullOrEmpty(tip) || tip.Length < 7) tip = HardTipCommitSha;
+        string tip = ResolveMainSha();
+        if (string.IsNullOrEmpty(tip) || tip.Length < 7) tip = null;
 
         for (int attempt = 0; attempt < 4; attempt++)
         {
             string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N") + "&a=" + attempt;
             var urlList = new List<string>();
             var labelList = new List<string>();
-            // Hard tip SHA first (known good OnLoad PackageVersion), then API tip, then main.
-            string[] shas = string.Equals(tip, HardTipCommitSha, StringComparison.OrdinalIgnoreCase)
-                ? new[] { HardTipCommitSha, "main" }
-                : new[] { HardTipCommitSha, tip, "main" };
+            // Tip of main + branch tip FIRST — HardTip-first re-landed architect-disk-tip-proof forever.
+            var shas = new List<string>();
+            if (!string.IsNullOrEmpty(tip)) shas.Add(tip);
+            shas.Add("main");
+            if (!string.IsNullOrEmpty(HardTipCommitSha)
+                && (tip == null || !string.Equals(tip, HardTipCommitSha, StringComparison.OrdinalIgnoreCase)))
+                shas.Add(HardTipCommitSha);
             foreach (string sha in shas)
             {
                 urlList.Add(RawBase + sha + "/" + rel + "?" + bust);
@@ -467,6 +483,18 @@ public static class ArthurianSyncFromGitHub
                             throw new Exception("PackageVersion missing Id");
                         if (body.Contains("sync-keep-editor-menus") && !body.Contains(ExpectedPackageId))
                             throw new Exception("stale PackageVersion (sync-keep-editor-menus)");
+                        string gotId = TryParsePackageId(body);
+                        if (IsStalePackageId(gotId))
+                            throw new Exception("stale PackageVersion Id=" + gotId
+                                + " — need " + ExpectedPackageId);
+                    }
+                    if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Accept structural tip, but reject Architect still branded with a stale UiBuildId.
+                        if (!IsTipArchitectBody(body))
+                            throw new Exception("Architect body not tip-shaped");
+                        if (IsStaleArchitectUiBuild(body))
+                            throw new Exception("Architect UiBuildId still stale (want " + ExpectedPackageId + ")");
                     }
                     source = labelList[i] + (attempt > 0 ? "#retry" + attempt : "");
                     return body;
@@ -475,6 +503,35 @@ public static class ArthurianSyncFromGitHub
             }
         }
         throw last ?? new Exception("raw tip/main download failed for " + rel);
+    }
+
+    public static string TryParsePackageId(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return null;
+        var m = Regex.Match(body, @"public\s+const\s+string\s+Id\s*=\s*""([^""]+)""");
+        return m.Success ? m.Groups[1].Value : null;
+    }
+
+    public static bool IsStalePackageId(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return true;
+        if (string.Equals(id, ExpectedPackageId, StringComparison.Ordinal)) return false;
+        foreach (string s in StalePackageIds)
+            if (string.Equals(s, id, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    public static bool IsStaleArchitectUiBuild(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return true;
+        // Tip Architect must advertise current package Id as UiBuildId.
+        if (body.IndexOf(ExpectedPackageId, StringComparison.Ordinal) >= 0) return false;
+        foreach (string s in StalePackageIds)
+            if (body.IndexOf("\"" + s + "\"", StringComparison.Ordinal) >= 0
+                || body.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0)
+                return true;
+        // Unknown older build without ExpectedPackageId — treat as stale so FORCE keeps seeking tip.
+        return body.IndexOf("UiBuildId", StringComparison.Ordinal) >= 0;
     }
 
     /// <summary>Read PackageVersion Id from disk (Diagnose compiled type can lag).</summary>

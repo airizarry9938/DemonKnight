@@ -9,19 +9,20 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "runtime-single-sprite";
-    public const string GitHint = "play-mode-one-sprite-no-paperdoll-layers";
-    public const string BuiltUtc = "2026-11-22T02:53:56Z";
+    public const string Id = "single-sprite-play-wipe";
+    public const string GitHint = "main-first-force-wipe-modular-paperdoll-library";
+    public const string BuiltUtc = "2026-11-22T03:06:51Z";
 
-    /// <summary>Hard tip known to contain LooksLikeHttpFailureBody Sync + OnLoad PackageVersion.</summary>
+    /// <summary>Fallback SHA only — OnLoad prefers API tip + raw@main first.</summary>
     public const string HardTipSha = "c414818b5bb591cd644e0f70a1c7bb16903f9ccf";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
 
     /// <summary>
-    /// After this file compiles (even via manual paste / FORCE of PackageVersion only),
-    /// pull Sync+Bootstrap+Architect from HardTipSha then main — never depends on stale Sync validate.
+    /// After this file compiles (FORCE / paste / tip), pull Sync+Bootstrap+Architect from
+    /// tip/main whenever Architect/Sync still advertise a stale package Id
+    /// (architect-disk-tip-proof, runtime-single-sprite, …).
     /// </summary>
     [InitializeOnLoadMethod]
     static void DkForceTipHostsIfFalsePositiveStuck()
@@ -41,7 +42,9 @@ public static class DemonKnightPackageVersion
                     need = syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0
                            || (syncBody.IndexOf("body.Contains(\"404: Not Found\")", StringComparison.Ordinal) >= 0
                                && syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0)
-                           || syncBody.IndexOf("HardTipCommitSha", StringComparison.Ordinal) < 0;
+                           || syncBody.IndexOf("HardTipCommitSha", StringComparison.Ordinal) < 0
+                           || syncBody.IndexOf("StalePackageIds", StringComparison.Ordinal) < 0
+                           || syncBody.IndexOf(Id, StringComparison.Ordinal) < 0;
                 }
                 bool archStale = !File.Exists(archPath);
                 if (File.Exists(archPath))
@@ -51,23 +54,19 @@ public static class DemonKnightPackageVersion
                                 || a.IndexOf("enum SheetCategory", StringComparison.Ordinal) >= 0
                                 || a.IndexOf("UiBuildId", StringComparison.Ordinal) < 0
                                 || a.IndexOf("SpriteCategory", StringComparison.Ordinal) < 0
-                                || a.IndexOf(Id, StringComparison.Ordinal) < 0;
-                }
-                // Also refresh hosts when our own Id is tip but Sync ExpectedPackageId lags.
-                if (!need && !archStale && File.Exists(syncPath))
-                {
-                    string syncBody = File.ReadAllText(syncPath);
-                    if (syncBody.IndexOf(Id, StringComparison.Ordinal) < 0)
-                        need = true;
+                                || a.IndexOf(Id, StringComparison.Ordinal) < 0
+                                || a.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0
+                                || a.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
+                                || a.IndexOf("runtime-single-sprite\"", StringComparison.Ordinal) >= 0;
                 }
                 if (!need && !archStale) return;
 
                 Debug.LogWarning(
-                    "[DemonKnight] PackageVersion OnLoad: break-glass pull Sync/Bootstrap/Architect "
-                    + "from HardTipSha=" + HardTipSha + " (+ main).");
+                    "[DemonKnight] PackageVersion OnLoad: pull tip Sync/Bootstrap/Architect "
+                    + "(want Id=" + Id + "; prefer API tip + main, HardTip last).");
 
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-                string tip = TryResolveTipSha() ?? HardTipSha;
+                string tip = TryResolveTipSha() ?? "main";
                 string[] rels =
                 {
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -86,6 +85,9 @@ public static class DemonKnightPackageVersion
                         if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                             && body.Length < 500)
                             throw new Exception("PackageVersion too small " + body.Length);
+                        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                            && body.IndexOf(Id, StringComparison.Ordinal) < 0)
+                            throw new Exception("PackageVersion missing tip Id " + Id);
                         string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                         try
@@ -135,7 +137,6 @@ public static class DemonKnightPackageVersion
             wc.Headers.Add("User-Agent", "DemonKnight-PackageVersion-OnLoad/" + Id);
             wc.Headers.Add("Accept", "application/vnd.github.v3+json");
             string json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/commits/main");
-            // Root commit sha only.
             if (json.Length > 50 && json.TrimStart().StartsWith("{", StringComparison.Ordinal))
             {
                 int colon = json.IndexOf(':');
@@ -156,8 +157,8 @@ public static class DemonKnightPackageVersion
     static string DownloadTip(string rel, string tip)
     {
         string bust = "t=" + DateTime.UtcNow.Ticks;
-        // Hard tip FIRST (known good), then API tip, then main.
-        string[] shas = { HardTipSha, tip, "main" };
+        // API tip + main FIRST — HardTip last (avoids re-landing architect-disk-tip-proof).
+        string[] shas = { tip, "main", HardTipSha };
         Exception last = null;
         foreach (string sha in shas)
         {

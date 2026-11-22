@@ -68,13 +68,15 @@ namespace ArthurianAutobattler
                 _loggedFirstBind = true;
                 string bodyName = layers.body != null && layers.body.sprite != null
                     ? layers.body.sprite.name : "NULL";
+                string outfitName = layers.outfit != null && layers.outfit.enabled && layers.outfit.sprite != null
+                    ? layers.outfit.sprite.name : "NULL";
+                string headName = layers.head != null && layers.head.enabled && layers.head.sprite != null
+                    ? layers.head.sprite.name : "NULL";
                 Debug.Log(
                     $"[DemonKnight] First pew Bind '{recruit.characterName}' (single-sprite): " +
                     $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
-                    $"sprite={bodyName} " +
-                    $"bodyEnabled={(layers.body != null && layers.body.enabled)} " +
-                    $"outfitOff={(layers.outfit == null || !layers.outfit.enabled)} " +
-                    $"headOff={(layers.head == null || !layers.head.enabled)}");
+                    $"body={bodyName} outfit={outfitName} head={headName} " +
+                    "(outfit/head must be NULL after Clear Paperdoll Library / tip single-sprite-play-wipe)");
             }
 
             if (moodLayer != null)

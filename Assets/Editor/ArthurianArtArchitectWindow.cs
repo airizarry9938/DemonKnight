@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "runtime-single-sprite";
+    public const string UiBuildId = "single-sprite-play-wipe";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -238,6 +238,35 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (GUILayout.Button($"Create Animation Clip ({selectedCount} frames) → Register Library", GUILayout.Height(36)))
             CreateAndRegisterClip();
         EditorGUI.EndDisabledGroup();
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space(6);
+        EditorGUILayout.LabelField("Play library (single Sprite)", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Save Sprite Library → Resources", GUILayout.Height(28)))
+        {
+            EnsureLibraryAsset();
+            if (targetLibrary != null && targetLibrary.HasPaperdollResidue())
+                targetLibrary.ClearPaperdollLayersKeepSprites();
+            EditorUtility.SetDirty(targetLibrary);
+            AssetDatabase.SaveAssets();
+            SyncLibraryToResources();
+            ArthurianMenuBootstrap.VerifyAndSyncModularLibraryInternal(showDialog: false);
+            EditorUtility.DisplayDialog(
+                "Sprite Library Saved",
+                "Copied ModularSpriteLibrary → Resources (play reads this).\n" +
+                "Outfit/Head/Prop cleared. Stop Play → New Game.\n" +
+                "Bind log must show outfit=NULL head=NULL.\n\n" +
+                "StageLayoutProfile is pew/battle slots only — not required for sprites.",
+                "OK");
+        }
+        if (GUILayout.Button("Clear Paperdoll Layers", GUILayout.Height(28)))
+        {
+            string report = ArthurianMenuBootstrap.ClearPaperdollLibraryInternal(showDialog: false);
+            EnsureLibraryAsset();
+            targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(DefaultLibraryPath);
+            EditorUtility.DisplayDialog("Paperdoll Cleared", report, "OK");
+        }
         EditorGUILayout.EndHorizontal();
 
         if (targetLibrary != null && targetLibrary.animClips != null && targetLibrary.animClips.Count > 0)

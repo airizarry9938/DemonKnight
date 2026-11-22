@@ -243,7 +243,70 @@ public static class ArthurianMenuBootstrap
         Debug.Log("[DemonKnight] " + report);
     }
 
-    /// <summary>Callable from Force Sync without a dialog.</summary>
+    [MenuItem("Arthurian/Art Tools/Clear Paperdoll Library → Single Sprite", false, 37)]
+    public static void ClearPaperdollLibraryMenu()
+    {
+        string report = ClearPaperdollLibraryInternal(showDialog: true);
+        Debug.Log("[DemonKnight] " + report);
+    }
+
+    [MenuItem("Arthurian/Art Tools/Save Sprite Library → Resources", false, 36)]
+    public static void SaveSpriteLibraryToResourcesMenu()
+    {
+        string report = VerifyAndSyncModularLibraryInternal(showDialog: true);
+        Debug.Log("[DemonKnight] Save Sprite Library: " + report);
+    }
+
+    /// <summary>Wipe Outfit/Head/Prop + legacy Pose clips, then copy library → Resources.</summary>
+    public static string ClearPaperdollLibraryInternal(bool showDialog)
+    {
+        const string artPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
+        const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
+        EnsureFolderPath("Assets/Art/Modular");
+        EnsureFolderPath("Assets/Resources/Art/Modular");
+
+        var art = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(artPath);
+        if (art == null)
+        {
+            string[] guids = AssetDatabase.FindAssets("t:ModularSpriteLibrary");
+            foreach (string g in guids)
+            {
+                string p = AssetDatabase.GUIDToAssetPath(g);
+                art = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(p);
+                if (art != null) break;
+            }
+        }
+        if (art == null)
+        {
+            art = ScriptableObject.CreateInstance<ModularSpriteLibrary>();
+            art.EnsureSizedArrays();
+            AssetDatabase.CreateAsset(art, artPath);
+        }
+
+        int cleared = art.ClearPaperdollLayersKeepSprites();
+        // Drop legacy Prepared_Pose sheets from basePoses when Spliced/Sprite exports exist — else keep / placeholder.
+        TryImportSplicedSpritesIntoBasePoses(art);
+        if (CountSprites(art.basePoses) == 0)
+        {
+            art.EnsurePlaceholderSpritesIfEmpty();
+            BakePlaceholderSpritesIntoProject(art, "Assets/Art/Modular/Placeholders");
+        }
+        EditorUtility.SetDirty(art);
+        AssetDatabase.SaveAssets();
+
+        string syncReport = VerifyAndSyncModularLibraryInternal(showDialog: false);
+        string report =
+            $"Cleared paperdoll residue entries≈{cleared}.\n" +
+            $"outfits/heads/props emptied; anim clips kept=Sprite-only.\n" +
+            syncReport +
+            "\nStageLayoutProfile is pew/battle SLOTS only — not required for sprite wipe.\n" +
+            "Stop Play → New Game. Bind log must show outfit=NULL head=NULL.";
+        if (showDialog)
+            EditorUtility.DisplayDialog("Paperdoll Library Cleared", report, "OK");
+        return report;
+    }
+
+    /// <summary>Callable from Force Sync without a dialog. Also strips paperdoll residue.</summary>
     public static string VerifyAndSyncModularLibraryInternal(bool showDialog)
     {
         const string artPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
@@ -275,19 +338,27 @@ public static class ArthurianMenuBootstrap
         }
 
         art.EnsureSizedArrays();
+        int wiped = 0;
+        if (art.HasPaperdollResidue())
+            wiped = art.ClearPaperdollLayersKeepSprites();
+        TryImportSplicedSpritesIntoBasePoses(art);
+
         bool usedPlaceholders = CountSprites(art.basePoses) == 0;
         if (usedPlaceholders)
         {
             art.EnsurePlaceholderSpritesIfEmpty();
             // Persist placeholders as textures under the library so Resources copy keeps refs.
             BakePlaceholderSpritesIntoProject(art, "Assets/Art/Modular/Placeholders");
-            EditorUtility.SetDirty(art);
-            AssetDatabase.SaveAssets();
         }
+        EditorUtility.SetDirty(art);
+        AssetDatabase.SaveAssets();
 
         int poses = CountSprites(art.basePoses);
         int outfits = CountSprites(art.outfits);
-        int heads = art.heads != null ? art.heads.Length : 0;
+        int heads = 0;
+        if (art.heads != null)
+            for (int i = 0; i < art.heads.Length; i++)
+                if (art.heads[i] != null && art.heads[i].sprite != null) heads++;
         string artAssetPath = AssetDatabase.GetAssetPath(art);
 
         if (AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath) != null)
@@ -318,30 +389,80 @@ public static class ArthurianMenuBootstrap
         if (res != null)
         {
             res.EnsureSizedArrays();
+            if (res.HasPaperdollResidue())
+                res.ClearPaperdollLayersKeepSprites();
             if (CountSprites(res.basePoses) == 0)
             {
                 // CopyAsset can drop ephemeral refs — re-seed + bake under Resources.
                 res.EnsurePlaceholderSpritesIfEmpty();
                 BakePlaceholderSpritesIntoProject(res, "Assets/Resources/Art/Modular/Placeholders");
-                EditorUtility.SetDirty(res);
-                AssetDatabase.SaveAssets();
             }
+            EditorUtility.SetDirty(res);
+            AssetDatabase.SaveAssets();
         }
         int resPoses = res != null ? CountSprites(res.basePoses) : 0;
+        int resOutfits = res != null ? CountSprites(res.outfits) : -1;
 
         string report =
             $"Source: {artAssetPath}\n" +
-            $"poses {poses}/4 · outfits {outfits}/6 · heads {heads}\n" +
+            $"sprites(basePoses) {poses} · outfits {outfits} (want 0) · heads {heads} (want 0)\n" +
+            (wiped > 0 ? $"Wiped paperdoll residue≈{wiped}\n" : "") +
             $"Runtime copy: {resPath}\n" +
-            $"Resources poses filled: {resPoses}\n" +
+            $"Resources sprites filled: {resPoses} · outfits: {resOutfits}\n" +
             (usedPlaceholders
-                ? "Seeded PLACEHOLDER poses (no sheets imported yet).\nImport real sprites via Art & Stage Architect → Tab 1 when ready.\n"
+                ? "Seeded PLACEHOLDER sprites (no Spliced/Sprite exports yet).\nArchitect → Save Splices (Category Sprite) when ready.\n"
                 : "") +
-            "Stop Play → Main Menu → New Game to rebuild pews.";
+            "Stop Play → Main Menu → New Game to rebuild pews.\n" +
+            "Bind log must show: body=… outfit=NULL head=NULL";
 
         if (showDialog)
             EditorUtility.DisplayDialog("Modular Library Synced", report, "OK");
         return report;
+    }
+
+    /// <summary>Pull PNG/sprites from Assets/Art/Spliced/Sprite into basePoses when present.</summary>
+    static void TryImportSplicedSpritesIntoBasePoses(ModularSpriteLibrary lib)
+    {
+        if (lib == null) return;
+        const string folder = "Assets/Art/Spliced/Sprite";
+        if (!AssetDatabase.IsValidFolder(folder)) return;
+        string[] guids = AssetDatabase.FindAssets("t:Sprite", new[] { folder });
+        if (guids == null || guids.Length == 0) return;
+
+        var sprites = new List<Sprite>();
+        foreach (string g in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(g);
+            var sp = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sp != null) sprites.Add(sp);
+        }
+        if (sprites.Count == 0) return;
+
+        // Prefer Spliced/Sprite over legacy Prepared_Pose sheets.
+        bool legacyOnly = CountSprites(lib.basePoses) > 0;
+        if (legacyOnly)
+        {
+            bool allLegacy = true;
+            for (int i = 0; i < lib.basePoses.Length; i++)
+            {
+                var sp = lib.basePoses[i];
+                if (sp == null) continue;
+                string n = sp.name ?? "";
+                if (n.IndexOf("Prepared_Pose", StringComparison.OrdinalIgnoreCase) < 0
+                    && n.IndexOf("Prepared_Outfit", StringComparison.OrdinalIgnoreCase) < 0
+                    && n.IndexOf("DK_Sprite_", StringComparison.OrdinalIgnoreCase) < 0
+                    && n.IndexOf("DK_Pose_", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    allLegacy = false;
+                    break;
+                }
+            }
+            if (!allLegacy) return; // already has real spliced refs
+        }
+
+        lib.basePoses = sprites.ToArray();
+        EditorUtility.SetDirty(lib);
+        Debug.Log($"[DemonKnight] Imported {sprites.Count} sprite(s) from {folder} → basePoses.");
     }
 
     static void EnsureFolderPath(string folder)
@@ -391,20 +512,10 @@ public static class ArthurianMenuBootstrap
             if (loaded != null) sp = loaded;
         }
 
+        // Single-sprite: only bake basePoses (never re-materialize Outfit/Head/Prop placeholders).
         if (lib.basePoses != null)
             for (int i = 0; i < lib.basePoses.Length; i++)
-                Bake(ref lib.basePoses[i], $"Pose_{i}");
-        if (lib.outfits != null)
-            for (int i = 0; i < lib.outfits.Length; i++)
-                Bake(ref lib.outfits[i], $"Outfit_{i}");
-        if (lib.heads != null)
-            for (int i = 0; i < lib.heads.Length; i++)
-                if (lib.heads[i] != null)
-                    Bake(ref lib.heads[i].sprite, $"Head_{i}");
-        if (lib.props != null)
-            for (int i = 0; i < lib.props.Length; i++)
-                if (lib.props[i] != null)
-                    Bake(ref lib.props[i], $"Prop_{i}");
+                Bake(ref lib.basePoses[i], $"Sprite_{i}");
     }
 
     [InitializeOnLoadMethod]
@@ -418,10 +529,16 @@ public static class ArthurianMenuBootstrap
                 const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
                 var res = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath);
                 int filled = res != null ? CountSprites(res.basePoses) : 0;
-                if (res == null || filled == 0)
+                bool paperdoll = res != null && res.HasPaperdollResidue();
+                if (res == null || filled == 0 || paperdoll)
                 {
-                    Debug.Log("[DemonKnight] Auto Verify & Sync Modular Library (Resources missing/empty).");
-                    VerifyAndSyncModularLibraryInternal(showDialog: false);
+                    Debug.Log(paperdoll
+                        ? "[DemonKnight] Auto Clear Paperdoll → Single Sprite (Resources still has Outfit/Head/Pose clips)."
+                        : "[DemonKnight] Auto Verify & Sync Modular Library (Resources missing/empty).");
+                    if (paperdoll)
+                        ClearPaperdollLibraryInternal(showDialog: false);
+                    else
+                        VerifyAndSyncModularLibraryInternal(showDialog: false);
                 }
                 DedupeArtToolScripts();
                 ForceArchitectTipIfStale();
@@ -446,10 +563,14 @@ public static class ArthurianMenuBootstrap
         {
             ArthurianSyncFromGitHub.NukeNestedArchitectCopies(projectRoot);
             string disk = File.Exists(dest) ? File.ReadAllText(dest) : "";
-            bool tip = ArthurianSyncFromGitHub.IsTipArchitectBody(disk);
-            if (tip) return;
+            bool tipShape = ArthurianSyncFromGitHub.IsTipArchitectBody(disk);
+            bool packageMatch = disk.IndexOf(DemonKnightPackageVersion.Id, StringComparison.Ordinal) >= 0
+                                && !ArthurianSyncFromGitHub.IsStaleArchitectUiBuild(disk);
+            if (tipShape && packageMatch) return;
 
-            Debug.LogWarning("[DemonKnight] Stale Art Architect on disk (paperdoll/multi-category) — force tip overwrite.");
+            Debug.LogWarning(
+                "[DemonKnight] Stale Art Architect on disk (paperdoll and/or package Id≠"
+                + DemonKnightPackageVersion.Id + ") — force tip overwrite.");
             ArthurianSyncFromGitHub.NukeStaleArchitectAndPaperDollEditors(projectRoot);
             ArthurianSyncFromGitHub.CloseOpenArchitectWindows();
             var errors = new List<string>();
@@ -457,7 +578,8 @@ public static class ArthurianMenuBootstrap
             AssetDatabase.Refresh();
             string after = File.Exists(dest) ? File.ReadAllText(dest) : "";
             Debug.Log("[DemonKnight] " + ArthurianSyncFromGitHub.ArchitectTipMarkersReport());
-            if (ArthurianSyncFromGitHub.IsTipArchitectBody(after))
+            if (ArthurianSyncFromGitHub.IsTipArchitectBody(after)
+                && after.IndexOf(DemonKnightPackageVersion.Id, StringComparison.Ordinal) >= 0)
                 Debug.Log($"[DemonKnight] Architect tip landed via host overwrite ({n} hosts). Re-open Art & Stage Architect.");
             else
                 Debug.LogError("[DemonKnight] Architect still stale after host overwrite. Run Arthurian → FORCE Upgrade Sync Hosts From main, wait compile, Force Sync again.\n"
@@ -849,8 +971,10 @@ public static class ArthurianMenuBootstrap
                 return true;
             string id = ReadPackageIdFromDisk() ?? "";
             if (id == "architect-force-tip-ui" || id == "single-sprite-no-paperdoll"
-                || id == "architect-breakglass-hosts")
+                || id == "architect-breakglass-hosts" || id == "architect-disk-tip-proof"
+                || id == "runtime-single-sprite")
                 return true;
+            if (ArthurianSyncFromGitHub.IsStalePackageId(id)) return true;
             return false;
         }
         catch { return true; }
