@@ -117,7 +117,7 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Next Night = same advance as former Enter Next Timeline (AdvanceNightAndRestart).
+        /// Next Night → StartNextTimelineRun (mid-run keep-wave OR defeat wave→1).
         /// Single listener only — clears persistent Inspector wiring.
         /// </summary>
         private void WireNextNightButton(bool promoteOverlay)
@@ -450,7 +450,7 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Mid-run wave win: victory message + Next Night (advances night via StartNextTimelineRun).
+        /// Mid-run wave win: victory message + Next Night (ContinueAfterWaveVictory — keep wave index).
         /// </summary>
         public void TriggerWaveVictoryScreen(int waveCleared, int goldEarned, string flockBreakdown = null)
         {
@@ -460,9 +460,12 @@ namespace ArthurianAutobattler
             EnsureResurrectionCanvas();
             PromoteVictoryCanvas();
             CullDuplicateEventSystems();
+            var loopFlag = GameLoopManager.Instance ?? FindFirstObjectByType<GameLoopManager>();
+            if (loopFlag != null)
+                loopFlag.pendingMidRunWaveVictory = true;
             if (string.IsNullOrEmpty(flockBreakdown))
             {
-                var loop = GameLoopManager.Instance;
+                var loop = loopFlag ?? GameLoopManager.Instance;
                 flockBreakdown = loop != null ? loop.lastFlockUpkeepBreakdown : null;
             }
             string flockLine = string.IsNullOrEmpty(flockBreakdown)
@@ -642,6 +645,8 @@ namespace ArthurianAutobattler
         {
             if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
             if (legacyBankPanel != null) legacyBankPanel.SetActive(false);
+            var loopClear = GameLoopManager.Instance ?? FindFirstObjectByType<GameLoopManager>();
+            if (loopClear != null) loopClear.pendingMidRunWaveVictory = false;
 
             int staged = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
@@ -693,6 +698,8 @@ namespace ArthurianAutobattler
             SaveBankData();
             // Lose / full-run end: force per-wave disband before Merlin bank (party → pews).
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
+            // Defeat / Nimue clear uses AdvanceNightAndRestart (wave→1), not mid-run keep-wave.
+            if (loop != null) loop.pendingMidRunWaveVictory = false;
             DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
             int staged = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
@@ -774,6 +781,8 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Begin the next night without relying on Build Settings. Soft-restarts the
         /// GameLoop when present; only falls back to a scene reload if needed.
+        /// Mid-run wave victory → ContinueAfterWaveVictory (keep currentBattleNumber).
+        /// Defeat / full-run end → AdvanceNightAndRestart (wave resets to 1).
         /// </summary>
         public void StartNextTimelineRun()
         {
@@ -791,6 +800,11 @@ namespace ArthurianAutobattler
                 var loop = GameLoopManager.Instance ?? FindFirstObjectByType<GameLoopManager>();
                 if (loop != null)
                 {
+                    if (loop.pendingMidRunWaveVictory)
+                    {
+                        loop.ContinueAfterWaveVictory();
+                        return;
+                    }
                     loop.AdvanceNightAndRestart();
                     return;
                 }

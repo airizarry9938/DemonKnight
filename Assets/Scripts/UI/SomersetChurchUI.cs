@@ -116,7 +116,7 @@ namespace ArthurianAutobattler
             StartCoroutine(RelayoutHudNextFrame());
 
             if (GameLoopManager.Instance != null)
-                SetNight(GameLoopManager.Instance.currentNight);
+                SetNight(GameLoopManager.Instance.CurrentWaveNumber());
 
             // Dice/codex/warband start closed. Selection menu starts closed;
             // bottom dialogue strip stays visible for hover quotes.
@@ -1283,6 +1283,12 @@ namespace ArthurianAutobattler
             hudRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 84f);
         }
 
+        /// <summary>
+        /// HUD Night/Wave bar. Display always uses combat wave
+        /// (<see cref="AutoBattlerEngine.currentBattleNumber"/>) — same index as
+        /// DemonHordeGenerator budget + GetBossForWave. The <paramref name="night"/>
+        /// arg is ignored when it disagrees with combat (stale calendar).
+        /// </summary>
         public void SetNight(int night)
         {
             if (nightText == null)
@@ -1298,15 +1304,21 @@ namespace ArthurianAutobattler
 
             int wave = 1;
             var loop = GameLoopManager.Instance;
-            if (loop != null) wave = loop.CurrentWaveNumber();
+            if (loop != null)
+            {
+                loop.SyncNightToCombatWave();
+                wave = loop.CurrentWaveNumber();
+            }
             else
             {
                 var eng = FindFirstObjectByType<AutoBattlerEngine>();
                 if (eng != null) wave = Mathf.Max(1, eng.currentBattleNumber);
+                else wave = Mathf.Max(1, night);
             }
 
-            nightText.text = GameLoopManager.FormatNightWaveLabel(night, wave);
-            // Slightly smaller so "Night N · Wave M (Boss)" fits the HUD slot.
+            // Night number == Wave number == combat SoT (no Night 2 · Wave 1 drift).
+            nightText.text = GameLoopManager.FormatNightWaveLabel(wave, wave);
+            // Slightly smaller so "Night N · Wave N (Boss)" fits the HUD slot.
             if (nightText.fontSize > 18f) nightText.fontSize = 18f;
             nightText.textWrappingMode = TextWrappingModes.NoWrap;
             nightText.overflowMode = TextOverflowModes.Overflow;
@@ -3356,7 +3368,8 @@ namespace ArthurianAutobattler
         {
             var town = Town;
             var loop = GameLoopManager.Instance;
-            if (loop != null) SetNight(loop.currentNight);
+            // Combat wave SoT — not stale currentNight calendar alone.
+            if (loop != null) SetNight(loop.CurrentWaveNumber());
             if (goldText != null && town != null) goldText.text = $"Royal Gold: {town.playerGold}g";
             UpdateWarbandHudLabel();
             RefreshShepherdsVowBadge(loop);
