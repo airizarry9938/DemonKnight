@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "class-sprite-pools";
+    const string TipPackageId = "force-sync-appliers-hardfix";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
@@ -453,6 +453,10 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
+            // Applier embed host — Force Sync CS0103 hardfix.
+            "Assets/Scripts/Data/GameDataTypes.cs",
+            "Assets/Scripts/UI/SceneBackgroundApplier.cs",
+            "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
