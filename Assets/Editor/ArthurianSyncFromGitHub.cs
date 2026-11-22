@@ -1705,7 +1705,8 @@ public static class ArthurianSyncFromGitHub
             if (!File.Exists(path))
                 return "Architect tip markers: SpriteCategory=NO UiBuildId=NO PaperDoll remnant=YES (file MISSING)";
             string body = File.ReadAllText(path);
-            bool sprite = body.Contains("SpriteCategory") && body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds }");
+            bool sprite = body.Contains("SpriteCategory")
+                          && body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites }");
             bool ui = body.Contains("UiBuildId");
             bool remnant = body.Contains("Paper-Doll Unit Generator")
                            || body.Contains("enum SheetCategory")
