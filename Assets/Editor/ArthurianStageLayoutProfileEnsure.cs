@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "merlin-lore-narrative";
+    const string TipPackageId = "lore-boss-wave-order";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
@@ -56,6 +56,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-wave-advance-stuck",
         "legends-fullwidth-column",
         "fix-hud-wave-match",
+        "merlin-lore-narrative",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]

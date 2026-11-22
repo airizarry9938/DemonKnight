@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
 
-    private const string ExpectedPackageId = "merlin-lore-narrative";
+    private const string ExpectedPackageId = "lore-boss-wave-order";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -65,6 +65,7 @@ public static class ArthurianSyncFromGitHub
         "fix-wave-advance-stuck",
         "legends-fullwidth-column",
         "fix-hud-wave-match",
+        "merlin-lore-narrative",
     };
 
     /// <summary>
@@ -1655,7 +1656,8 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("force-sync-appliers-hardfix")
                    || body.Contains("sheet-splicer-chroma-despill")
                    || body.Contains("fix-hud-wave-match")
-                   || body.Contains("merlin-lore-narrative");
+                   || body.Contains("merlin-lore-narrative")
+                   || body.Contains("lore-boss-wave-order");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))

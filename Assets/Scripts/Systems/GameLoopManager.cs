@@ -1051,18 +1051,18 @@ namespace ArthurianAutobattler
             wave = Mathf.Max(1, wave);
             var db = CharacterDatabase.Load();
             if (db != null) return db.DescribeWave(wave);
-            // Legacy fallback aligned with DemonHordeGenerator (boss from wave 3).
+            // Legacy fallback aligned with DemonHordeGenerator lore order (boss from wave 3).
             return wave switch
             {
                 1 => "Wave 1 (Horde)",
                 2 => "Wave 2 (Horde)",
                 3 => "Wave 3: The Black Knight",
-                4 => "Wave 4: Vortigern, Usurper King",
-                5 => "Wave 5: The Green Knight",
-                6 => "Wave 6: Accolon of Gaul",
-                7 => "Wave 7: Sir Meleagant",
-                8 => "Wave 8: King Lot of Lothian",
-                9 => "Wave 9: The Questing Beast",
+                4 => "Wave 4: Sir Meleagant",
+                5 => "Wave 5: King Lot of Lothian",
+                6 => "Wave 6: Vortigern, Usurper King",
+                7 => "Wave 7: Accolon of Gaul",
+                8 => "Wave 8: The Questing Beast",
+                9 => "Wave 9: The Green Knight",
                 _ => $"Wave {wave}: Nimue, Queen of Thorns"
             };
         }

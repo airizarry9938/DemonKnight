@@ -186,8 +186,8 @@ namespace ArthurianAutobattler
                 var waveBoss = hordeGenerator.SpawnCorruptedLegendBoss(currentBattleNumber, mult);
                 demonArmy.Insert(0, waveBoss);
                 spawnedBoss = waveBoss != null;
-                // King Lot: summons 2 Frenzied Imps on spawn.
-                if (waveBoss.unitType == UnitType.BossKingLot)
+                // King Lot (lore wave 5): summons 2 Frenzied Imps on spawn — keyed by UnitType, not wave#.
+                if (waveBoss != null && waveBoss.unitType == UnitType.BossKingLot)
                 {
                     demonArmy.Insert(1, DemonHordeGenerator.MakeImp(9001, mult));
                     demonArmy.Insert(2, DemonHordeGenerator.MakeImp(9002, mult));

@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "merlin-lore-narrative";
-    public const string GitHint = "merlin-missing-grail-nightmare-prologue";
-    public const string BuiltUtc = "2026-11-22T21:45:00Z";
+    public const string Id = "lore-boss-wave-order";
+    public const string GitHint = "lore-boss-wave-order-remap";
+    public const string BuiltUtc = "2026-11-22T21:55:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
@@ -213,6 +213,10 @@ public static class DemonKnightPackageVersion
             "class-sprite-pools",
             "force-sync-appliers-hardfix",
             "sheet-splicer-chroma-despill",
+            "fix-wave-advance-stuck",
+            "legends-fullwidth-column",
+            "fix-hud-wave-match",
+            "merlin-lore-narrative",
         };
         foreach (string s in stale)
         {
