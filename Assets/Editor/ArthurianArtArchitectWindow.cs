@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "spliced-sprite-escape";
+    public const string UiBuildId = "architect-no-bootstrap-clear";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -245,26 +245,16 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Save Sprite Library → Resources", GUILayout.Height(28)))
         {
-            EnsureLibraryAsset();
-            if (targetLibrary != null && targetLibrary.HasPaperdollResidue())
-                targetLibrary.ClearPaperdollLayersKeepSprites();
-            EditorUtility.SetDirty(targetLibrary);
-            AssetDatabase.SaveAssets();
-            SyncLibraryToResources();
-            ArthurianMenuBootstrap.VerifyAndSyncModularLibraryInternal(showDialog: false);
+            string report = ClearPaperdollLibraryLocal();
             EditorUtility.DisplayDialog(
                 "Sprite Library Saved",
-                "Copied ModularSpriteLibrary → Resources (play reads this).\n" +
-                "Outfit/Head/Prop cleared. Stop Play → New Game.\n" +
-                "Bind log must show outfit=NULL head=NULL.\n\n" +
-                "StageLayoutProfile is pew/battle slots only — not required for sprites.",
+                report + "\n\nStop Play → New Game. Bind: outfit=NULL head=NULL.\n"
+                + "StageLayoutProfile is pew/battle slots only — not required for sprites.",
                 "OK");
         }
         if (GUILayout.Button("Clear Paperdoll Layers", GUILayout.Height(28)))
         {
-            string report = ArthurianMenuBootstrap.ClearPaperdollLibraryInternal(showDialog: false);
-            EnsureLibraryAsset();
-            targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(DefaultLibraryPath);
+            string report = ClearPaperdollLibraryLocal();
             EditorUtility.DisplayDialog("Paperdoll Cleared", report, "OK");
         }
         EditorGUILayout.EndHorizontal();
@@ -1783,6 +1773,45 @@ public class ArthurianArtArchitectWindow : EditorWindow
         targetLibrary.animClips = new List<ModularAnimRegistration>();
         AssetDatabase.CreateAsset(targetLibrary, DefaultLibraryPath);
         AssetDatabase.SaveAssets();
+    }
+
+    /// <summary>
+    /// Local clear — no ArthurianMenuBootstrap.ClearPaperdollLibraryInternal dependency
+    /// (CS0117 when tip Architect lands before tip Bootstrap).
+    /// </summary>
+    string ClearPaperdollLibraryLocal()
+    {
+        var log = new System.Text.StringBuilder();
+        try
+        {
+            log.AppendLine(DemonKnightPackageVersion.WipeModularPaperdollAssets());
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine("PackageVersion wipe: " + ex.Message);
+        }
+        try
+        {
+            log.AppendLine(ArthurianStageLayoutProfileEnsure.RebuildPewLibraryFromSplices());
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine("Rebuild splices: " + ex.Message);
+            // Fallback: clear in-memory library + Resources copy only.
+            EnsureLibraryAsset();
+            if (targetLibrary != null)
+            {
+                targetLibrary.ClearPaperdollLayersKeepSprites();
+                EditorUtility.SetDirty(targetLibrary);
+                AssetDatabase.SaveAssets();
+                SyncLibraryToResources();
+                log.AppendLine("Local ClearPaperdollLayersKeepSprites + SyncLibraryToResources.");
+            }
+        }
+        EnsureLibraryAsset();
+        targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(DefaultLibraryPath);
+        TownsfolkVisualApplier.SetLibrary(null);
+        return log.ToString().TrimEnd();
     }
 
     void SyncLibraryToResources()

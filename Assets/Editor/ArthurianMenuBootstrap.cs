@@ -862,7 +862,7 @@ public static class ArthurianMenuBootstrap
                 "FORCE Upgrade → Tip Escape",
                 "Pull PackageVersion / Sync / Bootstrap / Architect / TipEscape / PaperDoll\n"
                 + "from GitHub tip of main (never HardTip).\n\n"
-                + "Diagnose after compile must show: spliced-sprite-escape\n"
+                + "Diagnose after compile must show: architect-no-bootstrap-clear\n"
                 + "(compiled Id == disk Id).",
                 "Escape Now", "Cancel"))
             return;
@@ -942,7 +942,7 @@ public static class ArthurianMenuBootstrap
                 if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
                         || body.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0)
-                    && body.IndexOf("spliced-sprite-escape", StringComparison.Ordinal) < 0)
+                    && body.IndexOf("architect-no-bootstrap-clear", StringComparison.Ordinal) < 0)
                     throw new Exception("stale PackageVersion body");
                 string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
@@ -962,7 +962,7 @@ public static class ArthurianMenuBootstrap
         }
         AssetDatabase.Refresh();
         log.AppendLine($"Wrote {ok}/{rels.Length}. Wait compile → click FORCE again if TipEscape menu missing.");
-        log.AppendLine("Diagnose must show spliced-sprite-escape compiled=disk.");
+        log.AppendLine("Diagnose must show architect-no-bootstrap-clear compiled=disk.");
         return log.ToString();
     }
 
@@ -1000,7 +1000,8 @@ public static class ArthurianMenuBootstrap
             if (id == "architect-force-tip-ui" || id == "single-sprite-no-paperdoll"
                 || id == "architect-breakglass-hosts" || id == "architect-disk-tip-proof"
                 || id == "runtime-single-sprite" || id == "single-sprite-play-wipe"
-                || id == "single-sprite-auto-wipe")
+                || id == "single-sprite-auto-wipe" || id == "spliced-sprite-escape"
+                || id == "spliced-sprite-pews")
                 return true;
             if (ArthurianSyncFromGitHub.IsStalePackageId(id)) return true;
             return false;

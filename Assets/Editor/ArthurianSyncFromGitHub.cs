@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "5f97e7e2f6760335fe485cacf11880a8f7ad7f32";
 
-    private const string ExpectedPackageId = "spliced-sprite-escape";
+    private const string ExpectedPackageId = "architect-no-bootstrap-clear";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -45,6 +45,7 @@ public static class ArthurianSyncFromGitHub
         "single-sprite-play-wipe",
         "single-sprite-auto-wipe",
         "spliced-sprite-pews",
+        "spliced-sprite-escape",
         "sync-keep-editor-menus",
     };
 

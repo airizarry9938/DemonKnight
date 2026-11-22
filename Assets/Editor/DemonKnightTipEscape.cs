@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "spliced-sprite-escape";
+    public const string TipPackageId = "architect-no-bootstrap-clear";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -31,7 +31,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (spliced-sprite-escape)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (architect-no-bootstrap-clear)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -100,6 +100,7 @@ public static class DemonKnightTipEscape
             "single-sprite-play-wipe",
             "single-sprite-auto-wipe",
             "spliced-sprite-pews",
+            "spliced-sprite-escape",
         };
         foreach (string s in stale)
         {

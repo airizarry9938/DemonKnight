@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "spliced-sprite-escape";
-    public const string GitHint = "force-upgrade-tipescape-never-hardtip";
-    public const string BuiltUtc = "2026-11-22T09:51:28Z";
+    public const string Id = "architect-no-bootstrap-clear";
+    public const string GitHint = "architect-clear-local-no-CS0117-bootstrap";
+    public const string BuiltUtc = "2026-11-22T09:56:50Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "5f97e7e2f6760335fe485cacf11880a8f7ad7f32";
