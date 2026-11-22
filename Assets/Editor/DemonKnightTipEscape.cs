@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "force-sync-appliers-hardfix";
+    public const string TipPackageId = "legends-fullwidth-column";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -24,11 +24,12 @@ public static class DemonKnightTipEscape
         "Assets/Editor/DemonKnightPackageVersion.cs",
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
-        // Embed host BEFORE stubs — Appliers live in GameDataTypes (force-sync-appliers-hardfix).
+        // Embed host BEFORE stubs — Appliers live in GameDataTypes (force-sync-appliers-hardfix marker kept).
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
+        "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
@@ -40,7 +41,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (force-sync-appliers-hardfix)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (legends-fullwidth-column)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -124,6 +125,8 @@ public static class DemonKnightTipEscape
             "architect-persist-scene-bg",
             "fix-scene-bg-applier-cs0103",
             "class-sprite-pools",
+            "force-sync-appliers-hardfix",
+            "sheet-splicer-chroma-despill",
         };
         foreach (string s in stale)
         {

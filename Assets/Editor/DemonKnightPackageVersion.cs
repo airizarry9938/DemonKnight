@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "force-sync-appliers-hardfix";
-    public const string GitHint = "embed-appliers-in-gamedatatypes-force-sync";
-    public const string BuiltUtc = "2026-11-22T19:30:00Z";
+    public const string Id = "legends-fullwidth-column";
+    public const string GitHint = "legends-one-fullwidth-column-rows";
+    public const string BuiltUtc = "2026-11-22T20:20:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
+    public const string HardTipSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -211,6 +211,8 @@ public static class DemonKnightPackageVersion
             "architect-persist-scene-bg",
             "fix-scene-bg-applier-cs0103",
             "class-sprite-pools",
+            "force-sync-appliers-hardfix",
+            "sheet-splicer-chroma-despill",
         };
         foreach (string s in stale)
         {

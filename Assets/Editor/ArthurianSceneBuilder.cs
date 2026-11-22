@@ -284,12 +284,14 @@ public static class ArthurianSceneBuilder
             new Vector2(0.04f, 0.06f), new Vector2(0.96f, 0.94f), Vector2.zero, Vector2.zero,
             new Color(0.07f, 0.08f, 0.10f, 0.98f));
         codexPanel.SetActive(false);
-        var codexTitle = CreateTMP(codexPanel.transform, "CodexTitle", "LEGEND CODEX — 10 Arthurian Fusions", 28, TextAlignmentOptions.Center,
+        // Title object kept for Find() compat but inactive (Andrew: drop Legends title panel).
+        var codexTitle = CreateTMP(codexPanel.transform, "CodexTitle", "LEGENDS", 28, TextAlignmentOptions.Center,
             new Vector2(0f, -18f), new Vector2(0f, 48f));
         var codexTitleRt = codexTitle.rectTransform;
         codexTitleRt.anchorMin = new Vector2(0.05f, 1f);
         codexTitleRt.anchorMax = new Vector2(0.95f, 1f);
         codexTitleRt.pivot = new Vector2(0.5f, 1f);
+        codexTitle.gameObject.SetActive(false);
         CreateButton(codexPanel.transform, "CodexCloseX", "X",
             new Vector2(-12f, -12f), new Vector2(44f, 44f), new Color(0.45f, 0.12f, 0.12f));
         var codexCloseRt = codexPanel.transform.Find("CodexCloseX") as RectTransform;
@@ -304,7 +306,7 @@ public static class ArthurianSceneBuilder
         scrollHost.transform.SetParent(codexPanel.transform, false);
         var scrollHostRt = scrollHost.GetComponent<RectTransform>();
         scrollHostRt.anchorMin = new Vector2(0.04f, 0.06f);
-        scrollHostRt.anchorMax = new Vector2(0.96f, 0.88f);
+        scrollHostRt.anchorMax = new Vector2(0.96f, 0.895f);
         scrollHostRt.offsetMin = Vector2.zero;
         scrollHostRt.offsetMax = Vector2.zero;
         scrollHost.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.15f);
@@ -318,14 +320,15 @@ public static class ArthurianSceneBuilder
         recipeRt.pivot = new Vector2(0.5f, 1f);
         recipeRt.anchoredPosition = Vector2.zero;
         recipeRt.sizeDelta = new Vector2(0f, 0f);
+        // One full-width column — each hero/fusion row spans the scroll width.
         var grid = recipeList.GetComponent<GridLayoutGroup>();
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 2;
-        grid.cellSize = new Vector2(560f, 156f);
-        grid.spacing = new Vector2(16f, 14f);
-        grid.padding = new RectOffset(10, 10, 10, 10);
+        grid.constraintCount = 1;
+        grid.cellSize = new Vector2(980f, 172f);
+        grid.spacing = new Vector2(0f, 14f);
+        grid.padding = new RectOffset(14, 14, 10, 12);
         grid.childAlignment = TextAnchor.UpperCenter;
-        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.startAxis = GridLayoutGroup.Axis.Vertical;
         recipeList.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         var hostScroll = scrollHost.GetComponent<ScrollRect>();
         hostScroll.content = recipeRt;
@@ -354,8 +357,10 @@ public static class ArthurianSceneBuilder
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640f, 480f),
             new Color(0.07f, 0.09f, 0.08f, 0.98f));
         warbandPanel.SetActive(false);
-        CreateTMP(warbandPanel.transform, "WarbandTitle", "CAMELOT CROWD — CURRENT WARBAND", 24, TextAlignmentOptions.Center,
+        // Title kept for Find() compat but inactive (Andrew: drop Warband title panel).
+        var warbandTitle = CreateTMP(warbandPanel.transform, "WarbandTitle", "WARBAND", 24, TextAlignmentOptions.Center,
             new Vector2(0f, 200f), new Vector2(600f, 36f));
+        warbandTitle.gameObject.SetActive(false);
         // Scroll host + list (SomersetChurchUI.EnsureWarbandModal will reinforce at runtime).
         GameObject warbandScroll = new GameObject("WarbandScroll", typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));
         warbandScroll.transform.SetParent(warbandPanel.transform, false);
