@@ -20,7 +20,7 @@ public static class ArthurianMenuBootstrap
     /// Package tip with Modular/Battle importers + Art Tools.
     /// Update when shipping a new Sync pin (Force Sync prefers this over main).
     /// </summary>
-    public const string ArtToolsPinSha = "627d5253989ad29f8c6522c0d92d5d1b6563e4fb";
+    public const string ArtToolsPinSha = "4bd0eb6d2df564d8f168c9d4a950302373af08ff";
 
     /// <summary>
     /// Hard pin for Phase 2–5 editor helpers (absolute raw URLs). Updated each ship.
@@ -845,7 +845,7 @@ public static class ArthurianMenuBootstrap
     /// Known-good tip with LooksLikeHttpFailureBody + OnLoad PackageVersion (≥500B).
     /// Update when shipping break-glass tips. Used when Sync tip-resolve is stuck.
     /// </summary>
-    public const string BreakGlassTipSha = "627d5253989ad29f8c6522c0d92d5d1b6563e4fb";
+    public const string BreakGlassTipSha = "4bd0eb6d2df564d8f168c9d4a950302373af08ff";
 
     /// <summary>
     /// Lives in MenuBootstrap so skip-self Sync hosts still get a one-click upgrade.
