@@ -25,14 +25,18 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "40396ee240461d4979506432c98e293397ceba42";
 
-    private const string ExpectedPackageId = "single-sprite-no-paperdoll";
+    private const string ExpectedPackageId = "architect-force-tip-ui";
 
-    /// <summary>Menu hosts that must always overwrite from tip/main — never skip-self, never Fallback pin.</summary>
+    /// <summary>
+    /// Always overwrite from tip/main — never skip-self, never Fallback pin.
+    /// Includes Art Architect so ValidateCritical / mid-sync stale IL cannot leave paperdoll UI.
+    /// </summary>
     public static readonly string[] SyncHostForceOverwritePaths =
     {
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
+        "Assets/Editor/ArthurianArtArchitectWindow.cs",
     };
 
     /// <summary>
@@ -250,13 +254,15 @@ public static class ArthurianSyncFromGitHub
         AssetDatabase.Refresh();
         string diskId = ReadPackageIdFromDisk() ?? "(unread)";
         EditorUtility.DisplayDialog(
-            n >= 3 ? "Sync Hosts Upgraded" : "Sync Hosts Partial",
-            $"Wrote {n}/3 hosts from raw @main.\n"
+            n >= SyncHostForceOverwritePaths.Length ? "Sync Hosts Upgraded" : "Sync Hosts Partial",
+            $"Wrote {n}/{SyncHostForceOverwritePaths.Length} hosts from raw @main "
+            + "(Sync / Bootstrap / PackageVersion / Art Architect).\n"
             + $"Package Id on disk now: {diskId}\n"
             + $"Expected after compile: {ExpectedPackageId}\n\n"
             + "1) Wait for compile spinner.\n"
             + "2) Arthurian → Diagnose Project — must show that package id.\n"
-            + "3) Then Force Delete+Sync ALL Scripts.\n"
+            + "3) Open Art & Stage Architect — title must show " + ExpectedPackageId + ".\n"
+            + "4) Then Force Delete+Sync ALL Scripts if still incomplete.\n"
             + (errors.Count > 0 ? "\nFailures:\n" + string.Join("\n", errors) : ""),
             "OK");
     }
@@ -378,8 +384,14 @@ public static class ArthurianSyncFromGitHub
                 if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                     && !body.Contains("public const string Id"))
                     throw new Exception("PackageVersion body missing Id (" + source + ")");
+                if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
+                    && !IsTipArchitectBody(body))
+                    throw new Exception("Architect body still paperdoll / missing Sprite category (" + source + ")");
 
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                // Nuke nested duplicates before writing the canonical Editor path.
+                if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
+                    NukeNestedArchitectCopies(projectRoot);
                 WriteReplacing(dest, body, deleteFirst: true);
                 ok++;
                 Debug.Log($"[DemonKnight] FORCE host overwrite {rel} via {source} ({body.Length} bytes)");
@@ -661,7 +673,7 @@ public static class ArthurianSyncFromGitHub
             // Old hosts used FallbackCommitSha after tip CDN 404 → stuck on sync-keep-editor-menus.
             EditorUtility.DisplayProgressBar("DemonKnight Sync", "FORCE overwrite Sync hosts from raw @main…", 0f);
             int hostOk = ForceOverwriteSyncHostsFromMain(errors);
-            Debug.Log($"[DemonKnight] Force Sync host overwrite from main: {hostOk}/3");
+            Debug.Log($"[DemonKnight] Force Sync host overwrite from main: {hostOk}/{SyncHostForceOverwritePaths.Length}");
             foreach (string h in SyncHostForceOverwritePaths)
                 if (!okFiles.Contains(h)) okFiles.Add(h);
 
@@ -744,6 +756,8 @@ public static class ArthurianSyncFromGitHub
         // After FixMisplaced (old compiled maps may re-drop standalones) — nuke again BEFORE refresh/compile.
         NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
         ArthurianMenuBootstrap.DedupeArtToolScripts();
+        NukeNestedArchitectCopies(projectRoot);
+        CloseOpenArchitectWindows();
         AssetDatabase.Refresh();
 
         // Post-Sync: seed ModularSpriteLibrary + recreate StageLayoutProfile (stale GUID after embed).
@@ -767,6 +781,17 @@ public static class ArthurianSyncFromGitHub
             errors.Add("Ensure StageLayoutProfile: " + ex.Message);
             Debug.LogWarning("[DemonKnight] Post-Sync StageLayout ensure failed: " + ex.Message);
         }
+
+        // After tip Architect lands, close any leftover window so Open() shows tip UI.
+        EditorApplication.delayCall += () =>
+        {
+            try
+            {
+                CloseOpenArchitectWindows();
+                NukeNestedArchitectCopies(null);
+            }
+            catch { /* ignore */ }
+        };
 
         var missingCritical = new List<string>();
         foreach (string rel in AtomicCritical)
@@ -1104,24 +1129,7 @@ public static class ArthurianSyncFromGitHub
         }
 
         if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
-        {
-            return body.Contains("class ArthurianArtArchitectWindow")
-                   && body.Contains("Art & Stage Architect")
-                   && body.Contains("Sheet Splicer")
-                   && body.Contains("Manual Box Crop")
-                   && body.Contains("Slice Manual Boxes")
-                   && body.Contains("Save Splices to Folder")
-                   && body.Contains("Target Export Folder")
-                   && body.Contains("ApplyChromaKeyClearAndDefringe")
-                   && body.Contains("defringeMagentaEdges")
-                   && body.Contains("Auto-Detect Corner Color")
-                   && body.Contains("Quick Add to Parallax Layer")
-                   && body.Contains("previewOrOverrideSprite")
-                   && body.Contains("Paper-Doll")
-                   && body.Contains("Auto-Arrange 52 Overflow Formation")
-                   && body.Contains("RegisterAnimClip")
-                   && body.Contains("Save as CharacterDefinition");
-        }
+            return IsTipArchitectBody(body);
 
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
         {
@@ -1398,6 +1406,88 @@ public static class ArthurianSyncFromGitHub
         }
 
         return true;
+    }
+
+    /// <summary>Tip Architect = single Sprite category, no paperdoll tab/generator.</summary>
+    public static bool IsTipArchitectBody(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return false;
+        if (!body.Contains("class ArthurianArtArchitectWindow")) return false;
+        if (!body.Contains("Art & Stage Architect")) return false;
+        if (!body.Contains("SpriteCategory")) return false;
+        if (!body.Contains("enum ArchitectTab { Splicer, StagePlacer }")) return false;
+        if (!body.Contains("Sheet Splicer")) return false;
+        if (!body.Contains("Manual Box Crop")) return false;
+        if (!body.Contains("Save Splices to Folder")) return false;
+        if (!body.Contains("UiBuildId")) return false;
+        // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
+        if (body.Contains("Paper-Doll Unit Generator")) return false;
+        if (body.Contains("enum SheetCategory")) return false;
+        if (body.Contains("Save as CharacterDefinition")) return false;
+        if (body.Contains("DrawPaperDollTab")) return false;
+        return true;
+    }
+
+    /// <summary>Delete nested/duplicate ArthurianArtArchitectWindow.cs under Assets (zip extracts).</summary>
+    public static int NukeNestedArchitectCopies(string projectRoot = null)
+    {
+        projectRoot ??= Directory.GetParent(Application.dataPath)!.FullName;
+        string canonical = Path.Combine(projectRoot, "Assets", "Editor", "ArthurianArtArchitectWindow.cs");
+        int n = 0;
+        try
+        {
+            string assets = Path.Combine(projectRoot, "Assets");
+            if (!Directory.Exists(assets)) return 0;
+            foreach (string hit in Directory.GetFiles(assets, "ArthurianArtArchitectWindow.cs", SearchOption.AllDirectories))
+            {
+                if (string.Equals(hit, canonical, StringComparison.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    string rel = "Assets" + hit.Substring(assets.Length).Replace('\\', '/');
+                    Debug.LogWarning("[DemonKnight] Removing nested/stale Architect copy: " + rel);
+                    if (!AssetDatabase.DeleteAsset(rel))
+                    {
+                        File.SetAttributes(hit, FileAttributes.Normal);
+                        File.Delete(hit);
+                        if (File.Exists(hit + ".meta")) File.Delete(hit + ".meta");
+                    }
+                    n++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[DemonKnight] Could not delete nested Architect: " + ex.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] NukeNestedArchitectCopies: " + ex.Message);
+        }
+        return n;
+    }
+
+    /// <summary>Close any open Architect windows so the next Open() uses the tip type.</summary>
+    public static void CloseOpenArchitectWindows()
+    {
+        try
+        {
+            var windows = Resources.FindObjectsOfTypeAll<EditorWindow>();
+            foreach (var w in windows)
+            {
+                if (w == null) continue;
+                string tn = w.GetType().Name;
+                if (tn == "ArthurianArtArchitectWindow" || (w.titleContent != null
+                    && w.titleContent.text != null
+                    && w.titleContent.text.IndexOf("Art & Stage Architect", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    try { w.Close(); } catch { /* ignore */ }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] CloseOpenArchitectWindows: " + ex.Message);
+        }
     }
 }
 #endif

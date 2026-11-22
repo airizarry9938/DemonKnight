@@ -422,6 +422,7 @@ public static class ArthurianMenuBootstrap
                     VerifyAndSyncModularLibraryInternal(showDialog: false);
                 }
                 DedupeArtToolScripts();
+                ForceArchitectTipIfStale();
             }
             catch (Exception ex)
             {
@@ -430,7 +431,42 @@ public static class ArthurianMenuBootstrap
         };
     }
 
-    /// <summary>Delete nested/duplicate Art Tools .cs that cause MenuItem already exists.</summary>
+    /// <summary>
+    /// Chicken-egg: PackageVersion can tip while Architect stays paperdoll because old Sync
+    /// ValidateCritical required "Paper-Doll". After Bootstrap compiles, force Architect from tip.
+    /// </summary>
+    public static void ForceArchitectTipIfStale()
+    {
+        const string rel = "Assets/Editor/ArthurianArtArchitectWindow.cs";
+        string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+        try
+        {
+            ArthurianSyncFromGitHub.NukeNestedArchitectCopies(projectRoot);
+            string disk = File.Exists(dest) ? File.ReadAllText(dest) : "";
+            bool tip = ArthurianSyncFromGitHub.IsTipArchitectBody(disk);
+            if (tip) return;
+
+            Debug.LogWarning("[DemonKnight] Stale Art Architect on disk (paperdoll/multi-category) — force tip overwrite.");
+            // Prefer Sync host force path (raw tip/main).
+            var errors = new List<string>();
+            int n = ArthurianSyncFromGitHub.ForceOverwriteSyncHostsFromMain(errors);
+            ArthurianSyncFromGitHub.CloseOpenArchitectWindows();
+            AssetDatabase.Refresh();
+            string after = File.Exists(dest) ? File.ReadAllText(dest) : "";
+            if (ArthurianSyncFromGitHub.IsTipArchitectBody(after))
+                Debug.Log($"[DemonKnight] Architect tip landed via host overwrite ({n} hosts). Re-open Art & Stage Architect.");
+            else
+                Debug.LogError("[DemonKnight] Architect still stale after host overwrite. Run Arthurian → FORCE Upgrade Sync Hosts From main, wait compile, Force Sync again.\n"
+                               + string.Join("\n", errors));
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] ForceArchitectTipIfStale: " + ex.Message);
+        }
+    }
+
+    /// <summary>Delete nested/duplicate Art Tools / Architect .cs that cause MenuItem already exists.</summary>
     public static void DedupeArtToolScripts()
     {
         string editorDir = Path.Combine(Application.dataPath, "Editor");
@@ -438,21 +474,21 @@ public static class ArthurianMenuBootstrap
         {
             "ArthurianModularSpriteSheetImporterWindow.cs",
             "ArthurianBattleSpriteSheetSlicerWindow.cs",
+            "ArthurianArtArchitectWindow.cs",
         };
-        string canonicalImporter = Path.Combine(editorDir, names[0]);
-        string canonicalSlicer = Path.Combine(editorDir, names[1]);
         try
         {
-            foreach (var hit in Directory.GetFiles(editorDir, names[0], SearchOption.AllDirectories))
+            foreach (string name in names)
             {
-                if (string.Equals(hit, canonicalImporter, StringComparison.OrdinalIgnoreCase)) continue;
-                TryDeleteEditorScript(hit);
+                string canonical = Path.Combine(editorDir, name);
+                foreach (var hit in Directory.GetFiles(editorDir, name, SearchOption.AllDirectories))
+                {
+                    if (string.Equals(hit, canonical, StringComparison.OrdinalIgnoreCase)) continue;
+                    TryDeleteEditorScript(hit);
+                }
             }
-            foreach (var hit in Directory.GetFiles(editorDir, names[1], SearchOption.AllDirectories))
-            {
-                if (string.Equals(hit, canonicalSlicer, StringComparison.OrdinalIgnoreCase)) continue;
-                TryDeleteEditorScript(hit);
-            }
+            // Also sweep nested under Assets outside Editor (zip extract).
+            ArthurianSyncFromGitHub.NukeNestedArchitectCopies(null);
         }
         catch (Exception ex)
         {

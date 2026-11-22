@@ -14,6 +14,9 @@ using UnityEngine;
 /// </summary>
 public class ArthurianArtArchitectWindow : EditorWindow
 {
+    /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
+    public const string UiBuildId = "architect-force-tip-ui";
+
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
     const string SplicedRootFolder = "Assets/Art/Spliced";
@@ -84,17 +87,40 @@ public class ArthurianArtArchitectWindow : EditorWindow
     Sprite paletteSelectedSprite;
     double lastPaletteRefresh;
 
+    // Single menu path only — do not also register under DemonKnight/.
     [MenuItem("Arthurian/Art & Stage Architect", false, 35)]
     public static void Open()
     {
-        var win = GetWindow<ArthurianArtArchitectWindow>("Art & Stage Architect");
+        // Drop cached/stale EditorWindow instances so tip type + layout always show.
+        CloseAllArchitectWindows();
+        string title = "Art & Stage Architect · " + UiBuildId;
+        var win = CreateInstance<ArthurianArtArchitectWindow>();
+        win.titleContent = new GUIContent(title);
         win.minSize = new Vector2(780, 560);
         win.Show();
+        win.Focus();
+        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 2 tabs.");
+    }
+
+    public static void CloseAllArchitectWindows()
+    {
+        var windows = Resources.FindObjectsOfTypeAll<EditorWindow>();
+        foreach (var w in windows)
+        {
+            if (w == null) continue;
+            if (w is ArthurianArtArchitectWindow
+                || (w.titleContent?.text != null
+                    && w.titleContent.text.IndexOf("Art & Stage Architect", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                try { w.Close(); } catch { /* ignore */ }
+            }
+        }
     }
 
     void OnEnable()
     {
         wantsMouseMove = true;
+        titleContent = new GUIContent("Art & Stage Architect · " + UiBuildId);
         if (targetLibrary == null)
             targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(DefaultLibraryPath)
                             ?? ModularSpriteLibrary.Load();
@@ -124,7 +150,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
             tab = ArchitectTab.Splicer;
         if (GUILayout.Toggle(tab == ArchitectTab.StagePlacer, "2 · Stage Placer & Parallax", EditorStyles.toolbarButton))
             tab = ArchitectTab.StagePlacer;
+        GUILayout.FlexibleSpace();
+        GUILayout.Label(UiBuildId, EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField(
+            $"Art & Stage Architect  ·  {UiBuildId}  ·  Category: {SpriteCategory} (no paperdoll)",
+            EditorStyles.boldLabel);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -133,7 +164,6 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     void DrawSplicerTab()
     {
-        EditorGUILayout.LabelField("Sheet Splicer & Animation Builder", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Drop a sprite sheet → Auto-Prepare → crop with Manual Box (default), Grid, or Auto-Island → " +
             "Save Splices / Create Animation Clip (single Sprite category). Manual: LMB drag green boxes; select gold + handles.",
