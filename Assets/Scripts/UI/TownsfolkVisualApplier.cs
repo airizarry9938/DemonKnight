@@ -57,12 +57,20 @@ namespace ArthurianAutobattler
             DisableExtraLayers(layers);
         }
 
-        /// <summary>Pick one usable spliced sprite; never Pose_/Outfit_/Head_ placeholders.</summary>
+        /// <summary>
+        /// Prefer Architect class pools (Peasant/Warrior/Knight) when a recruit is known;
+        /// else spliced library poses; never Pose_/Outfit_/Head_ placeholders.
+        /// </summary>
         public static Sprite ResolveSingleSprite(
             TownsfolkAppearance appearance,
             ModularSpriteLibrary lib,
             RecruitInstance fallback = null)
         {
+            if (fallback != null)
+            {
+                Sprite pool = ClassSpritePoolApplier.PickForRecruit(fallback);
+                if (IsUsablePewSprite(pool)) return pool;
+            }
             if (lib != null && lib.basePoses != null && lib.basePoses.Length > 0)
             {
                 int idx = appearance != null ? appearance.poseIndex : 0;

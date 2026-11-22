@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-scene-bg-applier-cs0103";
-    public const string GitHint = "mustrestore-scene-bg-applier-marched-rename";
-    public const string BuiltUtc = "2026-11-22T19:20:00Z";
+    public const string Id = "class-sprite-pools";
+    public const string GitHint = "architect-class-sprite-pools-pew-pick";
+    public const string BuiltUtc = "2026-11-22T19:45:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "ebe377af772cc967fc080c09f2c3e38f10b94a4d";
@@ -189,6 +189,7 @@ public static class DemonKnightPackageVersion
             "legend-unlocks-meta",
             "hidden-potential-bloodline",
             "architect-persist-scene-bg",
+            "fix-scene-bg-applier-cs0103",
         };
         foreach (string s in stale)
         {

@@ -11,13 +11,13 @@ using UnityEngine.Video;
 /// <summary>
 /// Master Spec Phase 3 — Art &amp; Stage Architect.
 /// Menu: Arthurian → Art &amp; Stage Architect
-/// Tabs: Sheet Splicer &amp; Animation Builder | Numbered Stage Placer | Scene Backgrounds
+/// Tabs: Sheet Splicer | Stage Placer | Scene Backgrounds | Class Sprites / Unit Pools
 /// Single sprite category only (no paperdoll / multi-layer body·outfit·head).
 /// </summary>
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-scene-bg-applier-cs0103";
+    public const string UiBuildId = "class-sprite-pools";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -26,6 +26,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const string DefaultExportFolder = SplicedRootFolder + "/" + SpriteCategory;
     const string StageProfilePath = "Assets/Resources/StageLayoutProfile.asset";
     const string SceneBgProfilePath = "Assets/Resources/SceneBackgroundProfile.asset";
+    const string ClassPoolProfilePath = "Assets/Resources/ClassSpritePoolProfile.asset";
     /// <summary>Same art as SomersetChurchUI / SomersetPewLayout (play stage).</summary>
     const string ChurchBackgroundPath = "Assets/Art/Backgrounds/SomersetChurchInterior.jpg";
     /// <summary>Reference pixel size of SomersetChurchInterior (play layout tuned to this).</summary>
@@ -34,17 +35,22 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// <summary>Must match SomersetChurchUI.baseSeatSize tip (play pew sprite size).</summary>
     static readonly Vector2 PlayPewBaseSize = new Vector2(88f, 112f);
 
-    enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds }
+    enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
     enum BattleSlotSide { Player, Enemy }
     enum CropToolMode { ManualBox, GridCrop, AutoIsland }
     enum BoxPivotMode { BottomCenter, Center, Custom }
+    enum ClassPoolKind { Peasant, Warrior, Knight }
 
     ArchitectTab tab;
     Vector2 scroll;
     SceneBackgroundProfile sceneBgProfile;
     Vector2 sceneBgScroll;
     int selectedSceneBgSlot;
+    ClassSpritePoolProfile classPoolProfile;
+    Vector2 classPoolScroll;
+    ClassPoolKind selectedClassPool = ClassPoolKind.Peasant;
+    Sprite classPoolAddSprite;
 
     // ── Tab 1: Splicer ─────────────────────────────────────────────────────
     Texture2D sheetTexture;
@@ -122,7 +128,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         win.minSize = new Vector2(780, 560);
         win.Show();
         win.Focus();
-        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 3 tabs.");
+        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 4 tabs.");
     }
 
     public static void CloseAllArchitectWindows()
@@ -153,6 +159,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         stageProfile?.EnsureSlotCounts();
         sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
         sceneBgProfile?.EnsureDefaultEntries();
+        classPoolProfile = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
+        classPoolProfile?.EnsureLists();
         SyncDefaultExportFolder();
         EditorApplication.playModeStateChanged -= OnArchitectPlayModeChanged;
         EditorApplication.playModeStateChanged += OnArchitectPlayModeChanged;
@@ -163,6 +171,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorApplication.playModeStateChanged -= OnArchitectPlayModeChanged;
         PersistStageProfile("OnDisable");
         PersistSceneBgProfile("OnDisable");
+        PersistClassPoolProfile("OnDisable");
     }
 
     void OnArchitectPlayModeChanged(PlayModeStateChange state)
@@ -172,6 +181,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         {
             PersistStageProfile("PlayMode:" + state);
             PersistSceneBgProfile("PlayMode:" + state);
+            PersistClassPoolProfile("PlayMode:" + state);
         }
     }
 
@@ -184,6 +194,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             case ArchitectTab.Splicer: DrawSplicerTab(); break;
             case ArchitectTab.StagePlacer: DrawStagePlacerTab(); break;
             case ArchitectTab.SceneBackgrounds: DrawSceneBackgroundsTab(); break;
+            case ArchitectTab.ClassSprites: DrawClassSpritesTab(); break;
         }
         EditorGUILayout.EndScrollView();
     }
@@ -197,6 +208,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
             tab = ArchitectTab.StagePlacer;
         if (GUILayout.Toggle(tab == ArchitectTab.SceneBackgrounds, "3 · Scene Backgrounds", EditorStyles.toolbarButton))
             tab = ArchitectTab.SceneBackgrounds;
+        if (GUILayout.Toggle(tab == ArchitectTab.ClassSprites, "4 · Class Sprites / Unit Pools", EditorStyles.toolbarButton))
+            tab = ArchitectTab.ClassSprites;
         GUILayout.FlexibleSpace();
         GUILayout.Label(UiBuildId, EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
@@ -244,6 +257,43 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorUtility.SetDirty(sceneBgProfile);
         AssetDatabase.SaveAssets();
         try { SceneBackgroundApplier.InvalidateCache(); } catch { /* ignore */ }
+    }
+
+    void PersistClassPoolProfile(string reason)
+    {
+        if (classPoolProfile == null) return;
+        if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(classPoolProfile)))
+        {
+            classPoolProfile = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
+            if (classPoolProfile == null) return;
+        }
+        SyncClassPoolAssetPaths(classPoolProfile);
+        EditorUtility.SetDirty(classPoolProfile);
+        AssetDatabase.SaveAssets();
+        try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
+    }
+
+    static void SyncClassPoolAssetPaths(ClassSpritePoolProfile p)
+    {
+        if (p == null) return;
+        p.EnsureLists();
+        SyncPathList(p.peasantSprites, p.peasantAssetPaths);
+        SyncPathList(p.warriorSprites, p.warriorAssetPaths);
+        SyncPathList(p.knightSprites, p.knightAssetPaths);
+    }
+
+    static void SyncPathList(List<Sprite> sprites, List<string> paths)
+    {
+        if (sprites == null || paths == null) return;
+        while (paths.Count < sprites.Count) paths.Add("");
+        if (paths.Count > sprites.Count)
+            paths.RemoveRange(sprites.Count, paths.Count - sprites.Count);
+        for (int i = 0; i < sprites.Count; i++)
+        {
+            if (sprites[i] == null) { paths[i] = ""; continue; }
+            string ap = AssetDatabase.GetAssetPath(sprites[i]);
+            if (!string.IsNullOrEmpty(ap)) paths[i] = ap;
+        }
     }
 
     static void CopyStageSlots(StageLayoutProfile from, StageLayoutProfile to)
@@ -1520,9 +1570,10 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Numbered Stage Placer & Moving Background Editor", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Assign-only pew sprites persist on Assets/Resources/StageLayoutProfile.asset. "
-            + "Ensure remaps script GUID / transplants YAML — never wipes seat sprites. "
-            + "Empty seats stay empty (no auto-fill).",
+            "StageLayoutProfile pew slots are POSITION/SCALE placement guides (and optional "
+            + "empty-seat preview sprites). Gameplay church visuals pick from Tab 4 Class "
+            + "Sprite pools by Peasant/Warrior/Knight. Ensure remaps script GUID / transplants "
+            + "YAML — never wipes seat guides. Empty seats stay empty (no auto-fill).",
             MessageType.Info);
         stageProfile = (StageLayoutProfile)EditorGUILayout.ObjectField(
             "StageLayoutProfile", stageProfile, typeof(StageLayoutProfile), false);
@@ -2000,6 +2051,161 @@ public class ArthurianArtArchitectWindow : EditorWindow
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(4);
         }
+        EditorGUILayout.EndScrollView();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Tab 4 — Class Sprites / Unit Pools (Peasant · Warrior · Knight)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    void DrawClassSpritesTab()
+    {
+        EditorGUILayout.LabelField("Class Sprites / Unit Pools", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Submit multiple sprites into Peasant, Warrior, and Knight pools. "
+            + "Church spawn picks from the matching class pool (deterministic by unitID — "
+            + "same recruit keeps the same sprite across refreshes). "
+            + "Empty pool → soft-fail to StageLayout assign-guide / solid fallback (no crash). "
+            + "Tab 2 Stage Placer seat sprites stay POSITION/SCALE placement guides only — "
+            + "they are NOT gameplay identity. Persists on " + ClassPoolProfilePath + ".",
+            MessageType.Info);
+
+        classPoolProfile = (ClassSpritePoolProfile)EditorGUILayout.ObjectField(
+            "ClassSpritePoolProfile", classPoolProfile, typeof(ClassSpritePoolProfile), false);
+        if (classPoolProfile == null
+            || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(classPoolProfile)))
+        {
+            if (GUILayout.Button("Ensure Class Sprite Pool Profile Asset"))
+                classPoolProfile = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
+            if (classPoolProfile == null) return;
+        }
+        classPoolProfile.EnsureLists();
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Save ClassSpritePoolProfile", GUILayout.Height(26)))
+            PersistClassPoolProfile("SaveButton");
+        if (GUILayout.Button("Ping Asset", GUILayout.Width(90)))
+        {
+            Selection.activeObject = classPoolProfile;
+            EditorGUIUtility.PingObject(classPoolProfile);
+        }
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField(
+            "Asset: " + AssetDatabase.GetAssetPath(classPoolProfile), EditorStyles.miniLabel);
+        EditorGUILayout.LabelField(
+            $"Counts — Peasant {classPoolProfile.CountUsable(UnitType.Peasant)} · "
+            + $"Warrior {classPoolProfile.CountUsable(UnitType.Warrior)} · "
+            + $"Knight {classPoolProfile.CountUsable(UnitType.Knight)}",
+            EditorStyles.miniLabel);
+
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        if (GUILayout.Toggle(selectedClassPool == ClassPoolKind.Peasant, "Peasant", EditorStyles.toolbarButton))
+            selectedClassPool = ClassPoolKind.Peasant;
+        if (GUILayout.Toggle(selectedClassPool == ClassPoolKind.Warrior, "Warrior", EditorStyles.toolbarButton))
+            selectedClassPool = ClassPoolKind.Warrior;
+        if (GUILayout.Toggle(selectedClassPool == ClassPoolKind.Knight, "Knight", EditorStyles.toolbarButton))
+            selectedClassPool = ClassPoolKind.Knight;
+        EditorGUILayout.EndHorizontal();
+
+        List<Sprite> pool = selectedClassPool switch
+        {
+            ClassPoolKind.Warrior => classPoolProfile.warriorSprites,
+            ClassPoolKind.Knight => classPoolProfile.knightSprites,
+            _ => classPoolProfile.peasantSprites
+        };
+
+        EditorGUILayout.BeginHorizontal();
+        classPoolAddSprite = (Sprite)EditorGUILayout.ObjectField(
+            "Add Sprite", classPoolAddSprite, typeof(Sprite), false);
+        EditorGUI.BeginDisabledGroup(classPoolAddSprite == null);
+        if (GUILayout.Button("Add to pool", GUILayout.Width(110)))
+        {
+            Undo.RecordObject(classPoolProfile, "Add Class Pool Sprite");
+            pool.Add(classPoolAddSprite);
+            classPoolAddSprite = null;
+            PersistClassPoolProfile("AddClassPoolSprite");
+        }
+        EditorGUI.EndDisabledGroup();
+        if (GUILayout.Button("Add selected palette", GUILayout.Width(150))
+            && paletteSelectedSprite != null)
+        {
+            Undo.RecordObject(classPoolProfile, "Add Palette to Class Pool");
+            pool.Add(paletteSelectedSprite);
+            PersistClassPoolProfile("AddPaletteToClassPool");
+        }
+        EditorGUILayout.EndHorizontal();
+
+        if (GUILayout.Button("Clear this pool", GUILayout.Width(140)))
+        {
+            if (EditorUtility.DisplayDialog(
+                    "Clear class pool",
+                    "Remove all sprites from the " + selectedClassPool + " pool?",
+                    "Clear", "Cancel"))
+            {
+                Undo.RecordObject(classPoolProfile, "Clear Class Pool");
+                pool.Clear();
+                PersistClassPoolProfile("ClearClassPool");
+            }
+        }
+
+        classPoolScroll = EditorGUILayout.BeginScrollView(classPoolScroll, GUILayout.MinHeight(320f));
+        if (pool.Count == 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Pool empty — church seats for this class keep StageLayout assign-guide / solid fallback.",
+                MessageType.Warning);
+        }
+        for (int i = 0; i < pool.Count; i++)
+        {
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.BeginHorizontal();
+            EditorGUI.BeginChangeCheck();
+            pool[i] = (Sprite)EditorGUILayout.ObjectField(
+                "#" + i, pool[i], typeof(Sprite), false, GUILayout.Height(64f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(classPoolProfile, "Edit Class Pool Sprite");
+                PersistClassPoolProfile("EditClassPoolSprite");
+            }
+            if (GUILayout.Button("×", GUILayout.Width(28), GUILayout.Height(64f)))
+            {
+                Undo.RecordObject(classPoolProfile, "Remove Class Pool Sprite");
+                pool.RemoveAt(i);
+                PersistClassPoolProfile("RemoveClassPoolSprite");
+                i--;
+            }
+            EditorGUILayout.EndHorizontal();
+            if (i >= 0 && i < pool.Count && pool[i] != null)
+            {
+                Rect prev = GUILayoutUtility.GetRect(48f, 48f, GUILayout.ExpandWidth(false));
+                DrawSprite(prev, pool[i], Color.white);
+                EditorGUILayout.LabelField(pool[i].name, EditorStyles.miniLabel);
+            }
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndScrollView();
+
+        EditorGUILayout.Space(8);
+        EditorGUILayout.LabelField("Spliced palette (quick add)", EditorStyles.boldLabel);
+        RefreshSplicedPalette();
+        paletteScroll = EditorGUILayout.BeginScrollView(paletteScroll, GUILayout.Height(120f));
+        EditorGUILayout.BeginHorizontal();
+        for (int i = 0; i < splicedPalette.Count; i++)
+        {
+            Sprite sp = splicedPalette[i];
+            if (sp == null) continue;
+            Rect r = GUILayoutUtility.GetRect(56f, 56f, GUILayout.Width(56f), GUILayout.Height(56f));
+            if (Event.current.type == EventType.Repaint)
+                DrawSprite(r, sp, Color.white);
+            if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+            {
+                paletteSelectedSprite = sp;
+                Undo.RecordObject(classPoolProfile, "Add Palette Click to Class Pool");
+                pool.Add(sp);
+                PersistClassPoolProfile("PaletteClickClassPool");
+            }
+        }
+        EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndScrollView();
     }
 

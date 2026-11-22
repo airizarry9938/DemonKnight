@@ -1254,6 +1254,88 @@ namespace ArthurianAutobattler
         }
     }
 
+    /// <summary>
+    /// Architect class sprite pools (Peasant / Warrior / Knight). Resources path:
+    /// ClassSpritePoolProfile. StageLayoutProfile pew slots stay position/scale guides —
+    /// church/combat visuals pick from these pools by unit class.
+    /// </summary>
+    [CreateAssetMenu(fileName = "ClassSpritePoolProfile", menuName = "DemonKnight/Class Sprite Pool Profile")]
+    public class ClassSpritePoolProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "ClassSpritePoolProfile";
+
+        public List<Sprite> peasantSprites = new List<Sprite>();
+        public List<Sprite> warriorSprites = new List<Sprite>();
+        public List<Sprite> knightSprites = new List<Sprite>();
+
+        /// <summary>Editor path backups so list entries survive reimports.</summary>
+        public List<string> peasantAssetPaths = new List<string>();
+        public List<string> warriorAssetPaths = new List<string>();
+        public List<string> knightAssetPaths = new List<string>();
+
+        public static ClassSpritePoolProfile Load()
+        {
+            ClassSpritePoolProfile p = null;
+            try { p = Resources.Load<ClassSpritePoolProfile>(ResourcesPath); }
+            catch { /* missing script — fall through */ }
+            if (p != null)
+            {
+                p.EnsureLists();
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<ClassSpritePoolProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureLists();
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset */ }
+            p = CreateInstance<ClassSpritePoolProfile>();
+            p.name = "ClassSpritePoolProfile_Runtime";
+            p.EnsureLists();
+            return p;
+        }
+
+        public void EnsureLists()
+        {
+            peasantSprites ??= new List<Sprite>();
+            warriorSprites ??= new List<Sprite>();
+            knightSprites ??= new List<Sprite>();
+            peasantAssetPaths ??= new List<string>();
+            warriorAssetPaths ??= new List<string>();
+            knightAssetPaths ??= new List<string>();
+        }
+
+        public List<Sprite> GetPool(UnitType type)
+        {
+            EnsureLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantSprites,
+                UnitType.Warrior => warriorSprites,
+                UnitType.Knight => knightSprites,
+                _ => null
+            };
+        }
+
+        public int CountUsable(UnitType type)
+        {
+            var pool = GetPool(type);
+            if (pool == null) return 0;
+            int n = 0;
+            for (int i = 0; i < pool.Count; i++)
+                if (pool[i] != null) n++;
+            return n;
+        }
+    }
+
 
     [Serializable]
     public class ModularHeadEntry

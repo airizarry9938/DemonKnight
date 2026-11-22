@@ -221,21 +221,30 @@ namespace ArthurianAutobattler
                 cg.blocksRaycasts = false;
                 cg.interactable = false;
             }
-            else if (recruit != null && recruit.randomAvatar != null)
-            {
-                img.sprite = recruit.randomAvatar;
-                img.color = Color.white;
-            }
             else if (recruit != null)
             {
-                img.sprite = null;
-                img.color = recruit.unitType switch
+                Sprite poolSprite = ClassSpritePoolApplier.PickForRecruit(recruit);
+                if (poolSprite != null)
                 {
-                    UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 0.92f),
-                    UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 0.92f),
-                    UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 0.92f),
-                    _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
-                };
+                    img.sprite = poolSprite;
+                    img.color = Color.white;
+                }
+                else if (recruit.randomAvatar != null)
+                {
+                    img.sprite = recruit.randomAvatar;
+                    img.color = Color.white;
+                }
+                else
+                {
+                    img.sprite = null;
+                    img.color = recruit.unitType switch
+                    {
+                        UnitType.Knight => new Color(0.55f, 0.48f, 0.25f, 0.92f),
+                        UnitType.Warrior => new Color(0.40f, 0.38f, 0.45f, 0.92f),
+                        UnitType.Peasant => new Color(0.35f, 0.42f, 0.28f, 0.92f),
+                        _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
+                    };
+                }
             }
             else
             {

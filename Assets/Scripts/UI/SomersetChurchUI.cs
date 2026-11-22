@@ -1766,8 +1766,12 @@ namespace ArthurianAutobattler
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
                 {
-                    // ALWAYS StageLayoutProfile assign-only — never library / palette fill all seats.
+                    // Occupied seats: prefer Architect class pools (Peasant/Warrior/Knight).
+                    // StageLayoutProfile previewOrOverrideSprite is a placement-guide fallback
+                    // (and still paints empty assigned seats for layout preview).
                     Sprite assigned = authored?.previewOrOverrideSprite;
+                    Sprite poolSprite = recruit != null ? ClassSpritePoolApplier.PickForRecruit(recruit) : null;
+                    Sprite visual = poolSprite != null ? poolSprite : assigned;
                     if (showSprite && recruit != null)
                     {
                         view.Bind(
@@ -1776,7 +1780,7 @@ namespace ArthurianAutobattler
                             onHover: () => ShowHoverPreview(recruit),
                             onRightClick: () => CloseUnitSelectionMenu(),
                             useLibraryArt: false);
-                        if (assigned != null) view.ApplyAssignedBodySprite(assigned);
+                        if (visual != null) view.ApplyAssignedBodySprite(visual);
                         else view.ClearBodyToSolid();
                     }
                     else if (showSprite && assigned != null)
@@ -1789,8 +1793,9 @@ namespace ArthurianAutobattler
                 }
                 else if (showSprite)
                 {
-                    // Non-PaperDoll prefab: assigned sprite only (never recruit.randomAvatar fill-all).
-                    EnsureSeatImageAssignedOnly(go, authored?.previewOrOverrideSprite, recruit);
+                    // Non-PaperDoll prefab: class pool preferred, then StageLayout assign-only.
+                    Sprite poolSprite = recruit != null ? ClassSpritePoolApplier.PickForRecruit(recruit) : null;
+                    EnsureSeatImageAssignedOnly(go, poolSprite ?? authored?.previewOrOverrideSprite, recruit);
                     VictoryStarBadge.Apply(go.transform, recruit);
                     Button btn = go.GetComponent<Button>();
                     if (btn != null)
@@ -1820,9 +1825,15 @@ namespace ArthurianAutobattler
             }
 
             int assignedCount = CountAssignedChurchSprites();
+            int poolHits = 0;
+            foreach (var kv in bySeat)
+            {
+                if (kv.Value != null && ClassSpritePoolApplier.PickForRecruit(kv.Value) != null)
+                    poolHits++;
+            }
             Debug.Log(
                 $"[DemonKnight] Populated {SomersetPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied); "
-                + $"assign-only sprites={assignedCount} (StageLayoutProfile); "
+                + $"class-pool sprites={poolHits}; StageLayout assign-guides={assignedCount}; "
                 + $"rows 0–{SomersetPewLayout.VisualSpriteRowCount - 1}.");
             RefreshHUD();
         }

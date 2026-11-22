@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "1f51ac6a0ecc1eac3faa3a5086602c41292c5119";
 
-    private const string ExpectedPackageId = "fix-scene-bg-applier-cs0103";
+    private const string ExpectedPackageId = "class-sprite-pools";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -55,6 +55,7 @@ public static class ArthurianSyncFromGitHub
         "legend-unlocks-meta",
         "hidden-potential-bloodline",
         "architect-persist-scene-bg",
+        "fix-scene-bg-applier-cs0103",
         "assign-only-runtime",
         "sync-keep-editor-menus",
     };
@@ -127,6 +128,8 @@ public static class ArthurianSyncFromGitHub
         // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
         // SceneBackgroundApplier MUST land before Battle/UI/Merlin consumers (Force Delete race).
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
+        // ClassSpritePoolApplier before Church / TownSplit / Townsfolk consumers (PR #31 lesson).
+        "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
@@ -188,6 +191,7 @@ public static class ArthurianSyncFromGitHub
         // Phase 2–5 types embedded in hosts below — no standalone downloads.
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
+        "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
@@ -221,6 +225,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Data/GameDataTypes.cs",
         // SceneBackgroundApplier before LegendCodex/MainMenu/Church consumers (CS0103 Force Delete race).
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
+        // ClassSpritePoolApplier before Church/Town consumers (Force Delete race — PR #31 lesson).
+        "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // Embed hosts (DA-59 — Phase 2–5 types live here).
@@ -885,6 +891,7 @@ public static class ArthurianSyncFromGitHub
         {
             ArthurianStageLayoutProfileEnsure.EnsureAsset();
             ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
+            ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
         }
         catch (Exception ex)
         {
@@ -1230,7 +1237,11 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("assignedCharacterId")
                    && body.Contains("ChurchPewCount = 52")
                    && body.Contains("class SceneBackgroundProfile")
-                   && body.Contains("enum SceneBackgroundSlot");
+                   && body.Contains("enum SceneBackgroundSlot")
+                   && body.Contains("class ClassSpritePoolProfile")
+                   && body.Contains("peasantSprites")
+                   && body.Contains("warriorSprites")
+                   && body.Contains("knightSprites");
         }
 
         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase))
@@ -1240,6 +1251,16 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ApplyToSpriteRenderer")
                    && body.Contains("InvalidateCache")
                    && body.Contains("SceneBackgroundProfile");
+        }
+
+        if (rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class ClassSpritePoolApplier")
+                   && body.Contains("PickForRecruit")
+                   && body.Contains("PickForClass")
+                   && body.Contains("StableHash")
+                   && body.Contains("ClassSpritePoolProfile")
+                   && body.Contains("InvalidateCache");
         }
 
         // Phase 2–5 standalones are NOT synced — reject any download that would redefine embeds.
@@ -1278,7 +1299,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ApplyRecruitButtonLabel")
                    && body.Contains("Recruit {hireCost}g ({purse}g)")
                    && body.Contains("58f, 8f")
-                   && body.Contains("GetMouseButtonDown(1)");
+                   && body.Contains("GetMouseButtonDown(1)")
+                   && body.Contains("ClassSpritePoolApplier.PickForRecruit");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -1540,12 +1562,17 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("class ArthurianArtArchitectWindow")) return false;
         if (!body.Contains("Art & Stage Architect")) return false;
         if (!body.Contains("SpriteCategory")) return false;
-        if (!body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds }")) return false;
+        // Tip: 4 tabs including Class Sprites / Unit Pools.
+        if (!body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites }"))
+            return false;
         if (!body.Contains("Sheet Splicer")) return false;
         if (!body.Contains("Manual Box Crop")) return false;
         if (!body.Contains("Save Splices to Folder")) return false;
         if (!body.Contains("Scene Backgrounds")) return false;
         if (!body.Contains("SceneBackgroundProfile")) return false;
+        if (!body.Contains("Class Sprites")) return false;
+        if (!body.Contains("ClassSpritePoolProfile")) return false;
+        if (!body.Contains("DrawClassSpritesTab")) return false;
         if (!body.Contains("UiBuildId")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;
