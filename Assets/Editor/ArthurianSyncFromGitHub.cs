@@ -24,14 +24,14 @@ public static class ArthurianSyncFromGitHub
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
     // Pre-ship pin = tip before this PR; ship commit bumps both to feature SHA.
-    private const string FallbackCommitSha = "45eb5cbcd6813a261ea86a963d3e39193bb52635";
+    private const string FallbackCommitSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "45eb5cbcd6813a261ea86a963d3e39193bb52635";
+    public const string HardTipCommitSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
 
     private const string ExpectedPackageId = "force-sync-appliers-hardfix";
 
