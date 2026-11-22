@@ -627,6 +627,11 @@ namespace ArthurianAutobattler
             if (resurrectionCanvas != null) resurrectionCanvas.SetActive(false);
             if (legacyBankPanel != null) legacyBankPanel.SetActive(false);
 
+            int staged = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
+                : 0;
+            LegendUnlockManager.Ensure()?.NotifyRunEnded(staged);
+
             var perk = PerkDraftManager.Instance ?? FindFirstObjectByType<PerkDraftManager>();
             if (perk != null)
             {
@@ -673,6 +678,12 @@ namespace ArthurianAutobattler
             // Lose / full-run end: force per-wave disband before Merlin bank (party → pews).
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             DemonKnightCompatApi.EnsureDisbandedAfterWave(loop);
+            int staged = GrudgeSaveManager.Instance != null
+                ? GrudgeSaveManager.Instance.CountPositiveStagedGrudges()
+                : 0;
+            LegendUnlockManager.Ensure()?.NotifyRunEnded(staged);
+            if (defeatedNimue)
+                LegendUnlockManager.Ensure()?.NotifyFullRunVictory();
             GrudgeSaveManager.Instance?.CommitStagedGrudgesToDisk();
             if (resurrectionSequenceRoutine != null)
                 StopCoroutine(resurrectionSequenceRoutine);

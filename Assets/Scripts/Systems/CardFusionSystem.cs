@@ -58,6 +58,7 @@ namespace ArthurianAutobattler
         public bool CanFuseType(UnitType type, List<RecruitInstance> p)
         {
             SanitizeBaseUnitFusionFlags(p);
+            if (!IsFusionUnlocked(type)) return false;
             var db = CharacterDatabase.Load();
             var def = db?.GetByUnitType(type);
             if (def != null && def.HasFusionRecipe)
@@ -76,6 +77,12 @@ namespace ArthurianAutobattler
         public bool FuseType(UnitType type, List<RecruitInstance> p)
         {
             SanitizeBaseUnitFusionFlags(p);
+            if (!IsFusionUnlocked(type))
+            {
+                Debug.LogWarning(
+                    $"[DemonKnight] Fuse blocked — legend not unlocked: {LegendUnlockManager.LegendIdFor(type)}");
+                return false;
+            }
             var db = CharacterDatabase.Load();
             var def = db?.GetByUnitType(type);
             if (def != null && def.HasFusionRecipe)
@@ -95,6 +102,16 @@ namespace ArthurianAutobattler
                 return false;
             }
             return FuseLegacy(type, p);
+        }
+
+        /// <summary>
+        /// Gated legends require LegendUnlockManager; Captain / LadyOfTheLake stay open mid-tier.
+        /// </summary>
+        public static bool IsFusionUnlocked(UnitType type)
+        {
+            if (!LegendUnlockManager.IsGatedLegend(type)) return true;
+            var mgr = LegendUnlockManager.Ensure();
+            return mgr != null && mgr.IsLegendUnlocked(type);
         }
 
         /// <summary>
@@ -214,6 +231,14 @@ namespace ArthurianAutobattler
                                     && CountType(p, UnitType.Warrior) >= 1,
             UnitType.Guinevere => CountWhere(p, r => r.primaryTrait == TraitTag.Noble) >= 1
                                   && CountType(p, UnitType.Priest) >= 1,
+            UnitType.LadyGuinevere => CountWhere(p, r => r.primaryTrait == TraitTag.Noble) >= 1
+                                      && CountType(p, UnitType.Priest) >= 1,
+            UnitType.ArchPriestOfGlastonbury => CountType(p, UnitType.Peasant) >= 2,
+            UnitType.Nimue => CountType(p, UnitType.Priest) >= 2
+                              && CountType(p, UnitType.Captain) >= 1,
+            UnitType.TheGreenKnight => CountType(p, UnitType.Warrior) >= 2
+                                       && CountWhere(p, r => r.unitType == UnitType.Knight
+                                                             && r.primaryTrait == TraitTag.Loyalist) >= 1,
             _ => false
         };
 
@@ -283,9 +308,24 @@ namespace ArthurianAutobattler
                 new IngredientPick(r => r.unitType == UnitType.Knight, 1),
                 new IngredientPick(r => r.unitType == UnitType.Warrior, 1)),
             UnitType.Guinevere => TryFuse(p, x => CanFuseLegacy(UnitType.Guinevere, x),
-                () => CreateHero("hero_guinevere", "Guinevere", UnitType.Guinevere, guinevereSprite, 140, 12, 1.4f, TraitTag.Noble, CombatRole.BacklineRanged),
+                () => CreateHero("hero_guinevere", "Lady Guinevere", UnitType.Guinevere, guinevereSprite, 140, 12, 1.4f, TraitTag.Noble, CombatRole.BacklineRanged),
                 new IngredientPick(r => r.primaryTrait == TraitTag.Noble, 1),
                 new IngredientPick(r => r.unitType == UnitType.Priest, 1)),
+            UnitType.LadyGuinevere => TryFuse(p, x => CanFuseLegacy(UnitType.LadyGuinevere, x),
+                () => CreateHero("hero_guinevere", "Lady Guinevere", UnitType.LadyGuinevere, guinevereSprite, 140, 12, 1.4f, TraitTag.Noble, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.primaryTrait == TraitTag.Noble, 1),
+                new IngredientPick(r => r.unitType == UnitType.Priest, 1)),
+            UnitType.ArchPriestOfGlastonbury => TryFuse(p, x => CanFuseLegacy(UnitType.ArchPriestOfGlastonbury, x),
+                () => CreateHero("hero_archpriest", "Arch Priest of Glastonbury", UnitType.ArchPriestOfGlastonbury, priestSprite, 55, 11, 1.4f, TraitTag.Zealot, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.unitType == UnitType.Peasant, 2)),
+            UnitType.Nimue => TryFuse(p, x => CanFuseLegacy(UnitType.Nimue, x),
+                () => CreateHero("hero_nimue", "Nimue", UnitType.Nimue, ladyOfLakeSprite, 200, 20, 1.5f, TraitTag.Zealot, CombatRole.BacklineRanged),
+                new IngredientPick(r => r.unitType == UnitType.Priest, 2),
+                new IngredientPick(r => r.unitType == UnitType.Captain, 1)),
+            UnitType.TheGreenKnight => TryFuse(p, x => CanFuseLegacy(UnitType.TheGreenKnight, x),
+                () => CreateHero("hero_green_knight", "The Green Knight", UnitType.TheGreenKnight, gawainSprite, 280, 28, 1.5f, TraitTag.Loyalist, CombatRole.FrontlineTank),
+                new IngredientPick(r => r.unitType == UnitType.Warrior, 2),
+                new IngredientPick(r => r.unitType == UnitType.Knight && r.primaryTrait == TraitTag.Loyalist, 1)),
             _ => false
         };
 
@@ -367,6 +407,7 @@ namespace ArthurianAutobattler
             ApplyLegendSparkBonus(product, chosen);
 
             party.Add(product);
+            LegendUnlockManager.Ensure()?.NotifyFusionWithIngredients(product.unitType, chosen);
             // Phase 4 — Legend fusion micro-shake.
             StageParallaxController.MicroShake();
             Debug.Log(
@@ -384,8 +425,10 @@ namespace ArthurianAutobattler
             int sparks = 0;
             foreach (var ing in ingredients)
             {
-                if (ing != null
-                    && string.Equals(ing.hiddenTraitId, RecruitInstance.LegendSparkId, System.StringComparison.Ordinal))
+                if (ing == null || string.IsNullOrEmpty(ing.hiddenTraitId)) continue;
+                if (string.Equals(ing.hiddenTraitId, RecruitInstance.LegendSparkId, System.StringComparison.Ordinal)
+                    || string.Equals(ing.hiddenTraitId, RecruitInstance.DarkhorseId, System.StringComparison.Ordinal)
+                    || string.Equals(ing.hiddenTraitId, RecruitInstance.GoldenEggId, System.StringComparison.Ordinal))
                     sparks++;
             }
             if (sparks < 2) return;
@@ -393,7 +436,7 @@ namespace ArthurianAutobattler
             product.AddVeteranRank(1);
             product.maxHealth = Mathf.RoundToInt(product.maxHealth * 1.15f);
             product.attackDamage = Mathf.Max(1, Mathf.RoundToInt(product.attackDamage * 1.15f));
-            product.hiddenTraitId = RecruitInstance.LegendSparkId;
+            product.hiddenTraitId = RecruitInstance.DarkhorseId;
             product.isScouted = true;
             product.intelTierUnlocked = Mathf.Max(product.intelTierUnlocked, 1);
             Debug.Log(

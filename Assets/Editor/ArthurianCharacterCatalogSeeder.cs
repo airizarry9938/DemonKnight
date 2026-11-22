@@ -101,10 +101,22 @@ public static class ArthurianCharacterCatalogSeeder
             CharacterPassiveType.None, 0f, "One-handed knight — loyal to the end.",
             Rule(UnitType.Knight, 1), Rule(UnitType.Warrior, 1));
 
-        SeedLegend("Guinevere", "hero_guinevere", "Guinevere", UnitType.Guinevere,
+        SeedLegend("Guinevere", "hero_guinevere", "Lady Guinevere", UnitType.Guinevere,
             CharacterCombatRole.Backline, TraitTag.Noble, 140, 12, 1.4f, true, false,
-            CharacterPassiveType.AuraHpBuff, 0f, "Queen — steadies the backline.",
+            CharacterPassiveType.AuraHpBuff, 0f, "Heal allies in her row 10% max HP at battle start.",
             TraitOnly(TraitTag.Noble, 1), Rule(UnitType.Priest, 1));
+
+        SeedLegend("Nimue", "hero_nimue", "Nimue", UnitType.Nimue,
+            CharacterCombatRole.Backline, TraitTag.Zealot, 200, 20, 1.5f, true, false,
+            CharacterPassiveType.SurviveFirstLethalAt1Hp, 1f,
+            "MartyrsWard — nearest frontline ally survives first lethal at 1 HP.",
+            Rule(UnitType.Priest, 2), Rule(UnitType.Captain, 1));
+
+        SeedLegend("TheGreenKnight", "hero_green_knight", "The Green Knight", UnitType.TheGreenKnight,
+            CharacterCombatRole.Tank, TraitTag.Loyalist, 280, 28, 1.5f, false, false,
+            CharacterPassiveType.Custom, 0f,
+            "Regen 8% max HP per turn; cannot be one-shot above 50% HP.",
+            Rule(UnitType.Warrior, 2), Rule(UnitType.Knight, 1, TraitTag.Loyalist));
 
         // —— Bosses (wave 3–10) ——
         SeedBoss("BlackKnight", "boss_black_knight", "The Black Knight", UnitType.BossBlackKnight,

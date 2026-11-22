@@ -111,6 +111,12 @@ namespace ArthurianAutobattler
         [TextArea(2, 4)]
         public string passiveDescription;
 
+        [Header("Codex / Meta-Unlock")]
+        [TextArea(2, 5)]
+        public string loreDescription;
+        [TextArea(1, 3)]
+        public string unlockRiddle;
+
         public bool HasFusionRecipe => fusionRecipe != null && fusionRecipe.Count > 0;
 
         public CombatRole ToCombatRole() => role switch

@@ -72,6 +72,9 @@ namespace ArthurianAutobattler
                 : 0;
             if (gamblerRank >= 3 && GameLoopManager.Instance != null)
                 GameLoopManager.Instance.AddTownTimeBonus(15f);
+
+            // Successful tavern cash-out counts as a dice win for The Green Knight.
+            LegendUnlockManager.Ensure()?.NotifyDiceWin();
         }
 
         private void ApplyCursedDiceGrudge()
@@ -164,6 +167,8 @@ namespace ArthurianAutobattler
                 ApplyJackpot(out message);
 
             lastResultMessage = message;
+            // Free stakes rolls always resolve as a win tier — count for Green Knight unlock.
+            LegendUnlockManager.Ensure()?.NotifyDiceWin();
             Debug.Log($"[DemonKnight] DiceManager free roll → {message}");
             return true;
         }

@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "31ee456c2f85cbb7ba5c8ae7c4918ea7513b4ed1";
 
-    private const string ExpectedPackageId = "assign-only-runtime";
+    private const string ExpectedPackageId = "legend-unlocks-meta";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -52,6 +52,7 @@ public static class ArthurianSyncFromGitHub
         "church-bg-pew-preview",
         "fix-seatshow-cs0436",
         "assign-only-pew-drag",
+        "assign-only-runtime",
         "sync-keep-editor-menus",
     };
 
@@ -140,6 +141,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Data/SomersetRunes.cs",
         "Assets/Scripts/Data/SomersetVisualDatabase.cs",
         "Assets/Scripts/Persistence/GrudgeSaveManager.cs",
+        "Assets/Scripts/Persistence/LegendUnlockManager.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Persistence/WarbandAutosave.cs",
         "Assets/Scripts/Systems/CardFusionSystem.cs",
@@ -195,6 +197,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Combat/BattlefieldVisualizer.cs",
         "Assets/Scripts/Combat/UnitVisualActor.cs",
         "Assets/Scripts/Combat/BattleBossDialogUI.cs",
+        "Assets/Scripts/Persistence/LegendUnlockManager.cs",
         "Assets/Scripts/Persistence/MerlinResurrectionManager.cs",
         "Assets/Scripts/Systems/PerkDraftManager.cs",
         "Assets/Scripts/Systems/CardFusionSystem.cs",
