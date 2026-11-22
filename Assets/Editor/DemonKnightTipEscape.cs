@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-scene-bg-applier-cs0103";
+    public const string TipPackageId = "class-sprite-pools";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -25,6 +25,8 @@ public static class DemonKnightTipEscape
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
+        "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
+        "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -37,7 +39,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-scene-bg-applier-cs0103)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (class-sprite-pools)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);

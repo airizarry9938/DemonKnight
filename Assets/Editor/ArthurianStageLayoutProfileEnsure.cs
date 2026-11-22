@@ -24,8 +24,9 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "architect-persist-scene-bg";
+    const string TipPackageId = "class-sprite-pools";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
+    const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
     const string SplicedSpriteFolder = "Assets/Art/Spliced/Sprite";
@@ -50,6 +51,8 @@ public static class ArthurianStageLayoutProfileEnsure
         "assign-only-runtime",
         "legend-unlocks-meta",
         "hidden-potential-bloodline",
+        "architect-persist-scene-bg",
+        "fix-scene-bg-applier-cs0103",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
@@ -57,13 +60,17 @@ public static class ArthurianStageLayoutProfileEnsure
     {
         var p = EnsureAsset();
         var bg = EnsureSceneBackgroundAsset();
+        var pools = EnsureClassSpritePoolAsset();
         Selection.activeObject = p;
         EditorGUIUtility.PingObject(p);
         int assigned = CountAssignedSprites(p);
         Debug.Log($"[DemonKnight] StageLayoutProfile ready → {AssetPath} " +
                   $"(pews={p.churchPewSlots.Count}, assignedSprites={assigned}, " +
                   $"player={p.playerBattleSlots.Count}, enemy={p.enemyBattleSlots.Count}). " +
-                  $"SceneBackgroundProfile → {SceneBgAssetPath} ({bg.entries.Count} slots).");
+                  $"SceneBackgroundProfile → {SceneBgAssetPath} ({bg.entries.Count} slots). " +
+                  $"ClassSpritePoolProfile → {ClassPoolAssetPath} " +
+                  $"(P={pools.CountUsable(UnitType.Peasant)} W={pools.CountUsable(UnitType.Warrior)} " +
+                  $"K={pools.CountUsable(UnitType.Knight)}).");
     }
 
     [MenuItem("Arthurian/Escape Breakglass → Tip Hosts + Spliced Pew Library", false, 2)]
@@ -83,6 +90,7 @@ public static class ArthurianStageLayoutProfileEnsure
             {
                 EnsureAsset();
                 EnsureSceneBackgroundAsset();
+                EnsureClassSpritePoolAsset();
                 if (HostsLookStale())
                 {
                     Debug.LogWarning(
@@ -272,11 +280,76 @@ public static class ArthurianStageLayoutProfileEnsure
         return n;
     }
 
+    /// <summary>Ensure ClassSpritePoolProfile.asset exists (Architect Tab 4). Never wipe pools.</summary>
+    public static ClassSpritePoolProfile EnsureClassSpritePoolAsset()
+    {
+        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+            AssetDatabase.CreateFolder("Assets", "Resources");
+
+        var existing = AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(ClassPoolAssetPath);
+        if (existing != null)
+        {
+            existing.EnsureLists();
+            return existing;
+        }
+
+        string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+            ClassPoolAssetPath.Replace('/', Path.DirectorySeparatorChar));
+        string yamlBackup = null;
+        if (File.Exists(full))
+        {
+            try { yamlBackup = File.ReadAllText(full); } catch { /* ignore */ }
+            if (TryRemapClassPoolScriptGuid(full))
+            {
+                AssetDatabase.ImportAsset(ClassPoolAssetPath);
+                existing = AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(ClassPoolAssetPath);
+                if (existing != null)
+                {
+                    existing.EnsureLists();
+                    return existing;
+                }
+            }
+            AssetDatabase.DeleteAsset(ClassPoolAssetPath);
+            try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
+            try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
+            AssetDatabase.Refresh();
+        }
+
+        var created = ScriptableObject.CreateInstance<ClassSpritePoolProfile>();
+        created.EnsureLists();
+        AssetDatabase.CreateAsset(created, ClassPoolAssetPath);
+        AssetDatabase.SaveAssets();
+
+        if (!string.IsNullOrEmpty(yamlBackup) && File.Exists(full))
+        {
+            try
+            {
+                string fresh = File.ReadAllText(full);
+                // Transplant from first pool list field so all three lists + paths survive.
+                string merged = TransplantFromField(fresh, yamlBackup, "peasantSprites:");
+                if (!string.IsNullOrEmpty(merged) && merged != fresh)
+                {
+                    File.WriteAllText(full, merged);
+                    AssetDatabase.ImportAsset(ClassPoolAssetPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] ClassSpritePool YAML transplant: " + ex.Message);
+            }
+        }
+
+        return AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(ClassPoolAssetPath) ?? created;
+    }
+
     static bool TryRemapStageLayoutScriptGuid(string fullPath)
         => TryRemapScriptGuid(fullPath, typeof(StageLayoutProfile));
 
     static bool TryRemapSceneBgScriptGuid(string fullPath)
         => TryRemapScriptGuid(fullPath, typeof(SceneBackgroundProfile));
+
+    static bool TryRemapClassPoolScriptGuid(string fullPath)
+        => TryRemapScriptGuid(fullPath, typeof(ClassSpritePoolProfile));
 
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {

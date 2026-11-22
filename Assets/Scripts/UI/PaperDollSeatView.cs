@@ -44,7 +44,9 @@ namespace ArthurianAutobattler
             => Bind(recruit, onLeftClick, onHover, onRightClick, useLibraryArt: true);
 
         /// <param name="useLibraryArt">
-        /// False = church pews: StageLayoutProfile assign-only (no library / no clip paint).
+        /// False = church pews: caller paints body via class pool / StageLayout assign-guide
+        /// (no library / no clip paint). Prefer <see cref="ClassSpritePoolApplier"/> then
+        /// StageLayoutProfile previewOrOverrideSprite fallback.
         /// </param>
         public void Bind(
             RecruitInstance recruit,

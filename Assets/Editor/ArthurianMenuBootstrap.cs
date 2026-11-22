@@ -862,7 +862,7 @@ public static class ArthurianMenuBootstrap
                 "FORCE Upgrade → Tip Escape",
                 "Pull PackageVersion / Sync / Bootstrap / Architect / TipEscape / PaperDoll\n"
                 + "from GitHub tip of main (never HardTip).\n\n"
-                + "Diagnose after compile must show: architect-persist-scene-bg\n"
+                + "Diagnose after compile must show: class-sprite-pools\n"
                 + "(compiled Id == disk Id).",
                 "Escape Now", "Cancel"))
             return;
@@ -907,6 +907,8 @@ public static class ArthurianMenuBootstrap
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Scripts/UI/SomersetPewLayout.cs",
+            "Assets/Scripts/Data/GameDataTypes.cs",
+            "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
             "Assets/Scripts/UI/SomersetChurchUI.cs",
             "Assets/Scripts/UI/TownSplitUIController.cs",
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -945,7 +947,7 @@ public static class ArthurianMenuBootstrap
                 if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
                         || body.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0)
-                    && body.IndexOf("architect-persist-scene-bg", StringComparison.Ordinal) < 0)
+                    && body.IndexOf("class-sprite-pools", StringComparison.Ordinal) < 0)
                     throw new Exception("stale PackageVersion body");
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
@@ -968,7 +970,7 @@ public static class ArthurianMenuBootstrap
         }
         AssetDatabase.Refresh();
         log.AppendLine($"Wrote {ok}/{rels.Length}. Wait compile → click FORCE again if TipEscape menu missing.");
-        log.AppendLine("Diagnose must show architect-persist-scene-bg compiled=disk.");
+        log.AppendLine("Diagnose must show class-sprite-pools compiled=disk.");
         return log.ToString();
     }
 
@@ -982,8 +984,8 @@ public static class ArthurianMenuBootstrap
                 + "• TipEscape + PackageVersion + Sync + Bootstrap + Architect\n"
                 + "• SomersetChurchUI + SomersetPewLayout (3-row / scale)\n"
                 + "• PaperDoll + TownsfolkVisualApplier\n\n"
-                + "After compile: Diagnose = architect-persist-scene-bg\n"
-                + "Architect title shows architect-persist-scene-bg + church pew preview.",
+                + "After compile: Diagnose = class-sprite-pools\n"
+                + "Architect title shows class-sprite-pools + church pew preview.",
                 "Download Tip Now", "Cancel"))
             return;
         EditorUtility.DisplayDialog("Break-Glass Hosts", BreakGlassForceHostsFromHardTip(), "OK");
@@ -1033,6 +1035,8 @@ public static class ArthurianMenuBootstrap
             "Assets/Editor/DemonKnightPackageVersion.cs",
             // PewLayout BEFORE Architect so SeatShowsSprite exists if Architect still calls it.
             "Assets/Scripts/UI/SomersetPewLayout.cs",
+            "Assets/Scripts/Data/GameDataTypes.cs",
+            "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
             "Assets/Scripts/UI/SomersetChurchUI.cs",
             "Assets/Scripts/UI/TownSplitUIController.cs",
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -1043,7 +1047,7 @@ public static class ArthurianMenuBootstrap
             "Assets/Scripts/UI/PaperDollSeatView.cs",
             "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         };
-        const string wantId = "architect-persist-scene-bg";
+        const string wantId = "class-sprite-pools";
         int ok = 0;
         var log = new System.Text.StringBuilder();
         log.AppendLine("Break-Glass atomic tip pull (tip/main FIRST, HardTip last)");
@@ -1163,7 +1167,7 @@ public static class ArthurianMenuBootstrap
                     if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                         && (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0
                             || body.IndexOf("Id = \"architect-disk-tip-proof\"", StringComparison.Ordinal) >= 0)
-                        && body.IndexOf("architect-persist-scene-bg", StringComparison.Ordinal) < 0)
+                        && body.IndexOf("class-sprite-pools", StringComparison.Ordinal) < 0)
                     {
                         last = new Exception("stale PackageVersion from " + sha);
                         continue;

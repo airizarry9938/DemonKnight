@@ -41,7 +41,11 @@ namespace ArthurianAutobattler
         public const int VisualSpriteRowCount = 3;
         public const int PewSeatRowSize = 13;
 
-        /// <summary>True when this seat should draw a pew sprite (rows 0–2).</summary>
+        /// <summary>
+        /// True when this seat should draw a pew sprite (rows 0–2).
+        /// Visual identity comes from ClassSpritePoolApplier (by unit class) at church spawn;
+        /// StageLayoutProfile pew slots remain position/scale placement guides only.
+        /// </summary>
         public static bool SeatShowsSprite(int pewSeatIndex)
             => (Mathf.Clamp(pewSeatIndex, 0, TotalSeats - 1) / PewSeatRowSize) < VisualSpriteRowCount;
 
