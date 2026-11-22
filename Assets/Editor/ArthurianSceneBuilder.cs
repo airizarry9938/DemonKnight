@@ -320,11 +320,11 @@ public static class ArthurianSceneBuilder
         recipeRt.pivot = new Vector2(0.5f, 1f);
         recipeRt.anchoredPosition = Vector2.zero;
         recipeRt.sizeDelta = new Vector2(0f, 0f);
-        // One full-width column — each hero/fusion row spans the scroll width.
+        // One full-width column — taller rows for face portrait + readable lore.
         var grid = recipeList.GetComponent<GridLayoutGroup>();
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = 1;
-        grid.cellSize = new Vector2(980f, 172f);
+        grid.cellSize = new Vector2(980f, 268f);
         grid.spacing = new Vector2(0f, 14f);
         grid.padding = new RectOffset(14, 14, 10, 12);
         grid.childAlignment = TextAnchor.UpperCenter;
@@ -602,24 +602,41 @@ public static class ArthurianSceneBuilder
             Object.DestroyImmediate(fct);
         }
 
-        // Codex recipe row
+        // Codex recipe row — face portrait frame + named lore labels (runtime EnsureRowChrome fills scroll).
         if (AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/CodexRecipeRow.prefab") == null)
         {
-            GameObject row = new GameObject("CodexRecipeRow", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
+            GameObject row = new GameObject("CodexRecipeRow", typeof(RectTransform), typeof(Image));
             row.GetComponent<Image>().color = new Color(0.15f, 0.16f, 0.20f, 1f);
-            var hlg = row.GetComponent<HorizontalLayoutGroup>();
-            hlg.padding = new RectOffset(8, 8, 4, 4);
-            hlg.spacing = 8f;
-            hlg.childForceExpandWidth = true;
 
-            for (int i = 0; i < 3; i++)
+            var frame = new GameObject("FacePortraitFrame", typeof(RectTransform), typeof(Image));
+            frame.transform.SetParent(row.transform, false);
+            var frt = frame.GetComponent<RectTransform>();
+            frt.anchorMin = new Vector2(0f, 0.5f);
+            frt.anchorMax = new Vector2(0f, 0.5f);
+            frt.pivot = new Vector2(0f, 0.5f);
+            frt.anchoredPosition = new Vector2(12f, 0f);
+            frt.sizeDelta = new Vector2(128f, 128f);
+            frame.GetComponent<Image>().color = new Color(0.42f, 0.36f, 0.28f, 0.95f);
+            var face = new GameObject("FacePortrait", typeof(RectTransform), typeof(Image));
+            face.transform.SetParent(frame.transform, false);
+            var faceRt = face.GetComponent<RectTransform>();
+            faceRt.anchorMin = Vector2.zero;
+            faceRt.anchorMax = Vector2.one;
+            faceRt.offsetMin = new Vector2(4f, 4f);
+            faceRt.offsetMax = new Vector2(-4f, -4f);
+            face.GetComponent<Image>().color = new Color(0.28f, 0.30f, 0.36f, 0.92f);
+            face.GetComponent<Image>().preserveAspect = true;
+
+            string[] labels = { "Name", "Recipe", "Lore" };
+            for (int i = 0; i < labels.Length; i++)
             {
-                GameObject t = new GameObject($"Text_{i}", typeof(RectTransform), typeof(TextMeshProUGUI));
+                GameObject t = new GameObject(labels[i], typeof(RectTransform), typeof(TextMeshProUGUI));
                 t.transform.SetParent(row.transform, false);
                 var tmp = t.GetComponent<TextMeshProUGUI>();
-                tmp.fontSize = 14;
+                tmp.fontSize = i == 0 ? 18 : 14;
                 tmp.alignment = TextAlignmentOptions.Left;
-                tmp.text = i == 0 ? "Hero" : (i == 1 ? "Recipe" : "Perk");
+                tmp.text = labels[i];
+                tmp.textWrappingMode = TextWrappingModes.Normal;
             }
 
             GameObject fuse = new GameObject("FuseButton", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -637,8 +654,9 @@ public static class ArthurianSceneBuilder
             fl.rectTransform.offsetMax = Vector2.zero;
 
             var le = row.AddComponent<LayoutElement>();
-            le.minHeight = 56f;
-            le.preferredHeight = 56f;
+            le.minHeight = 260f;
+            le.preferredHeight = 268f;
+            le.flexibleWidth = 1f;
 
             PrefabUtility.SaveAsPrefabAsset(row, "Assets/Prefabs/CodexRecipeRow.prefab");
             Object.DestroyImmediate(row);

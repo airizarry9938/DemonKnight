@@ -1068,8 +1068,9 @@ namespace ArthurianAutobattler
             const float padTotalX = 28f;
             float cellW = Mathf.Floor(available - padTotalX);
             cellW = Mathf.Max(cellW, 720f);
-            // Tall enough for name + recipe + lore/riddle/passive on one full-width row.
-            float cellH = 172f;
+            // Tall enough for face portrait + scrollable lore on one full-width row
+            // (legends-lore-portrait). Grid still one column (PR #35).
+            float cellH = 268f;
 
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 1;

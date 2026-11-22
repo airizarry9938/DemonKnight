@@ -37,6 +37,17 @@ namespace ArthurianAutobattler
 
         MenuListSortMode legendsSortMode = MenuListSortMode.LowestHp;
 
+        /// <summary>Legends whose lore panel is expanded for full reading.</summary>
+        readonly HashSet<UnitType> expandedLoreTypes = new HashSet<UnitType>();
+
+        // Full-width row heights — taller than PR #35 so lore is readable; expand grows further.
+        const float RowHeightCollapsed = 268f;
+        const float RowHeightExpanded = 420f;
+        const float FacePortraitSize = 120f;
+
+        static readonly Color SoftPortraitPlaceholder = new Color(0.28f, 0.30f, 0.36f, 0.92f);
+        static readonly Color FaceFrameColor = new Color(0.42f, 0.36f, 0.28f, 0.95f);
+
         private void Start()
         {
             if (codexPanel != null) codexPanel.SetActive(false);
@@ -90,6 +101,13 @@ namespace ArthurianAutobattler
             if (codexPanel != null)
                 DemonKnightCompatApi.EnsureCodexScrollViewport(codexPanel.transform);
             DemonKnightCompatApi.ApplyFullWidthColumnCodexLayout(recipeListContainer);
+            // When any lore panel is expanded, grow the one-column grid cell so the row can show more text.
+            var layoutGrid = recipeListContainer.GetComponent<GridLayoutGroup>();
+            if (layoutGrid != null)
+            {
+                float h = expandedLoreTypes.Count > 0 ? RowHeightExpanded : RowHeightCollapsed;
+                layoutGrid.cellSize = new Vector2(layoutGrid.cellSize.x, h);
+            }
 
             EnsureLegendsSortBar();
 
@@ -116,26 +134,28 @@ namespace ArthurianAutobattler
                 else
                     row = BuildFallbackRow(recipeListContainer);
 
+                EnsureRowChrome(row);
+
+                bool loreExpanded = expandedLoreTypes.Contains(entry.resultingType);
+                float rowH = loreExpanded ? RowHeightExpanded : RowHeightCollapsed;
+
                 var le = row.GetComponent<LayoutElement>();
                 if (le == null) le = row.AddComponent<LayoutElement>();
                 // Full-width single column — row spans the Codex scroll usable width.
                 float cellW = 960f;
-                float cellH = 172f;
                 var grid = recipeListContainer.GetComponent<GridLayoutGroup>();
                 if (grid != null)
-                {
                     cellW = Mathf.Max(720f, grid.cellSize.x);
-                    cellH = Mathf.Max(160f, grid.cellSize.y);
-                }
-                le.minHeight = cellH - 12f;
-                le.preferredHeight = cellH;
+                else if (recipeListContainer is RectTransform listRt && listRt.rect.width > 80f)
+                    cellW = Mathf.Max(720f, listRt.rect.width - 28f);
+
+                le.minHeight = rowH - 8f;
+                le.preferredHeight = rowH;
                 le.minWidth = cellW - 24f;
                 le.preferredWidth = cellW;
                 le.flexibleWidth = 1f;
+                le.flexibleHeight = 0f;
 
-                TextMeshProUGUI[] texts = row.GetComponentsInChildren<TextMeshProUGUI>();
-                Button fuseBtn = row.GetComponentInChildren<Button>();
-                Image[] images = row.GetComponentsInChildren<Image>();
                 string legendId = LegendUnlockManager.LegendIdFor(entry.resultingType);
                 bool gated = LegendUnlockManager.IsGatedLegend(entry.resultingType);
                 bool unlocked = !gated || LegendUnlockManager.Ensure().IsLegendUnlocked(legendId);
@@ -148,65 +168,61 @@ namespace ArthurianAutobattler
                 if (string.IsNullOrWhiteSpace(riddle))
                     riddle = LegendUnlockManager.RiddleFor(legendId);
 
-                // Portrait: prefer first Image that isn't the row background / button.
-                if (images != null)
+                Sprite portrait = ResolveLegendPortrait(entry);
+                ApplyFacePortrait(row, portrait, unlocked, ready);
+
+                TextMeshProUGUI nameTmp = FindRowLabel(row, "Name");
+                TextMeshProUGUI recipeTmp = FindRowLabel(row, "Recipe");
+                TextMeshProUGUI loreTmp = FindRowLabel(row, "Lore") ?? FindRowLabel(row, "Perk");
+                // Prefab fallback: first three TMP children when named labels missing.
+                if (nameTmp == null || recipeTmp == null || loreTmp == null)
                 {
-                    foreach (var img in images)
-                    {
-                        if (img == null) continue;
-                        if (fuseBtn != null && img.gameObject == fuseBtn.gameObject) continue;
-                        if (img.gameObject == row) continue;
-                        if (img.GetComponentInParent<Button>() == fuseBtn && img.transform.parent == fuseBtn.transform)
-                            continue;
-                        if (unlocked && entry.heroPortrait != null)
-                        {
-                            img.sprite = entry.heroPortrait;
-                            img.preserveAspect = true;
-                            img.color = ready ? Color.white : new Color(1f, 1f, 1f, 0.85f);
-                        }
-                        else
-                        {
-                            // Locked silhouette #1E1E24
-                            img.sprite = entry.heroPortrait;
-                            img.preserveAspect = true;
-                            img.color = new Color(0x1E / 255f, 0x1E / 255f, 0x24 / 255f, 1f);
-                        }
-                        break;
-                    }
+                    TextMeshProUGUI[] texts = row.GetComponentsInChildren<TextMeshProUGUI>(true);
+                    if (nameTmp == null && texts.Length >= 1) nameTmp = texts[0];
+                    if (recipeTmp == null && texts.Length >= 2) recipeTmp = texts[1];
+                    if (loreTmp == null && texts.Length >= 3) loreTmp = texts[2];
                 }
 
-                if (texts.Length >= 1)
+                if (nameTmp != null)
                 {
                     if (!unlocked)
-                        texts[0].text = $"<color=#888899>{entry.heroName}  [LOCKED]</color>";
+                        nameTmp.text = $"<color=#888899>{entry.heroName}  [LOCKED]</color>";
                     else if (ready)
-                        texts[0].text = $"<color=#7CFF9A>{entry.heroName}  [READY TO FUSE]</color>";
+                        nameTmp.text = $"<color=#7CFF9A>{entry.heroName}  [READY TO FUSE]</color>";
                     else
-                        texts[0].text = entry.heroName;
-                    texts[0].fontSize = 22f;
-                    texts[0].textWrappingMode = TextWrappingModes.Normal;
-                    texts[0].overflowMode = TextOverflowModes.Overflow;
+                        nameTmp.text = entry.heroName;
+                    nameTmp.fontSize = 22f;
+                    nameTmp.textWrappingMode = TextWrappingModes.Normal;
+                    nameTmp.overflowMode = TextOverflowModes.Overflow;
                 }
-                if (texts.Length >= 2)
+                if (recipeTmp != null)
                 {
-                    texts[1].text = unlocked
+                    recipeTmp.text = unlocked
                         ? $"Recipe: {entry.ingredientFormula}"
                         : "Recipe: ???";
-                    texts[1].fontSize = 17f;
-                    texts[1].textWrappingMode = TextWrappingModes.Normal;
-                    texts[1].overflowMode = TextOverflowModes.Overflow;
+                    recipeTmp.fontSize = 17f;
+                    recipeTmp.textWrappingMode = TextWrappingModes.Normal;
+                    recipeTmp.overflowMode = TextOverflowModes.Overflow;
                 }
-                if (texts.Length >= 3)
+
+                string loreBody;
+                if (!unlocked)
+                    loreBody = string.IsNullOrEmpty(riddle) ? "Locked." : riddle;
+                else if (!string.IsNullOrEmpty(lore))
+                    loreBody = lore + (string.IsNullOrWhiteSpace(entry.combatPerkSummary)
+                        ? ""
+                        : $"\n\n<color=#B8C4A8>Perk: {entry.combatPerkSummary}</color>");
+                else
+                    loreBody = $"Perk: {entry.combatPerkSummary}";
+
+                if (loreTmp != null)
                 {
-                    if (!unlocked)
-                        texts[2].text = string.IsNullOrEmpty(riddle) ? "Locked." : riddle;
-                    else
-                        texts[2].text = string.IsNullOrEmpty(lore)
-                            ? $"Perk: {entry.combatPerkSummary}"
-                            : lore;
-                    texts[2].fontSize = 16f;
-                    texts[2].textWrappingMode = TextWrappingModes.Normal;
-                    texts[2].overflowMode = TextOverflowModes.Overflow;
+                    loreTmp.text = loreBody;
+                    loreTmp.fontSize = 16f;
+                    loreTmp.textWrappingMode = TextWrappingModes.Normal;
+                    loreTmp.overflowMode = TextOverflowModes.Overflow;
+                    loreTmp.raycastTarget = false;
+                    FitLoreScrollContent(row, loreTmp, loreExpanded);
                 }
 
                 // Highlight ready / locked cards.
@@ -221,7 +237,9 @@ namespace ArthurianAutobattler
                         bg.color = new Color(0.12f, 0.14f, 0.18f, 0.95f);
                 }
 
-                if (fuseBtn != null)
+                Button fuseBtn = FindNamedButton(row, "Fuse") ?? FindNamedButton(row, "FuseButton")
+                                 ?? row.GetComponentInChildren<Button>(true);
+                if (fuseBtn != null && fuseBtn.gameObject.name.IndexOf("Expand", StringComparison.OrdinalIgnoreCase) < 0)
                 {
                     UnitType type = entry.resultingType;
                     fuseBtn.interactable = ready;
@@ -230,7 +248,324 @@ namespace ArthurianAutobattler
                     fuseBtn.onClick.RemoveAllListeners();
                     fuseBtn.onClick.AddListener(() => ExecuteFusion(type));
                 }
+
+                WireExpandLoreButton(row, entry.resultingType, loreExpanded);
             }
+        }
+
+        static Sprite ResolveLegendPortrait(CodexRecipeEntry entry)
+        {
+            if (entry == null) return null;
+            if (entry.heroPortrait != null) return entry.heroPortrait;
+            try
+            {
+                var db = CharacterDatabase.Load();
+                return db != null ? db.GetPortrait(entry.resultingType) : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        static void ApplyFacePortrait(GameObject row, Sprite portrait, bool unlocked, bool ready)
+        {
+            if (row == null) return;
+            Image face = FindFacePortraitImage(row);
+            if (face == null) return;
+
+            face.preserveAspect = true;
+            face.raycastTarget = false;
+            if (portrait != null)
+            {
+                face.sprite = portrait;
+                if (!unlocked)
+                    face.color = new Color(0x1E / 255f, 0x1E / 255f, 0x24 / 255f, 1f);
+                else
+                    face.color = ready ? Color.white : new Color(1f, 1f, 1f, 0.88f);
+            }
+            else
+            {
+                face.sprite = null;
+                // Soft placeholder when CharacterDatabase / catalog has no face photo yet.
+                face.color = SoftPortraitPlaceholder;
+            }
+        }
+
+        static Image FindFacePortraitImage(GameObject row)
+        {
+            if (row == null) return null;
+            var t = row.transform.Find("FacePortraitFrame/FacePortrait")
+                    ?? row.transform.Find("FacePortrait")
+                    ?? row.transform.Find("Portrait");
+            if (t != null)
+            {
+                var img = t.GetComponent<Image>();
+                if (img != null) return img;
+            }
+            // Prefab: first Image that isn't row bg / button chrome.
+            foreach (var img in row.GetComponentsInChildren<Image>(true))
+            {
+                if (img == null || img.gameObject == row) continue;
+                if (img.GetComponent<Button>() != null) continue;
+                if (img.GetComponentInParent<Button>() != null
+                    && img.GetComponentInParent<Button>().transform != row.transform)
+                    continue;
+                if (img.gameObject.name.IndexOf("Frame", StringComparison.OrdinalIgnoreCase) >= 0)
+                    continue;
+                return img;
+            }
+            return null;
+        }
+
+        static TextMeshProUGUI FindRowLabel(GameObject row, string name)
+        {
+            if (row == null || string.IsNullOrEmpty(name)) return null;
+            var t = row.transform.Find(name)
+                    ?? row.transform.Find("LoreScroll/Viewport/Content/" + name)
+                    ?? row.transform.Find("LoreScroll/Viewport/" + name);
+            if (t == null)
+            {
+                foreach (Transform c in row.GetComponentsInChildren<Transform>(true))
+                {
+                    if (c != null && c.name == name)
+                    {
+                        t = c;
+                        break;
+                    }
+                }
+            }
+            return t != null ? t.GetComponent<TextMeshProUGUI>() : null;
+        }
+
+        static Button FindNamedButton(GameObject row, string name)
+        {
+            if (row == null) return null;
+            var t = row.transform.Find(name);
+            if (t != null) return t.GetComponent<Button>();
+            foreach (var b in row.GetComponentsInChildren<Button>(true))
+            {
+                if (b != null && b.gameObject.name == name) return b;
+            }
+            return null;
+        }
+
+        void WireExpandLoreButton(GameObject row, UnitType type, bool expanded)
+        {
+            var btn = FindNamedButton(row, "ExpandLore");
+            if (btn == null) return;
+            var label = btn.GetComponentInChildren<TextMeshProUGUI>();
+            if (label != null) label.text = expanded ? "Less" : "Lore";
+            btn.onClick.RemoveAllListeners();
+            btn.onClick.AddListener(() =>
+            {
+                if (expandedLoreTypes.Contains(type))
+                    expandedLoreTypes.Remove(type);
+                else
+                    expandedLoreTypes.Add(type);
+                RefreshCodexList();
+            });
+        }
+
+        static void FitLoreScrollContent(GameObject row, TextMeshProUGUI loreTmp, bool expanded)
+        {
+            if (row == null || loreTmp == null) return;
+            var scrollT = row.transform.Find("LoreScroll");
+            if (scrollT == null) return;
+
+            var scroll = scrollT.GetComponent<ScrollRect>();
+            var content = loreTmp.rectTransform;
+            if (content == null) return;
+
+            // Stretch lore TMP as scroll content; preferred height from text.
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.offsetMin = new Vector2(4f, 0f);
+            content.offsetMax = new Vector2(-4f, 0f);
+
+            // Expanded rows get a taller lore viewport (anchors on LoreScroll); content scrolls if longer.
+            float viewH = expanded ? 220f : 110f;
+            var loreScrollRt = scrollT as RectTransform;
+            if (loreScrollRt != null && expanded)
+            {
+                loreScrollRt.anchorMin = new Vector2(0f, 0f);
+                loreScrollRt.anchorMax = new Vector2(1f, 0.62f);
+            }
+
+            Canvas.ForceUpdateCanvases();
+            float preferred = loreTmp.preferredHeight + 8f;
+            content.sizeDelta = new Vector2(content.sizeDelta.x, Mathf.Max(viewH, preferred));
+            if (scroll != null)
+            {
+                scroll.vertical = preferred > viewH + 2f;
+                scroll.horizontal = false;
+                scroll.movementType = ScrollRect.MovementType.Clamped;
+                scroll.scrollSensitivity = 28f;
+            }
+        }
+
+        /// <summary>
+        /// Ensures FacePortrait frame + scrollable lore host exist on prefab or fallback rows.
+        /// </summary>
+        static void EnsureRowChrome(GameObject row)
+        {
+            if (row == null) return;
+
+            // Face portrait frame (left) — profile pic box Andrew asked for.
+            Transform frameT = row.transform.Find("FacePortraitFrame");
+            if (frameT == null)
+            {
+                var frameGo = new GameObject("FacePortraitFrame", typeof(RectTransform), typeof(Image));
+                frameGo.transform.SetParent(row.transform, false);
+                frameGo.transform.SetAsFirstSibling();
+                var frt = frameGo.GetComponent<RectTransform>();
+                frt.anchorMin = new Vector2(0f, 0.5f);
+                frt.anchorMax = new Vector2(0f, 0.5f);
+                frt.pivot = new Vector2(0f, 0.5f);
+                frt.anchoredPosition = new Vector2(12f, 0f);
+                frt.sizeDelta = new Vector2(FacePortraitSize + 8f, FacePortraitSize + 8f);
+                frameGo.GetComponent<Image>().color = FaceFrameColor;
+                frameGo.GetComponent<Image>().raycastTarget = false;
+                frameT = frameGo.transform;
+            }
+
+            Transform faceT = frameT.Find("FacePortrait");
+            if (faceT == null)
+            {
+                // Migrate old "Portrait" child into the frame when present.
+                var old = row.transform.Find("Portrait");
+                if (old != null)
+                {
+                    old.SetParent(frameT, false);
+                    old.name = "FacePortrait";
+                    faceT = old;
+                }
+                else
+                {
+                    var faceGo = new GameObject("FacePortrait", typeof(RectTransform), typeof(Image));
+                    faceGo.transform.SetParent(frameT, false);
+                    faceT = faceGo.transform;
+                }
+            }
+
+            var faceRt = faceT as RectTransform;
+            if (faceRt != null)
+            {
+                faceRt.anchorMin = Vector2.zero;
+                faceRt.anchorMax = Vector2.one;
+                faceRt.offsetMin = new Vector2(4f, 4f);
+                faceRt.offsetMax = new Vector2(-4f, -4f);
+            }
+            var faceImg = faceT.GetComponent<Image>();
+            if (faceImg != null)
+            {
+                faceImg.preserveAspect = true;
+                faceImg.raycastTarget = false;
+                if (faceImg.sprite == null)
+                    faceImg.color = SoftPortraitPlaceholder;
+            }
+
+            // Scrollable lore host (bottom band of the text column).
+            Transform loreScroll = row.transform.Find("LoreScroll");
+            if (loreScroll == null)
+            {
+                var scrollGo = new GameObject("LoreScroll", typeof(RectTransform), typeof(Image), typeof(ScrollRect), typeof(RectMask2D));
+                scrollGo.transform.SetParent(row.transform, false);
+                var srt = scrollGo.GetComponent<RectTransform>();
+                srt.anchorMin = new Vector2(0f, 0f);
+                srt.anchorMax = new Vector2(1f, 0.55f);
+                srt.offsetMin = new Vector2(FacePortraitSize + 28f, 8f);
+                srt.offsetMax = new Vector2(-130f, -4f);
+                scrollGo.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.11f, 0.55f);
+                scrollGo.GetComponent<Image>().raycastTarget = true;
+
+                var vpGo = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+                vpGo.transform.SetParent(scrollGo.transform, false);
+                var vprt = vpGo.GetComponent<RectTransform>();
+                vprt.anchorMin = Vector2.zero;
+                vprt.anchorMax = Vector2.one;
+                vprt.offsetMin = new Vector2(4f, 4f);
+                vprt.offsetMax = new Vector2(-4f, -4f);
+                vpGo.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.02f);
+                vpGo.GetComponent<Mask>().showMaskGraphic = false;
+
+                // Re-home existing Perk/Lore TMP into the scroll viewport when present.
+                Transform loreLabel = row.transform.Find("Lore") ?? row.transform.Find("Perk")
+                                      ?? row.transform.Find("Text_2");
+                GameObject loreGo;
+                if (loreLabel != null)
+                {
+                    loreLabel.SetParent(vpGo.transform, false);
+                    loreLabel.name = "Lore";
+                    loreGo = loreLabel.gameObject;
+                }
+                else
+                {
+                    loreGo = new GameObject("Lore", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    loreGo.transform.SetParent(vpGo.transform, false);
+                    var tmp = loreGo.GetComponent<TextMeshProUGUI>();
+                    tmp.fontSize = 16f;
+                    tmp.color = new Color(0.90f, 0.86f, 0.76f);
+                    tmp.textWrappingMode = TextWrappingModes.Normal;
+                }
+
+                var lrt = loreGo.GetComponent<RectTransform>();
+                lrt.anchorMin = new Vector2(0f, 1f);
+                lrt.anchorMax = new Vector2(1f, 1f);
+                lrt.pivot = new Vector2(0.5f, 1f);
+                lrt.anchoredPosition = Vector2.zero;
+                lrt.sizeDelta = new Vector2(0f, 120f);
+
+                var scroll = scrollGo.GetComponent<ScrollRect>();
+                scroll.content = lrt;
+                scroll.viewport = vprt;
+                scroll.horizontal = false;
+                scroll.vertical = true;
+                scroll.movementType = ScrollRect.MovementType.Clamped;
+                scroll.scrollSensitivity = 28f;
+            }
+
+            // Nudge Name / Recipe to clear the face frame.
+            NudgeLabelPastPortrait(row.transform.Find("Name"), 0.72f, 1f);
+            NudgeLabelPastPortrait(row.transform.Find("Recipe"), 0.55f, 0.72f);
+
+            // Expand lore toggle (above Fuse).
+            if (row.transform.Find("ExpandLore") == null)
+            {
+                var btnGo = new GameObject("ExpandLore", typeof(RectTransform), typeof(Image), typeof(Button));
+                btnGo.transform.SetParent(row.transform, false);
+                var brt = btnGo.GetComponent<RectTransform>();
+                brt.anchorMin = new Vector2(1f, 0.5f);
+                brt.anchorMax = new Vector2(1f, 0.5f);
+                brt.pivot = new Vector2(1f, 0.5f);
+                brt.anchoredPosition = new Vector2(-12f, 36f);
+                brt.sizeDelta = new Vector2(110f, 36f);
+                btnGo.GetComponent<Image>().color = new Color(0.32f, 0.28f, 0.22f, 0.98f);
+                var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                labelGo.transform.SetParent(btnGo.transform, false);
+                var lrt = labelGo.GetComponent<RectTransform>();
+                lrt.anchorMin = Vector2.zero;
+                lrt.anchorMax = Vector2.one;
+                lrt.offsetMin = Vector2.zero;
+                lrt.offsetMax = Vector2.zero;
+                var tmp = labelGo.GetComponent<TextMeshProUGUI>();
+                tmp.text = "Lore";
+                tmp.alignment = TextAlignmentOptions.Center;
+                tmp.fontSize = 16f;
+                tmp.color = Color.white;
+            }
+        }
+
+        static void NudgeLabelPastPortrait(Transform label, float anchorMinY, float anchorMaxY)
+        {
+            if (label == null) return;
+            var rt = label as RectTransform;
+            if (rt == null) return;
+            rt.anchorMin = new Vector2(0f, anchorMinY);
+            rt.anchorMax = new Vector2(1f, anchorMaxY);
+            rt.offsetMin = new Vector2(FacePortraitSize + 28f, 2f);
+            rt.offsetMax = new Vector2(-130f, -2f);
         }
 
         /// <summary>
@@ -370,7 +705,11 @@ namespace ArthurianAutobattler
                 allRecipes.Add(new CodexRecipeEntry
                 {
                     heroName = string.IsNullOrEmpty(def.displayName) ? def.unitType.ToString() : def.displayName,
-                    heroPortrait = def.portraitSprite != null ? def.portraitSprite : def.battleSprite,
+                    heroPortrait = def.portraitSprite != null
+                        ? def.portraitSprite
+                        : (def.battleSprite != null
+                            ? def.battleSprite
+                            : CharacterDatabase.Load()?.GetPortrait(def.unitType)),
                     ingredientFormula = def.FormatRecipeLine(),
                     combatPerkSummary = string.IsNullOrWhiteSpace(def.passiveDescription)
                         ? def.passiveType.ToString()
@@ -412,19 +751,12 @@ namespace ArthurianAutobattler
             var go = new GameObject("CodexRow", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
             go.transform.SetParent(parent, false);
             go.GetComponent<Image>().color = new Color(0.12f, 0.14f, 0.18f, 0.95f);
-            go.GetComponent<LayoutElement>().preferredHeight = 172f;
-            go.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            var le = go.GetComponent<LayoutElement>();
+            le.preferredHeight = RowHeightCollapsed;
+            le.minHeight = RowHeightCollapsed - 8f;
+            le.flexibleWidth = 1f;
 
-            var portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
-            portraitGo.transform.SetParent(go.transform, false);
-            var prt = portraitGo.GetComponent<RectTransform>();
-            prt.anchorMin = new Vector2(0f, 0.5f);
-            prt.anchorMax = new Vector2(0f, 0.5f);
-            prt.pivot = new Vector2(0f, 0.5f);
-            prt.anchoredPosition = new Vector2(10f, 0f);
-            prt.sizeDelta = new Vector2(64f, 64f);
-            portraitGo.GetComponent<Image>().color = new Color(0.2f, 0.22f, 0.28f);
-
+            // Face frame built by EnsureRowChrome; seed Name/Recipe + Fuse here.
             void MakeLabel(string name, Vector2 anchorMin, Vector2 anchorMax)
             {
                 var tGo = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -432,17 +764,17 @@ namespace ArthurianAutobattler
                 var rt = tGo.GetComponent<RectTransform>();
                 rt.anchorMin = anchorMin;
                 rt.anchorMax = anchorMax;
-                rt.offsetMin = new Vector2(84f, 4f);
-                rt.offsetMax = new Vector2(-120f, -4f);
+                rt.offsetMin = new Vector2(FacePortraitSize + 28f, 4f);
+                rt.offsetMax = new Vector2(-130f, -4f);
                 var tmp = tGo.GetComponent<TextMeshProUGUI>();
                 tmp.fontSize = 20f;
                 tmp.color = new Color(0.92f, 0.88f, 0.78f);
                 tmp.textWrappingMode = TextWrappingModes.Normal;
             }
 
-            MakeLabel("Name", new Vector2(0f, 0.55f), new Vector2(1f, 1f));
-            MakeLabel("Recipe", new Vector2(0f, 0.28f), new Vector2(1f, 0.55f));
-            MakeLabel("Perk", new Vector2(0f, 0f), new Vector2(1f, 0.28f));
+            MakeLabel("Name", new Vector2(0f, 0.72f), new Vector2(1f, 1f));
+            MakeLabel("Recipe", new Vector2(0f, 0.55f), new Vector2(1f, 0.72f));
+            // Lore TMP is created inside LoreScroll by EnsureRowChrome.
 
             var btnGo = new GameObject("Fuse", typeof(RectTransform), typeof(Image), typeof(Button));
             btnGo.transform.SetParent(go.transform, false);
@@ -450,7 +782,7 @@ namespace ArthurianAutobattler
             brt.anchorMin = new Vector2(1f, 0.5f);
             brt.anchorMax = new Vector2(1f, 0.5f);
             brt.pivot = new Vector2(1f, 0.5f);
-            brt.anchoredPosition = new Vector2(-12f, 0f);
+            brt.anchoredPosition = new Vector2(-12f, -18f);
             brt.sizeDelta = new Vector2(110f, 48f);
             btnGo.GetComponent<Image>().color = new Color(0.25f, 0.35f, 0.55f);
             var btnLabel = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
