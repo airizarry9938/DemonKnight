@@ -637,7 +637,8 @@ namespace ArthurianAutobattler
             {
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
                     0, false,
-                    "CAMELOT ABANDONED: Every soul in the Somerset pews priced you out. Merlin rewinds time..."
+                    "CAMELOT ABANDONED: Every soul in the Somerset pews priced you out.\n"
+                    + "THE GRAIL NIGHTMARE — Broken Vigil. Merlin remains missing. Grudge Memory endures."
                 );
                 return;
             }

@@ -405,7 +405,7 @@ public static class ArthurianSceneBuilder
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 520f),
             new Color(0.05f, 0.06f, 0.12f, 0.98f));
         var lore = CreateTMP(resPanel.transform, "LoreText",
-            "Merlin turns the hourglass...", 20, TextAlignmentOptions.Center,
+            "The Grail Nightmare… Broken Vigil…", 20, TextAlignmentOptions.Center,
             new Vector2(0f, 160f), new Vector2(820f, 120f));
 
         // Legacy bank panel removed — Next Night advances the night; End Run → Main Menu.
@@ -657,7 +657,6 @@ public static class ArthurianSceneBuilder
             new CodexRecipeEntry { heroName = "Sir Tristan", resultingType = UnitType.SirTristan, ingredientFormula = "1 Knight + 1 Peasant (Outlaw/Noble)", combatPerkSummary = "Bow — attacks from BACK" },
             new CodexRecipeEntry { heroName = "Guinevere", resultingType = UnitType.Guinevere, ingredientFormula = "1 Noble + 1 Priest", combatPerkSummary = "+15% ATK aura to Loyalist/Noble allies" },
             new CodexRecipeEntry { heroName = "King Arthur", resultingType = UnitType.KingArthur, ingredientFormula = "2 Knights + 1 Captain", combatPerkSummary = "Cleaves 2 foes; blocks Nimue seduction" },
-            new CodexRecipeEntry { heroName = "Merlin", resultingType = UnitType.Merlin, ingredientFormula = "2 Priests + 1 Knight", combatPerkSummary = "Hits all enemies" },
             new CodexRecipeEntry { heroName = "Sir Lancelot", resultingType = UnitType.SirLancelot, ingredientFormula = "2 Knights (incl. 1 Noble) + 1 Warrior", combatPerkSummary = "+5 ATK per fallen ally" },
             new CodexRecipeEntry { heroName = "Morgan le Fay", resultingType = UnitType.MorganLeFay, ingredientFormula = "2 Priests + 1 Outlaw", combatPerkSummary = "Hexes targets (halve APS)" },
             new CodexRecipeEntry { heroName = "Lady of the Lake", resultingType = UnitType.LadyOfTheLake, ingredientFormula = "2 Priests + 1 Captain", combatPerkSummary = "Shields / Chalice synergy" },

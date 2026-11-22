@@ -333,7 +333,7 @@ namespace ArthurianAutobattler
             ApplyFifteenLegendPassives();
         }
 
-        /// <summary>15-Legend combat passives from legend-unlocks-brief.</summary>
+        /// <summary>Playable-legend combat passives (Merlin narrative-only; UnitType kept).</summary>
         void ApplyFifteenLegendPassives()
         {
             bool anyOtherLegend(CombatUnit self) =>
@@ -1239,7 +1239,9 @@ namespace ArthurianAutobattler
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
                     currentBattleNumber, true,
                     $"VICTORY — Nimue falls on Wave {currentBattleNumber}. (+{goldEarned}g)\n\n"
-                    + "The abyss stirs, but Camelot endures this night. Merlin turns the hourglass in the Somerset church.");
+                    + "From rain and mist Merlin emerges — gaunt, late, and grave.\n"
+                    + "Somerset held. While you stood the churchyard, the Demon Enchantress army overran Camelot and Britain.\n"
+                    + "The reconquest war begins.");
             }
             else if (!playerWon)
             {
@@ -1250,9 +1252,11 @@ namespace ArthurianAutobattler
                 LegendUnlockManager.Ensure()?.NotifyRunEnded(endGrudges);
                 MerlinResurrectionManager.Instance?.TriggerEndOfRunResurrection(
                     wavesCleared, false,
-                    $"DEFEAT — The warband fell on Wave {currentBattleNumber}. (+{goldEarned}g consolation)\n"
+                    $"THE GRAIL NIGHTMARE — Broken Vigil\n"
+                    + $"The warband fell on Wave {currentBattleNumber}. (+{goldEarned}g consolation)\n"
                     + $"Waves cleared this night: {wavesCleared}.\n\n"
-                    + "The horde breaches the churchyard. Merlin shatters the hourglass — the pews remember the slaughter.");
+                    + "Somerset falls in a vision of rain and shattered pews.\n"
+                    + "Grudge Memory carries forward. Merlin remains missing — no hourglass, no rewind.");
             }
             else
             {

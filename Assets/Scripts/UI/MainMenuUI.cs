@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
@@ -6,7 +7,8 @@ using TMPro;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Boot / pause menu: New Game, Continue, Load/Save slots, Restart, Quit.
+    /// Boot / pause menu: New Game, Continue, Load/Save slots, Restart, Quit,
+    /// plus skippable Story / Prologue parchment crawl.
     /// Auto-spawns after scene load even if scene/builder never added it.
     /// Esc always toggles this menu (except during AutoBattle).
     /// </summary>
@@ -16,6 +18,7 @@ namespace ArthurianAutobattler
 
         public GameObject menuRoot;
         public Button newGameButton;
+        public Button storyButton;
         public Button continueButton;
         public Button loadGameButton;
         public Button saveGameButton;
@@ -28,7 +31,24 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI[] slotLabels = new TextMeshProUGUI[3];
         public TextMeshProUGUI statusText;
 
+        GameObject parchmentRoot;
+        TextMeshProUGUI parchmentText;
+        Button parchmentEnterButton;
+        Button parchmentSkipButton;
+        Coroutine parchmentRoutine;
+        bool parchmentStartsNewGame;
+
         private bool slotsAreLoadMode = true;
+
+        public const string PrologueCrawl =
+            "LAST KNIGHTS OF SOMERSET\n\n"
+            + "Rain drums the Somerset church. The Arch-Priest counts taxes across fifty-two pews "
+            + "while the townsfolk sit wet and weary under guttering candles.\n\n"
+            + "A survivor from fallen Cumberland bursts the doors — mud, blood, and news of demons. "
+            + "The tax meeting breaks. Aging King Arthur murmurs at the altar, searching for counsel "
+            + "that will not come. Merlin is missing.\n\n"
+            + "You are that Cumberland exile. Rally the pews. Hold the churchyard. "
+            + "Britain still burns beyond these walls.";
 
         /// <summary>Spawns MainMenuCanvas if missing — called from GameLoop Awake / Church Start / scene load.</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -79,6 +99,11 @@ namespace ArthurianAutobattler
         private void Update()
         {
             if (!Input.GetKeyDown(KeyCode.Escape)) return;
+            if (parchmentRoot != null && parchmentRoot.activeSelf)
+            {
+                FinishParchment(enterChurch: false);
+                return;
+            }
             HandleEscapeKey();
         }
 
@@ -145,62 +170,125 @@ namespace ArthurianAutobattler
                 canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, 500);
             }
 
-            if (menuRoot != null) return;
-
-            menuRoot = new GameObject("MenuRoot", typeof(RectTransform), typeof(Image));
-            menuRoot.transform.SetParent(transform, false);
-            Stretch(menuRoot.GetComponent<RectTransform>());
-            menuRoot.GetComponent<Image>().color = new Color(0.04f, 0.05f, 0.07f, 0.96f);
-
-            var title = MakeTmp(menuRoot.transform, "Title", "LAST KNIGHTS OF SOMERSET", 42f,
-                new Vector2(0.5f, 0.88f), new Vector2(0.5f, 0.88f), new Vector2(980f, 60f));
-            title.alignment = TextAlignmentOptions.Center;
-            title.color = new Color(0.92f, 0.86f, 0.7f);
-
-            statusText = MakeTmp(menuRoot.transform, "Status", "", 20f,
-                new Vector2(0.5f, 0.78f), new Vector2(0.5f, 0.78f), new Vector2(900f, 48f));
-            statusText.alignment = TextAlignmentOptions.Center;
-            statusText.color = new Color(0.75f, 0.8f, 0.85f);
-
-            newGameButton = MakeButton(menuRoot.transform, "NewGame", "New Game", new Vector2(0f, 120f));
-            continueButton = MakeButton(menuRoot.transform, "Continue", "Continue", new Vector2(0f, 55f));
-            loadGameButton = MakeButton(menuRoot.transform, "LoadGame", "Load Game (slots)", new Vector2(0f, -10f));
-            saveGameButton = MakeButton(menuRoot.transform, "SaveGame", "Save Game (slots)", new Vector2(0f, -75f));
-            restartButton = MakeButton(menuRoot.transform, "Restart", "Restart Scene", new Vector2(0f, -140f));
-            quitButton = MakeButton(menuRoot.transform, "Quit", "Quit", new Vector2(0f, -205f));
-            closeMenuButton = MakeButton(menuRoot.transform, "Close", "Return to Church", new Vector2(0f, -270f));
-
-            slotsPanel = new GameObject("SlotsPanel", typeof(RectTransform), typeof(Image));
-            slotsPanel.transform.SetParent(menuRoot.transform, false);
-            var srt = slotsPanel.GetComponent<RectTransform>();
-            srt.anchorMin = srt.anchorMax = new Vector2(0.5f, 0.5f);
-            srt.sizeDelta = new Vector2(560f, 300f);
-            srt.anchoredPosition = new Vector2(0f, -10f);
-            slotsPanel.GetComponent<Image>().color = new Color(0.1f, 0.12f, 0.14f, 0.98f);
-            slotsPanel.SetActive(false);
-
-            slotLoadButtons = new Button[3];
-            slotSaveButtons = new Button[3];
-            slotLabels = new TextMeshProUGUI[3];
-            for (int i = 0; i < 3; i++)
+            if (menuRoot == null)
             {
-                float y = 90f - i * 70f;
-                slotLabels[i] = MakeTmp(slotsPanel.transform, $"SlotLabel{i}", $"Slot {i + 1}", 18f,
-                    new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(220f, 28f));
-                slotLabels[i].rectTransform.anchoredPosition = new Vector2(-130f, y);
-                slotLoadButtons[i] = MakeButton(slotsPanel.transform, $"Load{i}", "Load", new Vector2(90f, y), new Vector2(100f, 40f));
-                slotSaveButtons[i] = MakeButton(slotsPanel.transform, $"Save{i}", "Save", new Vector2(200f, y), new Vector2(100f, 40f));
+                menuRoot = new GameObject("MenuRoot", typeof(RectTransform), typeof(Image));
+                menuRoot.transform.SetParent(transform, false);
+                Stretch(menuRoot.GetComponent<RectTransform>());
+                menuRoot.GetComponent<Image>().color = new Color(0.04f, 0.05f, 0.07f, 0.96f);
+
+                var title = MakeTmp(menuRoot.transform, "Title", "LAST KNIGHTS OF SOMERSET", 42f,
+                    new Vector2(0.5f, 0.88f), new Vector2(0.5f, 0.88f), new Vector2(980f, 60f));
+                title.alignment = TextAlignmentOptions.Center;
+                title.color = new Color(0.92f, 0.86f, 0.7f);
+
+                statusText = MakeTmp(menuRoot.transform, "Status", "", 20f,
+                    new Vector2(0.5f, 0.78f), new Vector2(0.5f, 0.78f), new Vector2(900f, 48f));
+                statusText.alignment = TextAlignmentOptions.Center;
+                statusText.color = new Color(0.75f, 0.8f, 0.85f);
+
+                newGameButton = MakeButton(menuRoot.transform, "NewGame", "New Game", new Vector2(0f, 140f));
+                storyButton = MakeButton(menuRoot.transform, "Story", "Story / Prologue", new Vector2(0f, 75f));
+                continueButton = MakeButton(menuRoot.transform, "Continue", "Continue", new Vector2(0f, 10f));
+                loadGameButton = MakeButton(menuRoot.transform, "LoadGame", "Load Game (slots)", new Vector2(0f, -55f));
+                saveGameButton = MakeButton(menuRoot.transform, "SaveGame", "Save Game (slots)", new Vector2(0f, -120f));
+                restartButton = MakeButton(menuRoot.transform, "Restart", "Restart Scene", new Vector2(0f, -185f));
+                quitButton = MakeButton(menuRoot.transform, "Quit", "Quit", new Vector2(0f, -250f));
+                closeMenuButton = MakeButton(menuRoot.transform, "Close", "Return to Church", new Vector2(0f, -315f));
+
+                slotsPanel = new GameObject("SlotsPanel", typeof(RectTransform), typeof(Image));
+                slotsPanel.transform.SetParent(menuRoot.transform, false);
+                var srt = slotsPanel.GetComponent<RectTransform>();
+                srt.anchorMin = srt.anchorMax = new Vector2(0.5f, 0.5f);
+                srt.sizeDelta = new Vector2(560f, 300f);
+                srt.anchoredPosition = new Vector2(0f, -10f);
+                slotsPanel.GetComponent<Image>().color = new Color(0.1f, 0.12f, 0.14f, 0.98f);
+                slotsPanel.SetActive(false);
+
+                slotLoadButtons = new Button[3];
+                slotSaveButtons = new Button[3];
+                slotLabels = new TextMeshProUGUI[3];
+                for (int i = 0; i < 3; i++)
+                {
+                    float y = 90f - i * 70f;
+                    slotLabels[i] = MakeTmp(slotsPanel.transform, $"SlotLabel{i}", $"Slot {i + 1}", 18f,
+                        new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(220f, 28f));
+                    slotLabels[i].rectTransform.anchoredPosition = new Vector2(-130f, y);
+                    slotLoadButtons[i] = MakeButton(slotsPanel.transform, $"Load{i}", "Load", new Vector2(90f, y), new Vector2(100f, 40f));
+                    slotSaveButtons[i] = MakeButton(slotsPanel.transform, $"Save{i}", "Save", new Vector2(200f, y), new Vector2(100f, 40f));
+                }
+
+                var back = MakeButton(slotsPanel.transform, "SlotsBack", "Back", new Vector2(0f, -120f), new Vector2(160f, 40f));
+                back.onClick.AddListener(() => { slotsPanel.SetActive(false); RefreshMainButtons(); });
             }
 
-            var back = MakeButton(slotsPanel.transform, "SlotsBack", "Back", new Vector2(0f, -120f), new Vector2(160f, 40f));
-            back.onClick.AddListener(() => { slotsPanel.SetActive(false); RefreshMainButtons(); });
+            EnsureParchmentBuilt();
+            // Older Downloads scenes may have menuRoot without Story button — add if missing.
+            if (storyButton == null && menuRoot != null)
+            {
+                var existing = menuRoot.transform.Find("Story");
+                if (existing != null) storyButton = existing.GetComponent<Button>();
+                if (storyButton == null)
+                    storyButton = MakeButton(menuRoot.transform, "Story", "Story / Prologue", new Vector2(0f, 75f));
+            }
+
             WireButtons();
+        }
+
+        void EnsureParchmentBuilt()
+        {
+            if (parchmentRoot != null) return;
+
+            parchmentRoot = new GameObject("PrologueParchment", typeof(RectTransform), typeof(Image));
+            parchmentRoot.transform.SetParent(transform, false);
+            Stretch(parchmentRoot.GetComponent<RectTransform>());
+            parchmentRoot.GetComponent<Image>().color = new Color(0.12f, 0.09f, 0.05f, 0.97f);
+            parchmentRoot.SetActive(false);
+
+            var sheet = new GameObject("Sheet", typeof(RectTransform), typeof(Image));
+            sheet.transform.SetParent(parchmentRoot.transform, false);
+            var srt = sheet.GetComponent<RectTransform>();
+            srt.anchorMin = new Vector2(0.12f, 0.12f);
+            srt.anchorMax = new Vector2(0.88f, 0.88f);
+            srt.offsetMin = Vector2.zero;
+            srt.offsetMax = Vector2.zero;
+            sheet.GetComponent<Image>().color = new Color(0.86f, 0.78f, 0.58f, 1f);
+
+            parchmentText = MakeTmp(sheet.transform, "CrawlText", PrologueCrawl, 28f,
+                new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.92f), Vector2.zero);
+            parchmentText.alignment = TextAlignmentOptions.TopJustified;
+            parchmentText.color = new Color(0.18f, 0.12f, 0.08f, 1f);
+            parchmentText.textWrappingMode = TextWrappingModes.Normal;
+            Stretch(parchmentText.rectTransform);
+            parchmentText.rectTransform.offsetMin = new Vector2(36f, 90f);
+            parchmentText.rectTransform.offsetMax = new Vector2(-36f, -36f);
+
+            parchmentEnterButton = MakeButton(sheet.transform, "EnterChurch", "Enter Church",
+                new Vector2(-120f, -260f), new Vector2(220f, 48f));
+            parchmentEnterButton.GetComponent<Image>().color = new Color(0.35f, 0.28f, 0.16f, 1f);
+            parchmentSkipButton = MakeButton(sheet.transform, "SkipPrologue", "Skip",
+                new Vector2(120f, -260f), new Vector2(160f, 48f));
+            parchmentSkipButton.GetComponent<Image>().color = new Color(0.45f, 0.32f, 0.18f, 1f);
+
+            // Re-anchor bottom buttons to sheet bottom.
+            void PinBottom(Button b, float x)
+            {
+                if (b == null) return;
+                var rt = b.GetComponent<RectTransform>();
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0f);
+                rt.pivot = new Vector2(0.5f, 0f);
+                rt.anchoredPosition = new Vector2(x, 28f);
+            }
+            PinBottom(parchmentEnterButton, -120f);
+            PinBottom(parchmentSkipButton, 120f);
         }
 
         private void WireButtons()
         {
             newGameButton?.onClick.RemoveAllListeners();
             newGameButton?.onClick.AddListener(OnNewGame);
+            storyButton?.onClick.RemoveAllListeners();
+            storyButton?.onClick.AddListener(OnStoryPrologue);
             continueButton?.onClick.RemoveAllListeners();
             continueButton?.onClick.AddListener(OnContinue);
             loadGameButton?.onClick.RemoveAllListeners();
@@ -213,6 +301,11 @@ namespace ArthurianAutobattler
             quitButton?.onClick.AddListener(OnQuit);
             closeMenuButton?.onClick.RemoveAllListeners();
             closeMenuButton?.onClick.AddListener(HideMenu);
+
+            parchmentEnterButton?.onClick.RemoveAllListeners();
+            parchmentEnterButton?.onClick.AddListener(() => FinishParchment(enterChurch: true));
+            parchmentSkipButton?.onClick.RemoveAllListeners();
+            parchmentSkipButton?.onClick.AddListener(() => FinishParchment(enterChurch: true));
 
             for (int i = 0; i < 3; i++)
             {
@@ -235,6 +328,7 @@ namespace ArthurianAutobattler
             EnsureBuilt();
             WireButtons();
             ApplyArchitectMenuBackground();
+            if (parchmentRoot != null) parchmentRoot.SetActive(false);
             if (menuRoot != null) menuRoot.SetActive(true);
             if (slotsPanel != null) slotsPanel.SetActive(false);
             RefreshMainButtons();
@@ -310,9 +404,74 @@ namespace ArthurianAutobattler
 
         private void OnNewGame()
         {
+            ShowParchment(startNewGameAfter: true);
+        }
+
+        private void OnStoryPrologue()
+        {
+            ShowParchment(startNewGameAfter: false);
+        }
+
+        void ShowParchment(bool startNewGameAfter)
+        {
+            EnsureBuilt();
+            parchmentStartsNewGame = startNewGameAfter;
+            if (menuRoot != null) menuRoot.SetActive(false);
+            if (parchmentRoot != null) parchmentRoot.SetActive(true);
+            if (parchmentText != null)
+            {
+                parchmentText.text = PrologueCrawl;
+                parchmentText.alpha = 0f;
+            }
+            if (parchmentRoutine != null) StopCoroutine(parchmentRoutine);
+            parchmentRoutine = StartCoroutine(FadeParchmentIn());
+            Debug.Log("[DemonKnight] Prologue parchment shown (skippable). startNewGame=" + startNewGameAfter);
+        }
+
+        IEnumerator FadeParchmentIn()
+        {
+            float t = 0f;
+            while (t < 1.2f)
+            {
+                t += Time.unscaledDeltaTime;
+                if (parchmentText != null)
+                    parchmentText.alpha = Mathf.Clamp01(t / 1.2f);
+                yield return null;
+            }
+            if (parchmentText != null) parchmentText.alpha = 1f;
+            parchmentRoutine = null;
+        }
+
+        void FinishParchment(bool enterChurch)
+        {
+            if (parchmentRoutine != null)
+            {
+                StopCoroutine(parchmentRoutine);
+                parchmentRoutine = null;
+            }
+            if (parchmentRoot != null) parchmentRoot.SetActive(false);
+
+            bool startRun = parchmentStartsNewGame && enterChurch;
+            parchmentStartsNewGame = false;
+
+            if (startRun)
+            {
+                BeginFreshCampaign();
+                return;
+            }
+
+            // Story-only viewing: return to main menu.
+            if (menuRoot != null) menuRoot.SetActive(true);
+            RefreshMainButtons();
+            SetStatus("Prologue closed. New Game starts the Cumberland vigil.");
+        }
+
+        void BeginFreshCampaign()
+        {
             var loop = DemonKnightCompatApi.ResolveLoop() ?? FindFirstObjectByType<GameLoopManager>();
             if (loop == null)
             {
+                if (menuRoot != null) menuRoot.SetActive(true);
                 SetStatus("No GameLoopManager in scene.");
                 return;
             }
