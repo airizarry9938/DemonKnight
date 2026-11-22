@@ -9,8 +9,8 @@ using System.Collections.Generic;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Modular pew seat: Body → Outfit → Head → Prop (bottom→top), driven by
-    /// <see cref="TownsfolkAppearance"/> so dossier portraits match.
+    /// Pew seat: single Sprite on Body (no paperdoll Outfit/Head/Prop stack).
+    /// Driven by <see cref="TownsfolkAppearance"/>.poseIndex → ModularSpriteLibrary.basePoses.
     /// </summary>
     public class PaperDollSeatView : MonoBehaviour
     {
@@ -68,15 +68,13 @@ namespace ArthurianAutobattler
                 _loggedFirstBind = true;
                 string bodyName = layers.body != null && layers.body.sprite != null
                     ? layers.body.sprite.name : "NULL";
-                string outfitName = layers.outfit != null && layers.outfit.sprite != null
-                    ? layers.outfit.sprite.name : "NULL";
-                string headName = layers.head != null && layers.head.sprite != null
-                    ? layers.head.sprite.name : "NULL";
                 Debug.Log(
-                    $"[DemonKnight] First pew Bind '{recruit.characterName}': " +
+                    $"[DemonKnight] First pew Bind '{recruit.characterName}' (single-sprite): " +
                     $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
-                    $"body={bodyName} outfit={outfitName} head={headName} " +
-                    $"bodyEnabled={(layers.body != null && layers.body.enabled)}");
+                    $"sprite={bodyName} " +
+                    $"bodyEnabled={(layers.body != null && layers.body.enabled)} " +
+                    $"outfitOff={(layers.outfit == null || !layers.outfit.enabled)} " +
+                    $"headOff={(layers.head == null || !layers.head.enabled)}");
             }
 
             if (moodLayer != null)
@@ -393,9 +391,13 @@ namespace ArthurianAutobattler
             boundRecruit = recruit;
             library = TownsfolkVisualApplier.Library ?? ModularSpriteLibrary.Load();
             bodyImg = seat.bodyLayer;
-            outfitImg = seat.outfitLayer;
-            headImg = seat.headLayer;
-            propImg = seat.propLayer;
+            // Single-sprite runtime — never drive Outfit/Head/Prop layers.
+            outfitImg = null;
+            headImg = null;
+            propImg = null;
+            if (seat.outfitLayer != null) { seat.outfitLayer.sprite = null; seat.outfitLayer.enabled = false; }
+            if (seat.headLayer != null) { seat.headLayer.sprite = null; seat.headLayer.enabled = false; }
+            if (seat.propLayer != null) { seat.propLayer.sprite = null; seat.propLayer.enabled = false; }
             CaptureBase();
             ResolveClips();
             startOffset = UnityEngine.Random.Range(0f, 1.5f);
@@ -412,10 +414,10 @@ namespace ArthurianAutobattler
             boundRecruit = null;
             library = ModularSpriteLibrary.Load();
             bodySr = actor.spriteRenderer;
-            // Optional modular children if present later.
-            outfitSr = actor.transform.Find("Outfit")?.GetComponent<SpriteRenderer>();
-            headSr = actor.transform.Find("Head")?.GetComponent<SpriteRenderer>();
-            propSr = actor.transform.Find("Prop")?.GetComponent<SpriteRenderer>();
+            // Single-sprite battle — ignore Outfit/Head/Prop children.
+            outfitSr = null;
+            headSr = null;
+            propSr = null;
             CaptureBase();
             ResolveClips();
             startOffset = UnityEngine.Random.Range(0f, 1.5f);
@@ -464,12 +466,10 @@ namespace ArthurianAutobattler
 
         void TickIdle(float t)
         {
-            if (poseMulti || outfitMulti || headMulti || weaponMulti)
+            if (poseMulti)
             {
+                // Single Sprite category clip on body only.
                 ApplyClipFrame(poseClip, poseMulti, 0, t);
-                ApplyClipFrame(outfitClip, outfitMulti, 1, t);
-                ApplyClipFrame(headClip, headMulti, 2, t);
-                ApplyClipFrame(weaponClip, weaponMulti, 3, t);
             }
             else
             {
@@ -482,15 +482,9 @@ namespace ArthurianAutobattler
         void TickClipState(AnimState s, float t)
         {
             string name = ClipName(s);
-            var p = library?.FindAnimClip("Pose", name) ?? poseClip;
-            var o = library?.FindAnimClip("Outfit", name) ?? outfitClip;
-            var h = library?.FindAnimClip("Head", name) ?? headClip;
-            var w = library?.FindAnimClip("Weapon", name) ?? weaponClip;
+            var p = FindSpriteClip(name) ?? poseClip;
             ApplyClipFrame(p, p != null && p.FrameCount > 1, 0, t);
-            ApplyClipFrame(o, o != null && o.FrameCount > 1, 1, t);
-            ApplyClipFrame(h, h != null && h.FrameCount > 1, 2, t);
-            ApplyClipFrame(w, w != null && w.FrameCount > 1, 3, t);
-            float dur = EstimateClipDuration(p, o, h, w);
+            float dur = EstimateClipDuration(p);
             if (!IsLooping(s) && t >= dur)
                 Play(AnimState.Idle);
         }
@@ -589,27 +583,28 @@ namespace ArthurianAutobattler
 
         void ResolveClips()
         {
-            poseClip = library?.FindAnimClip("Pose", SpriteAnimClip.Idle);
-            outfitClip = library?.FindAnimClip("Outfit", SpriteAnimClip.Idle);
-            headClip = library?.FindAnimClip("Head", SpriteAnimClip.Idle);
-            weaponClip = library?.FindAnimClip("Weapon", SpriteAnimClip.Idle);
+            // Architect registers clips under category "Sprite"; accept legacy "Pose".
+            poseClip = FindSpriteClip(SpriteAnimClip.Idle);
+            outfitClip = null;
+            headClip = null;
+            weaponClip = null;
             poseMulti = poseClip != null && poseClip.FrameCount > 1;
-            outfitMulti = outfitClip != null && outfitClip.FrameCount > 1;
-            headMulti = headClip != null && headClip.FrameCount > 1;
-            weaponMulti = weaponClip != null && weaponClip.FrameCount > 1;
+            outfitMulti = false;
+            headMulti = false;
+            weaponMulti = false;
+        }
+
+        SpriteAnimClip FindSpriteClip(string clipName)
+        {
+            if (library == null || string.IsNullOrEmpty(clipName)) return null;
+            return library.FindAnimClip("Sprite", clipName)
+                   ?? library.FindAnimClip("Pose", clipName);
         }
 
         bool HasMultiFrameFor(AnimState s)
         {
-            string n = ClipName(s);
-            var p = library?.FindAnimClip("Pose", n);
-            var o = library?.FindAnimClip("Outfit", n);
-            var h = library?.FindAnimClip("Head", n);
-            var w = library?.FindAnimClip("Weapon", n);
-            return (p != null && p.FrameCount > 1)
-                   || (o != null && o.FrameCount > 1)
-                   || (h != null && h.FrameCount > 1)
-                   || (w != null && w.FrameCount > 1);
+            var p = FindSpriteClip(ClipName(s));
+            return p != null && p.FrameCount > 1;
         }
 
         static string ClipName(AnimState s) => s switch

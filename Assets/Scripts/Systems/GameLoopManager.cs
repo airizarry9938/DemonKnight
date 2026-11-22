@@ -885,10 +885,14 @@ namespace ArthurianAutobattler
             if (lib != null)
             {
                 TownsfolkVisualApplier.SetLibrary(lib);
+                // Single-sprite runtime — body only (Architect Category Sprite → basePoses).
                 var pose = lib.GetPose(r.appearance.poseIndex);
-                var head = lib.GetHead(r.appearance.headIndex);
-                if (pose != null) r.bodySprite = pose;
-                if (head != null) r.headSprite = head;
+                if (pose != null)
+                {
+                    r.bodySprite = pose;
+                    r.headSprite = null;
+                    if (r.randomAvatar == null) r.randomAvatar = pose;
+                }
             }
             // Best-effort avatar from type pools (sprites are not stored in JSON).
             List<Sprite> pool = null;
@@ -897,7 +901,7 @@ namespace ArthurianAutobattler
             else if (r.unitType == UnitType.Peasant) pool = rngGenerator.peasantAvatars;
             if (pool != null && pool.Count > 0 && r.randomAvatar == null)
                 r.randomAvatar = pool[UnityEngine.Random.Range(0, pool.Count)];
-            if (r.headSprite == null) r.headSprite = r.randomAvatar;
+            if (r.bodySprite == null) r.bodySprite = r.randomAvatar;
         }
 
         /// <summary>

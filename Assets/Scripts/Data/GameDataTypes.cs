@@ -1150,8 +1150,8 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// When poses/outfits were never imported (posesArray=4 posesFilled=0), bake simple
-        /// placeholder sprites so pew Bind is not all-NULL after New Game.
+        /// When Sprite category poses were never imported (posesFilled=0), bake simple
+        /// placeholder sprites on basePoses only — no Outfit/Head/Prop stack placeholders.
         /// </summary>
         public void EnsurePlaceholderSpritesIfEmpty()
         {
@@ -1162,43 +1162,12 @@ namespace ArthurianAutobattler
                     if (basePoses[i] != null) filled++;
             if (filled > 0) return;
 
-            // Grayscale body poses (skin-tintable)
+            // Single-sprite placeholders (Architect Category: Sprite → basePoses).
             for (int i = 0; i < 4; i++)
                 if (basePoses[i] == null)
-                    basePoses[i] = MakePlaceholderSprite($"DK_Pose_{i}", 48, 64, new Color(0.75f, 0.75f, 0.78f, 1f), bodySilhouette: true);
+                    basePoses[i] = MakePlaceholderSprite($"DK_Sprite_{i}", 48, 64, new Color(0.75f, 0.75f, 0.78f, 1f), bodySilhouette: true);
 
-            if (outfits == null || outfits.Length < 6)
-                Array.Resize(ref outfits, 6);
-            Color[] outfitCols =
-            {
-                new Color(0.55f, 0.45f, 0.35f), new Color(0.50f, 0.42f, 0.32f),
-                new Color(0.35f, 0.40f, 0.55f), new Color(0.30f, 0.35f, 0.50f),
-                new Color(0.55f, 0.50f, 0.35f), new Color(0.60f, 0.52f, 0.30f)
-            };
-            for (int i = 0; i < 6; i++)
-                if (outfits[i] == null)
-                    outfits[i] = MakePlaceholderSprite($"DK_Outfit_{i}", 48, 64, outfitCols[i], bodySilhouette: true);
-
-            if (heads == null || heads.Length < 4)
-            {
-                var hs = new ModularHeadEntry[4];
-                for (int i = 0; i < 4; i++)
-                {
-                    hs[i] = new ModularHeadEntry
-                    {
-                        sprite = MakePlaceholderSprite($"DK_Head_{i}", 32, 32, new Color(0.2f, 0.15f, 0.12f), bodySilhouette: false),
-                        isHair = true
-                    };
-                }
-                heads = hs;
-            }
-
-            if (props == null || props.Length < 2)
-            {
-                props = new Sprite[2];
-                props[0] = null;
-                props[1] = MakePlaceholderSprite("DK_Prop_1", 16, 28, new Color(0.6f, 0.55f, 0.4f), bodySilhouette: false);
-            }
+            // Leave outfits/heads/props empty — runtime never applies them.
         }
 
         static Sprite MakePlaceholderSprite(string name, int w, int h, Color fill, bool bodySilhouette)

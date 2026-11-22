@@ -9,9 +9,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "architect-breakglass-hosts";
-    public const string GitHint = "hard-tip-sha-reject-381B-breakglass-menu";
-    public const string BuiltUtc = "2026-11-22T02:48:25Z";
+    public const string Id = "runtime-single-sprite";
+    public const string GitHint = "play-mode-one-sprite-no-paperdoll-layers";
+    public const string BuiltUtc = "2026-11-22T02:53:56Z";
 
     /// <summary>Hard tip known to contain LooksLikeHttpFailureBody Sync + OnLoad PackageVersion.</summary>
     public const string HardTipSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";

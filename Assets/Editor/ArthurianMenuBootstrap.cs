@@ -848,7 +848,8 @@ public static class ArthurianMenuBootstrap
                 && body.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0)
                 return true;
             string id = ReadPackageIdFromDisk() ?? "";
-            if (id == "architect-force-tip-ui" || id == "single-sprite-no-paperdoll")
+            if (id == "architect-force-tip-ui" || id == "single-sprite-no-paperdoll"
+                || id == "architect-breakglass-hosts")
                 return true;
             return false;
         }

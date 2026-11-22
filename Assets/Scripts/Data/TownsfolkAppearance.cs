@@ -112,12 +112,10 @@ namespace ArthurianAutobattler
             };
             a.BindSeatSalt(pewSeat);
 
-            a.outfitIndex = RollOutfitIndex(tier, rng);
-            a.headIndex = RollHeadIndex(tier, rng, library);
-            if (a.poseIndex == (int)TownsfolkPose.HoldingProp)
-                a.propIndex = RollPropIndex(rng, library);
-            else
-                a.propIndex = 0;
+            // Single-sprite runtime — Outfit/Head/Prop indices unused (kept 0 for save compat).
+            a.outfitIndex = 0;
+            a.headIndex = 0;
+            a.propIndex = 0;
 
             return a;
         }

@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "architect-breakglass-hosts";
+    public const string UiBuildId = "runtime-single-sprite";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";

@@ -4,8 +4,7 @@ using UnityEngine.UI;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Dossier / inspection portrait stack using the same TownsfolkAppearance as pew seats.
-    /// Attach to a RectTransform under the dossier; children Body/Outfit/Head/Prop are created if missing.
+    /// Dossier portrait: one Sprite on Body (Outfit/Head/Prop forced off by TownsfolkVisualApplier).
     /// </summary>
     public class TownsfolkPortraitView : MonoBehaviour
     {

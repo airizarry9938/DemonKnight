@@ -31,7 +31,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
 
-    private const string ExpectedPackageId = "architect-breakglass-hosts";
+    private const string ExpectedPackageId = "runtime-single-sprite";
 
     /// <summary>
     /// Always overwrite from tip/main — never skip-self, never Fallback pin.

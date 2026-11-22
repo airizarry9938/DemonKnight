@@ -2167,7 +2167,7 @@ namespace ArthurianAutobattler
             }
         }
 
-        /// <summary>Stack Body/Outfit/Head/Prop from the same TownsfolkAppearance as the pew seat.</summary>
+        /// <summary>Single-sprite dossier portrait (same Sprite as pew seat Body).</summary>
         private void ApplyDossierPortrait(RecruitInstance recruit)
         {
             if (dossierModularPortrait == null)
@@ -2181,10 +2181,10 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            // Last resort: legacy single-image portrait.
+            // Last resort: legacy single-image portrait (body / avatar only).
             if (dossierPortrait == null) return;
             dossierPortrait.enabled = true;
-            Sprite portrait = recruit.headSprite != null ? recruit.headSprite : recruit.randomAvatar;
+            Sprite portrait = recruit.bodySprite != null ? recruit.bodySprite : recruit.randomAvatar;
             dossierPortrait.sprite = portrait;
             dossierPortrait.color = portrait != null
                 ? Color.white

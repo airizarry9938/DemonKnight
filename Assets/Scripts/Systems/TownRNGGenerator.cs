@@ -216,11 +216,14 @@ namespace ArthurianAutobattler
 
             if (lib != null)
             {
+                // Single-sprite — no head/outfit paperdoll layers at runtime.
                 var pose = lib.GetPose(r.appearance.poseIndex);
-                var head = lib.GetHead(r.appearance.headIndex);
-                if (pose != null) r.bodySprite = pose;
-                if (head != null) r.headSprite = head;
-                if (r.randomAvatar == null) r.randomAvatar = head != null ? head : pose;
+                if (pose != null)
+                {
+                    r.bodySprite = pose;
+                    r.headSprite = null;
+                    if (r.randomAvatar == null) r.randomAvatar = pose;
+                }
             }
 
             if (r.bodySprite == null)
@@ -231,13 +234,7 @@ namespace ArthurianAutobattler
                 if (bodyPool != null && bodyPool.Count > 0)
                     r.bodySprite = bodyPool[Random.Range(0, bodyPool.Count)];
             }
-            if (r.headSprite == null)
-            {
-                if (headPool != null && headPool.Count > 0)
-                    r.headSprite = headPool[Random.Range(0, headPool.Count)];
-                else
-                    r.headSprite = r.randomAvatar;
-            }
+            r.headSprite = null; // single-sprite — no separate head layer
 
             if (grudge > 0) r.moodOverlaySprite = moodGrudge;
             else if (r.primaryTrait == TraitTag.Loyalist) r.moodOverlaySprite = moodLoyalist;
