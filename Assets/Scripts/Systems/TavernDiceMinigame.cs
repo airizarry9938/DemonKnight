@@ -215,10 +215,14 @@ namespace ArthurianAutobattler
             }
 
             var candidates = new List<RecruitInstance>();
+            var rare = new List<RecruitInstance>();
             foreach (var r in pool)
             {
                 if (r == null) continue;
                 candidates.Add(r);
+                if (r.secretArchetype == SecretArchetype.GoldenEgg
+                    || r.secretArchetype == SecretArchetype.MythicVessel)
+                    rare.Add(r);
             }
             if (candidates.Count == 0)
             {
@@ -226,11 +230,18 @@ namespace ArthurianAutobattler
                 return;
             }
 
-            var pick = candidates[Random.Range(0, candidates.Count)];
+            // Prefer unrecruited GoldenEgg / MythicVessel when any remain in pews.
+            var pickPool = rare.Count > 0 ? rare : candidates;
+            var pick = pickPool[Random.Range(0, pickPool.Count)];
             pick.hireCostForcedZero = true;
             pick.baseHireCost = 0;
+            pick.isScouted = true;
+            pick.intelTierUnlocked = Mathf.Max(pick.intelTierUnlocked, 1);
+            string rareTag = rare.Count > 0
+                ? $" <color=#FFE066>({pick.secretArchetype})</color>"
+                : "";
             message =
-                $"<color=#FFD700>Jackpot!</color> {pick.characterName}'s hire is <b>FREE</b> this night.";
+                $"<color=#FFD700>Jackpot!</color> {pick.characterName}'s hire is <b>FREE</b> this night.{rareTag}";
             SyncHud();
         }
 

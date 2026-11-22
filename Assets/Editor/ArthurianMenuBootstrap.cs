@@ -862,7 +862,7 @@ public static class ArthurianMenuBootstrap
                 "FORCE Upgrade → Tip Escape",
                 "Pull PackageVersion / Sync / Bootstrap / Architect / TipEscape / PaperDoll\n"
                 + "from GitHub tip of main (never HardTip).\n\n"
-                + "Diagnose after compile must show: legend-unlocks-meta\n"
+                + "Diagnose after compile must show: hidden-potential-bloodline\n"
                 + "(compiled Id == disk Id).",
                 "Escape Now", "Cancel"))
             return;
@@ -945,7 +945,7 @@ public static class ArthurianMenuBootstrap
                 if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
                         || body.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0)
-                    && body.IndexOf("legend-unlocks-meta", StringComparison.Ordinal) < 0)
+                    && body.IndexOf("hidden-potential-bloodline", StringComparison.Ordinal) < 0)
                     throw new Exception("stale PackageVersion body");
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
@@ -968,7 +968,7 @@ public static class ArthurianMenuBootstrap
         }
         AssetDatabase.Refresh();
         log.AppendLine($"Wrote {ok}/{rels.Length}. Wait compile → click FORCE again if TipEscape menu missing.");
-        log.AppendLine("Diagnose must show legend-unlocks-meta compiled=disk.");
+        log.AppendLine("Diagnose must show hidden-potential-bloodline compiled=disk.");
         return log.ToString();
     }
 
@@ -982,8 +982,8 @@ public static class ArthurianMenuBootstrap
                 + "• TipEscape + PackageVersion + Sync + Bootstrap + Architect\n"
                 + "• SomersetChurchUI + SomersetPewLayout (3-row / scale)\n"
                 + "• PaperDoll + TownsfolkVisualApplier\n\n"
-                + "After compile: Diagnose = legend-unlocks-meta\n"
-                + "Architect title shows legend-unlocks-meta + church pew preview.",
+                + "After compile: Diagnose = hidden-potential-bloodline\n"
+                + "Architect title shows hidden-potential-bloodline + church pew preview.",
                 "Download Tip Now", "Cancel"))
             return;
         EditorUtility.DisplayDialog("Break-Glass Hosts", BreakGlassForceHostsFromHardTip(), "OK");
@@ -1043,7 +1043,7 @@ public static class ArthurianMenuBootstrap
             "Assets/Scripts/UI/PaperDollSeatView.cs",
             "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
         };
-        const string wantId = "legend-unlocks-meta";
+        const string wantId = "hidden-potential-bloodline";
         int ok = 0;
         var log = new System.Text.StringBuilder();
         log.AppendLine("Break-Glass atomic tip pull (tip/main FIRST, HardTip last)");
@@ -1163,7 +1163,7 @@ public static class ArthurianMenuBootstrap
                     if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                         && (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0
                             || body.IndexOf("Id = \"architect-disk-tip-proof\"", StringComparison.Ordinal) >= 0)
-                        && body.IndexOf("legend-unlocks-meta", StringComparison.Ordinal) < 0)
+                        && body.IndexOf("hidden-potential-bloodline", StringComparison.Ordinal) < 0)
                     {
                         last = new Exception("stale PackageVersion from " + sha);
                         continue;

@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "1f51ac6a0ecc1eac3faa3a5086602c41292c5119";
 
-    private const string ExpectedPackageId = "legend-unlocks-meta";
+    private const string ExpectedPackageId = "hidden-potential-bloodline";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -52,6 +52,7 @@ public static class ArthurianSyncFromGitHub
         "church-bg-pew-preview",
         "fix-seatshow-cs0436",
         "assign-only-pew-drag",
+        "legend-unlocks-meta",
         "assign-only-runtime",
         "sync-keep-editor-menus",
     };
@@ -151,6 +152,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/SinRuneManager.cs",
         "Assets/Scripts/Systems/TavernDiceMinigame.cs",
         "Assets/Scripts/Systems/TownRNGGenerator.cs",
+        "Assets/Scripts/Systems/HiddenPotentialSystem.cs",
         "Assets/Scripts/UI/SomersetPewLayout.cs",
         "Assets/Scripts/UI/ChurchPewLayout.cs",
         "Assets/Scripts/UI/MainMenuUI.cs",

@@ -459,8 +459,15 @@ namespace ArthurianAutobattler
             string flockLine = string.IsNullOrEmpty(flockBreakdown)
                 ? ""
                 : $"\n{flockBreakdown}\n";
+            string mythic = "";
+            var loopMythic = GameLoopManager.Instance;
+            if (loopMythic != null && loopMythic.lastMythicVesselAscensionBanner)
+            {
+                mythic = "\n<color=#FFD700><b>MYTHIC VESSEL ASCENDED</b> — a bloodline awakens (+25% HP/ATK/SPD).</color>\n";
+                loopMythic.lastMythicVesselAscensionBanner = false;
+            }
             string msg =
-                $"<b>VICTORY</b> — Wave {waveCleared} cleared (+{goldEarned}g).{flockLine}\n"
+                $"<b>VICTORY</b> — Wave {waveCleared} cleared (+{goldEarned}g).{flockLine}{mythic}\n"
                 + "The pews hold. Press <b>Next Night</b> to advance, or <b>End Run</b> for the Main Menu.";
             // Buttons once — coroutine must not re-wire (that logged Wire* twice per EndBattle).
             HideLegacyBankPanel();

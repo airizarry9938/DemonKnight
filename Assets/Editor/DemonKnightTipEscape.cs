@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "legend-unlocks-meta";
+    public const string TipPackageId = "hidden-potential-bloodline";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -36,7 +36,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (legend-unlocks-meta)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (hidden-potential-bloodline)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);

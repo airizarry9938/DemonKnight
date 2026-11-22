@@ -145,6 +145,7 @@ namespace ArthurianAutobattler
                 product.fusionIngredients.Add(CardFusionSystem.CloneForFusionMemory(r));
 
             CardFusionSystem.ApplyLegendSparkBonus(product, chosen);
+            HiddenPotentialSystem.InheritBloodline(product, chosen);
 
             party.Add(product);
             LegendUnlockManager.Ensure()?.NotifyFusionWithIngredients(product.unitType, chosen);

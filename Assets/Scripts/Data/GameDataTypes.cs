@@ -45,6 +45,16 @@ namespace ArthurianAutobattler
         LowestAttack = 6,
     }
 
+    /// <summary>5-tier Hidden Potential secret archetype (TownRNG weighted roll).</summary>
+    public enum SecretArchetype
+    {
+        Parishioner = 0,
+        Liability = 1,
+        Darkhorse = 2,
+        GoldenEgg = 3,
+        MythicVessel = 4
+    }
+
     /// <summary>
     /// Single source of truth for hire add-ons / subtractions.
     /// UI (dossier, dialogue, mood) and payment both use <see cref="RecruitInstance.ComputeHireBreakdown"/>.
@@ -130,22 +140,42 @@ namespace ArthurianAutobattler
         /// <summary>When false, unit stays in pew reserve and does not march.</summary>
         public bool isDeployed = true;
 
-        /// <summary>Intel / gossip scouted — Phase 5 reveals hiddenTraitId + hire discount.</summary>
+        /// <summary>Intel / gossip scouted — reveals Potential, archetype, trait + hire discount.</summary>
         public bool isScouted;
 
-        /// <summary>Hidden spark id (e.g. "Legend Spark") revealed when scouted.</summary>
+        /// <summary>Combat trait id (MartyrsWard, SleeperSpike, PendragonBlood, …).</summary>
         public string hiddenTraitId;
+
+        /// <summary>5-tier secret archetype from TownRNG.</summary>
+        public SecretArchetype secretArchetype = SecretArchetype.Parishioner;
+
+        /// <summary>Growth multiplier applied to trained + veteran-star pools in combat.</summary>
+        public float potentialMultiplier = 1f;
+
+        /// <summary>Baptism by Fire — trait first awoke in combat (or on scout for unlocks).</summary>
+        public bool traitAwakened;
+
+        /// <summary>3-wave ascension consumed (+25% base HP/ATK/SPD).</summary>
+        public bool hasAscended;
+
+        /// <summary>Wave victories survived while recruited (ascension counter).</summary>
+        public int wavesSurvived;
+
+        /// <summary>Paid Train bonuses (+2 per purchase into one pool).</summary>
+        public int trainedHP;
+        public int trainedATK;
+        public int trainedSPD;
 
         /// <summary>Dice Jackpot — hire is free regardless of floors / mods.</summary>
         public bool hireCostForcedZero;
 
-        /// <summary>Master Spec Phase 5 spark id (Darkhorse-class).</summary>
+        /// <summary>Legacy Phase 5 spark id (Darkhorse-class) — migrated to SecretArchetype.</summary>
         public const string LegendSparkId = "Legend Spark";
-        /// <summary>Hidden Potential — Percival unlock when awakened/ascended.</summary>
+        /// <summary>Hidden Potential — Percival unlock when Darkhorse awakened/ascended.</summary>
         public const string DarkhorseId = "Darkhorse";
-        /// <summary>Hidden Potential — Merlin unlock when awakened/fused.</summary>
+        /// <summary>Hidden Potential — Merlin unlock when GoldenEgg awakened/fused.</summary>
         public const string GoldenEggId = "Golden Egg";
-        /// <summary>Hidden Potential — Nimue unlock when fused.</summary>
+        /// <summary>Hidden Potential — Nimue unlock when GrailTouched fused (MythicVessel trait).</summary>
         public const string GrailTouchedId = "GrailTouched";
         public const float ScoutHireMult = 0.7f;
         public const int ScoutHireMinGold = 5;
@@ -423,19 +453,39 @@ namespace ArthurianAutobattler
         /// </summary>
         public string ApplyRandomTrainStatBonus()
         {
+            // Only trained* pools — combat applies EffectiveGrowth = Round((trained+stars)*mult).
             int roll = UnityEngine.Random.Range(0, 3);
             switch (roll)
             {
                 case 0:
-                    maxHealth += 2;
+                    trainedHP += 2;
                     return "+2 HP";
                 case 1:
-                    attackDamage += 2;
+                    trainedATK += 2;
                     return "+2 ATK";
                 default:
-                    attackSpeed = Mathf.Min(3f, attackSpeed + 0.2f);
+                    trainedSPD += 2;
                     return "+2 SPD";
             }
+        }
+
+        /// <summary>Effective combat HP after trained+star growth × potentialMultiplier.</summary>
+        public int GetEffectiveMaxHealth()
+        {
+            int g = HiddenPotentialSystem.EffectiveGrowth(trainedHP, EffectiveVeteranRank, potentialMultiplier);
+            return Mathf.Max(1, maxHealth + g);
+        }
+
+        public int GetEffectiveAttackDamage()
+        {
+            int g = HiddenPotentialSystem.EffectiveGrowth(trainedATK, EffectiveVeteranRank, potentialMultiplier);
+            return Mathf.Max(1, attackDamage + g);
+        }
+
+        public float GetEffectiveAttackSpeed()
+        {
+            int g = HiddenPotentialSystem.EffectiveGrowth(trainedSPD, EffectiveVeteranRank, potentialMultiplier);
+            return Mathf.Clamp(attackSpeed + g * 0.1f, 0.4f, 3.0f);
         }
 
         /// <summary>
@@ -507,14 +557,30 @@ namespace ArthurianAutobattler
             }
 
             if (intelTierUnlocked >= 1 || isScouted)
-                info += $"HP: {maxHealth} | ATK: {attackDamage} | SPD: {attackSpeed:F1}/s\n";
+            {
+                info += $"HP: {GetEffectiveMaxHealth()} | ATK: {GetEffectiveAttackDamage()} | SPD: {GetEffectiveAttackSpeed():F1}/s\n";
+                if (trainedHP + trainedATK + trainedSPD > 0 || EffectiveVeteranRank > 0)
+                    info += $"<color=#B8E986>(base {maxHealth}/{attackDamage}/{attackSpeed:F1} + growth)</color>\n";
+            }
             else
                 info += $"HP: ??? | ATK: ??? (Scout — free)\n";
 
-            if (isScouted && !string.IsNullOrEmpty(hiddenTraitId))
-                info += $"<color=#FFD700>Spark: {hiddenTraitId}</color>\n";
-            else if (!isScouted)
-                info += "Spark: ??? (Scout to reveal)\n";
+            if (isScouted)
+            {
+                info += $"<color=#FFD700>Potential: ×{potentialMultiplier:F2} ({secretArchetype})</color>\n";
+                if (!string.IsNullOrEmpty(hiddenTraitId))
+                    info += $"<color=#FFD700>Trait: {hiddenTraitId}</color>"
+                            + (traitAwakened ? " <color=#FFE066>[AWAKENED]</color>" : "")
+                            + (hasAscended ? " <color=#FFAA66>[ASCENDED]</color>" : "")
+                            + "\n";
+                if (trainedHP + trainedATK + trainedSPD > 0)
+                    info += $"Trained: HP+{trainedHP} ATK+{trainedATK} SPD+{trainedSPD}\n";
+            }
+            else
+            {
+                info += "Potential: ??? (Scout to reveal)\n";
+                info += "Trait: ???\n";
+            }
 
             // Hire add-ons / subtractions — same math as Recruit (Ng).
             info += $"<color=#FFE066>{hire.FormatDossierLines()}</color>\n";
@@ -639,9 +705,16 @@ namespace ArthurianAutobattler
         public float charmedTimer = 0f;
         public bool cannotBeHealed = false;
         public float maxHpDrainPerSecond = 0f;
-        /// <summary>Nimue MartyrsWard — survive first lethal at 1 HP.</summary>
+        /// <summary>Nimue / MartyrsWard trait — survive first lethal at 1 HP.</summary>
         public bool martyrsWard;
         public bool martyrsWardUsed;
+        /// <summary>Secret combat trait id mirrored from RecruitInstance.hiddenTraitId.</summary>
+        public string hiddenTraitId;
+        public SecretArchetype secretArchetype;
+        public bool traitAwakened;
+        public bool sleeperSpikeArmed;
+        public int sleeperSpikeHits;
+        public bool gluttonHealTick;
         /// <summary>Train Ranged crossbow — allows melee to fire from BACK.</summary>
         public bool canAttackFromBack;
 
@@ -824,9 +897,17 @@ namespace ArthurianAutobattler
             bool wasScouted = r.isScouted;
             r.isScouted = true;
             if (r.intelTierUnlocked < 1) r.intelTierUnlocked = 1;
-            // Awaken Hidden Potential once the spark is revealed to the player.
-            if (!wasScouted && !string.IsNullOrEmpty(r.hiddenTraitId))
-                LegendUnlockManager.Ensure()?.NotifyHiddenPotentialAwakened(r.hiddenTraitId);
+            HiddenPotentialSystem.MigrateLegacySpark(r);
+            // Reveal / awaken Hidden Potential once scouted.
+            if (!wasScouted
+                && (r.secretArchetype != SecretArchetype.Parishioner
+                    || !string.IsNullOrEmpty(r.hiddenTraitId)))
+            {
+                if (!r.traitAwakened
+                    && HiddenPotentialSystem.IsPositiveCombatTrait(r.hiddenTraitId))
+                    r.traitAwakened = true;
+                LegendUnlockManager.Ensure()?.NotifyHiddenPotentialAwakened(r);
+            }
         }
 
         /// <summary>
