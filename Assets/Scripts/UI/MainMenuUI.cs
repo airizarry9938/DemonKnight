@@ -234,6 +234,7 @@ namespace ArthurianAutobattler
         {
             EnsureBuilt();
             WireButtons();
+            ApplyArchitectMenuBackground();
             if (menuRoot != null) menuRoot.SetActive(true);
             if (slotsPanel != null) slotsPanel.SetActive(false);
             RefreshMainButtons();
@@ -241,6 +242,21 @@ namespace ArthurianAutobattler
                 ? "NEW GAME clears stale party. Esc = this menu (Quit / Restart / New / Load)."
                 : "Paused — Quit / Restart / New / Load / Save, or Return to Church.");
             Debug.Log("[DemonKnight] MainMenuUI.ShowMenu visible=true");
+        }
+
+        void ApplyArchitectMenuBackground()
+        {
+            if (menuRoot == null) return;
+            try
+            {
+                var img = menuRoot.GetComponent<Image>();
+                var rt = menuRoot.GetComponent<RectTransform>();
+                SceneBackgroundApplier.ApplyToUiHost(SceneBackgroundSlot.MainMenu, img, rt);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] ApplyArchitectMenuBackground: " + ex.Message);
+            }
         }
 
         public void HideMenu()

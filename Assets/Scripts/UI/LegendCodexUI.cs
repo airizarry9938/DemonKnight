@@ -64,6 +64,16 @@ namespace ArthurianAutobattler
         public void RefreshCodexList()
         {
             if (codexPanel == null || !codexPanel.activeSelf) return;
+            try
+            {
+                var img = codexPanel.GetComponent<Image>();
+                if (img == null) img = codexPanel.GetComponentInChildren<Image>();
+                SceneBackgroundApplier.ApplyToUiHost(
+                    SceneBackgroundSlot.LegendCodex,
+                    img,
+                    codexPanel.GetComponent<RectTransform>());
+            }
+            catch { /* ignore */ }
 
             if (recipeListContainer == null)
             {

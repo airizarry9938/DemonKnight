@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "hidden-potential-bloodline";
-    public const string GitHint = "5-tier-secret-archetypes-bloodline";
-    public const string BuiltUtc = "2026-11-22T12:08:58Z";
+    public const string Id = "architect-persist-scene-bg";
+    public const string GitHint = "persist-seat-sprites-scene-bg-tab";
+    public const string BuiltUtc = "2026-11-22T19:05:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "48652b365e77f2d015c04db430f314928daa7f5b";
+    public const string HardTipSha = "ebe377af772cc967fc080c09f2c3e38f10b94a4d";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -187,6 +187,7 @@ public static class DemonKnightPackageVersion
             "fix-seatshow-cs0436",
             "assign-only-pew-drag",
             "legend-unlocks-meta",
+            "hidden-potential-bloodline",
         };
         foreach (string s in stale)
         {

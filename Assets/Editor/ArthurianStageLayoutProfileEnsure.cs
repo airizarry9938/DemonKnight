@@ -24,7 +24,8 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "hidden-potential-bloodline";
+    const string TipPackageId = "architect-persist-scene-bg";
+    const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
     const string SplicedSpriteFolder = "Assets/Art/Spliced/Sprite";
@@ -44,18 +45,25 @@ public static class ArthurianStageLayoutProfileEnsure
         "breakglass-local-wipe",
         "pew-3rows-chroma-scale",
         "church-bg-pew-preview",
-            "fix-seatshow-cs0436",
-            "assign-only-pew-drag",
+        "fix-seatshow-cs0436",
+        "assign-only-pew-drag",
+        "assign-only-runtime",
+        "legend-unlocks-meta",
+        "hidden-potential-bloodline",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
     public static void EnsureFromMenu()
     {
         var p = EnsureAsset();
+        var bg = EnsureSceneBackgroundAsset();
         Selection.activeObject = p;
         EditorGUIUtility.PingObject(p);
+        int assigned = CountAssignedSprites(p);
         Debug.Log($"[DemonKnight] StageLayoutProfile ready → {AssetPath} " +
-                  $"(pews={p.churchPewSlots.Count}, player={p.playerBattleSlots.Count}, enemy={p.enemyBattleSlots.Count}).");
+                  $"(pews={p.churchPewSlots.Count}, assignedSprites={assigned}, " +
+                  $"player={p.playerBattleSlots.Count}, enemy={p.enemyBattleSlots.Count}). " +
+                  $"SceneBackgroundProfile → {SceneBgAssetPath} ({bg.entries.Count} slots).");
     }
 
     [MenuItem("Arthurian/Escape Breakglass → Tip Hosts + Spliced Pew Library", false, 2)]
@@ -74,6 +82,7 @@ public static class ArthurianStageLayoutProfileEnsure
             try
             {
                 EnsureAsset();
+                EnsureSceneBackgroundAsset();
                 if (HostsLookStale())
                 {
                     Debug.LogWarning(
@@ -103,27 +112,50 @@ public static class ArthurianStageLayoutProfileEnsure
         var existing = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(AssetPath);
         if (existing != null)
         {
+            int before = existing.churchPewSlots != null ? existing.churchPewSlots.Count : 0;
             existing.EnsureSlotCounts();
-            EditorUtility.SetDirty(existing);
-            AssetDatabase.SaveAssets();
+            // Pad-only — do NOT SaveAssets on every editor load (was racing user assigns).
+            if ((existing.churchPewSlots?.Count ?? 0) != before)
+            {
+                EditorUtility.SetDirty(existing);
+                AssetDatabase.SaveAssets();
+            }
             return existing;
         }
 
         string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
             AssetPath.Replace('/', Path.DirectorySeparatorChar));
-        bool staleOnDisk = File.Exists(full) || AssetDatabase.LoadMainAssetAtPath(AssetPath) != null;
+        bool fileOnDisk = File.Exists(full) || AssetDatabase.LoadMainAssetAtPath(AssetPath) != null;
+        string yamlBackup = null;
         if (File.Exists(full))
         {
-            try
-            {
-                if (File.ReadAllText(full).IndexOf("c4a8f2e19b6d4078a5e31c0d9f7b2a64", StringComparison.OrdinalIgnoreCase) >= 0)
-                    staleOnDisk = true;
-            }
-            catch { staleOnDisk = true; }
+            try { yamlBackup = File.ReadAllText(full); }
+            catch { yamlBackup = null; }
         }
-        if (staleOnDisk)
+
+        // Prefer remapping m_Script GUID (embed into GameDataTypes) over wipe — preserves seat sprites.
+        if (fileOnDisk && !string.IsNullOrEmpty(yamlBackup))
         {
-            Debug.LogWarning("[DemonKnight] Recreating StageLayoutProfile.asset (stale MonoScript GUID after embed).");
+            if (TryRemapStageLayoutScriptGuid(full))
+            {
+                AssetDatabase.ImportAsset(AssetPath);
+                existing = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(AssetPath);
+                if (existing != null)
+                {
+                    existing.EnsureSlotCounts();
+                    int n = CountAssignedSprites(existing);
+                    Debug.Log(
+                        $"[DemonKnight] StageLayoutProfile script GUID remapped — preserved {n} assigned seat sprite(s).");
+                    return existing;
+                }
+            }
+        }
+
+        if (fileOnDisk)
+        {
+            Debug.LogWarning(
+                "[DemonKnight] Recreating StageLayoutProfile.asset (stale MonoScript) — " +
+                "transplanting pew/battle slot YAML so assign-only sprites survive.");
             AssetDatabase.DeleteAsset(AssetPath);
             if (File.Exists(full))
             {
@@ -138,8 +170,167 @@ public static class ArthurianStageLayoutProfileEnsure
         created.EnsureSlotCounts();
         AssetDatabase.CreateAsset(created, AssetPath);
         AssetDatabase.SaveAssets();
+
+        if (!string.IsNullOrEmpty(yamlBackup) && File.Exists(full))
+        {
+            try
+            {
+                string fresh = File.ReadAllText(full);
+                string merged = TransplantStageLayoutLists(fresh, yamlBackup);
+                if (!string.IsNullOrEmpty(merged) && merged != fresh)
+                {
+                    File.WriteAllText(full, merged);
+                    AssetDatabase.ImportAsset(AssetPath);
+                    existing = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(AssetPath);
+                    if (existing != null)
+                    {
+                        existing.EnsureSlotCounts();
+                        int n = CountAssignedSprites(existing);
+                        Debug.Log(
+                            $"[DemonKnight] StageLayoutProfile recreated with YAML transplant — {n} seat sprite(s) restored.");
+                        return existing;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] StageLayout YAML transplant failed: " + ex.Message);
+            }
+        }
+
         AssetDatabase.Refresh();
         return AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(AssetPath) ?? created;
+    }
+
+    /// <summary>Ensure SceneBackgroundProfile.asset exists (Architect Tab 3). Never wipe assignments.</summary>
+    public static SceneBackgroundProfile EnsureSceneBackgroundAsset()
+    {
+        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+            AssetDatabase.CreateFolder("Assets", "Resources");
+
+        var existing = AssetDatabase.LoadAssetAtPath<SceneBackgroundProfile>(SceneBgAssetPath);
+        if (existing != null)
+        {
+            existing.EnsureDefaultEntries();
+            return existing;
+        }
+
+        string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+            SceneBgAssetPath.Replace('/', Path.DirectorySeparatorChar));
+        string yamlBackup = null;
+        if (File.Exists(full))
+        {
+            try { yamlBackup = File.ReadAllText(full); } catch { /* ignore */ }
+            if (TryRemapSceneBgScriptGuid(full))
+            {
+                AssetDatabase.ImportAsset(SceneBgAssetPath);
+                existing = AssetDatabase.LoadAssetAtPath<SceneBackgroundProfile>(SceneBgAssetPath);
+                if (existing != null)
+                {
+                    existing.EnsureDefaultEntries();
+                    return existing;
+                }
+            }
+            AssetDatabase.DeleteAsset(SceneBgAssetPath);
+            try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
+            try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
+            AssetDatabase.Refresh();
+        }
+
+        var created = ScriptableObject.CreateInstance<SceneBackgroundProfile>();
+        created.EnsureDefaultEntries();
+        AssetDatabase.CreateAsset(created, SceneBgAssetPath);
+        AssetDatabase.SaveAssets();
+
+        if (!string.IsNullOrEmpty(yamlBackup) && File.Exists(full))
+        {
+            try
+            {
+                string fresh = File.ReadAllText(full);
+                string merged = TransplantFromField(fresh, yamlBackup, "entries:");
+                if (!string.IsNullOrEmpty(merged) && merged != fresh)
+                {
+                    File.WriteAllText(full, merged);
+                    AssetDatabase.ImportAsset(SceneBgAssetPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] SceneBackground YAML transplant: " + ex.Message);
+            }
+        }
+
+        return AssetDatabase.LoadAssetAtPath<SceneBackgroundProfile>(SceneBgAssetPath) ?? created;
+    }
+
+    public static int CountAssignedSprites(StageLayoutProfile p)
+    {
+        if (p?.churchPewSlots == null) return 0;
+        int n = 0;
+        for (int i = 0; i < p.churchPewSlots.Count; i++)
+            if (p.churchPewSlots[i]?.previewOrOverrideSprite != null) n++;
+        return n;
+    }
+
+    static bool TryRemapStageLayoutScriptGuid(string fullPath)
+        => TryRemapScriptGuid(fullPath, typeof(StageLayoutProfile));
+
+    static bool TryRemapSceneBgScriptGuid(string fullPath)
+        => TryRemapScriptGuid(fullPath, typeof(SceneBackgroundProfile));
+
+    static bool TryRemapScriptGuid(string fullPath, Type soType)
+    {
+        try
+        {
+            var tmp = ScriptableObject.CreateInstance(soType);
+            var ms = MonoScript.FromScriptableObject((ScriptableObject)tmp);
+            UnityEngine.Object.DestroyImmediate(tmp);
+            if (ms == null) return false;
+            string scriptPath = AssetDatabase.GetAssetPath(ms);
+            string newGuid = AssetDatabase.AssetPathToGUID(scriptPath);
+            if (string.IsNullOrEmpty(newGuid) || newGuid.Length != 32) return false;
+
+            string yaml = File.ReadAllText(fullPath);
+            var re = new System.Text.RegularExpressions.Regex(
+                @"m_Script:\s*\{fileID:\s*11500000,\s*guid:\s*([0-9a-fA-F]+),\s*type:\s*3\}");
+            var m = re.Match(yaml);
+            if (!m.Success) return false;
+            if (string.Equals(m.Groups[1].Value, newGuid, StringComparison.OrdinalIgnoreCase))
+                return false; // already correct — typed load failed for another reason
+            string replaced = re.Replace(yaml,
+                "m_Script: {fileID: 11500000, guid: " + newGuid + ", type: 3}", 1);
+            if (replaced == yaml) return false;
+            File.WriteAllText(fullPath, replaced);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] TryRemapScriptGuid: " + ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>Keep fresh m_Script header; transplant church/battle/parallax lists from backup YAML.</summary>
+    static string TransplantStageLayoutLists(string freshYaml, string backupYaml)
+        => TransplantFromField(freshYaml, backupYaml, "churchPewSlots:");
+
+    static string TransplantFromField(string freshYaml, string backupYaml, string fieldMarker)
+    {
+        if (string.IsNullOrEmpty(freshYaml) || string.IsNullOrEmpty(backupYaml)) return freshYaml;
+        int backupData = IndexOfYamlField(backupYaml, fieldMarker);
+        int freshData = IndexOfYamlField(freshYaml, fieldMarker);
+        if (backupData < 0 || freshData < 0) return freshYaml;
+        return freshYaml.Substring(0, freshData) + backupYaml.Substring(backupData);
+    }
+
+    static int IndexOfYamlField(string yaml, string fieldMarker)
+    {
+        // Prefer indented Unity YAML field ("  churchPewSlots:").
+        string indented = "\n  " + fieldMarker;
+        int i = yaml.IndexOf(indented, StringComparison.Ordinal);
+        if (i >= 0) return i;
+        string bare = "\n" + fieldMarker;
+        return yaml.IndexOf(bare, StringComparison.Ordinal);
     }
 
     public static bool HostsLookStalePublic() => HostsLookStale();
