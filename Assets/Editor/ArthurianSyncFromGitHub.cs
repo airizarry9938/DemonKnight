@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "a35193efd12fb0d95789893b4cd9ae670614c339";
 
-    private const string ExpectedPackageId = "single-sprite-play-wipe";
+    private const string ExpectedPackageId = "single-sprite-auto-wipe";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -41,7 +41,8 @@ public static class ArthurianSyncFromGitHub
         "architect-breakglass-hosts",
         "architect-force-tip-ui",
         "single-sprite-no-paperdoll",
-        "runtime-single-sprite", // superseded — lacked library wipe + main-first FORCE
+        "runtime-single-sprite",
+        "single-sprite-play-wipe", // superseded — menu never landed; auto-wipe OnLoad
         "sync-keep-editor-menus",
     };
 
@@ -835,17 +836,27 @@ public static class ArthurianSyncFromGitHub
         AssetDatabase.Refresh();
         Debug.Log("[DemonKnight] " + ArchitectTipMarkersReport());
 
-        // Post-Sync: seed ModularSpriteLibrary + recreate StageLayoutProfile (stale GUID after embed).
+        // Post-Sync: ALWAYS wipe paperdoll residue (no separate Art Tools menu required).
         string modularReport = null;
         try
         {
-            modularReport = ArthurianMenuBootstrap.VerifyAndSyncModularLibraryInternal(showDialog: false);
-            Debug.Log("[DemonKnight] Post-Sync modular verify:\n" + modularReport);
+            string wipe = DemonKnightPackageVersion.WipeModularPaperdollAssets();
+            Debug.Log("[DemonKnight] Post-Sync PackageVersion wipe:\n" + wipe);
+            try
+            {
+                modularReport = ArthurianMenuBootstrap.ClearPaperdollLibraryInternal(showDialog: false);
+            }
+            catch
+            {
+                // Bootstrap tip may not have compiled yet — PackageVersion wipe is enough.
+                modularReport = wipe;
+            }
+            Debug.Log("[DemonKnight] Post-Sync modular clear:\n" + modularReport);
         }
         catch (Exception ex)
         {
-            errors.Add("Verify & Sync Modular Library: " + ex.Message);
-            Debug.LogWarning("[DemonKnight] Post-Sync modular verify failed: " + ex.Message);
+            errors.Add("Clear paperdoll / modular wipe: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] Post-Sync modular wipe failed: " + ex.Message);
         }
         try
         {
@@ -890,11 +901,13 @@ public static class ArthurianSyncFromGitHub
                    + $"(disk Id now: {ReadPackageIdFromDisk() ?? "?"}).\n"
                    + "If still sync-keep-editor-menus: Arthurian → FORCE Upgrade Sync Hosts From main.\n"
                    + "Arthurian menus kept: Bootstrap / Force Delete+Sync / Diagnose.\n"
-                   + "Modular library + StageLayoutProfile auto-verified after Sync.\n"
+                   + "Modular paperdoll auto-WIPED after Sync (no Clear menu required).\n"
                    + "Stop Play → New Game to rebuild pews.\n"
+                   + "Bind log must show outfit=NULL.\n"
                    + "Do NOT rebuild the scene.";
             if (!string.IsNullOrEmpty(modularReport))
                 msg += "\n\n" + modularReport;
+            msg += "\n" + DemonKnightPackageVersion.WipeStatusForDiagnose();
         }
 
         Debug.Log("[DemonKnight] " + msg);

@@ -154,7 +154,9 @@ public static class ArthurianMenuBootstrap
                 : "") + "\n" +
             ArthurianSyncFromGitHub.ArchitectTipMarkersReport() + "\n" +
             PackageVersionDiskReport() + "\n" +
+            DemonKnightPackageVersion.WipeStatusForDiagnose() + "\n" +
             $"Art Tools pin: {ArtToolsPinSha}\n" +
+            $"Clear Paperdoll menu on disk: {(menuBootOnDisk && File.Exists(menuBootPath) && File.ReadAllText(menuBootPath).IndexOf("Clear Paperdoll Library", StringComparison.Ordinal) >= 0 ? "YES" : "NO (auto-wipe OnLoad/Force Sync still runs)")}\n" +
             $"Assets path:\n{Application.dataPath}\n" +
             $"Expected importer path:\n{modularImporterPath}\n" +
             $"Sync menus on disk: {(syncOnDisk ? "YES" : "NO")}\n" +
@@ -283,6 +285,8 @@ public static class ArthurianMenuBootstrap
             AssetDatabase.CreateAsset(art, artPath);
         }
 
+        // Prefer PackageVersion SerializedObject wipe (works even mid-upgrade).
+        try { DemonKnightPackageVersion.WipeModularPaperdollAssets(); } catch { /* ignore */ }
         int cleared = art.ClearPaperdollLayersKeepSprites();
         // Drop legacy Prepared_Pose sheets from basePoses when Spliced/Sprite exports exist — else keep / placeholder.
         TryImportSplicedSpritesIntoBasePoses(art);
@@ -972,7 +976,7 @@ public static class ArthurianMenuBootstrap
             string id = ReadPackageIdFromDisk() ?? "";
             if (id == "architect-force-tip-ui" || id == "single-sprite-no-paperdoll"
                 || id == "architect-breakglass-hosts" || id == "architect-disk-tip-proof"
-                || id == "runtime-single-sprite")
+                || id == "runtime-single-sprite" || id == "single-sprite-play-wipe")
                 return true;
             if (ArthurianSyncFromGitHub.IsStalePackageId(id)) return true;
             return false;

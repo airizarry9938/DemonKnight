@@ -1,40 +1,52 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Cache;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "single-sprite-play-wipe";
-    public const string GitHint = "main-first-force-wipe-modular-paperdoll-library";
-    public const string BuiltUtc = "2026-11-22T03:06:51Z";
+    public const string Id = "single-sprite-auto-wipe";
+    public const string GitHint = "onload-auto-wipe-modular-no-menu-required";
+    public const string BuiltUtc = "2026-11-22T03:35:50Z";
 
     /// <summary>Fallback SHA only — OnLoad prefers API tip + raw@main first.</summary>
     public const string HardTipSha = "a35193efd12fb0d95789893b4cd9ae670614c339";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
+    const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
+    const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
+
+    /// <summary>Last wipe summary for Diagnose (session).</summary>
+    public static string LastWipeReport { get; private set; } = "(wipe not run this session)";
 
     /// <summary>
-    /// After this file compiles (FORCE / paste / tip), pull Sync+Bootstrap+Architect from
-    /// tip/main whenever Architect/Sync still advertise a stale package Id
-    /// (architect-disk-tip-proof, runtime-single-sprite, …).
+    /// After this file compiles (FORCE / paste / tip):
+    /// 1) Always wipe ModularSpriteLibrary paperdoll residue (no Art Tools menu required).
+    /// 2) Pull Sync/Bootstrap/Architect from tip/main when hosts still stale.
     /// </summary>
     [InitializeOnLoadMethod]
-    static void DkForceTipHostsIfFalsePositiveStuck()
+    static void DkForceTipHostsAndWipeLibrary()
     {
         EditorApplication.delayCall += () =>
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             try
             {
+                // 1) Library wipe first — works even when MenuBootstrap tip menus never landed.
+                LastWipeReport = WipeModularPaperdollAssets();
+                Debug.Log("[DemonKnight] PackageVersion OnLoad library wipe:\n" + LastWipeReport);
+
                 string root = Directory.GetParent(Application.dataPath)!.FullName;
                 string syncPath = Path.Combine(root, "Assets", "Editor", "ArthurianSyncFromGitHub.cs");
                 string archPath = Path.Combine(root, "Assets", "Editor", "ArthurianArtArchitectWindow.cs");
+                string bootPath = Path.Combine(root, "Assets", "Editor", "ArthurianMenuBootstrap.cs");
                 bool need = !File.Exists(syncPath);
                 if (File.Exists(syncPath))
                 {
@@ -44,8 +56,18 @@ public static class DemonKnightPackageVersion
                                && syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0)
                            || syncBody.IndexOf("HardTipCommitSha", StringComparison.Ordinal) < 0
                            || syncBody.IndexOf("StalePackageIds", StringComparison.Ordinal) < 0
-                           || syncBody.IndexOf(Id, StringComparison.Ordinal) < 0;
+                           || syncBody.IndexOf(Id, StringComparison.Ordinal) < 0
+                           || syncBody.IndexOf("ClearPaperdollLibraryInternal", StringComparison.Ordinal) < 0;
                 }
+                if (File.Exists(bootPath))
+                {
+                    string boot = File.ReadAllText(bootPath);
+                    if (boot.IndexOf("Clear Paperdoll Library", StringComparison.Ordinal) < 0
+                        || boot.IndexOf(Id, StringComparison.Ordinal) < 0)
+                        need = true;
+                }
+                else need = true;
+
                 bool archStale = !File.Exists(archPath);
                 if (File.Exists(archPath))
                 {
@@ -57,7 +79,8 @@ public static class DemonKnightPackageVersion
                                 || a.IndexOf(Id, StringComparison.Ordinal) < 0
                                 || a.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0
                                 || a.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
-                                || a.IndexOf("runtime-single-sprite\"", StringComparison.Ordinal) >= 0;
+                                || a.IndexOf("runtime-single-sprite\"", StringComparison.Ordinal) >= 0
+                                || a.IndexOf("single-sprite-play-wipe\"", StringComparison.Ordinal) >= 0;
                 }
                 if (!need && !archStale) return;
 
@@ -112,9 +135,236 @@ public static class DemonKnightPackageVersion
             }
             catch (Exception ex)
             {
-                Debug.LogWarning("[DemonKnight] PackageVersion OnLoad host pull skipped: " + ex.Message);
+                Debug.LogWarning("[DemonKnight] PackageVersion OnLoad skipped: " + ex.Message);
             }
         };
+    }
+
+    /// <summary>
+    /// Self-contained wipe — no MenuBootstrap / ClearPaperdollLayersKeepSprites required.
+    /// Clears Outfit/Head/Prop arrays + non-Sprite anim clips on every ModularSpriteLibrary asset,
+    /// deletes Outfit_/Head_/Prop_ placeholder textures, copies Art → Resources.
+    /// </summary>
+    public static string WipeModularPaperdollAssets()
+    {
+        var log = new StringBuilder();
+        log.AppendLine("Package=" + Id);
+        int libs = 0, clearedSlots = 0, deletedTex = 0;
+
+        try
+        {
+            EnsureFolderPath("Assets/Art/Modular");
+            EnsureFolderPath("Assets/Resources/Art/Modular");
+
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (AssetDatabase.LoadMainAssetAtPath(ArtLibPath) != null) paths.Add(ArtLibPath);
+            if (AssetDatabase.LoadMainAssetAtPath(ResLibPath) != null) paths.Add(ResLibPath);
+            foreach (string g in AssetDatabase.FindAssets("t:ScriptableObject"))
+            {
+                string p = AssetDatabase.GUIDToAssetPath(g);
+                if (p.IndexOf("ModularSpriteLibrary", StringComparison.OrdinalIgnoreCase) >= 0)
+                    paths.Add(p);
+            }
+
+            foreach (string path in paths)
+            {
+                var obj = AssetDatabase.LoadMainAssetAtPath(path);
+                if (obj == null) continue;
+                libs++;
+                clearedSlots += WipeLibraryObject(obj);
+                EditorUtility.SetDirty(obj);
+                log.AppendLine("Wiped " + path);
+            }
+
+            deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Outfit_");
+            deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Head_");
+            deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Prop_");
+            deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Outfit_");
+            deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Head_");
+            deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Prop_");
+
+            AssetDatabase.SaveAssets();
+
+            // Force Resources copy from Art (play reads Resources).
+            if (AssetDatabase.LoadMainAssetAtPath(ArtLibPath) != null)
+            {
+                if (AssetDatabase.LoadMainAssetAtPath(ResLibPath) != null)
+                    AssetDatabase.DeleteAsset(ResLibPath);
+                AssetDatabase.CopyAsset(ArtLibPath, ResLibPath);
+                var res = AssetDatabase.LoadMainAssetAtPath(ResLibPath);
+                if (res != null)
+                {
+                    WipeLibraryObject(res);
+                    EditorUtility.SetDirty(res);
+                }
+                AssetDatabase.SaveAssets();
+                log.AppendLine("Copied Art → Resources " + ResLibPath);
+            }
+            else if (AssetDatabase.LoadMainAssetAtPath(ResLibPath) != null)
+            {
+                // No Art copy — wipe Resources in place.
+                var res = AssetDatabase.LoadMainAssetAtPath(ResLibPath);
+                if (res != null)
+                {
+                    clearedSlots += WipeLibraryObject(res);
+                    EditorUtility.SetDirty(res);
+                    AssetDatabase.SaveAssets();
+                }
+            }
+
+            AssetDatabase.Refresh();
+            log.AppendLine($"libs={libs} clearedSlots≈{clearedSlots} deletedPlaceholderTex={deletedTex}");
+            log.AppendLine("outfit/head/prop arrays emptied; non-Sprite anim clips removed.");
+            log.AppendLine("Stop Play → New Game. Bind log must show outfit=NULL.");
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine("WIPE ERROR: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] WipeModularPaperdollAssets: " + ex.Message);
+        }
+
+        LastWipeReport = log.ToString().TrimEnd();
+        return LastWipeReport;
+    }
+
+    /// <summary>Diagnose one-liner: Resources outfits/heads + LastWipeReport head.</summary>
+    public static string WipeStatusForDiagnose()
+    {
+        int outfits = 0, heads = 0, poses = 0, legacyClips = 0;
+        try
+        {
+            var res = AssetDatabase.LoadMainAssetAtPath(ResLibPath);
+            if (res == null)
+                return "Modular wipe status: Resources library MISSING\nLast wipe: " + LastWipeReport;
+            var so = new SerializedObject(res);
+            poses = CountFilledArray(so.FindProperty("basePoses"));
+            outfits = CountFilledArray(so.FindProperty("outfits"));
+            heads = CountFilledHeads(so.FindProperty("heads"));
+            legacyClips = CountLegacyAnimClips(so.FindProperty("animClips"));
+        }
+        catch (Exception ex)
+        {
+            return "Modular wipe status: ERROR " + ex.Message + "\nLast wipe: " + LastWipeReport;
+        }
+
+        string ok = (outfits == 0 && heads == 0 && legacyClips == 0) ? "CLEAN" : "DIRTY (need wipe)";
+        return $"Modular wipe status: {ok} — sprites(basePoses)={poses} outfits={outfits} heads={heads} legacyClips={legacyClips}\n"
+               + "Last wipe: " + LastWipeReport;
+    }
+
+    static int WipeLibraryObject(UnityEngine.Object obj)
+    {
+        int n = 0;
+        var so = new SerializedObject(obj);
+        n += ClearSpriteArray(so.FindProperty("outfits"));
+        n += ClearHeadArray(so.FindProperty("heads"));
+        n += ClearSpriteArray(so.FindProperty("props"));
+        n += StripLegacyAnimClips(so.FindProperty("animClips"));
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return n;
+    }
+
+    static int ClearSpriteArray(SerializedProperty prop)
+    {
+        if (prop == null || !prop.isArray) return 0;
+        int had = 0;
+        for (int i = 0; i < prop.arraySize; i++)
+            if (prop.GetArrayElementAtIndex(i).objectReferenceValue != null) had++;
+        prop.arraySize = 0;
+        return had;
+    }
+
+    static int ClearHeadArray(SerializedProperty prop)
+    {
+        if (prop == null || !prop.isArray) return 0;
+        int had = 0;
+        for (int i = 0; i < prop.arraySize; i++)
+        {
+            var el = prop.GetArrayElementAtIndex(i);
+            var sp = el?.FindPropertyRelative("sprite");
+            if (sp != null && sp.objectReferenceValue != null) had++;
+        }
+        prop.arraySize = 0;
+        return had;
+    }
+
+    static int StripLegacyAnimClips(SerializedProperty prop)
+    {
+        if (prop == null || !prop.isArray) return 0;
+        int removed = 0;
+        for (int i = prop.arraySize - 1; i >= 0; i--)
+        {
+            var el = prop.GetArrayElementAtIndex(i);
+            var cat = el?.FindPropertyRelative("category");
+            string c = cat != null ? cat.stringValue : "";
+            if (string.Equals(c, "Sprite", StringComparison.OrdinalIgnoreCase)) continue;
+            prop.DeleteArrayElementAtIndex(i);
+            removed++;
+        }
+        return removed;
+    }
+
+    static int CountFilledArray(SerializedProperty prop)
+    {
+        if (prop == null || !prop.isArray) return 0;
+        int n = 0;
+        for (int i = 0; i < prop.arraySize; i++)
+            if (prop.GetArrayElementAtIndex(i).objectReferenceValue != null) n++;
+        return n;
+    }
+
+    static int CountFilledHeads(SerializedProperty prop)
+    {
+        if (prop == null || !prop.isArray) return 0;
+        int n = 0;
+        for (int i = 0; i < prop.arraySize; i++)
+        {
+            var sp = prop.GetArrayElementAtIndex(i)?.FindPropertyRelative("sprite");
+            if (sp != null && sp.objectReferenceValue != null) n++;
+        }
+        return n;
+    }
+
+    static int CountLegacyAnimClips(SerializedProperty prop)
+    {
+        if (prop == null || !prop.isArray) return 0;
+        int n = 0;
+        for (int i = 0; i < prop.arraySize; i++)
+        {
+            var cat = prop.GetArrayElementAtIndex(i)?.FindPropertyRelative("category");
+            string c = cat != null ? cat.stringValue : "";
+            if (!string.Equals(c, "Sprite", StringComparison.OrdinalIgnoreCase)) n++;
+        }
+        return n;
+    }
+
+    static int DeleteMatchingTextures(string folder, string namePrefix)
+    {
+        if (!AssetDatabase.IsValidFolder(folder)) return 0;
+        int n = 0;
+        string[] guids = AssetDatabase.FindAssets(namePrefix, new[] { folder });
+        foreach (string g in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(g);
+            string file = Path.GetFileName(path);
+            if (file == null || !file.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase)) continue;
+            if (AssetDatabase.DeleteAsset(path)) n++;
+        }
+        return n;
+    }
+
+    static void EnsureFolderPath(string folder)
+    {
+        if (string.IsNullOrEmpty(folder) || AssetDatabase.IsValidFolder(folder)) return;
+        string[] parts = folder.Replace('\\', '/').Split('/');
+        string cur = parts[0];
+        for (int i = 1; i < parts.Length; i++)
+        {
+            string next = cur + "/" + parts[i];
+            if (!AssetDatabase.IsValidFolder(next))
+                AssetDatabase.CreateFolder(cur, parts[i]);
+            cur = next;
+        }
     }
 
     static bool IsTiny404(string body)
@@ -157,7 +407,6 @@ public static class DemonKnightPackageVersion
     static string DownloadTip(string rel, string tip)
     {
         string bust = "t=" + DateTime.UtcNow.Ticks;
-        // API tip + main FIRST — HardTip last (avoids re-landing architect-disk-tip-proof).
         string[] shas = { tip, "main", HardTipSha };
         Exception last = null;
         foreach (string sha in shas)

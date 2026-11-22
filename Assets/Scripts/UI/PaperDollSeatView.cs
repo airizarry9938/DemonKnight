@@ -76,7 +76,7 @@ namespace ArthurianAutobattler
                     $"[DemonKnight] First pew Bind '{recruit.characterName}' (single-sprite): " +
                     $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
                     $"body={bodyName} outfit={outfitName} head={headName} " +
-                    "(outfit/head must be NULL after Clear Paperdoll Library / tip single-sprite-play-wipe)");
+                    "(outfit/head must be NULL after auto-wipe / tip single-sprite-auto-wipe)");
             }
 
             if (moodLayer != null)
