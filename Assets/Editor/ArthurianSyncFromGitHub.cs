@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "1f51ac6a0ecc1eac3faa3a5086602c41292c5119";
 
-    private const string ExpectedPackageId = "hidden-potential-bloodline";
+    private const string ExpectedPackageId = "architect-persist-scene-bg";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -53,6 +53,7 @@ public static class ArthurianSyncFromGitHub
         "fix-seatshow-cs0436",
         "assign-only-pew-drag",
         "legend-unlocks-meta",
+        "hidden-potential-bloodline",
         "assign-only-runtime",
         "sync-keep-editor-menus",
     };
@@ -154,6 +155,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/TownRNGGenerator.cs",
         "Assets/Scripts/Systems/HiddenPotentialSystem.cs",
         "Assets/Scripts/UI/SomersetPewLayout.cs",
+        "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ChurchPewLayout.cs",
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
@@ -877,6 +879,7 @@ public static class ArthurianSyncFromGitHub
         try
         {
             ArthurianStageLayoutProfileEnsure.EnsureAsset();
+            ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
         }
         catch (Exception ex)
         {
@@ -1521,10 +1524,12 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("class ArthurianArtArchitectWindow")) return false;
         if (!body.Contains("Art & Stage Architect")) return false;
         if (!body.Contains("SpriteCategory")) return false;
-        if (!body.Contains("enum ArchitectTab { Splicer, StagePlacer }")) return false;
+        if (!body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds }")) return false;
         if (!body.Contains("Sheet Splicer")) return false;
         if (!body.Contains("Manual Box Crop")) return false;
         if (!body.Contains("Save Splices to Folder")) return false;
+        if (!body.Contains("Scene Backgrounds")) return false;
+        if (!body.Contains("SceneBackgroundProfile")) return false;
         if (!body.Contains("UiBuildId")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;
@@ -1657,7 +1662,7 @@ public static class ArthurianSyncFromGitHub
             if (!File.Exists(path))
                 return "Architect tip markers: SpriteCategory=NO UiBuildId=NO PaperDoll remnant=YES (file MISSING)";
             string body = File.ReadAllText(path);
-            bool sprite = body.Contains("SpriteCategory") && body.Contains("enum ArchitectTab { Splicer, StagePlacer }");
+            bool sprite = body.Contains("SpriteCategory") && body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds }");
             bool ui = body.Contains("UiBuildId");
             bool remnant = body.Contains("Paper-Doll Unit Generator")
                            || body.Contains("enum SheetCategory")

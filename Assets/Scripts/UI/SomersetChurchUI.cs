@@ -109,6 +109,7 @@ namespace ArthurianAutobattler
             WireHudButtonsOnce();
             RewireDiceToggleButton();
             RewireWarbandToggleButton();
+            ApplyArchitectChurchBackground();
             // Perks/runes offline — kill any scene PerkDraftPanel left active after Sync.
             PerkDraftManager.SuppressAllPerkUi();
             MainMenuUI.EnsureExists();
@@ -1859,6 +1860,30 @@ namespace ArthurianAutobattler
         public static void InvalidateChurchAssignCache()
         {
             _churchProfileCache = null;
+        }
+
+        /// <summary>Architect Tab 3 — apply SceneBackgroundProfile church image/video when assigned.</summary>
+        void ApplyArchitectChurchBackground()
+        {
+            try
+            {
+                Image img = churchBackgroundImage;
+                if (img == null && pewLayout != null && pewLayout.backgroundRect != null)
+                    img = pewLayout.backgroundRect.GetComponent<Image>();
+                if (img == null)
+                {
+                    var t = transform.Find("ChurchBackground");
+                    if (t != null) img = t.GetComponent<Image>();
+                }
+                RectTransform host = img != null ? img.rectTransform : null;
+                if (host == null && pewLayout != null) host = pewLayout.backgroundRect;
+                SceneBackgroundApplier.ApplyToUiHost(
+                    SceneBackgroundSlot.SomersetChurch, img, host);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] ApplyArchitectChurchBackground: " + ex.Message);
+            }
         }
 
         static void EnsureSeatImageAssignedOnly(GameObject go, Sprite assigned, RecruitInstance recruit)

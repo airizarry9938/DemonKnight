@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "hidden-potential-bloodline";
+    public const string TipPackageId = "architect-persist-scene-bg";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -24,6 +24,7 @@ public static class DemonKnightTipEscape
         "Assets/Editor/DemonKnightPackageVersion.cs",
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
+        "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -36,7 +37,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (hidden-potential-bloodline)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (architect-persist-scene-bg)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -114,6 +115,9 @@ public static class DemonKnightTipEscape
             "church-bg-pew-preview",
             "fix-seatshow-cs0436",
             "assign-only-pew-drag",
+            "assign-only-runtime",
+            "legend-unlocks-meta",
+            "hidden-potential-bloodline",
         };
         foreach (string s in stale)
         {

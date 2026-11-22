@@ -173,12 +173,21 @@ namespace ArthurianAutobattler
         public void ApplyBackgroundArt()
         {
             if (battleBackground == null) return;
-            if (battleBackgroundSprite != null)
+            // Architect Tab 3 SceneBackgroundProfile wins when assigned (assign-only).
+            bool fromArchitect = false;
+            try
+            {
+                fromArchitect = SceneBackgroundApplier.ApplyToSpriteRenderer(
+                    SceneBackgroundSlot.ChurchyardBattle, battleBackground);
+            }
+            catch { /* ignore */ }
+
+            if (!fromArchitect && battleBackgroundSprite != null)
             {
                 battleBackground.sprite = battleBackgroundSprite;
                 battleBackground.color = Color.white;
             }
-            else if (battleBackground.sprite == null)
+            else if (!fromArchitect && battleBackground.sprite == null)
             {
                 battleBackground.color = fallbackGroundColor;
             }
@@ -271,6 +280,15 @@ namespace ArthurianAutobattler
 
         private VideoClip ResolveVideoClip()
         {
+            // Architect Tab 3 assignment first (assign-only).
+            try
+            {
+                var entry = SceneBackgroundApplier.Get(SceneBackgroundSlot.ChurchyardBattle);
+                var arch = SceneBackgroundApplier.ResolveVideo(entry);
+                if (arch != null) return arch;
+            }
+            catch { /* ignore */ }
+
             if (battleBackgroundVideo != null) return battleBackgroundVideo;
 
             if (!string.IsNullOrEmpty(videoResourcesPath))

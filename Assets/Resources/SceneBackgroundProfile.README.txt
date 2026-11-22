@@ -1,0 +1,4 @@
+SceneBackgroundProfile.asset is created locally by Arthurian → Ensure Stage Layout Profile
+(and Art & Stage Architect Tab 3). Assign jpg/png Sprites and/or mp4 VideoClips per screen.
+Do not commit a YAML that still references a missing MonoScript GUID — Ensure remaps or
+transplants entries so assignments survive Force Sync / editor reloads.

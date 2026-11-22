@@ -5,18 +5,19 @@ using System.IO;
 using ArthurianAutobattler;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Video;
 #pragma warning disable CS0618 // TextureImporter.spritesheet — splice export still uses SpriteMetaData API
 
 /// <summary>
 /// Master Spec Phase 3 — Art &amp; Stage Architect.
 /// Menu: Arthurian → Art &amp; Stage Architect
-/// Tabs: Sheet Splicer &amp; Animation Builder | Numbered Stage Placer
+/// Tabs: Sheet Splicer &amp; Animation Builder | Numbered Stage Placer | Scene Backgrounds
 /// Single sprite category only (no paperdoll / multi-layer body·outfit·head).
 /// </summary>
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "hidden-potential-bloodline";
+    public const string UiBuildId = "architect-persist-scene-bg";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -24,6 +25,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const string SpriteCategory = "Sprite";
     const string DefaultExportFolder = SplicedRootFolder + "/" + SpriteCategory;
     const string StageProfilePath = "Assets/Resources/StageLayoutProfile.asset";
+    const string SceneBgProfilePath = "Assets/Resources/SceneBackgroundProfile.asset";
     /// <summary>Same art as SomersetChurchUI / SomersetPewLayout (play stage).</summary>
     const string ChurchBackgroundPath = "Assets/Art/Backgrounds/SomersetChurchInterior.jpg";
     /// <summary>Reference pixel size of SomersetChurchInterior (play layout tuned to this).</summary>
@@ -32,7 +34,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// <summary>Must match SomersetChurchUI.baseSeatSize tip (play pew sprite size).</summary>
     static readonly Vector2 PlayPewBaseSize = new Vector2(88f, 112f);
 
-    enum ArchitectTab { Splicer, StagePlacer }
+    enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
     enum BattleSlotSide { Player, Enemy }
     enum CropToolMode { ManualBox, GridCrop, AutoIsland }
@@ -40,6 +42,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     ArchitectTab tab;
     Vector2 scroll;
+    SceneBackgroundProfile sceneBgProfile;
+    Vector2 sceneBgScroll;
+    int selectedSceneBgSlot;
 
     // ── Tab 1: Splicer ─────────────────────────────────────────────────────
     Texture2D sheetTexture;
@@ -117,7 +122,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         win.minSize = new Vector2(780, 560);
         win.Show();
         win.Focus();
-        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 2 tabs.");
+        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 3 tabs.");
     }
 
     public static void CloseAllArchitectWindows()
@@ -142,11 +147,32 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (targetLibrary == null)
             targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(DefaultLibraryPath)
                             ?? ModularSpriteLibrary.Load();
-        if (stageProfile == null)
-            stageProfile = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(StageProfilePath)
-                           ?? StageLayoutProfile.Load();
+        // NEVER StageLayoutProfile.Load() here — that CreateInstance fallback is not an asset
+        // and SetDirty/SaveAssets will not persist seat sprites across sessions.
+        stageProfile = ArthurianStageLayoutProfileEnsure.EnsureAsset();
         stageProfile?.EnsureSlotCounts();
+        sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
+        sceneBgProfile?.EnsureDefaultEntries();
         SyncDefaultExportFolder();
+        EditorApplication.playModeStateChanged -= OnArchitectPlayModeChanged;
+        EditorApplication.playModeStateChanged += OnArchitectPlayModeChanged;
+    }
+
+    void OnDisable()
+    {
+        EditorApplication.playModeStateChanged -= OnArchitectPlayModeChanged;
+        PersistStageProfile("OnDisable");
+        PersistSceneBgProfile("OnDisable");
+    }
+
+    void OnArchitectPlayModeChanged(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.ExitingEditMode
+            || state == PlayModeStateChange.EnteredEditMode)
+        {
+            PersistStageProfile("PlayMode:" + state);
+            PersistSceneBgProfile("PlayMode:" + state);
+        }
     }
 
     void OnGUI()
@@ -157,6 +183,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         {
             case ArchitectTab.Splicer: DrawSplicerTab(); break;
             case ArchitectTab.StagePlacer: DrawStagePlacerTab(); break;
+            case ArchitectTab.SceneBackgrounds: DrawSceneBackgroundsTab(); break;
         }
         EditorGUILayout.EndScrollView();
     }
@@ -168,12 +195,95 @@ public class ArthurianArtArchitectWindow : EditorWindow
             tab = ArchitectTab.Splicer;
         if (GUILayout.Toggle(tab == ArchitectTab.StagePlacer, "2 · Stage Placer & Parallax", EditorStyles.toolbarButton))
             tab = ArchitectTab.StagePlacer;
+        if (GUILayout.Toggle(tab == ArchitectTab.SceneBackgrounds, "3 · Scene Backgrounds", EditorStyles.toolbarButton))
+            tab = ArchitectTab.SceneBackgrounds;
         GUILayout.FlexibleSpace();
         GUILayout.Label(UiBuildId, EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.LabelField(
             $"Art & Stage Architect  ·  {UiBuildId}  ·  Category: {SpriteCategory} (no paperdoll)",
             EditorStyles.boldLabel);
+    }
+
+    /// <summary>
+    /// Flush StageLayoutProfile to disk. Refuses runtime CreateInstance stand-ins —
+    /// those were the assign-only “saves that vanish after Unity restart” root cause.
+    /// </summary>
+    void PersistStageProfile(string reason)
+    {
+        if (stageProfile == null) return;
+        string path = AssetDatabase.GetAssetPath(stageProfile);
+        if (string.IsNullOrEmpty(path))
+        {
+            var disk = ArthurianStageLayoutProfileEnsure.EnsureAsset();
+            if (disk != null && !ReferenceEquals(disk, stageProfile))
+            {
+                CopyStageSlots(stageProfile, disk);
+                stageProfile = disk;
+                path = AssetDatabase.GetAssetPath(stageProfile);
+                Debug.LogWarning(
+                    "[DemonKnight] Architect was editing a non-asset StageLayoutProfile — copied into "
+                    + path + " (" + reason + ").");
+            }
+        }
+        if (stageProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(stageProfile)))
+            return;
+        EditorUtility.SetDirty(stageProfile);
+        AssetDatabase.SaveAssets();
+        try { SomersetChurchUI.InvalidateChurchAssignCache(); } catch { /* ignore */ }
+    }
+
+    void PersistSceneBgProfile(string reason)
+    {
+        if (sceneBgProfile == null) return;
+        if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sceneBgProfile)))
+        {
+            sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
+            if (sceneBgProfile == null) return;
+        }
+        EditorUtility.SetDirty(sceneBgProfile);
+        AssetDatabase.SaveAssets();
+        try { SceneBackgroundApplier.InvalidateCache(); } catch { /* ignore */ }
+    }
+
+    static void CopyStageSlots(StageLayoutProfile from, StageLayoutProfile to)
+    {
+        if (from == null || to == null) return;
+        to.churchPewSlots = CloneSlots(from.churchPewSlots);
+        to.playerBattleSlots = CloneSlots(from.playerBattleSlots);
+        to.enemyBattleSlots = CloneSlots(from.enemyBattleSlots);
+        to.parallaxLayers = from.parallaxLayers != null
+            ? new List<StageParallaxLayer>(from.parallaxLayers)
+            : new List<StageParallaxLayer>();
+        to.enableRainFX = from.enableRainFX;
+        to.enableLightningFlashes = from.enableLightningFlashes;
+        to.enableCandleFlicker = from.enableCandleFlicker;
+        to.EnsureSlotCounts();
+    }
+
+    static List<SlotTransformConfig> CloneSlots(List<SlotTransformConfig> src)
+    {
+        var list = new List<SlotTransformConfig>();
+        if (src == null) return list;
+        for (int i = 0; i < src.Count; i++)
+        {
+            var s = src[i];
+            if (s == null) { list.Add(null); continue; }
+            list.Add(new SlotTransformConfig
+            {
+                slotNumber = s.slotNumber,
+                position = s.position,
+                scale = s.scale,
+                aspectMultiplier = s.aspectMultiplier,
+                sortingOrder = s.sortingOrder,
+                bonusHP = s.bonusHP,
+                bonusATK = s.bonusATK,
+                bonusSPD = s.bonusSPD,
+                previewOrOverrideSprite = s.previewOrOverrideSprite,
+                assignedCharacterId = s.assignedCharacterId
+            });
+        }
+        return list;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1409,18 +1519,26 @@ public class ArthurianArtArchitectWindow : EditorWindow
     void DrawStagePlacerTab()
     {
         EditorGUILayout.LabelField("Numbered Stage Placer & Moving Background Editor", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Assign-only pew sprites persist on Assets/Resources/StageLayoutProfile.asset. "
+            + "Ensure remaps script GUID / transplants YAML — never wipes seat sprites. "
+            + "Empty seats stay empty (no auto-fill).",
+            MessageType.Info);
         stageProfile = (StageLayoutProfile)EditorGUILayout.ObjectField(
             "StageLayoutProfile", stageProfile, typeof(StageLayoutProfile), false);
-        if (stageProfile == null)
+        if (stageProfile == null
+            || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(stageProfile)))
         {
             if (GUILayout.Button("Ensure Stage Layout Profile Asset"))
             {
-                ArthurianStageLayoutProfileEnsure.EnsureAsset();
-                stageProfile = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(StageProfilePath);
+                stageProfile = ArthurianStageLayoutProfileEnsure.EnsureAsset();
             }
-            return;
+            if (stageProfile == null) return;
         }
         stageProfile.EnsureSlotCounts();
+        EditorGUILayout.LabelField(
+            $"Assigned pew sprites: {ArthurianStageLayoutProfileEnsure.CountAssignedSprites(stageProfile)} / 52  ·  asset={AssetDatabase.GetAssetPath(stageProfile)}",
+            EditorStyles.miniLabel);
 
         stageView = (StageViewMode)EditorGUILayout.EnumPopup("Stage View", stageView);
         if (stageView == StageViewMode.ChurchyardBattle)
@@ -1563,6 +1681,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (e.type == EventType.MouseUp && e.button == 0)
             {
                 draggingSlot = false;
+                PersistStageProfile("BattleSlotDragEnd");
                 e.Use();
             }
         }
@@ -1695,6 +1814,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 draggingSlot = false;
                 scalingSlot = false;
                 churchDragSeat = -1;
+                PersistStageProfile("ChurchPewDragEnd");
                 e.Use();
             }
         }
@@ -1712,7 +1832,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             {
                 Undo.RecordObject(stageProfile, "Scale Church Pew");
                 s.scale = new Vector2(nMul, nMul);
-                EditorUtility.SetDirty(stageProfile);
+                PersistStageProfile("ChurchPewScaleSlider");
             }
         }
 
@@ -1763,6 +1883,124 @@ public class ArthurianArtArchitectWindow : EditorWindow
             EditorUtility.SetDirty(stageProfile);
             Debug.Log("[DemonKnight] Seeded church pew slots to play-normalized 0–1 positions.");
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Tab 3 — Scene / Screen Backgrounds (jpg·png or mp4)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    void DrawSceneBackgroundsTab()
+    {
+        EditorGUILayout.LabelField("Scene / Screen Backgrounds", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Assign-only: pick a jpg/png Sprite and/or mp4 VideoClip per game screen. "
+            + "Empty slots keep each screen’s built-in default. Persists on "
+            + SceneBgProfilePath + " (same discipline as StageLayoutProfile).",
+            MessageType.Info);
+
+        sceneBgProfile = (SceneBackgroundProfile)EditorGUILayout.ObjectField(
+            "SceneBackgroundProfile", sceneBgProfile, typeof(SceneBackgroundProfile), false);
+        if (sceneBgProfile == null
+            || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sceneBgProfile)))
+        {
+            if (GUILayout.Button("Ensure Scene Background Profile Asset"))
+                sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
+            if (sceneBgProfile == null) return;
+        }
+        sceneBgProfile.EnsureDefaultEntries();
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Save SceneBackgroundProfile", GUILayout.Height(26)))
+            PersistSceneBgProfile("SaveButton");
+        if (GUILayout.Button("Ping Asset", GUILayout.Width(90)))
+        {
+            Selection.activeObject = sceneBgProfile;
+            EditorGUIUtility.PingObject(sceneBgProfile);
+        }
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField(
+            "Asset: " + AssetDatabase.GetAssetPath(sceneBgProfile), EditorStyles.miniLabel);
+
+        sceneBgScroll = EditorGUILayout.BeginScrollView(sceneBgScroll, GUILayout.MinHeight(360f));
+        var entries = sceneBgProfile.entries;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var e = entries[i];
+            if (e == null) continue;
+            bool selected = selectedSceneBgSlot == (int)e.slot;
+            EditorGUILayout.BeginVertical(selected ? EditorStyles.helpBox : "box");
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Toggle(selected, e.displayName + "  (" + e.slot + ")", EditorStyles.foldoutHeader))
+                selectedSceneBgSlot = (int)e.slot;
+            GUILayout.FlexibleSpace();
+            bool has = e.imageSprite != null || e.videoClip != null
+                       || !string.IsNullOrEmpty(e.imageAssetPath)
+                       || !string.IsNullOrEmpty(e.videoAssetPath);
+            GUILayout.Label(has ? "ASSIGNED" : "empty", EditorStyles.miniLabel, GUILayout.Width(70));
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUI.BeginChangeCheck();
+            e.displayName = EditorGUILayout.TextField("Label", e.displayName);
+            e.imageSprite = (Sprite)EditorGUILayout.ObjectField(
+                "Image (jpg/png Sprite)", e.imageSprite, typeof(Sprite), false);
+            e.videoClip = (VideoClip)EditorGUILayout.ObjectField(
+                "Video (mp4)", e.videoClip, typeof(VideoClip), false);
+
+            if (e.imageSprite != null)
+            {
+                string p = AssetDatabase.GetAssetPath(e.imageSprite);
+                if (!string.IsNullOrEmpty(p)) e.imageAssetPath = p;
+            }
+            if (e.videoClip != null)
+            {
+                string p = AssetDatabase.GetAssetPath(e.videoClip);
+                if (!string.IsNullOrEmpty(p)) e.videoAssetPath = p;
+            }
+
+            EditorGUILayout.LabelField("Image path", string.IsNullOrEmpty(e.imageAssetPath) ? "(none)" : e.imageAssetPath, EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("Video path", string.IsNullOrEmpty(e.videoAssetPath) ? "(none)" : e.videoAssetPath, EditorStyles.miniLabel);
+
+            // Preview strip
+            Rect prev = GUILayoutUtility.GetRect(64f, 72f, GUILayout.ExpandWidth(true));
+            EditorGUI.DrawRect(prev, new Color(0.12f, 0.12f, 0.14f));
+            if (e.imageSprite != null)
+            {
+                Rect sprR = new Rect(prev.x + 8f, prev.y + 4f, 64f, 64f);
+                DrawSprite(sprR, e.imageSprite, Color.white);
+            }
+            else if (e.videoClip != null)
+            {
+                GUI.Label(new Rect(prev.x + 8f, prev.y + 24f, prev.width - 16f, 24f),
+                    "Video: " + e.videoClip.name, EditorStyles.boldLabel);
+            }
+            else
+            {
+                GUI.Label(new Rect(prev.x + 8f, prev.y + 24f, prev.width - 16f, 24f),
+                    "(no assignment — screen keeps default)", EditorStyles.miniLabel);
+            }
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Clear slot", GUILayout.Width(100)))
+            {
+                Undo.RecordObject(sceneBgProfile, "Clear Scene Background");
+                e.imageSprite = null;
+                e.videoClip = null;
+                e.imageAssetPath = "";
+                e.videoAssetPath = "";
+                PersistSceneBgProfile("ClearSceneBg");
+            }
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(sceneBgProfile, "Edit Scene Background");
+                PersistSceneBgProfile("EditSceneBg");
+            }
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4);
+        }
+        EditorGUILayout.EndScrollView();
     }
 
     /// <summary>
@@ -1971,7 +2209,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(stageProfile, "Edit Stage Slot");
-            EditorUtility.SetDirty(stageProfile);
+            PersistStageProfile("EditSlotInspector");
         }
 
         EditorGUILayout.Space(4);
@@ -1991,13 +2229,10 @@ public class ArthurianArtArchitectWindow : EditorWindow
             Undo.RecordObject(stageProfile, "Clear Slot Preview");
             s.previewOrOverrideSprite = null;
             s.assignedCharacterId = "";
-            EditorUtility.SetDirty(stageProfile);
+            PersistStageProfile("ClearSlotPreview");
         }
         if (GUILayout.Button("Save StageLayoutProfile"))
-        {
-            EditorUtility.SetDirty(stageProfile);
-            AssetDatabase.SaveAssets();
-        }
+            PersistStageProfile("SaveButton");
         EditorGUILayout.EndVertical();
     }
 
@@ -2070,14 +2305,21 @@ public class ArthurianArtArchitectWindow : EditorWindow
         var slots = ActiveSlots();
         if (slots == null || selectedSlot < 0 || selectedSlot >= slots.Count) return;
         if (paletteSelectedSprite == null) return;
+        if (stageProfile == null
+            || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(stageProfile)))
+        {
+            stageProfile = ArthurianStageLayoutProfileEnsure.EnsureAsset();
+            slots = ActiveSlots();
+            if (slots == null || selectedSlot < 0 || selectedSlot >= slots.Count) return;
+        }
         var s = slots[selectedSlot];
         Undo.RecordObject(stageProfile, "Assign Palette To Slot");
         s.previewOrOverrideSprite = paletteSelectedSprite;
         // Clear other church seats' accidental copies? No — only this slot.
-        EditorUtility.SetDirty(stageProfile);
-        AssetDatabase.SaveAssets(); // Play Load() reads Resources — must flush assign.
-        try { SomersetChurchUI.InvalidateChurchAssignCache(); } catch { /* ignore */ }
-        Debug.Log($"[DemonKnight] Assigned '{paletteSelectedSprite.name}' → church seat #{selectedSlot:00} only (saved).");
+        PersistStageProfile("AssignPalette");
+        Debug.Log(
+            $"[DemonKnight] Assigned '{paletteSelectedSprite.name}' → church seat #{selectedSlot:00} only "
+            + $"(persisted → {AssetDatabase.GetAssetPath(stageProfile)}).");
         Repaint();
     }
 

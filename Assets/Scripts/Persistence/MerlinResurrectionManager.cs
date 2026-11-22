@@ -410,6 +410,15 @@ namespace ArthurianAutobattler
             prt.offsetMin = Vector2.zero;
             prt.offsetMax = Vector2.zero;
             panel.GetComponent<Image>().color = new Color(0.04f, 0.05f, 0.08f, 0.92f);
+            try
+            {
+                var img = panel.GetComponent<Image>();
+                var rt = panel.GetComponent<RectTransform>();
+                // Shared victory / Merlin canvas — prefer Merlin slot, else Victory.
+                if (!SceneBackgroundApplier.ApplyToUiHost(SceneBackgroundSlot.MerlinResurrection, img, rt))
+                    SceneBackgroundApplier.ApplyToUiHost(SceneBackgroundSlot.VictoryOverlay, img, rt);
+            }
+            catch { /* ignore */ }
 
             var loreGo = new GameObject("LoreNarrative", typeof(RectTransform), typeof(TextMeshProUGUI));
             loreGo.transform.SetParent(panel.transform, false);
