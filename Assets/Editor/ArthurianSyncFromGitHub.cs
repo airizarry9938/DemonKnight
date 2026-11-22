@@ -25,7 +25,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private const string FallbackCommitSha = "4e99aceca2e455101f6e5b2213709be7342fb459";
 
-    private const string ExpectedPackageId = "architect-force-tip-ui";
+    private const string ExpectedPackageId = "architect-disk-tip-proof";
 
     /// <summary>
     /// Always overwrite from tip/main — never skip-self, never Fallback pin.
@@ -366,6 +366,9 @@ public static class ArthurianSyncFromGitHub
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        // Always clear stale Architect/PaperDoll editor copies before host overwrite.
+        NukeStaleArchitectAndPaperDollEditors(projectRoot);
+        CloseOpenArchitectWindows();
         int ok = 0;
         foreach (string rel in SyncHostForceOverwritePaths)
         {
@@ -389,9 +392,12 @@ public static class ArthurianSyncFromGitHub
                     throw new Exception("Architect body still paperdoll / missing Sprite category (" + source + ")");
 
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
-                // Nuke nested duplicates before writing the canonical Editor path.
+                // Always delete+rewrite Architect — never leave a stale paperdoll body.
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
-                    NukeNestedArchitectCopies(projectRoot);
+                {
+                    NukeStaleArchitectAndPaperDollEditors(projectRoot);
+                    TryDeleteFile(dest);
+                }
                 WriteReplacing(dest, body, deleteFirst: true);
                 ok++;
                 Debug.Log($"[DemonKnight] FORCE host overwrite {rel} via {source} ({body.Length} bytes)");
@@ -441,11 +447,8 @@ public static class ArthurianSyncFromGitHub
                 try
                 {
                     string body = DownloadString(urlList[i]);
-                    if (string.IsNullOrEmpty(body) || body.StartsWith("404")
-                        || body.Contains("404: Not Found")
-                        || body.Contains("Failed to fetch")
-                        || body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
-                        throw new Exception("Empty or 404");
+                    if (LooksLikeHttpFailureBody(body))
+                        throw new Exception("Empty or 404 (len=" + (body == null ? 0 : body.Length) + ")");
                     // Reject bodies that are clearly the stuck legacy package when upgrading hosts.
                     if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                         && body.Contains("sync-keep-editor-menus")
@@ -756,9 +759,10 @@ public static class ArthurianSyncFromGitHub
         // After FixMisplaced (old compiled maps may re-drop standalones) — nuke again BEFORE refresh/compile.
         NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: errors);
         ArthurianMenuBootstrap.DedupeArtToolScripts();
-        NukeNestedArchitectCopies(projectRoot);
+        NukeStaleArchitectAndPaperDollEditors(projectRoot);
         CloseOpenArchitectWindows();
         AssetDatabase.Refresh();
+        Debug.Log("[DemonKnight] " + ArchitectTipMarkersReport());
 
         // Post-Sync: seed ModularSpriteLibrary + recreate StageLayoutProfile (stale GUID after embed).
         string modularReport = null;
@@ -788,7 +792,7 @@ public static class ArthurianSyncFromGitHub
             try
             {
                 CloseOpenArchitectWindows();
-                NukeNestedArchitectCopies(null);
+                NukeStaleArchitectAndPaperDollEditors(null);
             }
             catch { /* ignore */ }
         };
@@ -888,12 +892,8 @@ public static class ArthurianSyncFromGitHub
                 try
                 {
                     string body = DownloadString(urls[i]);
-                    if (string.IsNullOrEmpty(body) || body.StartsWith("404")
-                        || body.Contains("404: Not Found")
-                        || body.Contains("Failed to fetch")
-                        || body.Contains("Package size exceeded")
-                        || body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
-                        throw new Exception("Empty or 404");
+                    if (LooksLikeHttpFailureBody(body))
+                        throw new Exception("Empty or 404 (len=" + (body == null ? 0 : body.Length) + ")");
                     if (IsCritical(rel) && !PassesCriticalCheck(rel, body, relaxPackageId))
                         throw new Exception("stale body failed sanity check");
                     source = labels[i] + (attempt > 0 ? $"#retry{attempt}" : "");
@@ -1464,6 +1464,105 @@ public static class ArthurianSyncFromGitHub
             Debug.LogWarning("[DemonKnight] NukeNestedArchitectCopies: " + ex.Message);
         }
         return n;
+    }
+
+    /// <summary>
+    /// Real CDN/raw failures are tiny HTML/text. Large Editor hosts contain the literal
+    /// string "404: Not Found" in their OWN source — body.Contains that string is a false positive
+    /// that blocked FORCE Upgrade of SyncFromGitHub + MenuBootstrap forever.
+    /// </summary>
+    public static bool LooksLikeHttpFailureBody(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return true;
+        string t = body.TrimStart();
+        if (t.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase)) return true;
+        if (t.StartsWith("<html", StringComparison.OrdinalIgnoreCase)) return true;
+        // GitHub raw 404 bodies are a few dozen bytes ("404: Not Found").
+        if (body.Length < 512)
+        {
+            if (t.StartsWith("404", StringComparison.Ordinal)) return true;
+            if (t.IndexOf("404: Not Found", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (t.IndexOf("Failed to fetch", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (t.IndexOf("Package size exceeded", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (t.IndexOf("Not Found", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Delete every nested/stale ArtArchitect EditorWindow and PaperDoll *editor* window
+    /// under Assets (keep runtime PaperDollSeatView.cs). Canonical Architect is rewritten after.
+    /// </summary>
+    public static int NukeStaleArchitectAndPaperDollEditors(string projectRoot = null)
+    {
+        projectRoot ??= Directory.GetParent(Application.dataPath)!.FullName;
+        string canonical = Path.Combine(projectRoot, "Assets", "Editor", "ArthurianArtArchitectWindow.cs");
+        int n = NukeNestedArchitectCopies(projectRoot);
+        try
+        {
+            string assets = Path.Combine(projectRoot, "Assets");
+            if (!Directory.Exists(assets)) return n;
+            var patterns = new[] { "*ArtArchitect*.cs", "*ArchitectWindow*.cs", "*PaperDoll*Window*.cs", "*PaperDoll*Editor*.cs" };
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string pat in patterns)
+            {
+                foreach (string hit in Directory.GetFiles(assets, pat, SearchOption.AllDirectories))
+                {
+                    if (!seen.Add(hit)) continue;
+                    // Never delete the canonical tip Architect path here — caller rewrite handles it.
+                    if (string.Equals(hit, canonical, StringComparison.OrdinalIgnoreCase)) continue;
+                    // Never delete runtime pew paperdoll.
+                    string name = Path.GetFileName(hit);
+                    if (name.Equals("PaperDollSeatView.cs", StringComparison.OrdinalIgnoreCase)) continue;
+                    try
+                    {
+                        string rel = "Assets" + hit.Substring(assets.Length).Replace('\\', '/');
+                        Debug.LogWarning("[DemonKnight] Nuking stale Architect/PaperDoll editor: " + rel);
+                        if (!AssetDatabase.DeleteAsset(rel))
+                        {
+                            File.SetAttributes(hit, FileAttributes.Normal);
+                            File.Delete(hit);
+                            if (File.Exists(hit + ".meta")) File.Delete(hit + ".meta");
+                        }
+                        n++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning("[DemonKnight] Nuke editor failed: " + ex.Message);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] NukeStaleArchitectAndPaperDollEditors: " + ex.Message);
+        }
+        return n;
+    }
+
+    /// <summary>Disk proof for Diagnose — SpriteCategory / UiBuildId / PaperDoll remnant.</summary>
+    public static string ArchitectTipMarkersReport()
+    {
+        try
+        {
+            string path = Path.Combine(
+                Directory.GetParent(Application.dataPath)!.FullName,
+                "Assets", "Editor", "ArthurianArtArchitectWindow.cs");
+            if (!File.Exists(path))
+                return "Architect tip markers: SpriteCategory=NO UiBuildId=NO PaperDoll remnant=YES (file MISSING)";
+            string body = File.ReadAllText(path);
+            bool sprite = body.Contains("SpriteCategory") && body.Contains("enum ArchitectTab { Splicer, StagePlacer }");
+            bool ui = body.Contains("UiBuildId");
+            bool remnant = body.Contains("Paper-Doll Unit Generator")
+                           || body.Contains("enum SheetCategory")
+                           || body.Contains("DrawPaperDollTab")
+                           || body.Contains("Save as CharacterDefinition");
+            return $"Architect tip markers: SpriteCategory={(sprite ? "YES" : "NO")} UiBuildId={(ui ? "YES" : "NO")} PaperDoll remnant={(remnant ? "YES" : "NO")}";
+        }
+        catch (Exception ex)
+        {
+            return "Architect tip markers: ERROR " + ex.Message;
+        }
     }
 
     /// <summary>Close any open Architect windows so the next Open() uses the tip type.</summary>

@@ -5,6 +5,7 @@ using System.IO;
 using ArthurianAutobattler;
 using UnityEditor;
 using UnityEngine;
+#pragma warning disable CS0618 // TextureImporter.spritesheet — splice export still uses SpriteMetaData API
 
 /// <summary>
 /// Master Spec Phase 3 — Art &amp; Stage Architect.
@@ -15,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "architect-force-tip-ui";
+    public const string UiBuildId = "architect-disk-tip-proof";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";

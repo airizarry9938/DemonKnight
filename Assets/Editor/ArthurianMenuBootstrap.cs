@@ -152,6 +152,7 @@ public static class ArthurianMenuBootstrap
             + (packageStale
                 ? "\n⚠ STALE COMPILE — disk ≠ compiled. Run Arthurian → FORCE Upgrade Sync Hosts From main, wait for compile."
                 : "") + "\n" +
+            ArthurianSyncFromGitHub.ArchitectTipMarkersReport() + "\n" +
             $"Art Tools pin: {ArtToolsPinSha}\n" +
             $"Assets path:\n{Application.dataPath}\n" +
             $"Expected importer path:\n{modularImporterPath}\n" +
@@ -448,12 +449,13 @@ public static class ArthurianMenuBootstrap
             if (tip) return;
 
             Debug.LogWarning("[DemonKnight] Stale Art Architect on disk (paperdoll/multi-category) — force tip overwrite.");
-            // Prefer Sync host force path (raw tip/main).
+            ArthurianSyncFromGitHub.NukeStaleArchitectAndPaperDollEditors(projectRoot);
+            ArthurianSyncFromGitHub.CloseOpenArchitectWindows();
             var errors = new List<string>();
             int n = ArthurianSyncFromGitHub.ForceOverwriteSyncHostsFromMain(errors);
-            ArthurianSyncFromGitHub.CloseOpenArchitectWindows();
             AssetDatabase.Refresh();
             string after = File.Exists(dest) ? File.ReadAllText(dest) : "";
+            Debug.Log("[DemonKnight] " + ArthurianSyncFromGitHub.ArchitectTipMarkersReport());
             if (ArthurianSyncFromGitHub.IsTipArchitectBody(after))
                 Debug.Log($"[DemonKnight] Architect tip landed via host overwrite ({n} hosts). Re-open Art & Stage Architect.");
             else
@@ -900,9 +902,9 @@ public static class ArthurianMenuBootstrap
                     wc.Headers.Add("User-Agent", "DemonKnight-ForceUpgradeHosts/1.0");
                     wc.Headers.Add("Cache-Control", "no-cache, no-store");
                     string body = wc.DownloadString(url);
-                    if (!string.IsNullOrEmpty(body) && body.Length > 80
-                        && !body.Contains("404: Not Found")
-                        && !body.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase))
+                    // Do NOT body.Contains("404: Not Found") — Sync/Bootstrap source contains that
+                    // literal and would false-positive reject a good download.
+                    if (!ArthurianSyncFromGitHub.LooksLikeHttpFailureBody(body) && body.Length > 80)
                     {
                         // Reject stuck legacy package when tip CDN returns stale @main.
                         if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
@@ -1055,8 +1057,7 @@ public static class ArthurianMenuBootstrap
                 wc.Headers.Add("User-Agent", "DemonKnight-Phase25-Fetch/1.0");
                 wc.Headers.Add("Cache-Control", "no-cache, no-store");
                 string body = wc.DownloadString(url);
-                if (!string.IsNullOrEmpty(body) && body.Length > 40
-                    && body.IndexOf("404: Not Found", StringComparison.OrdinalIgnoreCase) < 0)
+                if (!ArthurianSyncFromGitHub.LooksLikeHttpFailureBody(body) && body.Length > 40)
                 {
                     source = url;
                     return body;
