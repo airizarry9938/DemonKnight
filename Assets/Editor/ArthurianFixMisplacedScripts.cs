@@ -73,6 +73,7 @@ public static class ArthurianFixMisplacedScripts
         Add("MenuListSortBar.cs", "Scripts/UI/MenuListSortBar.cs");
         Add("TownSplitUIController.cs", "Scripts/UI/TownSplitUIController.cs");
         Add("LegendCodexUI.cs", "Scripts/UI/LegendCodexUI.cs");
+        Add("SceneBackgroundApplier.cs", "Scripts/UI/SceneBackgroundApplier.cs");
 
         Add("GameLoopManager.cs", "Scripts/Systems/GameLoopManager.cs");
         Add("TownRNGGenerator.cs", "Scripts/Systems/TownRNGGenerator.cs");

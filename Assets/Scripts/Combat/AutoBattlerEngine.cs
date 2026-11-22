@@ -1175,10 +1175,10 @@ namespace ArthurianAutobattler
                     currentBattleNumber,
                     loop != null ? loop.soulsLostThisRun : 0);
                 // Liability / grudge Morgan unlock — use marched roster before disband.
-                var marched = new List<RecruitInstance>();
+                var marchedRoster = new List<RecruitInstance>();
                 if (loop?.recruitedParty != null)
-                    marched.AddRange(loop.recruitedParty);
-                unlockMgr?.NotifyWaveWonWithParty(marched, staged);
+                    marchedRoster.AddRange(loop.recruitedParty);
+                unlockMgr?.NotifyWaveWonWithParty(marchedRoster, staged);
                 unlockMgr?.MarkCursedDiceOwnedThisRun();
             }
 

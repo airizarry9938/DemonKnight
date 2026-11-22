@@ -20,13 +20,28 @@ namespace ArthurianAutobattler
         {
             get
             {
-                _cache ??= SceneBackgroundProfile.Load();
+                if (_cache == null)
+                {
+                    try { _cache = SceneBackgroundProfile.Load(); }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning("[DemonKnight] SceneBackgroundProfile.Load soft-fail: " + ex.Message);
+                        return null;
+                    }
+                }
                 return _cache;
             }
         }
 
         public static SceneBackgroundEntry Get(SceneBackgroundSlot slot)
-            => Profile?.GetEntry(slot);
+        {
+            try { return Profile?.GetEntry(slot); }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] SceneBackgroundApplier.Get soft-fail: " + ex.Message);
+                return null;
+            }
+        }
 
         /// <summary>Apply still sprite to a UI Image when the slot has an image assignment.</summary>
         public static bool ApplyToImage(SceneBackgroundSlot slot, Image target, bool preserveColor = true)
