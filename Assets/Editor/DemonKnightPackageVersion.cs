@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "legend-unlocks-meta";
-    public const string GitHint = "15-legend-meta-progression";
-    public const string BuiltUtc = "2026-11-22T11:52:54Z";
+    public const string Id = "hidden-potential-bloodline";
+    public const string GitHint = "5-tier-secret-archetypes-bloodline";
+    public const string BuiltUtc = "2026-11-22T12:08:58Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "1f51ac6a0ecc1eac3faa3a5086602c41292c5119";
+    public const string HardTipSha = "48652b365e77f2d015c04db430f314928daa7f5b";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -186,6 +186,7 @@ public static class DemonKnightPackageVersion
             "church-bg-pew-preview",
             "fix-seatshow-cs0436",
             "assign-only-pew-drag",
+            "legend-unlocks-meta",
         };
         foreach (string s in stale)
         {

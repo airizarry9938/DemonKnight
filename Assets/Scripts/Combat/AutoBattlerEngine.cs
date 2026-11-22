@@ -80,6 +80,7 @@ namespace ArthurianAutobattler
                     canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior
                 };
                 copy.isSirenEnchantress = r.isSirenEnchantress;
+                HiddenPotentialSystem.ApplyGrowthToClone(copy, r);
                 // Keep canonical slot for upkeep / next wave.
                 r.battleSlotIndex = slot;
                 combatRoster.Add(copy);
@@ -134,6 +135,14 @@ namespace ArthurianAutobattler
                         atk = Mathf.Max(1, Mathf.RoundToInt(atk * (1f + 0.15f * grudges)));
                 }
 
+                // IronLung: +20% max HP before combat.
+                int hp = r.maxHealth;
+                if (r.hiddenTraitId == HiddenPotentialSystem.TraitIronLung)
+                    hp = Mathf.Max(1, Mathf.RoundToInt(hp * 1.20f));
+                // Glutton: −10% ATK.
+                if (r.hiddenTraitId == HiddenPotentialSystem.TraitGlutton)
+                    atk = Mathf.Max(1, Mathf.RoundToInt(atk * 0.90f));
+
                 CombatUnit cu = new CombatUnit
                 {
                     unitID = r.unitID,
@@ -143,8 +152,8 @@ namespace ArthurianAutobattler
                     isDemon = false,
                     isSirenEnchantress = r.isSirenEnchantress,
                     primaryTrait = r.primaryTrait,
-                    maxHealth = r.maxHealth,
-                    currentHealth = r.maxHealth,
+                    maxHealth = hp,
+                    currentHealth = hp,
                     attackDamage = atk,
                     attacksPerSecond = aps,
                     battleSlotIndex = r.battleSlotIndex,
@@ -152,7 +161,12 @@ namespace ArthurianAutobattler
                                        || r.unitType == UnitType.SirTristan,
                     cannotBeHealed = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight),
                     maxHpDrainPerSecond = hellfire && (r.unitType == UnitType.Warrior || r.unitType == UnitType.Knight)
-                        ? r.maxHealth * 0.05f : 0f
+                        ? hp * 0.05f : 0f,
+                    hiddenTraitId = r.hiddenTraitId,
+                    secretArchetype = r.secretArchetype,
+                    traitAwakened = r.traitAwakened,
+                    martyrsWard = r.hiddenTraitId == HiddenPotentialSystem.TraitMartyrsWard,
+                    sleeperSpikeArmed = r.hiddenTraitId == HiddenPotentialSystem.TraitSleeperSpike
                 };
                 cu.ResetAttackCooldown();
                 playerArmy.Add(cu);
@@ -395,6 +409,75 @@ namespace ArthurianAutobattler
                     foe.attackDamage = Mathf.Max(1, Mathf.RoundToInt(foe.attackDamage * 0.85f));
                 }
             }
+
+            ApplyHiddenPotentialBattleStart();
+        }
+
+        /// <summary>Baptism by Fire + MythicVessel auras + MartyrsWard self-flag.</summary>
+        void ApplyHiddenPotentialBattleStart()
+        {
+            var loop = DemonKnightCompatApi.ResolveLoop() ?? GameLoopManager.Instance;
+            var party = loop?.recruitedParty;
+
+            foreach (var u in playerArmy)
+            {
+                if (u == null || !u.IsAlive || u.isDemon) continue;
+
+                if (!u.traitAwakened && !string.IsNullOrEmpty(u.hiddenTraitId))
+                {
+                    bool scouted = false;
+                    if (party != null)
+                    {
+                        foreach (var r in party)
+                        {
+                            if (r == null || r.unitID != u.unitID) continue;
+                            scouted = r.isScouted;
+                            if (!r.traitAwakened)
+                            {
+                                r.traitAwakened = true;
+                                LegendUnlockManager.Ensure()?.NotifyHiddenPotentialAwakened(r);
+                            }
+                            break;
+                        }
+                    }
+                    if (scouted || u.secretArchetype != SecretArchetype.Parishioner)
+                    {
+                        u.traitAwakened = true;
+                        BattlefieldVisualizer.Instance?.SpawnPopup(
+                            u, "AWAKENED!", new Color(1f, 0.85f, 0.2f));
+                    }
+                }
+
+                if (u.hiddenTraitId == HiddenPotentialSystem.TraitMartyrsWard)
+                    u.martyrsWard = true;
+            }
+
+            bool pendragon = playerArmy.Any(u =>
+                u != null && u.IsAlive && u.hiddenTraitId == HiddenPotentialSystem.TraitPendragonBlood);
+            bool grail = playerArmy.Any(u =>
+                u != null && u.IsAlive && u.hiddenTraitId == HiddenPotentialSystem.TraitGrailTouched);
+            bool fae = playerArmy.Any(u =>
+                u != null && u.IsAlive && u.hiddenTraitId == HiddenPotentialSystem.TraitFaeKissed);
+            if (!pendragon && !grail && !fae) return;
+
+            foreach (var ally in playerArmy.Where(a => a != null && a.IsAlive && !a.isDemon))
+            {
+                if (pendragon)
+                {
+                    ally.attackDamage = Mathf.Max(1, Mathf.RoundToInt(ally.attackDamage * 1.10f));
+                    BattlefieldVisualizer.Instance?.SpawnPopup(ally, "PENDRAGON!", new Color(1f, 0.75f, 0.2f));
+                }
+                if (grail)
+                {
+                    ally.shieldHealth += 15;
+                    BattlefieldVisualizer.Instance?.SpawnPopup(ally, "GRAIL!", new Color(0.6f, 0.9f, 1f));
+                }
+                if (fae)
+                {
+                    ally.attacksPerSecond = Mathf.Min(3f, ally.attacksPerSecond * 1.10f);
+                    BattlefieldVisualizer.Instance?.SpawnPopup(ally, "FAE!", new Color(0.85f, 0.6f, 1f));
+                }
+            }
         }
 
         int _combatTurnIndex;
@@ -591,10 +674,28 @@ namespace ArthurianAutobattler
 
         private void ExecuteUnitAction(CombatUnit attacker, List<CombatUnit> allies, List<CombatUnit> enemies)
         {
+            // Liability Coward: 20% chance to flinch and skip the attack.
+            if (!attacker.isDemon && attacker.hiddenTraitId == HiddenPotentialSystem.TraitCoward
+                && Random.value < 0.20f)
+            {
+                BattlefieldVisualizer.Instance?.SpawnPopup(attacker, "FLINCH!", new Color(0.7f, 0.7f, 0.7f));
+                return;
+            }
+
             int dmg = attacker.attackDamage;
             // Sir Gawain Morning Sun: +35% ATK first 3 combat turns (replaces old 8s double).
             if (attacker.unitType == UnitType.SirGawain && _combatTurnIndex < 3)
                 dmg = Mathf.Max(1, Mathf.RoundToInt(dmg * 1.35f));
+
+            // SleeperSpike: first 3 hits at 50%, then +40%.
+            if (!attacker.isDemon && attacker.hiddenTraitId == HiddenPotentialSystem.TraitSleeperSpike)
+            {
+                attacker.sleeperSpikeHits++;
+                if (attacker.sleeperSpikeHits <= 3)
+                    dmg = Mathf.Max(1, Mathf.RoundToInt(dmg * 0.50f));
+                else
+                    dmg = Mathf.Max(1, Mathf.RoundToInt(dmg * 1.40f));
+            }
 
             // When demons strike, `enemies` is already FRONT-only (until front is wiped).
             // When humans strike demons, pick among the living demon pool as given.
@@ -774,6 +875,27 @@ namespace ArthurianAutobattler
         {
             int finalDamage = rawDamage;
 
+            // Liability Turncoat: 12% chance to strike a random living ally instead.
+            if (attacker != null && !attacker.isDemon
+                && attacker.hiddenTraitId == HiddenPotentialSystem.TraitTurncoat
+                && Random.value < 0.12f)
+            {
+                var allyHit = playerArmy.Where(a => a != null && a.IsAlive && a != attacker).ToList();
+                if (allyHit.Count > 0)
+                {
+                    target = allyHit[Random.Range(0, allyHit.Count)];
+                    BattlefieldVisualizer.Instance?.SpawnPopup(attacker, "TURNCOAT!", new Color(1f, 0.3f, 0.3f));
+                }
+            }
+
+            // GiantSlayer: +50% vs bosses / elites.
+            if (attacker != null && !attacker.isDemon
+                && attacker.hiddenTraitId == HiddenPotentialSystem.TraitGiantSlayer
+                && target != null && IsEliteDemon(target))
+            {
+                finalDamage = Mathf.Max(1, Mathf.RoundToInt(finalDamage * 1.50f));
+            }
+
             if (target.unitType == UnitType.BossBlackKnight
                 && (attacker.unitType == UnitType.Peasant || attacker.unitType == UnitType.Warrior))
             {
@@ -849,7 +971,32 @@ namespace ArthurianAutobattler
                 ApplyLinePierceSplash(target, finalDamage);
             }
 
-            if (target.currentHealth <= 0) HandleUnitDeath(target);
+            // Glutton: heal 5% max HP when dealing damage.
+            if (attacker != null && !attacker.isDemon && attacker.IsAlive
+                && attacker.hiddenTraitId == HiddenPotentialSystem.TraitGlutton
+                && finalDamage > 0)
+            {
+                int heal = Mathf.Max(1, Mathf.RoundToInt(attacker.maxHealth * 0.05f));
+                attacker.currentHealth = Mathf.Min(attacker.maxHealth, attacker.currentHealth + heal);
+                BattlefieldVisualizer.Instance?.SpawnPopup(attacker, $"+{heal}", new Color(0.9f, 0.6f, 0.2f));
+            }
+
+            bool killed = target.currentHealth <= 0;
+            if (killed) HandleUnitDeath(target);
+
+            // TitheBearer: +5g on demon kill.
+            if (killed && attacker != null && !attacker.isDemon
+                && attacker.hiddenTraitId == HiddenPotentialSystem.TraitTitheBearer
+                && target != null && target.isDemon)
+            {
+                var town = Object.FindFirstObjectByType<TownSplitUIController>();
+                if (town != null)
+                {
+                    town.playerGold += 5;
+                    BattlefieldVisualizer.Instance?.SpawnPopup(attacker, "+5g TITHE", new Color(1f, 0.85f, 0.3f));
+                }
+            }
+
             return finalDamage;
         }
 

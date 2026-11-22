@@ -311,32 +311,58 @@ namespace ArthurianAutobattler
             {
                 foreach (var r in marchedOrParty)
                 {
-                    if (r != null && IsLiability(r.primaryTrait))
+                    if (r != null && IsLiabilityRecruit(r))
                     {
-                        Unlock("MorganLeFay", $"deployed Liability ({r.primaryTrait}) and won");
+                        Unlock("MorganLeFay", $"deployed Liability ({r.secretArchetype}/{r.hiddenTraitId}) and won");
                         break;
                     }
                 }
             }
         }
 
-        /// <summary>Liability = Coward / Turncoat(Outlaw) / Glutton(Drunkard).</summary>
+        /// <summary>Liability = Coward / Turncoat(Outlaw) / Glutton(Drunkard) or SecretArchetype.Liability.</summary>
         public static bool IsLiability(TraitTag trait) =>
             trait == TraitTag.Coward
             || trait == TraitTag.Outlaw
             || trait == TraitTag.Drunkard;
+
+        public static bool IsLiabilityRecruit(RecruitInstance r) =>
+            r != null && (r.secretArchetype == SecretArchetype.Liability
+                          || HiddenPotentialSystem.IsLiabilityTrait(r.hiddenTraitId)
+                          || IsLiability(r.primaryTrait));
+
+        public void NotifyHiddenPotentialAwakened(RecruitInstance r)
+        {
+            if (r == null) return;
+            HiddenPotentialSystem.MigrateLegacySpark(r);
+            if (r.secretArchetype == SecretArchetype.Darkhorse)
+                Unlock("SirPercival", $"awakened Darkhorse ({r.hiddenTraitId})");
+            if (r.secretArchetype == SecretArchetype.GoldenEgg)
+                Unlock("Merlin", $"awakened Golden Egg ({r.hiddenTraitId})");
+            // Legacy string-only path.
+            NotifyHiddenPotentialAwakened(r.hiddenTraitId);
+        }
 
         public void NotifyHiddenPotentialAwakened(string hiddenTraitId)
         {
             if (string.IsNullOrEmpty(hiddenTraitId)) return;
             if (string.Equals(hiddenTraitId, RecruitInstance.DarkhorseId, StringComparison.Ordinal)
                 || string.Equals(hiddenTraitId, RecruitInstance.LegendSparkId, StringComparison.Ordinal))
-            {
-                // Legend Spark counts as Darkhorse-class spark for Percival.
                 Unlock("SirPercival", $"awakened {hiddenTraitId}");
-            }
             if (string.Equals(hiddenTraitId, RecruitInstance.GoldenEggId, StringComparison.Ordinal))
                 Unlock("Merlin", "awakened Golden Egg");
+        }
+
+        public void NotifyHiddenPotentialAscended(RecruitInstance r)
+        {
+            if (r == null) return;
+            if (r.secretArchetype == SecretArchetype.Darkhorse)
+                Unlock("SirPercival", "ascended Darkhorse recruit");
+            if (r.secretArchetype == SecretArchetype.GoldenEgg)
+                Unlock("Merlin", "ascended Golden Egg");
+            if (r.hiddenTraitId == HiddenPotentialSystem.TraitGrailTouched
+                || string.Equals(r.hiddenTraitId, RecruitInstance.GrailTouchedId, StringComparison.Ordinal))
+                Unlock("Nimue", "ascended Grail-Touched soul");
         }
 
         public void NotifyFusionWithIngredients(UnitType productType, IList<RecruitInstance> ingredients)
@@ -356,13 +382,17 @@ namespace ArthurianAutobattler
             bool hadGrail = false;
             foreach (var ing in ingredients)
             {
-                if (ing == null || string.IsNullOrEmpty(ing.hiddenTraitId)) continue;
-                if (string.Equals(ing.hiddenTraitId, RecruitInstance.DarkhorseId, StringComparison.Ordinal)
+                if (ing == null) continue;
+                HiddenPotentialSystem.MigrateLegacySpark(ing);
+                if (ing.secretArchetype == SecretArchetype.Darkhorse
+                    || string.Equals(ing.hiddenTraitId, RecruitInstance.DarkhorseId, StringComparison.Ordinal)
                     || string.Equals(ing.hiddenTraitId, RecruitInstance.LegendSparkId, StringComparison.Ordinal))
                     hadDarkhorse = true;
-                if (string.Equals(ing.hiddenTraitId, RecruitInstance.GoldenEggId, StringComparison.Ordinal))
+                if (ing.secretArchetype == SecretArchetype.GoldenEgg
+                    || string.Equals(ing.hiddenTraitId, RecruitInstance.GoldenEggId, StringComparison.Ordinal))
                     hadGolden = true;
-                if (string.Equals(ing.hiddenTraitId, RecruitInstance.GrailTouchedId, StringComparison.Ordinal))
+                if (ing.hiddenTraitId == HiddenPotentialSystem.TraitGrailTouched
+                    || string.Equals(ing.hiddenTraitId, RecruitInstance.GrailTouchedId, StringComparison.Ordinal))
                     hadGrail = true;
             }
 

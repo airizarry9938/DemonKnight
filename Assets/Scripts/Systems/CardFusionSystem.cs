@@ -405,6 +405,7 @@ namespace ArthurianAutobattler
                 product.fusionIngredients.Add(CloneForFusionMemory(r));
 
             ApplyLegendSparkBonus(product, chosen);
+            HiddenPotentialSystem.InheritBloodline(product, chosen);
 
             party.Add(product);
             LegendUnlockManager.Ensure()?.NotifyFusionWithIngredients(product.unitType, chosen);
@@ -425,8 +426,12 @@ namespace ArthurianAutobattler
             int sparks = 0;
             foreach (var ing in ingredients)
             {
-                if (ing == null || string.IsNullOrEmpty(ing.hiddenTraitId)) continue;
-                if (string.Equals(ing.hiddenTraitId, RecruitInstance.LegendSparkId, System.StringComparison.Ordinal)
+                if (ing == null) continue;
+                HiddenPotentialSystem.MigrateLegacySpark(ing);
+                if (ing.secretArchetype == SecretArchetype.Darkhorse
+                    || ing.secretArchetype == SecretArchetype.GoldenEgg
+                    || ing.secretArchetype == SecretArchetype.MythicVessel
+                    || string.Equals(ing.hiddenTraitId, RecruitInstance.LegendSparkId, System.StringComparison.Ordinal)
                     || string.Equals(ing.hiddenTraitId, RecruitInstance.DarkhorseId, System.StringComparison.Ordinal)
                     || string.Equals(ing.hiddenTraitId, RecruitInstance.GoldenEggId, System.StringComparison.Ordinal))
                     sparks++;
@@ -436,7 +441,9 @@ namespace ArthurianAutobattler
             product.AddVeteranRank(1);
             product.maxHealth = Mathf.RoundToInt(product.maxHealth * 1.15f);
             product.attackDamage = Mathf.Max(1, Mathf.RoundToInt(product.attackDamage * 1.15f));
-            product.hiddenTraitId = RecruitInstance.DarkhorseId;
+            // Floor archetype to Darkhorse if spark bonus fires without a higher bloodline inherit.
+            if ((int)product.secretArchetype < (int)SecretArchetype.Darkhorse)
+                product.secretArchetype = SecretArchetype.Darkhorse;
             product.isScouted = true;
             product.intelTierUnlocked = Mathf.Max(product.intelTierUnlocked, 1);
             Debug.Log(
@@ -514,6 +521,14 @@ namespace ArthurianAutobattler
                 isDeployed = src.isDeployed,
                 isScouted = src.isScouted,
                 hiddenTraitId = src.hiddenTraitId,
+                secretArchetype = src.secretArchetype,
+                potentialMultiplier = src.potentialMultiplier,
+                traitAwakened = src.traitAwakened,
+                hasAscended = src.hasAscended,
+                wavesSurvived = src.wavesSurvived,
+                trainedHP = src.trainedHP,
+                trainedATK = src.trainedATK,
+                trainedSPD = src.trainedSPD,
                 hireCostForcedZero = src.hireCostForcedZero,
                 modularPoseId = src.modularPoseId,
                 modularOutfitId = src.modularOutfitId,

@@ -586,23 +586,33 @@ namespace ArthurianAutobattler
             if (survivingUnitIds == null || survivingUnitIds.Count == 0) return;
             if (recruitedParty == null) return;
             int awarded = 0;
+            bool mythicBanner = false;
             foreach (var r in recruitedParty)
             {
                 if (r == null || string.IsNullOrEmpty(r.unitID)) continue;
                 if (!survivingUnitIds.Contains(r.unitID)) continue;
                 r.AddVeteranRank(1);
                 awarded++;
+                if (HiddenPotentialSystem.TryAscendSurvivor(r))
+                    mythicBanner = true;
                 if (r.IsFusedLegend && r.fusionIngredients != null)
                 {
                     foreach (var leaf in r.fusionIngredients)
                     {
                         if (leaf == null) continue;
                         leaf.AddVeteranRank(1);
+                        if (HiddenPotentialSystem.TryAscendSurvivor(leaf))
+                            mythicBanner = true;
                     }
                 }
             }
+            if (mythicBanner)
+                lastMythicVesselAscensionBanner = true;
             Debug.Log($"[DemonKnight] WaveVictory veteranRank +1 on {awarded} canonical recruit(s).");
         }
+
+        /// <summary>Set when a MythicVessel ascends this wave — victory UI may append a banner line.</summary>
+        public bool lastMythicVesselAscensionBanner;
 
         /// <summary>Spec alias — same as <see cref="StartTownPhase"/>.</summary>
         public void StartTownRecruitPhase() => StartTownPhase();

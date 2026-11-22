@@ -97,8 +97,6 @@ namespace ArthurianAutobattler
                 randomAvatar = (pool != null && pool.Count > 0) ? pool[Random.Range(0, pool.Count)] : null,
                 intelTierUnlocked = unlockTier1 ? 1 : 0,
                 isSirenEnchantress = lustSiren,
-                // Hidden Potential: ~14% of pew souls carry Darkhorse / Golden Egg / Grail-Touched.
-                hiddenTraitId = RollHiddenPotential(),
                 appearance = TownsfolkAppearance.Generate(type, persistentID, pewSeat, lib)
             };
             // Master Spec Phase 1: base units never carry fusion memory.
@@ -182,6 +180,9 @@ namespace ArthurianAutobattler
             r.hatedTrait = RollSecondaryTrait(r.primaryTrait);
             r.lovedTrait = RollSecondaryTrait(r.primaryTrait);
 
+            // 5-tier Hidden Potential after base traits (Liability may retarget primaryTrait).
+            HiddenPotentialSystem.RollOnto(r);
+
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID)
                 : 0;
@@ -242,19 +243,6 @@ namespace ArthurianAutobattler
             else r.moodOverlaySprite = null;
         }
 
-        /// <summary>
-        /// Hidden Potential roll for legend unlocks (Darkhorse / Golden Egg / Grail-Touched).
-        /// ~14% of recruits; weights favor Darkhorse.
-        /// </summary>
-        static string RollHiddenPotential()
-        {
-            if (Random.value >= 0.14f) return null;
-            float r = Random.value;
-            if (r < 0.45f) return RecruitInstance.DarkhorseId;
-            if (r < 0.75f) return RecruitInstance.GoldenEggId;
-            if (r < 0.92f) return RecruitInstance.GrailTouchedId;
-            return RecruitInstance.LegendSparkId;
-        }
 
         private TraitTag RollPrimaryTrait()
         {

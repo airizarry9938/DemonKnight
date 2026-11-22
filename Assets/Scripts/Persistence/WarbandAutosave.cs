@@ -41,6 +41,14 @@ namespace ArthurianAutobattler
         public bool isDeployed = true;
         public bool isScouted;
         public string hiddenTraitId;
+        public int secretArchetype;
+        public float potentialMultiplier = 1f;
+        public bool traitAwakened;
+        public bool hasAscended;
+        public int wavesSurvived;
+        public int trainedHP;
+        public int trainedATK;
+        public int trainedSPD;
         public string modularPoseId;
         public string modularOutfitId;
         public string modularHeadId;
@@ -244,6 +252,16 @@ namespace ArthurianAutobattler
             dest.isDeployed = src.isDeployed;
             dest.isScouted = dest.isScouted || src.isScouted;
             if (!string.IsNullOrEmpty(src.hiddenTraitId)) dest.hiddenTraitId = src.hiddenTraitId;
+            if (src.potentialMultiplier > dest.potentialMultiplier)
+                dest.potentialMultiplier = src.potentialMultiplier;
+            if ((int)src.secretArchetype > (int)dest.secretArchetype)
+                dest.secretArchetype = src.secretArchetype;
+            dest.traitAwakened = dest.traitAwakened || src.traitAwakened;
+            dest.hasAscended = dest.hasAscended || src.hasAscended;
+            dest.wavesSurvived = Mathf.Max(dest.wavesSurvived, src.wavesSurvived);
+            dest.trainedHP = Mathf.Max(dest.trainedHP, src.trainedHP);
+            dest.trainedATK = Mathf.Max(dest.trainedATK, src.trainedATK);
+            dest.trainedSPD = Mathf.Max(dest.trainedSPD, src.trainedSPD);
             if (!string.IsNullOrEmpty(src.modularPoseId)) dest.modularPoseId = src.modularPoseId;
             if (!string.IsNullOrEmpty(src.modularOutfitId)) dest.modularOutfitId = src.modularOutfitId;
             if (!string.IsNullOrEmpty(src.modularHeadId)) dest.modularHeadId = src.modularHeadId;
@@ -370,6 +388,14 @@ namespace ArthurianAutobattler
                 isDeployed = r.isDeployed,
                 isScouted = r.isScouted,
                 hiddenTraitId = r.hiddenTraitId ?? "",
+                secretArchetype = (int)r.secretArchetype,
+                potentialMultiplier = r.potentialMultiplier,
+                traitAwakened = r.traitAwakened,
+                hasAscended = r.hasAscended,
+                wavesSurvived = r.wavesSurvived,
+                trainedHP = r.trainedHP,
+                trainedATK = r.trainedATK,
+                trainedSPD = r.trainedSPD,
                 modularPoseId = r.modularPoseId ?? "",
                 modularOutfitId = r.modularOutfitId ?? "",
                 modularHeadId = r.modularHeadId ?? "",
@@ -438,6 +464,14 @@ namespace ArthurianAutobattler
                 isDeployed = !s.hasDeployFlag || s.isDeployed,
                 isScouted = s.isScouted || s.intelTierUnlocked >= 1,
                 hiddenTraitId = s.hiddenTraitId,
+                secretArchetype = (SecretArchetype)s.secretArchetype,
+                potentialMultiplier = s.potentialMultiplier > 0.01f ? s.potentialMultiplier : 1f,
+                traitAwakened = s.traitAwakened,
+                hasAscended = s.hasAscended,
+                wavesSurvived = s.wavesSurvived,
+                trainedHP = s.trainedHP,
+                trainedATK = s.trainedATK,
+                trainedSPD = s.trainedSPD,
                 modularPoseId = s.modularPoseId,
                 modularOutfitId = s.modularOutfitId,
                 modularHeadId = s.modularHeadId,
@@ -448,6 +482,7 @@ namespace ArthurianAutobattler
             };
             CardFusionSystem.SanitizeBaseUnitFusionFlags(r);
             r.SyncVeteranRankFields();
+            HiddenPotentialSystem.MigrateLegacySpark(r);
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(r.unitID) : 0;
             r.RefreshBodyPostureFromTraits(grudge);
