@@ -31,7 +31,7 @@ public static class ArthurianSyncFromGitHub
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "65af3385fa3033e4dde41b09129feb4eb0c508cb";
+    public const string HardTipCommitSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
 
     private const string ExpectedPackageId = "legends-fullwidth-column";
 
