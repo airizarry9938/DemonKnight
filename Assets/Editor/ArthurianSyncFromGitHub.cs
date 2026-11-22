@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "1f51ac6a0ecc1eac3faa3a5086602c41292c5119";
 
-    private const string ExpectedPackageId = "architect-persist-scene-bg";
+    private const string ExpectedPackageId = "fix-scene-bg-applier-cs0103";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -54,6 +54,7 @@ public static class ArthurianSyncFromGitHub
         "assign-only-pew-drag",
         "legend-unlocks-meta",
         "hidden-potential-bloodline",
+        "architect-persist-scene-bg",
         "assign-only-runtime",
         "sync-keep-editor-menus",
     };
@@ -124,6 +125,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/DemonKnightTipEscape.cs",
         // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
+        // SceneBackgroundApplier MUST land before Battle/UI/Merlin consumers (Force Delete race).
+        "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
         "Assets/Scripts/Systems/GameLoopManager.cs",
@@ -155,7 +158,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/TownRNGGenerator.cs",
         "Assets/Scripts/Systems/HiddenPotentialSystem.cs",
         "Assets/Scripts/UI/SomersetPewLayout.cs",
-        "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ChurchPewLayout.cs",
         "Assets/Scripts/UI/MainMenuUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
@@ -185,6 +187,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
         // Phase 2–5 types embedded in hosts below — no standalone downloads.
         "Assets/Scripts/Data/GameDataTypes.cs",
+        "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
@@ -216,6 +219,8 @@ public static class ArthurianSyncFromGitHub
     private static readonly string[] MustRestoreUiHelpers =
     {
         "Assets/Scripts/Data/GameDataTypes.cs",
+        // SceneBackgroundApplier before LegendCodex/MainMenu/Church consumers (CS0103 Force Delete race).
+        "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // Embed hosts (DA-59 — Phase 2–5 types live here).
@@ -1223,7 +1228,18 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ModularSpriteLibrary")
                    && body.Contains("previewOrOverrideSprite")
                    && body.Contains("assignedCharacterId")
-                   && body.Contains("ChurchPewCount = 52");
+                   && body.Contains("ChurchPewCount = 52")
+                   && body.Contains("class SceneBackgroundProfile")
+                   && body.Contains("enum SceneBackgroundSlot");
+        }
+
+        if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class SceneBackgroundApplier")
+                   && body.Contains("ApplyToUiHost")
+                   && body.Contains("ApplyToSpriteRenderer")
+                   && body.Contains("InvalidateCache")
+                   && body.Contains("SceneBackgroundProfile");
         }
 
         // Phase 2–5 standalones are NOT synced — reject any download that would redefine embeds.
