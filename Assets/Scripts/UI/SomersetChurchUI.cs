@@ -1826,10 +1826,8 @@ namespace ArthurianAutobattler
                     {
                         btn.onClick.RemoveAllListeners();
                         btn.interactable = recruit != null;
-                        var colors = btn.colors;
-                        colors.highlightedColor = new Color(0.95f, 0.9f, 0.55f, 1f);
-                        colors.selectedColor = new Color(0.85f, 0.78f, 0.4f, 1f);
-                        btn.colors = colors;
+                        // Outline highlight owns hover chrome — no ColorTint wash over avatar art.
+                        btn.transition = Selectable.Transition.None;
                         if (recruit != null)
                         {
                             RecruitInstance leftClick = recruit;
