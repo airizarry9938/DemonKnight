@@ -946,7 +946,7 @@ namespace ArthurianAutobattler
 
             Transform recipeList = FindCodexRecipeList(codexModal.transform);
             if (recipeList != null)
-                ApplyTwoColumnCodexLayout(recipeList);
+                ApplyFullWidthColumnCodexLayout(recipeList);
 
             EnsureModalChromeButton(codexModal.transform, "CodexCloseX", "X",
                 new Vector2(0f, 0f), new Vector2(48f, 48f),
@@ -1042,8 +1042,11 @@ namespace ArthurianAutobattler
             scroll.scrollSensitivity = 40f;
         }
 
-        /// <summary>Legends (Codex) recipes in two wide columns so names/recipes aren't truncated.</summary>
-        public static void ApplyTwoColumnCodexLayout(Transform recipeList)
+        /// <summary>
+        /// Legends (Codex): one vertical column; each hero/fusion row spans the
+        /// full usable scroll width (Andrew: not a multi-column grid / left strip).
+        /// </summary>
+        public static void ApplyFullWidthColumnCodexLayout(Transform recipeList)
         {
             if (recipeList == null) return;
 
@@ -1055,7 +1058,6 @@ namespace ArthurianAutobattler
             var grid = recipeList.GetComponent<GridLayoutGroup>();
             if (grid == null) grid = recipeList.gameObject.AddComponent<GridLayoutGroup>();
 
-            // Fill the Codex scroll width: two columns share available space.
             float available = 1280f;
             var parentRt = recipeList.parent as RectTransform;
             if (parentRt != null && parentRt.rect.width > 80f)
@@ -1063,20 +1065,20 @@ namespace ArthurianAutobattler
             else if (recipeList is RectTransform selfRt && selfRt.rect.width > 80f)
                 available = selfRt.rect.width;
 
-            const float spacingX = 20f;
             const float padTotalX = 28f;
-            float cellW = Mathf.Floor((available - spacingX - padTotalX) / 2f);
-            cellW = Mathf.Clamp(cellW, 560f, 760f);
-            float cellH = 156f;
+            float cellW = Mathf.Floor(available - padTotalX);
+            cellW = Mathf.Max(cellW, 720f);
+            // Tall enough for name + recipe + lore/riddle/passive on one full-width row.
+            float cellH = 172f;
 
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = 2;
+            grid.constraintCount = 1;
             grid.cellSize = new Vector2(cellW, cellH);
-            grid.spacing = new Vector2(spacingX, 18f);
-            grid.padding = new RectOffset(14, 14, 12, 12);
+            grid.spacing = new Vector2(0f, 14f);
+            grid.padding = new RectOffset(14, 14, 10, 12);
             grid.childAlignment = TextAnchor.UpperCenter;
             grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-            grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+            grid.startAxis = GridLayoutGroup.Axis.Vertical;
             grid.enabled = true;
 
             var fitter = recipeList.GetComponent<ContentSizeFitter>();
@@ -1085,6 +1087,10 @@ namespace ArthurianAutobattler
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.enabled = true;
         }
+
+        /// <summary>Compat alias — Force Sync / older CompatApi still call this name.</summary>
+        public static void ApplyTwoColumnCodexLayout(Transform recipeList)
+            => ApplyFullWidthColumnCodexLayout(recipeList);
 
         /// <summary>Strip other LayoutGroups so GridLayoutGroup can be added same frame.</summary>
         private static void RemoveConflictingLayoutGroups(GameObject go)

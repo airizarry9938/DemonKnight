@@ -157,12 +157,18 @@ namespace ArthurianAutobattler
             Debug.LogWarning("[DemonKnight] EnsureCodexScrollViewport missing — Sync SomersetChurchUI.cs.");
         }
 
-        public static void ApplyTwoColumnCodexLayout(Transform recipeList)
+        public static void ApplyFullWidthColumnCodexLayout(Transform recipeList)
         {
             if (recipeList == null) return;
+            if (TryInvokeStatic(typeof(SomersetChurchUI), "ApplyFullWidthColumnCodexLayout", recipeList)) return;
+            // Older church builds only had the two-column name (now an alias).
             if (TryInvokeStatic(typeof(SomersetChurchUI), "ApplyTwoColumnCodexLayout", recipeList)) return;
-            Debug.LogWarning("[DemonKnight] ApplyTwoColumnCodexLayout missing — Sync SomersetChurchUI.cs.");
+            Debug.LogWarning("[DemonKnight] ApplyFullWidthColumnCodexLayout missing — Sync SomersetChurchUI.cs.");
         }
+
+        /// <summary>Compat alias — older callers / Sync hosts.</summary>
+        public static void ApplyTwoColumnCodexLayout(Transform recipeList)
+            => ApplyFullWidthColumnCodexLayout(recipeList);
 
         public static void UpdateWarbandHudLabel(Component church = null)
         {

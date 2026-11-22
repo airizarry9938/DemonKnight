@@ -89,7 +89,7 @@ namespace ArthurianAutobattler
 
             if (codexPanel != null)
                 DemonKnightCompatApi.EnsureCodexScrollViewport(codexPanel.transform);
-            DemonKnightCompatApi.ApplyTwoColumnCodexLayout(recipeListContainer);
+            DemonKnightCompatApi.ApplyFullWidthColumnCodexLayout(recipeListContainer);
 
             EnsureLegendsSortBar();
 
@@ -116,18 +116,20 @@ namespace ArthurianAutobattler
 
                 var le = row.GetComponent<LayoutElement>();
                 if (le == null) le = row.AddComponent<LayoutElement>();
-                float cellW = 560f;
-                float cellH = 156f;
+                // Full-width single column — row spans the Codex scroll usable width.
+                float cellW = 960f;
+                float cellH = 172f;
                 var grid = recipeListContainer.GetComponent<GridLayoutGroup>();
                 if (grid != null)
                 {
-                    cellW = Mathf.Max(560f, grid.cellSize.x);
-                    cellH = Mathf.Max(148f, grid.cellSize.y);
+                    cellW = Mathf.Max(720f, grid.cellSize.x);
+                    cellH = Mathf.Max(160f, grid.cellSize.y);
                 }
-                le.minHeight = cellH - 16f;
+                le.minHeight = cellH - 12f;
                 le.preferredHeight = cellH;
-                le.minWidth = cellW - 40f;
+                le.minWidth = cellW - 24f;
                 le.preferredWidth = cellW;
+                le.flexibleWidth = 1f;
 
                 TextMeshProUGUI[] texts = row.GetComponentsInChildren<TextMeshProUGUI>();
                 Button fuseBtn = row.GetComponentInChildren<Button>();
@@ -406,7 +408,8 @@ namespace ArthurianAutobattler
             var go = new GameObject("CodexRow", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
             go.transform.SetParent(parent, false);
             go.GetComponent<Image>().color = new Color(0.12f, 0.14f, 0.18f, 0.95f);
-            go.GetComponent<LayoutElement>().preferredHeight = 110f;
+            go.GetComponent<LayoutElement>().preferredHeight = 172f;
+            go.GetComponent<LayoutElement>().flexibleWidth = 1f;
 
             var portraitGo = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
             portraitGo.transform.SetParent(go.transform, false);
