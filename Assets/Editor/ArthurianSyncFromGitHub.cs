@@ -23,7 +23,7 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    private const string FallbackCommitSha = "b65683d41b7c56eb865710b5804cfa58e4267ea0";
+    private const string FallbackCommitSha = "40396ee240461d4979506432c98e293397ceba42";
 
     private const string ExpectedPackageId = "single-sprite-no-paperdoll";
 

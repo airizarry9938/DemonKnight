@@ -20,14 +20,14 @@ public static class ArthurianMenuBootstrap
     /// Package tip with Modular/Battle importers + Art Tools.
     /// Update when shipping a new Sync pin (Force Sync prefers this over main).
     /// </summary>
-    public const string ArtToolsPinSha = "b65683d41b7c56eb865710b5804cfa58e4267ea0";
+    public const string ArtToolsPinSha = "40396ee240461d4979506432c98e293397ceba42";
 
     /// <summary>
     /// Hard pin for Phase 2–5 editor helpers (absolute raw URLs). Updated each ship.
     /// Standalone ModularSpriteLibrary / StageLayout / Dice / Anim / Parallax are NEVER
     /// downloaded — types live in embeds; leftover standalones are deleted (CS0101).
     /// </summary>
-    public const string Phase25FetchPinSha = "b65683d41b7c56eb865710b5804cfa58e4267ea0";
+    public const string Phase25FetchPinSha = "40396ee240461d4979506432c98e293397ceba42";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
