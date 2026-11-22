@@ -20,14 +20,14 @@ public static class ArthurianMenuBootstrap
     /// Package tip with Modular/Battle importers + Art Tools.
     /// Update when shipping a new Sync pin (Force Sync prefers this over main).
     /// </summary>
-    public const string ArtToolsPinSha = "9c3426178b2fe758a7a424502f7b4576d336af4f";
+    public const string ArtToolsPinSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
 
     /// <summary>
     /// Hard pin for Phase 2–5 editor helpers (absolute raw URLs). Updated each ship.
     /// Standalone ModularSpriteLibrary / StageLayout / Dice / Anim / Parallax are NEVER
     /// downloaded — types live in embeds; leftover standalones are deleted (CS0101).
     /// </summary>
-    public const string Phase25FetchPinSha = "9c3426178b2fe758a7a424502f7b4576d336af4f";
+    public const string Phase25FetchPinSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -773,7 +773,7 @@ public static class ArthurianMenuBootstrap
     /// Known-good tip with LooksLikeHttpFailureBody + OnLoad PackageVersion (≥500B).
     /// Update when shipping break-glass tips. Used when Sync tip-resolve is stuck.
     /// </summary>
-    public const string BreakGlassTipSha = "5ca91be93a08bf24ece8a800d3b506a373ba0679";
+    public const string BreakGlassTipSha = "6e31cd9d28444881bbcbdcd3676720e4fd61ddd6";
 
     /// <summary>
     /// Lives in MenuBootstrap so skip-self Sync hosts still get a one-click upgrade.
