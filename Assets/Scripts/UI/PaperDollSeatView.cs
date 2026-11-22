@@ -76,7 +76,7 @@ namespace ArthurianAutobattler
                     $"[DemonKnight] First pew Bind '{recruit.characterName}' (single-sprite): " +
                     $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
                     $"body={bodyName} outfit={outfitName} head={headName} " +
-                    "(outfit/head must be NULL — tip spliced-sprite-pews; body from Spliced/Sprite)");
+                    "(outfit/head must be NULL — tip spliced-sprite-escape; body from Spliced/Sprite)");
             }
 
             if (moodLayer != null)
@@ -375,8 +375,8 @@ namespace ArthurianAutobattler
         bool playingReveal;
         Coroutine proceduralRoutine;
 
-        SpriteAnimClip poseClip, outfitClip, headClip, weaponClip;
-        bool poseMulti, outfitMulti, headMulti, weaponMulti;
+        SpriteAnimClip poseClip;
+        bool poseMulti;
 
         public static ModularSpriteAnimator EnsureOn(GameObject go)
         {
@@ -587,13 +587,7 @@ namespace ArthurianAutobattler
         {
             // Architect registers clips under category "Sprite"; accept legacy "Pose".
             poseClip = FindSpriteClip(SpriteAnimClip.Idle);
-            outfitClip = null;
-            headClip = null;
-            weaponClip = null;
             poseMulti = poseClip != null && poseClip.FrameCount > 1;
-            outfitMulti = false;
-            headMulti = false;
-            weaponMulti = false;
         }
 
         SpriteAnimClip FindSpriteClip(string clipName)
@@ -851,3 +845,105 @@ namespace ArthurianAutobattler
     }
 
 }
+
+#if UNITY_EDITOR
+/// <summary>
+/// Force Sync lands tip PaperDoll even when HardTip keeps stale Sync hosts.
+/// OnLoad pulls DemonKnightTipEscape + PackageVersion from raw@main when still breakglass.
+/// </summary>
+static class DemonKnightPaperDollTipEscapeHook
+{
+    [UnityEditor.InitializeOnLoadMethod]
+    static void Hook()
+    {
+        UnityEditor.EditorApplication.delayCall += () =>
+        {
+            if (UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
+            try
+            {
+                var tipEscape = System.Type.GetType("DemonKnightTipEscape")
+                                ?? System.Type.GetType("DemonKnightTipEscape, Assembly-CSharp-Editor");
+                if (tipEscape != null)
+                {
+                    var needs = tipEscape.GetMethod("NeedsEscape",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                    var escape = tipEscape.GetMethod("EscapeNow",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                    if (needs != null && escape != null && (bool)needs.Invoke(null, null))
+                    {
+                        UnityEngine.Debug.LogWarning(
+                            "[DemonKnight] PaperDoll tip hook: TipEscape.NeedsEscape — pulling tip hosts.");
+                        escape.Invoke(null, new object[] { false });
+                    }
+                    return;
+                }
+
+                // TipEscape.cs not on disk yet — fetch it + PackageVersion from raw@main.
+                string root = System.IO.Directory.GetParent(UnityEngine.Application.dataPath)!.FullName;
+                string pv = System.IO.Path.Combine(root, "Assets", "Editor", "DemonKnightPackageVersion.cs");
+                string diskId = "";
+                if (System.IO.File.Exists(pv))
+                {
+                    string t = System.IO.File.ReadAllText(pv);
+                    int i = t.IndexOf("public const string Id", System.StringComparison.Ordinal);
+                    int q1 = i >= 0 ? t.IndexOf('"', i) : -1;
+                    int q2 = q1 >= 0 ? t.IndexOf('"', q1 + 1) : -1;
+                    if (q1 >= 0 && q2 > q1) diskId = t.Substring(q1 + 1, q2 - q1 - 1);
+                }
+                if (diskId == "spliced-sprite-escape") return;
+                if (diskId != "architect-breakglass-hosts"
+                    && diskId != "architect-disk-tip-proof"
+                    && diskId != "single-sprite-auto-wipe"
+                    && diskId != "spliced-sprite-pews"
+                    && !string.IsNullOrEmpty(diskId)
+                    && diskId.IndexOf("architect-", System.StringComparison.Ordinal) < 0)
+                    return;
+
+                UnityEngine.Debug.LogWarning(
+                    "[DemonKnight] PaperDoll tip hook: fetching TipEscape+PackageVersion from main (disk Id="
+                    + diskId + ").");
+                System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12;
+                string[] rels =
+                {
+                    "Assets/Editor/DemonKnightTipEscape.cs",
+                    "Assets/Editor/DemonKnightPackageVersion.cs",
+                };
+                foreach (string rel in rels)
+                {
+                    try
+                    {
+                        string bust = "t=" + System.DateTime.UtcNow.Ticks;
+                        string url = "https://raw.githubusercontent.com/airizarry9938/DemonKnight/main/"
+                                     + rel + "?" + bust;
+                        using var wc = new System.Net.WebClient();
+                        wc.Headers.Add("User-Agent", "DemonKnight-PaperDollTipHook");
+                        string body = wc.DownloadString(url);
+                        if (string.IsNullOrEmpty(body) || body.Length < 80) continue;
+                        if (rel.EndsWith("PackageVersion.cs")
+                            && body.IndexOf("spliced-sprite-escape", System.StringComparison.Ordinal) < 0)
+                            continue;
+                        string dest = System.IO.Path.Combine(root, rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);
+                        if (System.IO.File.Exists(dest))
+                        {
+                            try { System.IO.File.SetAttributes(dest, System.IO.FileAttributes.Normal); } catch { }
+                            try { System.IO.File.Delete(dest); } catch { }
+                        }
+                        System.IO.File.WriteAllText(dest, body);
+                        UnityEngine.Debug.Log("[DemonKnight] PaperDoll tip hook wrote " + rel + " (" + body.Length + " B)");
+                    }
+                    catch (System.Exception ex)
+                    {
+                        UnityEngine.Debug.LogWarning("[DemonKnight] PaperDoll tip hook miss " + rel + ": " + ex.Message);
+                    }
+                }
+                UnityEditor.AssetDatabase.Refresh();
+            }
+            catch (System.Exception ex)
+            {
+                UnityEngine.Debug.LogWarning("[DemonKnight] PaperDoll tip hook: " + ex.Message);
+            }
+        };
+    }
+}
+#endif

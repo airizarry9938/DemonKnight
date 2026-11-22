@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "85b4696b1046d7184db7b5c83637f884426cb96f";
 
-    private const string ExpectedPackageId = "spliced-sprite-pews";
+    private const string ExpectedPackageId = "spliced-sprite-escape";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -44,19 +44,22 @@ public static class ArthurianSyncFromGitHub
         "runtime-single-sprite",
         "single-sprite-play-wipe",
         "single-sprite-auto-wipe",
+        "spliced-sprite-pews",
         "sync-keep-editor-menus",
     };
 
     /// <summary>
     /// Always overwrite from tip/main — never skip-self, never Fallback pin.
-    /// Includes Art Architect so ValidateCritical / mid-sync stale IL cannot leave paperdoll UI.
+    /// TipEscape FIRST so even partial FORCE lands the escape hatch.
     /// </summary>
     public static readonly string[] SyncHostForceOverwritePaths =
     {
+        "Assets/Editor/DemonKnightTipEscape.cs",
+        "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
-        "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
+        "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
     };
 
     /// <summary>
@@ -109,6 +112,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
+        "Assets/Editor/DemonKnightTipEscape.cs",
         // Types + helpers BEFORE any UI that references them (CS0103 / CS0246).
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
@@ -255,35 +259,31 @@ public static class ArthurianSyncFromGitHub
     /// Never uses FallbackCommitSha (that re-landed sync-keep-editor-menus forever when tip CDN 404'd).
     /// No skip-self. Minimal sanity — no ExpectedPackageId gate.
     /// </summary>
-    /// <summary>Invoked by MenuBootstrap menu (single MenuItem — avoids duplicate Arthurian entries).</summary>
+    /// <summary>
+    /// Invoked by older MenuBootstrap FORCE menus. NEVER HardTip — TipEscape tip/main only.
+    /// </summary>
     public static void ForceUpgradeSyncHostsMenu()
     {
         if (!EditorUtility.DisplayDialog(
-                "FORCE Upgrade Sync Hosts",
-                "Overwrite from raw.githubusercontent.com …/main (cache-busted):\n\n"
-                + "• ArthurianSyncFromGitHub.cs\n"
-                + "• ArthurianMenuBootstrap.cs\n"
-                + "• DemonKnightPackageVersion.cs\n\n"
-                + "Use when Diagnose is stuck on sync-keep-editor-menus / sync-skip-self.\n"
-                + "After compile, Diagnose must show: " + ExpectedPackageId,
-                "Overwrite Now", "Cancel"))
+                "FORCE Upgrade → Tip Escape",
+                "Pull tip hosts from GitHub main (never HardTip).\n"
+                + "Diagnose after compile: " + ExpectedPackageId + " (compiled=disk).",
+                "Escape Now", "Cancel"))
             return;
 
+        string report = DemonKnightTipEscape.EscapeNow(force: true);
+        // Also overwrite SyncHost paths via tip/main DownloadRawMainOnly (no HardTip).
         var errors = new List<string>();
         int n = ForceOverwriteSyncHostsFromMain(errors);
         AssetDatabase.Refresh();
         string diskId = ReadPackageIdFromDisk() ?? "(unread)";
         EditorUtility.DisplayDialog(
-            n >= SyncHostForceOverwritePaths.Length ? "Sync Hosts Upgraded" : "Sync Hosts Partial",
-            $"Wrote {n}/{SyncHostForceOverwritePaths.Length} hosts from raw @main "
-            + "(Sync / Bootstrap / PackageVersion / Art Architect).\n"
-            + $"Package Id on disk now: {diskId}\n"
-            + $"Expected after compile: {ExpectedPackageId}\n\n"
-            + "1) Wait for compile spinner.\n"
-            + "2) Arthurian → Diagnose Project — must show that package id.\n"
-            + "3) Open Art & Stage Architect — title must show " + ExpectedPackageId + ".\n"
-            + "4) Then Force Delete+Sync ALL Scripts if still incomplete.\n"
-            + (errors.Count > 0 ? "\nFailures:\n" + string.Join("\n", errors) : ""),
+            "Tip Escape",
+            report + "\n\nHost overwrite ok=" + n + "/" + SyncHostForceOverwritePaths.Length
+            + "\nPackage Id on disk: " + diskId
+            + "\nExpected: " + ExpectedPackageId
+            + "\nWait compile → Diagnose (compiled must equal disk)."
+            + (errors.Count > 0 ? "\n\nFailures:\n" + string.Join("\n", errors) : ""),
             "OK");
     }
 

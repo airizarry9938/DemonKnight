@@ -54,6 +54,21 @@ public static class ArthurianMenuBootstrap
     [MenuItem("Arthurian/Diagnose Project", false, 1)]
     public static void DiagnoseProject()
     {
+        // Auto-escape if still on breakglass / disk-tip-proof before reporting.
+        try
+        {
+            if (DemonKnightTipEscape.NeedsEscape())
+            {
+                Debug.LogWarning("[DemonKnight] Diagnose: hosts stale — TipEscape now.");
+                DemonKnightTipEscape.EscapeNow(force: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] Diagnose TipEscape skip: " + ex.Message);
+            try { EscapeHostsFromMainFallback(ex.Message); } catch { /* ignore */ }
+        }
+
         bool hasTmp = Type.GetType("TMPro.TextMeshProUGUI, Unity.TextMeshPro") != null
                       || Type.GetType("TMPro.TextMeshProUGUI, Unity.ugui") != null;
 
@@ -840,38 +855,115 @@ public static class ArthurianMenuBootstrap
     [MenuItem("Arthurian/FORCE Upgrade Sync Hosts From main", false, 2)]
     public static void ForceUpgradeSyncHostsFromMain()
     {
-        if (NeedsBreakGlassHostPull())
-        {
-            if (!EditorUtility.DisplayDialog(
-                    "FORCE Upgrade (Break-Glass)",
-                    "Local Sync/PackageVersion looks stuck (tiny PackageVersion or old 404 check).\n\n"
-                    + "Will download Sync / Bootstrap / PackageVersion / Architect from hard tip SHA:\n"
-                    + BreakGlassTipSha + "\n(+ raw@main fallback).\n\n"
-                    + "Does NOT use stale Sync tip-resolve.",
-                    "Break-Glass Now", "Cancel"))
-                return;
-            string report = BreakGlassForceHostsFromHardTip();
-            EditorUtility.DisplayDialog("Break-Glass Hosts", report, "OK");
+        // NEVER call Sync.ForceUpgradeSyncHostsMenu — breakglass Sync is HardTip-first and
+        // re-lands architect-breakglass-hosts / architect-disk-tip-proof forever.
+        // Always TipEscape: API tip + raw@main only.
+        if (!EditorUtility.DisplayDialog(
+                "FORCE Upgrade → Tip Escape",
+                "Pull PackageVersion / Sync / Bootstrap / Architect / TipEscape / PaperDoll\n"
+                + "from GitHub tip of main (never HardTip).\n\n"
+                + "Diagnose after compile must show: spliced-sprite-escape\n"
+                + "(compiled Id == disk Id).",
+                "Escape Now", "Cancel"))
             return;
-        }
 
-        // Prefer Sync host implementation when present (single code path).
+        string report;
         try
         {
-            var syncType = Type.GetType("ArthurianSyncFromGitHub")
-                           ?? Type.GetType("ArthurianSyncFromGitHub, Assembly-CSharp-Editor");
-            var mi = syncType?.GetMethod("ForceUpgradeSyncHostsMenu",
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            if (mi != null)
+            report = DemonKnightTipEscape.EscapeNow(force: true);
+        }
+        catch (Exception ex)
+        {
+            // TipEscape type missing (pre-tip Bootstrap) — fall back to main-only host write.
+            report = EscapeHostsFromMainFallback(ex.Message);
+        }
+        EditorUtility.DisplayDialog("FORCE Upgrade / Tip Escape", report, "OK");
+    }
+
+    /// <summary>When TipEscape.cs not compiled yet — still pull tip PackageVersion from raw@main.</summary>
+    static string EscapeHostsFromMainFallback(string why)
+    {
+        var log = new System.Text.StringBuilder();
+        log.AppendLine("TipEscape type missing (" + why + ") — main-only fallback.");
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        string tip = null;
+        try
+        {
+            using var wc = new System.Net.WebClient();
+            wc.Headers.Add("User-Agent", "DemonKnight-FORCE-EscapeFallback");
+            wc.Headers.Add("Accept", "application/vnd.github.v3+json");
+            string json = wc.DownloadString("https://api.github.com/repos/airizarry9938/DemonKnight/commits/main");
+            int colon = json.IndexOf(':');
+            int q1 = colon >= 0 ? json.IndexOf('"', colon + 1) : -1;
+            int q2 = q1 >= 0 ? json.IndexOf('"', q1 + 1) : -1;
+            if (q1 >= 0 && q2 == q1 + 41) tip = json.Substring(q1 + 1, 40);
+        }
+        catch { /* ignore */ }
+        if (string.IsNullOrEmpty(tip)) tip = "main";
+
+        string root = Directory.GetParent(Application.dataPath)!.FullName;
+        string[] rels =
+        {
+            "Assets/Editor/DemonKnightTipEscape.cs",
+            "Assets/Editor/DemonKnightPackageVersion.cs",
+            "Assets/Editor/ArthurianSyncFromGitHub.cs",
+            "Assets/Editor/ArthurianMenuBootstrap.cs",
+            "Assets/Editor/ArthurianArtArchitectWindow.cs",
+            "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+            "Assets/Scripts/UI/PaperDollSeatView.cs",
+            "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
+        };
+        int ok = 0;
+        foreach (string rel in rels)
+        {
+            try
             {
-                mi.Invoke(null, null);
-                return;
+                string bust = "t=" + DateTime.UtcNow.Ticks;
+                string body = null;
+                foreach (string sha in new[] { tip, "main" })
+                {
+                    string url = "https://raw.githubusercontent.com/airizarry9938/DemonKnight/"
+                                 + sha + "/" + rel + "?" + bust;
+                    try
+                    {
+                        using var wc = new System.Net.WebClient();
+                        wc.Headers.Add("User-Agent", "DemonKnight-FORCE-EscapeFallback");
+                        wc.CachePolicy = new System.Net.Cache.RequestCachePolicy(
+                            System.Net.Cache.RequestCacheLevel.BypassCache);
+                        body = wc.DownloadString(url);
+                        if (!string.IsNullOrEmpty(body) && body.Length > 80
+                            && !body.TrimStart().StartsWith("404", StringComparison.Ordinal))
+                            break;
+                        body = null;
+                    }
+                    catch { body = null; }
+                }
+                if (string.IsNullOrEmpty(body)) throw new Exception("download failed");
+                if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0)
+                    && body.IndexOf("spliced-sprite-escape", StringComparison.Ordinal) < 0)
+                    throw new Exception("stale PackageVersion body");
+                string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                if (File.Exists(dest))
+                {
+                    try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                    try { File.Delete(dest); } catch { /* ignore */ }
+                }
+                File.WriteAllText(dest, body);
+                ok++;
+                log.AppendLine($"OK {rel} ({body.Length} B)");
+            }
+            catch (Exception ex)
+            {
+                log.AppendLine($"MISS {rel}: {ex.Message}");
             }
         }
-        catch { /* fall through */ }
-
-        string report2 = BreakGlassForceHostsFromHardTip();
-        EditorUtility.DisplayDialog("Break-Glass Hosts", report2, "OK");
+        AssetDatabase.Refresh();
+        log.AppendLine($"Wrote {ok}/{rels.Length}. Wait compile → click FORCE again if TipEscape menu missing.");
+        log.AppendLine("Diagnose must show spliced-sprite-escape compiled=disk.");
+        return log.ToString();
     }
 
     /// <summary>Menu for Andrew when FORCE still stuck — same as break-glass path.</summary>

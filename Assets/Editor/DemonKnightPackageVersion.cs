@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "spliced-sprite-pews";
-    public const string GitHint = "escape-breakglass-pews-from-spliced-sprite-folder";
-    public const string BuiltUtc = "2026-11-22T09:29:56Z";
+    public const string Id = "spliced-sprite-escape";
+    public const string GitHint = "force-upgrade-tipescape-never-hardtip";
+    public const string BuiltUtc = "2026-11-22T09:51:28Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "85b4696b1046d7184db7b5c83637f884426cb96f";
@@ -129,6 +129,7 @@ public static class DemonKnightPackageVersion
             "runtime-single-sprite",
             "single-sprite-play-wipe",
             "single-sprite-auto-wipe",
+            "spliced-sprite-pews",
         };
         foreach (string s in stale)
         {
