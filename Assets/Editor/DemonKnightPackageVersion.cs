@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "legends-lore-portrait";
-    public const string GitHint = "legends-lore-portrait-face-frame";
-    public const string BuiltUtc = "2026-11-22T22:00:00Z";
+    public const string Id = "architect-legend-pew-portraits";
+    public const string GitHint = "architect-legend-pew-portraits-tab5";
+    public const string BuiltUtc = "2026-11-22T22:20:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
+    public const string HardTipSha = "9c3e7602cd597d73ebeb50376740a29fe5cd8a5c";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -105,7 +105,8 @@ public static class DemonKnightPackageVersion
                         }
                         if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
-                                || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0))
+                                || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0))
                             throw new Exception("GameDataTypes missing embedded Appliers");
                         // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
                         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
@@ -218,6 +219,7 @@ public static class DemonKnightPackageVersion
             "fix-hud-wave-match",
             "merlin-lore-narrative",
             "lore-boss-wave-order",
+            "legends-lore-portrait",
         };
         foreach (string s in stale)
         {

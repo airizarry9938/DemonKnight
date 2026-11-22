@@ -223,7 +223,7 @@ namespace ArthurianAutobattler
             }
             else if (recruit != null)
             {
-                Sprite poolSprite = ClassSpritePoolApplier.PickForRecruit(recruit);
+                Sprite poolSprite = LegendPewPortraitApplier.ResolvePewVisual(recruit);
                 if (poolSprite != null)
                 {
                     img.sprite = poolSprite;

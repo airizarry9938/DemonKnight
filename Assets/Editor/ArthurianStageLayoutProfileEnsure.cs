@@ -24,9 +24,10 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "legends-lore-portrait";
+    const string TipPackageId = "architect-legend-pew-portraits";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
+    const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
     const string SplicedSpriteFolder = "Assets/Art/Spliced/Sprite";
@@ -58,6 +59,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-hud-wave-match",
         "lore-boss-wave-order",
         "merlin-lore-narrative",
+        "legends-lore-portrait",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
@@ -66,6 +68,7 @@ public static class ArthurianStageLayoutProfileEnsure
         var p = EnsureAsset();
         var bg = EnsureSceneBackgroundAsset();
         var pools = EnsureClassSpritePoolAsset();
+        var legendPew = EnsureLegendPewPortraitAsset();
         Selection.activeObject = p;
         EditorGUIUtility.PingObject(p);
         int assigned = CountAssignedSprites(p);
@@ -75,7 +78,12 @@ public static class ArthurianStageLayoutProfileEnsure
                   $"SceneBackgroundProfile → {SceneBgAssetPath} ({bg.entries.Count} slots). " +
                   $"ClassSpritePoolProfile → {ClassPoolAssetPath} " +
                   $"(P={pools.CountUsable(UnitType.Peasant)} W={pools.CountUsable(UnitType.Warrior)} " +
-                  $"K={pools.CountUsable(UnitType.Knight)}).");
+                  $"K={pools.CountUsable(UnitType.Knight)}). " +
+                  $"LegendPewPortraitProfile → {LegendPewAssetPath} " +
+                  $"(legends={legendPew.CountAssignedLegendFaces()}/14 " +
+                  $"pewFaces P={legendPew.CountUsablePewFaces(UnitType.Peasant)} " +
+                  $"W={legendPew.CountUsablePewFaces(UnitType.Warrior)} " +
+                  $"K={legendPew.CountUsablePewFaces(UnitType.Knight)}).");
     }
 
     [MenuItem("Arthurian/Escape Breakglass → Tip Hosts + Spliced Pew Library", false, 2)]
@@ -96,6 +104,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 EnsureAsset();
                 EnsureSceneBackgroundAsset();
                 EnsureClassSpritePoolAsset();
+                EnsureLegendPewPortraitAsset();
                 if (HostsLookStale())
                 {
                     Debug.LogWarning(
@@ -347,6 +356,69 @@ public static class ArthurianStageLayoutProfileEnsure
         return AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(ClassPoolAssetPath) ?? created;
     }
 
+    /// <summary>Ensure LegendPewPortraitProfile.asset exists (Architect Tab 5). Never wipe assignments.</summary>
+    public static LegendPewPortraitProfile EnsureLegendPewPortraitAsset()
+    {
+        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+            AssetDatabase.CreateFolder("Assets", "Resources");
+
+        var existing = AssetDatabase.LoadAssetAtPath<LegendPewPortraitProfile>(LegendPewAssetPath);
+        if (existing != null)
+        {
+            existing.EnsureSlotsAndLists();
+            return existing;
+        }
+
+        string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+            LegendPewAssetPath.Replace('/', Path.DirectorySeparatorChar));
+        string yamlBackup = null;
+        if (File.Exists(full))
+        {
+            try { yamlBackup = File.ReadAllText(full); } catch { /* ignore */ }
+            if (TryRemapLegendPewScriptGuid(full))
+            {
+                AssetDatabase.ImportAsset(LegendPewAssetPath);
+                existing = AssetDatabase.LoadAssetAtPath<LegendPewPortraitProfile>(LegendPewAssetPath);
+                if (existing != null)
+                {
+                    existing.EnsureSlotsAndLists();
+                    return existing;
+                }
+            }
+            AssetDatabase.DeleteAsset(LegendPewAssetPath);
+            try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
+            try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
+            AssetDatabase.Refresh();
+        }
+
+        var created = ScriptableObject.CreateInstance<LegendPewPortraitProfile>();
+        created.EnsureSlotsAndLists();
+        AssetDatabase.CreateAsset(created, LegendPewAssetPath);
+        AssetDatabase.SaveAssets();
+
+        if (!string.IsNullOrEmpty(yamlBackup) && File.Exists(full))
+        {
+            try
+            {
+                string fresh = File.ReadAllText(full);
+                string merged = TransplantFromField(fresh, yamlBackup, "legendPortraits:");
+                if (!string.IsNullOrEmpty(merged) && merged != fresh)
+                {
+                    File.WriteAllText(full, merged);
+                    AssetDatabase.ImportAsset(LegendPewAssetPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] LegendPewPortrait YAML transplant: " + ex.Message);
+            }
+        }
+
+        existing = AssetDatabase.LoadAssetAtPath<LegendPewPortraitProfile>(LegendPewAssetPath) ?? created;
+        existing.EnsureSlotsAndLists();
+        return existing;
+    }
+
     static bool TryRemapStageLayoutScriptGuid(string fullPath)
         => TryRemapScriptGuid(fullPath, typeof(StageLayoutProfile));
 
@@ -355,6 +427,9 @@ public static class ArthurianStageLayoutProfileEnsure
 
     static bool TryRemapClassPoolScriptGuid(string fullPath)
         => TryRemapScriptGuid(fullPath, typeof(ClassSpritePoolProfile));
+
+    static bool TryRemapLegendPewScriptGuid(string fullPath)
+        => TryRemapScriptGuid(fullPath, typeof(LegendPewPortraitProfile));
 
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {

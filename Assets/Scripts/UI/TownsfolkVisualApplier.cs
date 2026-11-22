@@ -68,6 +68,9 @@ namespace ArthurianAutobattler
         {
             if (fallback != null)
             {
+                // Architect Tab 5 pew face/body profiles first (distinct from full-body class pools).
+                Sprite face = LegendPewPortraitApplier.PickPewProfile(fallback);
+                if (IsUsablePewSprite(face)) return face;
                 Sprite pool = ClassSpritePoolApplier.PickForRecruit(fallback);
                 if (IsUsablePewSprite(pool)) return pool;
             }
