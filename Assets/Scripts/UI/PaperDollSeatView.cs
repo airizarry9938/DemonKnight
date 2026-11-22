@@ -76,7 +76,7 @@ namespace ArthurianAutobattler
                     $"[DemonKnight] First pew Bind '{recruit.characterName}' (single-sprite): " +
                     $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
                     $"body={bodyName} outfit={outfitName} head={headName} " +
-                    "(outfit/head must be NULL — tip pew-3rows-chroma-scale; body from Spliced/Sprite)");
+                    "(outfit/head must be NULL — tip church-bg-pew-preview; body from Spliced/Sprite)");
             }
 
             if (moodLayer != null)
@@ -890,7 +890,7 @@ static class DemonKnightPaperDollTipEscapeHook
                     int q2 = q1 >= 0 ? t.IndexOf('"', q1 + 1) : -1;
                     if (q1 >= 0 && q2 > q1) diskId = t.Substring(q1 + 1, q2 - q1 - 1);
                 }
-                if (diskId == "pew-3rows-chroma-scale") return;
+                if (diskId == "church-bg-pew-preview") return;
                 if (diskId != "architect-breakglass-hosts"
                     && diskId != "architect-disk-tip-proof"
                     && diskId != "single-sprite-auto-wipe"
@@ -898,11 +898,13 @@ static class DemonKnightPaperDollTipEscapeHook
                     && diskId != "spliced-sprite-escape"
                     && diskId != "architect-no-bootstrap-clear"
                     && diskId != "breakglass-local-wipe"
+                    && diskId != "pew-3rows-chroma-scale"
                     && !string.IsNullOrEmpty(diskId)
                     && diskId.IndexOf("architect-", System.StringComparison.Ordinal) < 0
                     && diskId.IndexOf("spliced-", System.StringComparison.Ordinal) < 0
                     && diskId.IndexOf("breakglass-", System.StringComparison.Ordinal) < 0
-                    && diskId.IndexOf("pew-", System.StringComparison.Ordinal) < 0)
+                    && diskId.IndexOf("pew-", System.StringComparison.Ordinal) < 0
+                    && diskId.IndexOf("church-", System.StringComparison.Ordinal) < 0)
                     return;
 
                 UnityEngine.Debug.LogWarning(
@@ -926,7 +928,7 @@ static class DemonKnightPaperDollTipEscapeHook
                         string body = wc.DownloadString(url);
                         if (string.IsNullOrEmpty(body) || body.Length < 80) continue;
                         if (rel.EndsWith("PackageVersion.cs")
-                            && body.IndexOf("pew-3rows-chroma-scale", System.StringComparison.Ordinal) < 0)
+                            && body.IndexOf("church-bg-pew-preview", System.StringComparison.Ordinal) < 0)
                             continue;
                         string dest = System.IO.Path.Combine(root, rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
                         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);

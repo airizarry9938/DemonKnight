@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "pew-3rows-chroma-scale";
+    public const string TipPackageId = "church-bg-pew-preview";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -34,7 +34,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownSplitUIController.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (pew-3rows-chroma-scale)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (church-bg-pew-preview)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -108,6 +108,7 @@ public static class DemonKnightTipEscape
             "spliced-sprite-escape",
             "architect-no-bootstrap-clear",
             "breakglass-local-wipe",
+            "pew-3rows-chroma-scale",
         };
         foreach (string s in stale)
         {
