@@ -118,39 +118,39 @@ public static class ArthurianCharacterCatalogSeeder
             "Regen 8% max HP per turn; cannot be one-shot above 50% HP.",
             Rule(UnitType.Warrior, 2), Rule(UnitType.Knight, 1, TraitTag.Loyalist));
 
-        // —— Bosses (wave 3–10) ——
+        // —— Bosses (wave 3–10) — lore order; EACH WAVE SLOT keeps Power/HP/ATK/APS/Scale ——
         SeedBoss("BlackKnight", "boss_black_knight", "The Black Knight", UnitType.BossBlackKnight,
             3, 210, 22, 1.4f, 22, 2.0f,
             CharacterPassiveType.SurviveFirstLethalAt1Hp, 1f,
-            "Survives first lethal blow at 1 HP.");
-
-        SeedBoss("Vortigern", "boss_vortigern", "Vortigern, Usurper King", UnitType.BossVortigern,
-            4, 260, 26, 1.3f, 28, 2.0f,
-            CharacterPassiveType.Custom, 0f, "Usurper King — brutal frontline pressure.");
-
-        SeedBoss("GreenKnight", "boss_green_knight", "The Green Knight", UnitType.BossGreenKnight,
-            5, 320, 32, 1.2f, 34, 2.0f,
-            CharacterPassiveType.ReviveOnce, 1f, "Returns once after falling (Green Knight trial).");
-
-        SeedBoss("Accolon", "boss_accolon", "Accolon of Gaul", UnitType.BossAccolon,
-            6, 380, 38, 1.7f, 40, 2.0f,
-            CharacterPassiveType.ExtraDamageVsFront, 0f, "Enchanted blade — shreds the front.");
+            "First lethal → 1 HP; ½ damage from Peasant/Warrior.");
 
         SeedBoss("Meleagant", "boss_meleagant", "Sir Meleagant", UnitType.BossMeleagant,
-            7, 440, 42, 1.6f, 44, 2.0f,
-            CharacterPassiveType.Custom, 0f, "Kidnapper knight — locks the front.");
+            4, 260, 26, 1.3f, 28, 2.0f,
+            CharacterPassiveType.Custom, 0f, "Prefers backline / Meleagant targeting.");
 
         SeedBoss("KingLot", "boss_king_lot", "King Lot of Lothian", UnitType.BossKingLot,
-            8, 510, 46, 1.5f, 48, 2.0f,
-            CharacterPassiveType.AuraAtkBuff, 0f, "Warlord king — inspires the horde.");
+            5, 320, 32, 1.2f, 34, 2.0f,
+            CharacterPassiveType.AuraAtkBuff, 0f, "Spawns 2 Frenzied Imps on battle start.");
+
+        SeedBoss("Vortigern", "boss_vortigern", "Vortigern, Usurper King", UnitType.BossVortigern,
+            6, 380, 38, 1.7f, 40, 2.0f,
+            CharacterPassiveType.Custom, 0f, "Start: Coward/Drunkard allies −0.3 APS.");
+
+        SeedBoss("Accolon", "boss_accolon", "Accolon of Gaul", UnitType.BossAccolon,
+            7, 440, 42, 1.6f, 44, 2.0f,
+            CharacterPassiveType.ExtraDamageVsFront, 0f, "Lifesteal 30% of damage dealt (if not hexed).");
 
         SeedBoss("QuestingBeast", "boss_questing_beast", "The Questing Beast", UnitType.BossQuestingBeast,
+            8, 510, 46, 1.5f, 48, 2.0f,
+            CharacterPassiveType.Custom, 0f, "On hit: +5 staged grudge (FEAR).");
+
+        SeedBoss("GreenKnight", "boss_green_knight", "The Green Knight", UnitType.BossGreenKnight,
             9, 600, 50, 1.9f, 52, 2.1f,
-            CharacterPassiveType.Custom, 0f, "Serpent-tailed beast — feet/tail sit on the cobbles.");
+            CharacterPassiveType.ReviveOnce, 1f, "Revive once at 40% HP, +10 ATK.");
 
         SeedBoss("Nimue", "boss_nimue", "Nimue, Queen of Thorns", UnitType.BossNimue,
             10, 720, 55, 1.6f, 55, 2.2f,
-            CharacterPassiveType.CharmChance, 0.2f, "Queen of Thorns — charms and entangles.");
+            CharacterPassiveType.CharmChance, 0.2f, "35% petrify 2.5s; 20% seduce Coward/Outlaw.");
 
         // —— Demons ——
         SeedDemon("Imp", "demon_imp", "Frenzied Imp", UnitType.DemonImp,

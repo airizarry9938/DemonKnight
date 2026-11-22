@@ -94,28 +94,29 @@ namespace ArthurianAutobattler
                 return def.CreateCombatUnit(mult);
 
             // Legacy fallback if CharacterDatabase not seeded yet.
+            // Lore order: keep EACH WAVE SLOT's Power/HP/ATK/APS; identity moves.
             switch (battleNumber)
             {
                 case 3:
                     return Boss("boss_black_knight", "The Black Knight", UnitType.BossBlackKnight,
                         22, 210, 22, 1.4f, mult);
                 case 4:
-                    return Boss("boss_vortigern", "Vortigern, Usurper King", UnitType.BossVortigern,
+                    return Boss("boss_meleagant", "Sir Meleagant", UnitType.BossMeleagant,
                         28, 260, 26, 1.3f, mult);
                 case 5:
-                    return Boss("boss_green_knight", "The Green Knight", UnitType.BossGreenKnight,
+                    return Boss("boss_king_lot", "King Lot of Lothian", UnitType.BossKingLot,
                         34, 320, 32, 1.2f, mult);
                 case 6:
-                    return Boss("boss_accolon", "Accolon of Gaul", UnitType.BossAccolon,
+                    return Boss("boss_vortigern", "Vortigern, Usurper King", UnitType.BossVortigern,
                         40, 380, 38, 1.7f, mult);
                 case 7:
-                    return Boss("boss_meleagant", "Sir Meleagant", UnitType.BossMeleagant,
+                    return Boss("boss_accolon", "Accolon of Gaul", UnitType.BossAccolon,
                         44, 440, 42, 1.6f, mult);
                 case 8:
-                    return Boss("boss_king_lot", "King Lot of Lothian", UnitType.BossKingLot,
+                    return Boss("boss_questing_beast", "The Questing Beast", UnitType.BossQuestingBeast,
                         48, 510, 46, 1.5f, mult);
                 case 9:
-                    return Boss("boss_questing_beast", "The Questing Beast", UnitType.BossQuestingBeast,
+                    return Boss("boss_green_knight", "The Green Knight", UnitType.BossGreenKnight,
                         52, 600, 50, 1.9f, mult);
                 default:
                     return Boss("boss_nimue", "Nimue, Queen of Thorns", UnitType.BossNimue,
