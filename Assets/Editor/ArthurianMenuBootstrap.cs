@@ -862,7 +862,7 @@ public static class ArthurianMenuBootstrap
                 "FORCE Upgrade → Tip Escape",
                 "Pull PackageVersion / Sync / Bootstrap / Architect / TipEscape / PaperDoll\n"
                 + "from GitHub tip of main (never HardTip).\n\n"
-                + "Diagnose after compile must show: architect-no-bootstrap-clear\n"
+                + "Diagnose after compile must show: breakglass-local-wipe\n"
                 + "(compiled Id == disk Id).",
                 "Escape Now", "Cancel"))
             return;
@@ -942,8 +942,11 @@ public static class ArthurianMenuBootstrap
                 if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
                         || body.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0)
-                    && body.IndexOf("architect-no-bootstrap-clear", StringComparison.Ordinal) < 0)
+                    && body.IndexOf("breakglass-local-wipe", StringComparison.Ordinal) < 0)
                     throw new Exception("stale PackageVersion body");
+                if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
+                    && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
+                    throw new Exception("Architect still calls PackageVersion.Wipe* (CS0117)");
                 string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 if (File.Exists(dest))
@@ -962,20 +965,26 @@ public static class ArthurianMenuBootstrap
         }
         AssetDatabase.Refresh();
         log.AppendLine($"Wrote {ok}/{rels.Length}. Wait compile → click FORCE again if TipEscape menu missing.");
-        log.AppendLine("Diagnose must show architect-no-bootstrap-clear compiled=disk.");
+        log.AppendLine("Diagnose must show breakglass-local-wipe compiled=disk.");
         return log.ToString();
     }
 
-    /// <summary>Menu for Andrew when FORCE still stuck — same as break-glass path.</summary>
+    /// <summary>Andrew's reliable menu while Escape missing — tip/main only (never HardTip-first).</summary>
     [MenuItem("Arthurian/Break-Glass Pull Tip Hosts (hard SHA)", false, 2)]
     public static void BreakGlassPullTipHostsMenu()
     {
         if (!EditorUtility.DisplayDialog(
                 "Break-Glass Pull Tip Hosts",
-                "Force-download Sync + Bootstrap + PackageVersion + Architect from:\n"
-                + "raw.githubusercontent.com/…/" + BreakGlassTipSha + "/…\n"
-                + "and raw@main. Bypasses Sync tip-resolve entirely.",
-                "Download Now", "Cancel"))
+                "Overwrite from GitHub tip of main (never HardTip-first):\n\n"
+                + "• DemonKnightTipEscape.cs  ← Escape menu\n"
+                + "• DemonKnightPackageVersion.cs\n"
+                + "• ArthurianSyncFromGitHub.cs\n"
+                + "• ArthurianMenuBootstrap.cs\n"
+                + "• ArthurianArtArchitectWindow.cs\n"
+                + "• ArthurianStageLayoutProfileEnsure.cs\n\n"
+                + "After compile: Diagnose = breakglass-local-wipe\n"
+                + "and menu Arthurian → !!! Escape to Tip appears.",
+                "Download Tip Now", "Cancel"))
             return;
         EditorUtility.DisplayDialog("Break-Glass Hosts", BreakGlassForceHostsFromHardTip(), "OK");
     }
@@ -1009,29 +1018,51 @@ public static class ArthurianMenuBootstrap
         catch { return true; }
     }
 
-    /// <summary>Download hosts by hard SHA URL — no Sync validate, length-gated 404 only.</summary>
+    /// <summary>
+    /// Atomic tip pull: TipEscape + PackageVersion + Sync + Bootstrap + Architect + StageLayout.
+    /// API tip + raw@main FIRST — HardTip last and rejected if stale Id.
+    /// </summary>
     public static string BreakGlassForceHostsFromHardTip()
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+        string tip = TryResolveMainShaForBreakGlass() ?? "main";
         string[] hosts =
         {
+            "Assets/Editor/DemonKnightTipEscape.cs",
+            "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",
-            "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
+            "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         };
+        const string wantId = "breakglass-local-wipe";
         int ok = 0;
         var log = new System.Text.StringBuilder();
-        log.AppendLine("Break-glass tip SHA: " + BreakGlassTipSha);
+        log.AppendLine("Break-Glass atomic tip pull (tip/main FIRST, HardTip last)");
+        log.AppendLine("API tip=" + tip + " want package=" + wantId);
         foreach (string rel in hosts)
         {
             try
             {
-                string body = DownloadHardTipOrMain(rel, BreakGlassTipSha);
-                if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
-                    && body.Length < 500)
-                    throw new Exception("PackageVersion still tiny " + body.Length + "B");
+                string body = DownloadTipMainThenHardTip(rel, tip, BreakGlassTipSha);
+                if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (body.Length < 500)
+                        throw new Exception("PackageVersion still tiny " + body.Length + "B");
+                    if (body.IndexOf("Id = \"" + wantId + "\"", StringComparison.Ordinal) < 0
+                        && body.IndexOf(wantId, StringComparison.Ordinal) < 0)
+                        throw new Exception("PackageVersion missing " + wantId);
+                    if (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("Id = \"architect-disk-tip-proof\"", StringComparison.Ordinal) >= 0)
+                        throw new Exception("rejected stale PackageVersion Id");
+                }
+                if (rel.EndsWith("DemonKnightTipEscape.cs", StringComparison.OrdinalIgnoreCase)
+                    && body.IndexOf("Escape to Tip", StringComparison.Ordinal) < 0)
+                    throw new Exception("TipEscape body missing Escape menu");
+                if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
+                    && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
+                    throw new Exception("Architect still calls PackageVersion.Wipe* (CS0117)");
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 if (File.Exists(dest))
@@ -1059,40 +1090,84 @@ public static class ArthurianMenuBootstrap
             if (File.Exists(pv)) pvLen = new FileInfo(pv).Length;
         }
         catch { /* ignore */ }
+        bool tipEscapeOnDisk = File.Exists(Path.Combine(projectRoot, "Assets", "Editor", "DemonKnightTipEscape.cs"));
         log.AppendLine($"Wrote {ok}/{hosts.Length}. Package Id on disk: {diskId} ({pvLen} bytes)");
-        log.AppendLine("Wait compile → Diagnose → reopen Art & Stage Architect.");
+        log.AppendLine("TipEscape.cs on disk: " + (tipEscapeOnDisk ? "YES → Escape menu after compile" : "NO"));
+        log.AppendLine("Wait compile → Diagnose (" + wantId + ") → !!! Escape to Tip if still stale.");
         return log.ToString();
     }
 
-    static string DownloadHardTipOrMain(string rel, string tipSha)
+    static string TryResolveMainShaForBreakGlass()
+    {
+        try
+        {
+            using var wc = new WebClient();
+            wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
+            wc.Headers.Add("User-Agent", "DemonKnight-BreakGlass/2.0");
+            wc.Headers.Add("Accept", "application/vnd.github.v3+json");
+            string json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/commits/main");
+            int colon = json.IndexOf(':');
+            int q1 = colon >= 0 ? json.IndexOf('"', colon + 1) : -1;
+            int q2 = q1 >= 0 ? json.IndexOf('"', q1 + 1) : -1;
+            if (q1 >= 0 && q2 == q1 + 41)
+            {
+                string sha = json.Substring(q1 + 1, 40);
+                if (System.Text.RegularExpressions.Regex.IsMatch(sha, "^[0-9a-f]{40}$"))
+                    return sha;
+            }
+        }
+        catch { /* ignore */ }
+        return null;
+    }
+
+    /// <summary>API tip + main FIRST; HardTip last (and only if tip/main fail).</summary>
+    static string DownloadTipMainThenHardTip(string rel, string tipSha, string hardTip)
     {
         string bust = "t=" + DateTime.UtcNow.Ticks + "&r=" + Guid.NewGuid().ToString("N");
-        string[] urls =
-        {
-            RawBase + tipSha + "/" + rel + "?" + bust,
-            RawBase + tipSha + "/" + rel,
-            RawBase + "main/" + rel + "?" + bust,
-            RawBase + "main/" + rel,
-            JsDelivrBase + tipSha + "/" + rel + "?" + bust,
-            JsDelivrBase + "main/" + rel + "?" + bust,
-        };
+        var shas = new List<string>();
+        if (!string.IsNullOrEmpty(tipSha)) shas.Add(tipSha);
+        shas.Add("main");
+        if (!string.IsNullOrEmpty(hardTip)
+            && !string.Equals(hardTip, tipSha, StringComparison.OrdinalIgnoreCase))
+            shas.Add(hardTip);
         Exception last = null;
-        foreach (string url in urls)
+        foreach (string sha in shas)
         {
-            try
+            string[] urls =
             {
-                using var wc = new WebClient();
-                wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
-                wc.Headers.Add("User-Agent", "DemonKnight-BreakGlass/1.0");
-                wc.Headers.Add("Cache-Control", "no-cache, no-store");
-                string body = wc.DownloadString(url);
-                if (IsTinyHttpFailure(body) || body.Length < 80) throw new Exception("tiny/404");
-                return body;
+                RawBase + sha + "/" + rel + "?" + bust,
+                RawBase + sha + "/" + rel,
+                JsDelivrBase + sha + "/" + rel + "?" + bust,
+            };
+            foreach (string url in urls)
+            {
+                try
+                {
+                    using var wc = new WebClient();
+                    wc.CachePolicy = new RequestCachePolicy(RequestCacheLevel.BypassCache);
+                    wc.Headers.Add("User-Agent", "DemonKnight-BreakGlass/2.0");
+                    wc.Headers.Add("Cache-Control", "no-cache, no-store");
+                    string body = wc.DownloadString(url);
+                    if (IsTinyHttpFailure(body) || body.Length < 80) throw new Exception("tiny/404");
+                    // Never accept breakglass/disk-tip-proof PackageVersion from HardTip.
+                    if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                        && (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0
+                            || body.IndexOf("Id = \"architect-disk-tip-proof\"", StringComparison.Ordinal) >= 0)
+                        && body.IndexOf("breakglass-local-wipe", StringComparison.Ordinal) < 0)
+                    {
+                        last = new Exception("stale PackageVersion from " + sha);
+                        continue;
+                    }
+                    return body;
+                }
+                catch (Exception ex) { last = ex; }
             }
-            catch (Exception ex) { last = ex; }
         }
         throw last ?? new Exception("download failed " + rel);
     }
+
+    static string DownloadHardTipOrMain(string rel, string tipSha)
+        => DownloadTipMainThenHardTip(rel, tipSha, tipSha);
 
     static bool IsTinyHttpFailure(string body)
     {

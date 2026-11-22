@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "architect-no-bootstrap-clear";
+    public const string TipPackageId = "breakglass-local-wipe";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -31,7 +31,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (architect-no-bootstrap-clear)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (breakglass-local-wipe)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -78,6 +78,8 @@ public static class DemonKnightTipEscape
         if (pvBody.IndexOf("Id = \"" + TipPackageId + "\"", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
         if (syncBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
+        // CS0117: tip Architect must never call PackageVersion.Wipe*
+        if (archBody.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0) return true;
 
         // Compiled vs disk: if compiled type exists and Id differs, still need refresh.
         try
@@ -101,6 +103,7 @@ public static class DemonKnightTipEscape
             "single-sprite-auto-wipe",
             "spliced-sprite-pews",
             "spliced-sprite-escape",
+            "architect-no-bootstrap-clear",
         };
         foreach (string s in stale)
         {
@@ -140,6 +143,9 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("Id = \"architect-disk-tip-proof\"", StringComparison.Ordinal) >= 0)
                         throw new Exception("rejected stale PackageVersion");
                 }
+                if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
+                    && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
+                    throw new Exception("Architect still calls PackageVersion.Wipe* (CS0117)");
                 string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 try

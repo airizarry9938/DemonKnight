@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "architect-no-bootstrap-clear";
+    public const string UiBuildId = "breakglass-local-wipe";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -1776,41 +1776,81 @@ public class ArthurianArtArchitectWindow : EditorWindow
     }
 
     /// <summary>
-    /// Local clear — no ArthurianMenuBootstrap.ClearPaperdollLibraryInternal dependency
-    /// (CS0117 when tip Architect lands before tip Bootstrap).
+    /// Fully local wipe — NO PackageVersion.Wipe* / Bootstrap.Clear* (CS0117 when tip Architect
+    /// lands before tip PackageVersion/Bootstrap).
     /// </summary>
     string ClearPaperdollLibraryLocal()
     {
         var log = new System.Text.StringBuilder();
-        try
-        {
-            log.AppendLine(DemonKnightPackageVersion.WipeModularPaperdollAssets());
-        }
-        catch (Exception ex)
-        {
-            log.AppendLine("PackageVersion wipe: " + ex.Message);
-        }
-        try
-        {
-            log.AppendLine(ArthurianStageLayoutProfileEnsure.RebuildPewLibraryFromSplices());
-        }
-        catch (Exception ex)
-        {
-            log.AppendLine("Rebuild splices: " + ex.Message);
-            // Fallback: clear in-memory library + Resources copy only.
-            EnsureLibraryAsset();
-            if (targetLibrary != null)
-            {
-                targetLibrary.ClearPaperdollLayersKeepSprites();
-                EditorUtility.SetDirty(targetLibrary);
-                AssetDatabase.SaveAssets();
-                SyncLibraryToResources();
-                log.AppendLine("Local ClearPaperdollLayersKeepSprites + SyncLibraryToResources.");
-            }
-        }
+        log.AppendLine("Architect local wipe (no PackageVersion/Bootstrap deps)");
+        const string artPath = DefaultLibraryPath;
+        const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
+        const string splicedFolder = DefaultExportFolder;
+
+        EnsureFolder("Assets/Art/Modular");
+        EnsureFolder("Assets/Resources/Art/Modular");
+        EnsureFolder(splicedFolder);
         EnsureLibraryAsset();
-        targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(DefaultLibraryPath);
+
+        // Import Spliced/Sprite PNGs into basePoses; clear outfits/heads/props + legacy clips.
+        var spliced = new List<Sprite>();
+        if (AssetDatabase.IsValidFolder(splicedFolder))
+        {
+            foreach (string g in AssetDatabase.FindAssets("t:Sprite", new[] { splicedFolder }))
+            {
+                var sp = AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GUIDToAssetPath(g));
+                if (sp == null) continue;
+                string n = sp.name ?? "";
+                if (n.StartsWith("Pose_", StringComparison.OrdinalIgnoreCase)) continue;
+                if (n.StartsWith("Outfit_", StringComparison.OrdinalIgnoreCase)) continue;
+                if (n.StartsWith("Head_", StringComparison.OrdinalIgnoreCase)) continue;
+                if (n.StartsWith("DK_", StringComparison.OrdinalIgnoreCase)) continue;
+                if (n.IndexOf("Prepared_Pose", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                if (n.IndexOf("Prepared_Outfit", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                spliced.Add(sp);
+            }
+            spliced.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        }
+
+        void WipeLib(ModularSpriteLibrary lib, string path)
+        {
+            if (lib == null) return;
+            lib.outfits = Array.Empty<Sprite>();
+            lib.heads = Array.Empty<ModularHeadEntry>();
+            lib.props = Array.Empty<Sprite>();
+            if (lib.animClips != null)
+            {
+                lib.animClips.RemoveAll(e =>
+                    e == null || !string.Equals(e.category, "Sprite", StringComparison.OrdinalIgnoreCase));
+            }
+            if (spliced.Count > 0)
+                lib.basePoses = spliced.ToArray();
+            else
+            {
+                // Empty — never seed Pose_/Outfit_ silhouette placeholders.
+                lib.basePoses = new Sprite[4];
+            }
+            EditorUtility.SetDirty(lib);
+            log.AppendLine("Wiped " + path + " spliced=" + spliced.Count);
+        }
+
+        WipeLib(targetLibrary, artPath);
+        AssetDatabase.SaveAssets();
+
+        if (AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath) != null)
+            AssetDatabase.DeleteAsset(resPath);
+        if (!string.IsNullOrEmpty(AssetDatabase.GetAssetPath(targetLibrary)))
+            AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(targetLibrary), resPath);
+        var res = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath);
+        WipeLib(res, resPath);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        targetLibrary = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(artPath);
         TownsfolkVisualApplier.SetLibrary(null);
+        log.AppendLine(spliced.Count == 0
+            ? "No Spliced/Sprite yet — pews solid color until Save Splices."
+            : "Pew library ← Assets/Art/Spliced/Sprite. New Game → outfit=NULL.");
         return log.ToString().TrimEnd();
     }
 
