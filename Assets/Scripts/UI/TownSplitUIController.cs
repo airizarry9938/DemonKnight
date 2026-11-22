@@ -27,7 +27,7 @@ namespace ArthurianAutobattler
         public Transform townGridContainer;
         public GameObject recruitAvatarButtonPrefab;
         public SomersetPewLayout pewLayout;
-        public Vector2 baseSeatSize = new Vector2(48f, 64f);
+        public Vector2 baseSeatSize = new Vector2(76f, 100f);
 
         [Header("Bottom: Dossier, Role Training & Mediation")]
         public Image selectedAvatarImage;
@@ -205,9 +205,23 @@ namespace ArthurianAutobattler
             if (pewLayout != null)
                 pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
 
+            bool showSprite = SomersetPewLayout.SeatShowsSprite(seatIndex);
             Image img = btnObj.GetComponent<Image>();
             if (img == null) img = btnObj.AddComponent<Image>();
-            if (recruit != null && recruit.randomAvatar != null)
+            if (!showSprite)
+            {
+                img.sprite = null;
+                img.color = Color.clear;
+                img.raycastTarget = false;
+                var btnHidden = btnObj.GetComponent<Button>();
+                if (btnHidden != null) btnHidden.interactable = false;
+                var cg = btnObj.GetComponent<CanvasGroup>();
+                if (cg == null) cg = btnObj.AddComponent<CanvasGroup>();
+                cg.alpha = 0f;
+                cg.blocksRaycasts = false;
+                cg.interactable = false;
+            }
+            else if (recruit != null && recruit.randomAvatar != null)
             {
                 img.sprite = recruit.randomAvatar;
                 img.color = Color.white;

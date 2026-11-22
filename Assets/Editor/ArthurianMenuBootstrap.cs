@@ -862,7 +862,7 @@ public static class ArthurianMenuBootstrap
                 "FORCE Upgrade → Tip Escape",
                 "Pull PackageVersion / Sync / Bootstrap / Architect / TipEscape / PaperDoll\n"
                 + "from GitHub tip of main (never HardTip).\n\n"
-                + "Diagnose after compile must show: breakglass-local-wipe\n"
+                + "Diagnose after compile must show: pew-3rows-chroma-scale\n"
                 + "(compiled Id == disk Id).",
                 "Escape Now", "Cancel"))
             return;
@@ -912,6 +912,9 @@ public static class ArthurianMenuBootstrap
             "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
             "Assets/Scripts/UI/PaperDollSeatView.cs",
             "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
+            "Assets/Scripts/UI/SomersetChurchUI.cs",
+            "Assets/Scripts/UI/SomersetPewLayout.cs",
+            "Assets/Scripts/UI/TownSplitUIController.cs",
         };
         int ok = 0;
         foreach (string rel in rels)
@@ -942,7 +945,7 @@ public static class ArthurianMenuBootstrap
                 if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
                         || body.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0)
-                    && body.IndexOf("breakglass-local-wipe", StringComparison.Ordinal) < 0)
+                    && body.IndexOf("pew-3rows-chroma-scale", StringComparison.Ordinal) < 0)
                     throw new Exception("stale PackageVersion body");
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
@@ -965,7 +968,7 @@ public static class ArthurianMenuBootstrap
         }
         AssetDatabase.Refresh();
         log.AppendLine($"Wrote {ok}/{rels.Length}. Wait compile → click FORCE again if TipEscape menu missing.");
-        log.AppendLine("Diagnose must show breakglass-local-wipe compiled=disk.");
+        log.AppendLine("Diagnose must show pew-3rows-chroma-scale compiled=disk.");
         return log.ToString();
     }
 
@@ -982,7 +985,7 @@ public static class ArthurianMenuBootstrap
                 + "• ArthurianMenuBootstrap.cs\n"
                 + "• ArthurianArtArchitectWindow.cs\n"
                 + "• ArthurianStageLayoutProfileEnsure.cs\n\n"
-                + "After compile: Diagnose = breakglass-local-wipe\n"
+                + "After compile: Diagnose = pew-3rows-chroma-scale\n"
                 + "and menu Arthurian → !!! Escape to Tip appears.",
                 "Download Tip Now", "Cancel"))
             return;
@@ -1036,7 +1039,7 @@ public static class ArthurianMenuBootstrap
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
             "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         };
-        const string wantId = "breakglass-local-wipe";
+        const string wantId = "pew-3rows-chroma-scale";
         int ok = 0;
         var log = new System.Text.StringBuilder();
         log.AppendLine("Break-Glass atomic tip pull (tip/main FIRST, HardTip last)");
@@ -1153,7 +1156,7 @@ public static class ArthurianMenuBootstrap
                     if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
                         && (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0
                             || body.IndexOf("Id = \"architect-disk-tip-proof\"", StringComparison.Ordinal) >= 0)
-                        && body.IndexOf("breakglass-local-wipe", StringComparison.Ordinal) < 0)
+                        && body.IndexOf("pew-3rows-chroma-scale", StringComparison.Ordinal) < 0)
                     {
                         last = new Exception("stale PackageVersion from " + sha);
                         continue;

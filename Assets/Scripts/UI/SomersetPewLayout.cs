@@ -21,7 +21,7 @@ namespace ArthurianAutobattler
         public float seatSpread = 0.16f;
 
         [Tooltip("Sprite scale for perspective (front pews larger).")]
-        [Range(0.55f, 1.2f)]
+        [Range(0.55f, 1.65f)]
         public float scale = 1f;
 
         public int seatCapacity = 4;
@@ -34,8 +34,19 @@ namespace ArthurianAutobattler
         public const int PewCount = 12;
         public const int TotalSeats = 52;
 
+        /// <summary>
+        /// Visual sprite rows only (pewSeatIndex / 13). Gameplay keeps 52 seats;
+        /// seats on row ≥ this show no sprite (hidden/empty).
+        /// </summary>
+        public const int VisualSpriteRowCount = 3;
+        public const int PewSeatRowSize = 13;
+
+        /// <summary>True when this seat should draw a pew sprite (rows 0–2).</summary>
+        public static bool SeatShowsSprite(int pewSeatIndex)
+            => (Mathf.Clamp(pewSeatIndex, 0, TotalSeats - 1) / PewSeatRowSize) < VisualSpriteRowCount;
+
         /// <summary>Bump when default pew anchors change so Play Mode refreshes stale scene data.</summary>
-        public const int CurrentLayoutVersion = 3;
+        public const int CurrentLayoutVersion = 4;
 
         [Header("Background (full-screen church art)")]
         public RectTransform backgroundRect;
@@ -61,11 +72,11 @@ namespace ArthurianAutobattler
                 new[] { 0.238f, 0.500f, 0.765f }  // back / altar / windows
             };
 
-            // Sit on the upper 4 pew bands — leave the camera-front pew row empty.
-            // Tuned to SomersetChurchInterior.jpg wood benches (~0.36→0.72 from bottom).
-            float[] rowY = { 0.375f, 0.490f, 0.600f, 0.715f };
-            float[] rowScale = { 0.95f, 0.84f, 0.74f, 0.64f };
-            float[] rowSpread = { 0.165f, 0.150f, 0.138f, 0.125f };
+            // Three visible sprite rows (pews 0–2); row 3 seats stay in data but hidden in UI.
+            // Larger scales so pew sprites read clearly on church art.
+            float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
+            float[] rowScale = { 1.32f, 1.18f, 1.05f, 0.01f };
+            float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.120f };
 
             // Capacities still total 52 (biggest nearest the camera among occupied rows).
             // 5+5+5 + 4+5+4 + 4+4+4 + 4+4+4 = 15+13+12+12 = 52

@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "breakglass-local-wipe";
+    public const string UiBuildId = "pew-3rows-chroma-scale";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -53,8 +53,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
     static readonly Color MagentaChromaKey = new Color(1f, 0f, 1f, 1f); // #FF00FF
     Color saveChromaKey = MagentaChromaKey;
     bool autoDetectCornerColor;
-    float colorTolerance = 0.18f; // 0.01–0.50
+    float colorTolerance = 0.34f; // stronger default — cut magenta sheet bleed (0.01–0.65)
     bool defringeMagentaEdges = true;
+    int defringePasses = 2;
 
     // Interactive Manual Box Splicer (default crop tool)
     CropToolMode cropTool = CropToolMode.ManualBox;
@@ -224,9 +225,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
         autoDetectCornerColor = EditorGUILayout.ToggleLeft(
             "Auto-Detect Corner Color (overrides key from sheet/frame corners)", autoDetectCornerColor);
-        colorTolerance = EditorGUILayout.Slider("Color Tolerance", colorTolerance, 0.01f, 0.50f);
+        colorTolerance = EditorGUILayout.Slider("Color Tolerance", colorTolerance, 0.01f, 0.65f);
         defringeMagentaEdges = EditorGUILayout.ToggleLeft(
             "Defringe Magenta Edges (after key → Color.clear)", defringeMagentaEdges);
+        if (defringeMagentaEdges)
+            defringePasses = EditorGUILayout.IntSlider("Defringe Passes", defringePasses, 1, 4);
 
         int selectedCount = CountSelectedFrames();
         EditorGUILayout.BeginHorizontal();
@@ -239,6 +242,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
             CreateAndRegisterClip();
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.EndHorizontal();
+        if (GUILayout.Button("Re-bake Existing Splices (chroma + alpha)", GUILayout.Height(28)))
+            RebakeExistingSplicesInExportFolder();
 
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("Play library (single Sprite)", EditorStyles.boldLabel);
@@ -1007,9 +1012,67 @@ public class ArthurianArtArchitectWindow : EditorWindow
             "Save Splices to Folder",
             $"Wrote {saved.Count} PNG(s)\n"
             + $"Chroma {keyDesc} tol={colorTolerance:0.00}"
-            + (defringeMagentaEdges ? " + magenta defringe" : "") + "\n"
+            + (defringeMagentaEdges ? $" + magenta defringe×{defringePasses}" : "") + "\n"
             + "Importer: Sprite / alphaIsTransparency / FromInput / Point / Uncompressed / Bottom-Center\n"
             + $"→ {folder}\nRegistered into ModularSpriteLibrary.",
+            "OK");
+    }
+
+    /// <summary>
+    /// Re-key every PNG under Target Export Folder (default Assets/Art/Spliced/Sprite)
+    /// with current chroma/defringe settings and reimport alphaIsTransparency.
+    /// </summary>
+    void RebakeExistingSplicesInExportFolder()
+    {
+        SyncDefaultExportFolder();
+        string folder = string.IsNullOrWhiteSpace(targetExportFolder)
+            ? DefaultExportFolder
+            : targetExportFolder.Replace('\\', '/').TrimEnd('/');
+        if (!AssetDatabase.IsValidFolder(folder))
+        {
+            EditorUtility.DisplayDialog("Re-bake Splices", "Folder missing:\n" + folder, "OK");
+            return;
+        }
+
+        string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { folder });
+        int ok = 0, miss = 0;
+        var saved = new List<Sprite>();
+        foreach (string g in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(g);
+            if (string.IsNullOrEmpty(path) || !path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                continue;
+            try
+            {
+                var sp = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (sp == null)
+                {
+                    // Ensure sprite import then retry.
+                    ConfigureSingleSpritePointBottomCenter(path);
+                    sp = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                }
+                if (sp == null) { miss++; continue; }
+                Sprite written = WriteSpritePngPointBottomCenter(sp, path);
+                if (written != null) { ok++; saved.Add(written); }
+                else miss++;
+            }
+            catch (Exception ex)
+            {
+                miss++;
+                Debug.LogWarning("[DemonKnight] Re-bake miss " + path + ": " + ex.Message);
+            }
+        }
+
+        if (saved.Count > 0)
+            RegisterSpritesIntoLibrary(saved);
+        RefreshSplicedPalette(force: true);
+        ClearPaperdollLibraryLocal();
+        EditorUtility.DisplayDialog(
+            "Re-bake Existing Splices",
+            $"Re-keyed {ok} PNG(s), miss={miss}\n"
+            + $"Chroma tol={colorTolerance:0.00}"
+            + (defringeMagentaEdges ? $" + defringe×{defringePasses}" : "") + "\n"
+            + "alphaIsTransparency + FromInput baked.\n→ " + folder,
             "OK");
     }
 
@@ -1023,10 +1086,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (autoDetectCornerColor)
             key = DetectCornerKeyColor(readable);
         // Always also punch pure #FF00FF when keying (magenta sheets).
-        ApplyChromaKeyClearAndDefringe(readable, key, colorTolerance, defringeMagentaEdges);
+        ApplyChromaKeyClearAndDefringe(
+            readable, key, colorTolerance, defringeMagentaEdges, defringePasses);
 
-        File.WriteAllBytes(assetPath, readable.EncodeToPNG());
+        // EncodeToPNG preserves alpha — bake clear pixels into the file.
+        byte[] png = readable.EncodeToPNG();
         UnityEngine.Object.DestroyImmediate(readable);
+        if (png == null || png.Length < 32) return null;
+        File.WriteAllBytes(assetPath, png);
         AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
         ConfigureSingleSpritePointBottomCenter(assetPath);
         AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
@@ -1071,42 +1138,54 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Pixel pass: near-key → Color.clear; optional magenta edge defringe; mutates tex in place.
+    /// Stronger defaults: higher tol + multi-pass defringe so sheet BG does not show on pews.
     /// </summary>
     static void ApplyChromaKeyClearAndDefringe(
-        Texture2D tex, Color key, float tolerance, bool defringeMagenta)
+        Texture2D tex, Color key, float tolerance, bool defringeMagenta, int passes = 2)
     {
         if (tex == null) return;
         int w = tex.width, h = tex.height;
         Color[] pixels = tex.GetPixels();
-        float tol = Mathf.Clamp(tolerance, 0.01f, 0.50f);
+        float tol = Mathf.Clamp(tolerance, 0.01f, 0.65f);
+        float softTol = tol * 1.35f;
 
-        // Pass 1: chroma key → Color.clear (also always clear near #FF00FF).
+        // Pass 1: chroma key → Color.clear (also always clear near #FF00FF + magenta cast).
         for (int i = 0; i < pixels.Length; i++)
         {
             Color p = pixels[i];
-            if (p.a < 0.004f) { pixels[i] = Color.clear; continue; }
-            if (ColorRgbDistance(p, key) <= tol
-                || ColorRgbDistance(p, MagentaChromaKey) <= tol)
+            if (p.a < 0.008f) { pixels[i] = Color.clear; continue; }
+            float dKey = ColorRgbDistance(p, key);
+            float dMag = ColorRgbDistance(p, MagentaChromaKey);
+            float magCast = (p.r + p.b) * 0.5f - p.g;
+            bool nearKey = dKey <= tol || dMag <= tol;
+            // Soft punch: magenta-cast pixels near key range → clear (kills sheet bleed).
+            bool softMagenta = magCast > 0.18f && p.r > 0.35f && p.b > 0.35f && p.g < 0.55f
+                               && (dKey <= softTol || dMag <= softTol);
+            if (nearKey || softMagenta)
                 pixels[i] = Color.clear;
         }
 
-        // Pass 2: defringe magenta edges (semi-magenta pixels next to clear).
+        // Pass 2+: defringe magenta edges (semi-magenta pixels next to clear) — multi-pass.
         if (defringeMagenta)
         {
-            var outPx = (Color[])pixels.Clone();
-            for (int y = 0; y < h; y++)
+            int n = Mathf.Clamp(passes, 1, 4);
+            for (int pass = 0; pass < n; pass++)
             {
-                for (int x = 0; x < w; x++)
+                var outPx = (Color[])pixels.Clone();
+                for (int y = 0; y < h; y++)
                 {
-                    int i = y * w + x;
-                    Color p = pixels[i];
-                    if (p.a < 0.004f) continue;
-                    if (!IsMagentaFringe(p)) continue;
-                    if (!HasClearNeighbor(pixels, w, h, x, y)) continue;
-                    outPx[i] = DefringeMagentaPixel(p);
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = y * w + x;
+                        Color p = pixels[i];
+                        if (p.a < 0.008f) continue;
+                        if (!IsMagentaFringe(p)) continue;
+                        if (!HasClearNeighbor(pixels, w, h, x, y)) continue;
+                        outPx[i] = DefringeMagentaPixel(p);
+                    }
                 }
+                pixels = outPx;
             }
-            pixels = outPx;
         }
 
         tex.SetPixels(pixels);
@@ -1121,30 +1200,30 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (dx == 0 && dy == 0) continue;
             int nx = x + dx, ny = y + dy;
             if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-            if (pixels[ny * w + nx].a < 0.02f) return true;
+            if (pixels[ny * w + nx].a < 0.04f) return true;
         }
         return false;
     }
 
     static bool IsMagentaFringe(Color p)
     {
-        // High R+B vs G (magenta cast), still somewhat opaque.
+        // More aggressive: catch faint magenta halo left by soft anti-alias against #FF00FF.
         float mag = (p.r + p.b) * 0.5f - p.g;
-        return mag > 0.12f && p.r > 0.25f && p.b > 0.25f;
+        return mag > 0.06f && p.r > 0.18f && p.b > 0.18f;
     }
 
     static Color DefringeMagentaPixel(Color p)
     {
         float excess = Mathf.Max(0f, Mathf.Min(p.r, p.b) - p.g);
-        p.r = Mathf.Clamp01(p.r - excess);
-        p.b = Mathf.Clamp01(p.b - excess);
-        // If almost nothing left but fringe, clear it.
+        // Pull toward green channel more aggressively.
+        p.r = Mathf.Clamp01(p.r - excess * 1.35f);
+        p.b = Mathf.Clamp01(p.b - excess * 1.35f);
         float luma = p.r * 0.3f + p.g * 0.59f + p.b * 0.11f;
-        if (luma < 0.04f || (p.r + p.b) * 0.5f - p.g > 0.35f)
+        float magLeft = (p.r + p.b) * 0.5f - p.g;
+        if (luma < 0.06f || magLeft > 0.22f)
             return Color.clear;
-        // Soften alpha on residual fringe.
-        p.a *= Mathf.Clamp01(1f - excess * 1.5f);
-        if (p.a < 0.05f) return Color.clear;
+        p.a *= Mathf.Clamp01(1f - excess * 2.2f);
+        if (p.a < 0.08f) return Color.clear;
         return p;
     }
 

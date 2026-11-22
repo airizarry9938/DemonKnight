@@ -34,7 +34,8 @@ namespace ArthurianAutobattler
         public SomersetPewLayout pewLayout;
         public RectTransform pewSeatLayer;
         public GameObject paperDollSeatPrefab;
-        public Vector2 baseSeatSize = new Vector2(56f, 72f);
+        /// <summary>~1.55× prior 56×72 — pew sprites read larger on church art.</summary>
+        public Vector2 baseSeatSize = new Vector2(88f, 112f);
 
         [Header("Modals (mutual exclusion)")]
         public GameObject diceModal;
@@ -1679,6 +1680,9 @@ namespace ArthurianAutobattler
             if (pewLayout == null) pewLayout = gameObject.AddComponent<SomersetPewLayout>();
             pewLayout.ApplyLatestDefaultsIfNeeded();
             pewLayout.EnsureValid();
+            // Scene-serialized seat size may lag tip — keep pew sprites visibly large.
+            if (baseSeatSize.x < 80f || baseSeatSize.y < 100f)
+                baseSeatSize = new Vector2(88f, 112f);
 
             if (pewSeatLayer == null)
             {
@@ -1740,10 +1744,15 @@ namespace ArthurianAutobattler
                 }
                 pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize, jitterX);
 
+                // Visual sprites on 3 rows only (pewSeatIndex / 13 → 0,1,2). Row 3 = hidden.
+                bool showSprite = SomersetPewLayout.SeatShowsSprite(seatIndex);
+                if (!showSprite)
+                    HidePewSeatVisual(go);
+
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
                 {
-                    if (recruit != null)
+                    if (showSprite && recruit != null)
                         view.Bind(
                             recruit,
                             onLeftClick: () => ToggleUnitSelectionMenu(recruit),
@@ -1752,7 +1761,7 @@ namespace ArthurianAutobattler
                     else view.BindEmpty();
                     seats.Add(view);
                 }
-                else
+                else if (showSprite)
                 {
                     EnsureSeatImage(go, recruit);
                     VictoryStarBadge.Apply(go.transform, recruit);
@@ -1783,8 +1792,31 @@ namespace ArthurianAutobattler
                 }
             }
 
-            Debug.Log($"[DemonKnight] Populated {SomersetPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied).");
+            Debug.Log(
+                $"[DemonKnight] Populated {SomersetPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied); "
+                + $"sprite rows 0–{SomersetPewLayout.VisualSpriteRowCount - 1} only "
+                + $"(hide pewSeatIndex/{SomersetPewLayout.PewSeatRowSize} ≥ {SomersetPewLayout.VisualSpriteRowCount}).");
             RefreshHUD();
+        }
+
+        /// <summary>Row 3+ (pewSeatIndex/13 ≥ 3): no visible sprite; 52 seats remain in data.</summary>
+        static void HidePewSeatVisual(GameObject go)
+        {
+            if (go == null) return;
+            var cg = go.GetComponent<CanvasGroup>();
+            if (cg == null) cg = go.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;
+            cg.blocksRaycasts = false;
+            cg.interactable = false;
+            foreach (var img in go.GetComponentsInChildren<Image>(true))
+            {
+                img.sprite = null;
+                img.color = Color.clear;
+                img.raycastTarget = false;
+            }
+            var btn = go.GetComponent<Button>();
+            if (btn != null) btn.interactable = false;
+            go.transform.localScale = Vector3.zero;
         }
 
         private static void EnsureSeatImage(GameObject go, RecruitInstance recruit)

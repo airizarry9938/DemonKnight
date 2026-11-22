@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "breakglass-local-wipe";
+    const string TipPackageId = "pew-3rows-chroma-scale";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
     const string SplicedSpriteFolder = "Assets/Art/Spliced/Sprite";
@@ -41,6 +41,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "spliced-sprite-pews",
         "spliced-sprite-escape",
         "architect-no-bootstrap-clear",
+        "breakglass-local-wipe",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
