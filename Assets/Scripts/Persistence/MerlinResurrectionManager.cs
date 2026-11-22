@@ -731,22 +731,28 @@ namespace ArthurianAutobattler
                     loreNarrativeText.text = customReason;
                 else if (defeatedNimue)
                     loreNarrativeText.text =
-                        "VICTORY — Nimue is defeated.\n\n"
-                        + "Yet the abyss stirs… Merlin turns the hourglass inside the Somerset church once more.";
+                        "VICTORY — Nimue falls.\n\n"
+                        + "From rain and mist Merlin emerges at last — gaunt, late, and grave.\n"
+                        + "Somerset held. But while you stood the churchyard, the Demon Enchantress army overran Camelot and Britain.\n"
+                        + "The reconquest war begins.";
                 else
                     loreNarrativeText.text =
-                        "DEFEAT — Your warband was overrun.\n\n"
-                        + "The horde breaches the churchyard. Merlin shatters the hourglass. The pews remember the slaughter.";
+                        "THE GRAIL NIGHTMARE — Broken Vigil\n\n"
+                        + "Somerset falls in a vision of rain and shattered pews. The churchyard is lost.\n"
+                        + "Grudge Memory carries forward. Merlin remains missing — no hourglass turns, no rewind.\n"
+                        + "Only the vigil broken, and the war still waiting.";
             }
 
             yield return new WaitForSecondsRealtime(2.0f);
 
             if (loreNarrativeText != null)
             {
-                string outcome = defeatedNimue ? "VICTORY" : "DEFEAT";
+                string outcome = defeatedNimue ? "VICTORY — Camelot Fallen" : "GRAIL NIGHTMARE — Broken Vigil";
                 loreNarrativeText.text =
                     $"<b>{outcome}</b>\n\n"
-                    + "Perks & runes are offline while we redesign them.\n"
+                    + (defeatedNimue
+                        ? "Merlin's news stands: Britain bleeds while Somerset held.\n"
+                        : "Merlin is still missing. Grudge Memory endures.\n")
                     + "Press <b>Next Night</b> to continue, or <b>End Run</b> for the Main Menu.";
             }
             HideLegacyBankPanel();

@@ -38,10 +38,12 @@ public static class ArthurianCharacterCatalogSeeder
             CharacterPassiveType.AuraAtkBuff, 0f, "High King of Camelot — anchors the front.",
             Rule(UnitType.Knight, 2), Rule(UnitType.Captain, 1));
 
+        // Merlin kept as UnitType / catalog entry for narrative + combat refs, but NOT playable.
+        // Empty fusion recipe → HasFusionRecipe false → never appears in fuseable Codex pool.
         SeedLegend("Merlin", "hero_merlin", "Merlin the Archmage", UnitType.Merlin,
             CharacterCombatRole.Backline, TraitTag.Zealot, 195, 30, 1.5f, true, false,
-            CharacterPassiveType.None, 0f, "Archmage — devastating backline caster.",
-            Rule(UnitType.Priest, 2), Rule(UnitType.Knight, 1));
+            CharacterPassiveType.None, 0f,
+            "Missing from Somerset — narrative NPC only. Cannot be fused or summoned.");
 
         SeedLegend("Lancelot", "hero_lancelot", "Sir Lancelot", UnitType.SirLancelot,
             CharacterCombatRole.Tank, TraitTag.Noble, 240, 29, 2.0f, false, false,

@@ -175,7 +175,7 @@ namespace ArthurianAutobattler
         public const string LegendSparkId = "Legend Spark";
         /// <summary>Hidden Potential — Percival unlock when Darkhorse awakened/ascended.</summary>
         public const string DarkhorseId = "Darkhorse";
-        /// <summary>Hidden Potential — Merlin unlock when GoldenEgg awakened/fused.</summary>
+        /// <summary>Hidden Potential — GoldenEgg (Merlin no longer unlocks; narrative-only).</summary>
         public const string GoldenEggId = "Golden Egg";
         /// <summary>Hidden Potential — Nimue unlock when GrailTouched fused (MythicVessel trait).</summary>
         public const string GrailTouchedId = "GrailTouched";
