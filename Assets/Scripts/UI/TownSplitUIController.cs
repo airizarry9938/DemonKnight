@@ -48,6 +48,22 @@ namespace ArthurianAutobattler
         private RecruitInstance selectedRecruit;
         private GameObject selectedButtonObj;
         private List<RecruitInstance> activeTownPool = new List<RecruitInstance>();
+        static StageLayoutProfile _townChurchProfileCache;
+
+        static SlotTransformConfig GetAuthoredChurchSlot(int seatIndex)
+        {
+            try
+            {
+                _townChurchProfileCache ??= StageLayoutProfile.Load();
+                var slots = _townChurchProfileCache?.churchPewSlots;
+                if (slots == null || seatIndex < 0 || seatIndex >= slots.Count) return null;
+                return slots[seatIndex];
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         private void Start()
         {
@@ -145,6 +161,11 @@ namespace ArthurianAutobattler
             activeTownPool = generatedTown ?? new List<RecruitInstance>();
             if (townGridContainer == null) return;
 
+            // Fresh Architect layout + pools (same as SomersetChurchUI.PopulatePews).
+            _townChurchProfileCache = null;
+            try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
+            try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
+
             // Disable legacy GridLayoutGroup — seats are absolute on the church art.
             var grid = townGridContainer.GetComponent<GridLayoutGroup>();
             if (grid != null) grid.enabled = false;
@@ -202,8 +223,23 @@ namespace ArthurianAutobattler
             var rt = btnObj.GetComponent<RectTransform>();
             if (rt == null) rt = btnObj.AddComponent<RectTransform>();
 
+            // Prefer StageLayoutProfile church authoring (normalized 0–1 + scale) when set —
+            // matches SomersetChurchUI.PopulatePews so Architect Tab 2 layout shows in Play.
+            SlotTransformConfig authored = GetAuthoredChurchSlot(seatIndex);
             if (pewLayout != null)
-                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
+            {
+                if (authored != null
+                    && authored.position.x >= 0f && authored.position.x <= 1f
+                    && authored.position.y >= 0f && authored.position.y <= 1f)
+                {
+                    float mul = authored.scale.x > 0.01f ? authored.scale.x : 1f;
+                    float rowScale = pewLayout.GetSeatScale(seatIndex);
+                    pewLayout.ApplyNormalizedSeatTransform(
+                        rt, authored.position, baseSeatSize, rowScale * mul, 0f);
+                }
+                else
+                    pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
+            }
 
             bool showSprite = SomersetPewLayout.SeatShowsSprite(seatIndex);
             Image img = btnObj.GetComponent<Image>();
@@ -224,9 +260,10 @@ namespace ArthurianAutobattler
             else if (recruit != null)
             {
                 Sprite poolSprite = LegendPewPortraitApplier.ResolvePewVisual(recruit);
-                if (poolSprite != null)
+                Sprite visual = poolSprite != null ? poolSprite : authored?.previewOrOverrideSprite;
+                if (visual != null)
                 {
-                    img.sprite = poolSprite;
+                    img.sprite = visual;
                     img.color = Color.white;
                 }
                 else if (recruit.randomAvatar != null)
@@ -245,6 +282,11 @@ namespace ArthurianAutobattler
                         _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
                     };
                 }
+            }
+            else if (showSprite && authored?.previewOrOverrideSprite != null)
+            {
+                img.sprite = authored.previewOrOverrideSprite;
+                img.color = Color.white;
             }
             else
             {

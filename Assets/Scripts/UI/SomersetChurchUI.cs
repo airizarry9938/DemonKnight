@@ -1696,6 +1696,12 @@ namespace ArthurianAutobattler
 
         public void PopulatePews(List<RecruitInstance> town)
         {
+            // Fresh Architect assets every spawn (Enter Play Mode without domain reload
+            // otherwise keeps empty CreateInstance pool caches).
+            InvalidateChurchAssignCache();
+            try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
+            try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
+
             if (pewLayout == null) pewLayout = GetComponent<SomersetPewLayout>();
             if (pewLayout == null) pewLayout = gameObject.AddComponent<SomersetPewLayout>();
             pewLayout.ApplyLatestDefaultsIfNeeded();

@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "architect-legend-pew-portraits";
-    public const string GitHint = "architect-legend-pew-portraits-tab5";
-    public const string BuiltUtc = "2026-11-22T22:20:00Z";
+    public const string Id = "fix-architect-pool-apply";
+    public const string GitHint = "fix-architect-pool-apply-layout-pools";
+    public const string BuiltUtc = "2026-11-22T23:10:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "9c3e7602cd597d73ebeb50376740a29fe5cd8a5c";
+    public const string HardTipSha = "cabf49fa45d691f5305979feccc80e99d24123ea";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -220,6 +220,7 @@ public static class DemonKnightPackageVersion
             "merlin-lore-narrative",
             "lore-boss-wave-order",
             "legends-lore-portrait",
+            "architect-legend-pew-portraits",
         };
         foreach (string s in stale)
         {

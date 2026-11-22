@@ -4,5 +4,8 @@ Submit multiple Peasant / Warrior / Knight sprites into each pool.
 At church spawn, occupied pews pick from the matching class pool (deterministic by unitID).
 Empty pools soft-fail to StageLayoutProfile assign-only / solid fallbacks.
 Stage Placer seat sprites remain position/scale placement guides — not gameplay identity.
+Path backups (peasantAssetPaths etc.) rematerialize Missing sprites after reimport —
+Persist must never wipe those paths when a sprite is temporarily null
+(tip fix-architect-pool-apply).
 Do not commit a YAML that still references a missing MonoScript GUID — Ensure remaps or
 transplants pool lists so assignments survive Force Sync / editor reloads.
