@@ -146,10 +146,13 @@ public static class ArthurianStageLayoutProfileEnsure
         string arch = Path.Combine(root, "Assets", "Editor", "ArthurianArtArchitectWindow.cs");
         string sync = Path.Combine(root, "Assets", "Editor", "ArthurianSyncFromGitHub.cs");
         if (!File.Exists(pv) || !File.Exists(arch)) return true;
+        string tipEscape = Path.Combine(root, "Assets", "Editor", "DemonKnightTipEscape.cs");
+        if (!File.Exists(tipEscape)) return true;
         string pvBody = File.ReadAllText(pv);
         string archBody = File.ReadAllText(arch);
         if (pvBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0) return true;
         foreach (string m in StaleHostMarkers)
         {
             if (m == TipPackageId) continue;
@@ -179,6 +182,7 @@ public static class ArthurianStageLayoutProfileEnsure
         string root = Directory.GetParent(Application.dataPath)!.FullName;
         string[] rels =
         {
+            "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             "Assets/Editor/ArthurianSyncFromGitHub.cs",
             "Assets/Editor/ArthurianMenuBootstrap.cs",

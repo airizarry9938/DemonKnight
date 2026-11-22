@@ -13,7 +13,7 @@ public static class DemonKnightPackageVersion
 {
     public const string Id = "breakglass-local-wipe";
     public const string GitHint = "breakglass-tip-local-wipe-no-CS0117-Wipe";
-    public const string BuiltUtc = "2026-11-22T10:31:23Z";
+    public const string BuiltUtc = "2026-11-22T10:33:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "4b7cfc2d5541e06aaebe47edd3a5bfbe7b6d8d9f";
@@ -43,6 +43,9 @@ public static class DemonKnightPackageVersion
                 string bootPath = Path.Combine(root, "Assets", "Editor", "ArthurianMenuBootstrap.cs");
                 bool need = !File.Exists(syncPath) || !File.Exists(archPath) || !File.Exists(bootPath);
 
+                string tipEscapePath = Path.Combine(root, "Assets", "Editor", "DemonKnightTipEscape.cs");
+                if (!File.Exists(tipEscapePath)) need = true;
+
                 if (!need)
                 {
                     string arch = File.ReadAllText(archPath);
@@ -55,6 +58,8 @@ public static class DemonKnightPackageVersion
                     if (sync.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0) need = true;
                     if (sync.IndexOf("StalePackageIds", StringComparison.Ordinal) < 0) need = true;
                     if (boot.IndexOf("Clear Paperdoll Library", StringComparison.Ordinal) < 0) need = true;
+                    // CS0117 chicken-egg: Architect must not call PackageVersion.Wipe*
+                    if (arch.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0) need = true;
                 }
 
                 if (!need) return;
@@ -67,6 +72,7 @@ public static class DemonKnightPackageVersion
                 string tip = TryResolveTipSha() ?? "main";
                 string[] rels =
                 {
+                    "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
                     "Assets/Editor/ArthurianMenuBootstrap.cs",
                     "Assets/Editor/ArthurianArtArchitectWindow.cs",
