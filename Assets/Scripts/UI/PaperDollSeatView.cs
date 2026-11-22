@@ -41,6 +41,17 @@ namespace ArthurianAutobattler
             Action onLeftClick,
             Action onHover,
             Action onRightClick)
+            => Bind(recruit, onLeftClick, onHover, onRightClick, useLibraryArt: true);
+
+        /// <param name="useLibraryArt">
+        /// False = church pews: StageLayoutProfile assign-only (no library / no clip paint).
+        /// </param>
+        public void Bind(
+            RecruitInstance recruit,
+            Action onLeftClick,
+            Action onHover,
+            Action onRightClick,
+            bool useLibraryArt)
         {
             Bound = recruit;
             var layers = EnsureModularLayers();
@@ -48,35 +59,39 @@ namespace ArthurianAutobattler
 
             if (recruit != null)
             {
-                // Older TownRNG / Sync copies left appearance unset → solid pew boxes.
-                if (recruit.appearance == null)
+                if (recruit.appearance == null && useLibraryArt)
                 {
                     var lib = TownsfolkVisualApplier.Library;
                     recruit.appearance = TownsfolkAppearance.Generate(
                         recruit.unitType, recruit.unitID, recruit.pewSeatIndex, lib);
                 }
-                recruit.appearance.BindSeatSalt(recruit.pewSeatIndex);
+                recruit.appearance?.BindSeatSalt(recruit.pewSeatIndex);
             }
 
-            TownsfolkVisualApplier.Apply(
-                recruit?.appearance,
-                layers,
-                recruit);
+            if (useLibraryArt)
+            {
+                TownsfolkVisualApplier.Apply(recruit?.appearance, layers, recruit);
+            }
+            else
+            {
+                if (layers.body != null)
+                {
+                    layers.body.sprite = null;
+                    layers.body.color = new Color(0.12f, 0.10f, 0.09f, 0.40f);
+                    layers.body.enabled = true;
+                }
+                if (layers.outfit != null) { layers.outfit.sprite = null; layers.outfit.enabled = false; }
+                if (layers.head != null) { layers.head.sprite = null; layers.head.enabled = false; }
+                if (layers.prop != null) { layers.prop.sprite = null; layers.prop.enabled = false; }
+            }
 
             if (!_loggedFirstBind && recruit != null)
             {
                 _loggedFirstBind = true;
                 string bodyName = layers.body != null && layers.body.sprite != null
                     ? layers.body.sprite.name : "NULL";
-                string outfitName = layers.outfit != null && layers.outfit.enabled && layers.outfit.sprite != null
-                    ? layers.outfit.sprite.name : "NULL";
-                string headName = layers.head != null && layers.head.enabled && layers.head.sprite != null
-                    ? layers.head.sprite.name : "NULL";
                 Debug.Log(
-                    $"[DemonKnight] First pew Bind '{recruit.characterName}' (single-sprite): " +
-                    $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
-                    $"body={bodyName} outfit={outfitName} head={headName} " +
-                    "(outfit/head must be NULL — tip assign-only-pew-drag; body from Spliced/Sprite)");
+                    $"[DemonKnight] First pew Bind '{recruit.characterName}' useLibraryArt={useLibraryArt} body={bodyName}");
             }
 
             if (moodLayer != null)
@@ -113,12 +128,14 @@ namespace ArthurianAutobattler
                 onRightClick: onRightClick);
             VictoryStarBadge.Apply(transform, recruit);
 
-            // Phase 4 — modular Idle clips / breath bob + unscouted tint.
             var anim = ModularSpriteAnimator.EnsureOn(gameObject);
-            anim?.ConfigurePaperDoll(this, recruit);
+            if (useLibraryArt)
+                anim?.ConfigurePaperDoll(this, recruit);
+            else
+                anim?.ConfigureAssignedOnlyPaperDoll(this, recruit);
         }
 
-        /// <summary>Force body to Stage Placer–assigned sprite (no library RNG).</summary>
+        /// <summary>Force body to Stage Placer–assigned sprite (no library RNG / animator clip).</summary>
         public void ApplyAssignedBodySprite(Sprite sp)
         {
             var layers = EnsureModularLayers();
@@ -131,9 +148,11 @@ namespace ArthurianAutobattler
             if (layers.outfit != null) { layers.outfit.sprite = null; layers.outfit.enabled = false; }
             if (layers.head != null) { layers.head.sprite = null; layers.head.enabled = false; }
             if (layers.prop != null) { layers.prop.sprite = null; layers.prop.enabled = false; }
+            var anim = GetComponent<ModularSpriteAnimator>();
+            if (anim != null) anim.LockBodySprite(true);
         }
 
-        /// <summary>Solid seat marker — no library copy when assign-mode seat has no sprite.</summary>
+        /// <summary>Solid / empty seat — no library copy.</summary>
         public void ClearBodyToSolid()
         {
             var layers = EnsureModularLayers();
@@ -145,6 +164,8 @@ namespace ArthurianAutobattler
             if (layers.outfit != null) { layers.outfit.sprite = null; layers.outfit.enabled = false; }
             if (layers.head != null) { layers.head.sprite = null; layers.head.enabled = false; }
             if (layers.prop != null) { layers.prop.sprite = null; layers.prop.enabled = false; }
+            var anim = GetComponent<ModularSpriteAnimator>();
+            if (anim != null) anim.LockBodySprite(true);
         }
 
         public void BindEmpty()
@@ -406,6 +427,8 @@ namespace ArthurianAutobattler
 
         SpriteAnimClip poseClip;
         bool poseMulti;
+        /// <summary>When true, never overwrite body Image from library clips (StageLayout assign-only).</summary>
+        bool lockBodySprite;
 
         public static ModularSpriteAnimator EnsureOn(GameObject go)
         {
@@ -415,11 +438,38 @@ namespace ArthurianAutobattler
             return a;
         }
 
+        public void LockBodySprite(bool locked) => lockBodySprite = locked;
+
+        /// <summary>Pew assign-only: breath bob OK, no library clip frames on body.</summary>
+        public void ConfigureAssignedOnlyPaperDoll(PaperDollSeatView seat, RecruitInstance recruit)
+        {
+            if (seat == null) return;
+            uiMode = true;
+            boundRecruit = recruit;
+            library = null;
+            lockBodySprite = true;
+            bodyImg = seat.bodyLayer;
+            outfitImg = null;
+            headImg = null;
+            propImg = null;
+            if (seat.outfitLayer != null) { seat.outfitLayer.sprite = null; seat.outfitLayer.enabled = false; }
+            if (seat.headLayer != null) { seat.headLayer.sprite = null; seat.headLayer.enabled = false; }
+            if (seat.propLayer != null) { seat.propLayer.sprite = null; seat.propLayer.enabled = false; }
+            poseClip = null;
+            poseMulti = false;
+            CaptureBase();
+            startOffset = UnityEngine.Random.Range(0f, 1.5f);
+            state = AnimState.Idle;
+            stateTime = 0f;
+            enabled = true;
+        }
+
         public void ConfigurePaperDoll(PaperDollSeatView seat, RecruitInstance recruit)
         {
             if (seat == null) return;
             uiMode = true;
             boundRecruit = recruit;
+            lockBodySprite = false;
             library = TownsfolkVisualApplier.Library ?? ModularSpriteLibrary.Load();
             bodyImg = seat.bodyLayer;
             // Single-sprite runtime — never drive Outfit/Head/Prop layers.
@@ -667,6 +717,8 @@ namespace ArthurianAutobattler
         void SetLayerSprite(int layer, Sprite sp)
         {
             if (sp == null) return;
+            // StageLayout assign-only pews: never re-paint body from library clips.
+            if (lockBodySprite && layer == 0) return;
             if (uiMode)
             {
                 Image img = LayerImage(layer);
@@ -919,7 +971,7 @@ static class DemonKnightPaperDollTipEscapeHook
                     int q2 = q1 >= 0 ? t.IndexOf('"', q1 + 1) : -1;
                     if (q1 >= 0 && q2 > q1) diskId = t.Substring(q1 + 1, q2 - q1 - 1);
                 }
-                if (diskId == "assign-only-pew-drag") return;
+                if (diskId == "assign-only-runtime") return;
                 if (diskId != "architect-breakglass-hosts"
                     && diskId != "architect-disk-tip-proof"
                     && diskId != "single-sprite-auto-wipe"
@@ -958,7 +1010,7 @@ static class DemonKnightPaperDollTipEscapeHook
                         string body = wc.DownloadString(url);
                         if (string.IsNullOrEmpty(body) || body.Length < 80) continue;
                         if (rel.EndsWith("PackageVersion.cs")
-                            && body.IndexOf("assign-only-pew-drag", System.StringComparison.Ordinal) < 0)
+                            && body.IndexOf("assign-only-runtime", System.StringComparison.Ordinal) < 0)
                             continue;
                         string dest = System.IO.Path.Combine(root, rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
                         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);

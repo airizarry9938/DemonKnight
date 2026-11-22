@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "assign-only-pew-drag";
+    public const string TipPackageId = "assign-only-runtime";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -36,7 +36,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (assign-only-pew-drag)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (assign-only-runtime)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -113,6 +113,7 @@ public static class DemonKnightTipEscape
             "pew-3rows-chroma-scale",
             "church-bg-pew-preview",
             "fix-seatshow-cs0436",
+            "assign-only-pew-drag",
         };
         foreach (string s in stale)
         {

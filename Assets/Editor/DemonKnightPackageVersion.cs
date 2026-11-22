@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "assign-only-pew-drag";
-    public const string GitHint = "assign-only-no-rng-drag-scale";
-    public const string BuiltUtc = "2026-11-22T11:02:09Z";
+    public const string Id = "assign-only-runtime";
+    public const string GitHint = "runtime-assign-only-no-library-fill";
+    public const string BuiltUtc = "2026-11-22T11:20:23Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "4bd0eb6d2df564d8f168c9d4a950302373af08ff";
@@ -185,6 +185,7 @@ public static class DemonKnightPackageVersion
             "pew-3rows-chroma-scale",
             "church-bg-pew-preview",
             "fix-seatshow-cs0436",
+            "assign-only-pew-drag",
         };
         foreach (string s in stale)
         {

@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "assign-only-pew-drag";
+    public const string UiBuildId = "assign-only-runtime";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -2073,7 +2073,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
         var s = slots[selectedSlot];
         Undo.RecordObject(stageProfile, "Assign Palette To Slot");
         s.previewOrOverrideSprite = paletteSelectedSprite;
+        // Clear other church seats' accidental copies? No — only this slot.
         EditorUtility.SetDirty(stageProfile);
+        AssetDatabase.SaveAssets(); // Play Load() reads Resources — must flush assign.
+        try { SomersetChurchUI.InvalidateChurchAssignCache(); } catch { /* ignore */ }
+        Debug.Log($"[DemonKnight] Assigned '{paletteSelectedSprite.name}' → church seat #{selectedSlot:00} only (saved).");
         Repaint();
     }
 
