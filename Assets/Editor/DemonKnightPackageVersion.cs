@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-wave-advance-stuck";
-    public const string GitHint = "wave-keep-after-victory-next-night";
-    public const string BuiltUtc = "2026-11-22T20:45:00Z";
+    public const string Id = "fix-hud-wave-match";
+    public const string GitHint = "hud-night-equals-combat-wave";
+    public const string BuiltUtc = "2026-11-22T20:50:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";

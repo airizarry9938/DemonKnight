@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-wave-advance-stuck";
+    public const string TipPackageId = "fix-hud-wave-match";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -41,7 +41,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-wave-advance-stuck)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-hud-wave-match)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -127,7 +127,8 @@ public static class DemonKnightTipEscape
             "class-sprite-pools",
             "force-sync-appliers-hardfix",
             "sheet-splicer-chroma-despill",
-            "legends-fullwidth-column",
+            "fix-wave-advance-stuck",
+        "legends-fullwidth-column",
         };
         foreach (string s in stale)
         {

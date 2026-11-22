@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
 
-    private const string ExpectedPackageId = "fix-wave-advance-stuck";
+    private const string ExpectedPackageId = "fix-hud-wave-match";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -62,6 +62,7 @@ public static class ArthurianSyncFromGitHub
         "sync-keep-editor-menus",
         "force-sync-appliers-hardfix",
         "sheet-splicer-chroma-despill",
+        "fix-wave-advance-stuck",
         "legends-fullwidth-column",
     };
 
@@ -1300,6 +1301,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("AdvanceNightCounterAfterWaveWin")
                    && body.Contains("ContinueAfterWaveVictory")
                    && body.Contains("pendingMidRunWaveVictory")
+                   && body.Contains("SyncNightToCombatWave")
                    && body.Contains("AwardWaveVictoryVeteranRanks")
                    && body.Contains("RedrawVeteranStarIcons")
                    && body.Contains("StartTownRecruitPhase")
@@ -1651,7 +1653,7 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("fix-scene-bg-applier-cs0103")
                    || body.Contains("force-sync-appliers-hardfix")
                    || body.Contains("sheet-splicer-chroma-despill")
-                   || body.Contains("fix-wave-advance-stuck");
+                   || body.Contains("fix-hud-wave-match");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))

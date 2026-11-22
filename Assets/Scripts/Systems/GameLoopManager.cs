@@ -401,19 +401,17 @@ namespace ArthurianAutobattler
         public bool pendingMidRunWaveVictory;
 
         /// <summary>
-        /// Mid-wave victory: bump Night HUD (1→2→3…) without Merlin Next Night reload.
-        /// Keeps the player in the same town loop; only the night counter / label change.
+        /// Mid-wave victory fallback (Merlin missing): sync Night HUD to combat wave.
+        /// Does not invent a separate calendar night — mirrors currentBattleNumber.
         /// </summary>
         public void AdvanceNightCounterAfterWaveWin()
         {
             int from = Mathf.Max(1, currentNight);
-            currentNight = from + 1;
-            PlayerPrefs.SetInt(NightPrefsKey, currentNight);
-            PlayerPrefs.Save();
+            SyncNightToCombatWave();
             RefreshNightHUD();
             var church = ResolveChurchUI();
-            church?.SetNight(currentNight);
-            Debug.LogError($"[DemonKnight] Wave win night {from} → {currentNight}");
+            church?.SetNight(CurrentWaveNumber());
+            Debug.LogError($"[DemonKnight] Wave win HUD sync night {from} → {currentNight} (wave={CurrentWaveNumber()})");
         }
 
         /// <summary>
@@ -439,13 +437,13 @@ namespace ArthurianAutobattler
 
                 int waveKeep = CurrentWaveNumber();
                 int fromNight = Mathf.Max(1, currentNight);
-                // Keep night aligned with the upcoming wave (1→2→3… through finalBossWave).
-                currentNight = Mathf.Max(fromNight + 1, waveKeep);
+                // Night HUD mirrors combat wave (same index as horde/boss spawn).
+                currentNight = waveKeep;
                 PlayerPrefs.SetInt(NightPrefsKey, currentNight);
                 PlayerPrefs.Save();
                 Debug.LogError(
-                    $"[DemonKnight] Wave victory continue — Night {fromNight} → {currentNight}, "
-                    + $"wave kept at {waveKeep} (NOT reset to 1).");
+                    $"[DemonKnight] Wave victory continue — HUD Night/Wave → {waveKeep} "
+                    + $"(from night {fromNight}; NOT reset to 1).");
 
                 int gold = townUI != null ? townUI.playerGold : StartingGold;
                 AutosaveWarband(gold);
@@ -463,7 +461,7 @@ namespace ArthurianAutobattler
 
                 RefreshNightHUD();
                 var church = ResolveChurchUI();
-                church?.SetNight(currentNight);
+                church?.SetNight(CurrentWaveNumber());
                 church?.RefreshHUD();
             }
             finally
@@ -474,7 +472,7 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Defeat / full-run Merlin "Next Night" (or legacy Enter Next Timeline):
-        /// advance night and restart wave index at 1 for a fresh night of the campaign.
+        /// restart combat at Wave 1; HUD Night mirrors Wave 1 (same SoT).
         /// Mid-run wave wins must use <see cref="ContinueAfterWaveVictory"/> instead.
         /// </summary>
         public void AdvanceNightAndRestart()
@@ -490,17 +488,20 @@ namespace ArthurianAutobattler
             try
             {
                 int from = Mathf.Max(1, currentNight);
-                currentNight = from + 1;
-                PlayerPrefs.SetInt(NightPrefsKey, currentNight);
-                PlayerPrefs.Save();
-                Debug.Log($"[DemonKnight] Night advance {from} → {currentNight} (wave reset to 1 — defeat/timeline)");
-
-                // Capture survivors AFTER night bump — automatic, no Save menu.
+                // Defeat / timeline restart: next fight is Wave 1 — HUD Night mirrors that
+                // (no "Night 2 · Wave 1" mismatch vs DemonHordeGenerator).
+                if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
                 if (battleEngine != null)
                 {
                     battleEngine.isBattling = false;
                     battleEngine.currentBattleNumber = 1;
                 }
+                currentNight = 1;
+                PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+                PlayerPrefs.Save();
+                Debug.Log(
+                    $"[DemonKnight] Defeat/timeline restart — HUD Night/Wave 1 "
+                    + $"(was night {from}; combat wave reset to 1).");
 
                 int gold = townUI != null ? townUI.playerGold : StartingGold;
                 AutosaveWarband(gold);
@@ -996,28 +997,51 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Updates the top-HUD Night label by GameObject name only.
+        /// HUD Night number = combat wave (<see cref="AutoBattlerEngine.currentBattleNumber"/>).
+        /// Keeps church bar / PlayerPrefs aligned with horde budget + boss spawn.
+        /// </summary>
+        public void SyncNightToCombatWave()
+        {
+            int wave = CurrentWaveNumber();
+            if (currentNight == wave) return;
+            currentNight = wave;
+            PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Updates the top-HUD Night/Wave label by GameObject name only.
         /// Deliberately does NOT call ChurchStageUIController.SetNight / SomersetChurchUI.SetNight
         /// so this file compiles even when those UI scripts are a stale partial Sync.
+        /// Label always uses combat wave SoT (never a stale calendar Night alone).
         /// </summary>
         public void RefreshNightHUD()
         {
-            ApplyNightLabel(FormatNightWaveLabel(currentNight, CurrentWaveNumber()));
+            SyncNightToCombatWave();
+            int wave = CurrentWaveNumber();
+            ApplyNightLabel(FormatNightWaveLabel(wave, wave));
         }
 
-        /// <summary>Upcoming / current AutoBattle wave index (1-based).</summary>
+        /// <summary>
+        /// Upcoming / current AutoBattle wave index (1-based).
+        /// Same value DemonHordeGenerator / GetBossForWave / EndBattle bump use.
+        /// </summary>
         public int CurrentWaveNumber()
         {
             if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
             return battleEngine != null ? Mathf.Max(1, battleEngine.currentBattleNumber) : 1;
         }
 
-        /// <summary>e.g. "Night 2 · Wave 3 (Vortigern)".</summary>
+        /// <summary>
+        /// HUD bar label. Night and Wave numbers are the same combat index
+        /// (<c>currentBattleNumber</c>) — Night is not a separate calendar that can drift.
+        /// e.g. "Night 3 · Wave 3: The Black Knight".
+        /// </summary>
         public static string FormatNightWaveLabel(int night, int wave)
         {
-            night = Mathf.Max(1, night);
-            wave = Mathf.Max(1, wave);
-            return $"Night {night} · {DescribeWave(wave)}";
+            // Prefer combat wave when callers pass a mismatched night (stale SetNight arg).
+            int shown = Mathf.Max(1, wave > 0 ? wave : night);
+            return $"Night {shown} · {DescribeWave(shown)}";
         }
 
         /// <summary>Wave number + boss/horde type for HUD (CharacterDatabase schedule).</summary>
@@ -1225,6 +1249,10 @@ namespace ArthurianAutobattler
             // Every wave that starts MUST end with a pew disband (win or lose).
             mustDisbandPartyAfterCurrentWave = true;
             church?.CloseAllModals();
+            // HUD must match the fight about to spawn (horde/boss use currentBattleNumber).
+            SyncNightToCombatWave();
+            RefreshNightHUD();
+            church?.SetNight(CurrentWaveNumber());
             // Snapshot before March (pre-disband). Wave-end EnsureDisbanded overwrites this.
             AutosaveWarband();
             if (townCanvasObj != null) townCanvasObj.SetActive(false);
