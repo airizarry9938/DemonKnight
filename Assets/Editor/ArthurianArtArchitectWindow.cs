@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "single-sprite-auto-wipe";
+    public const string UiBuildId = "spliced-sprite-pews";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -1497,6 +1497,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUI.BeginDisabledGroup(ResolveSlotPreviewSprite(s) == null && paletteSelectedSprite == null);
         if (GUILayout.Button("Quick Add to Parallax Layer", GUILayout.Height(26)))
             QuickAddPreviewToParallax(ResolveSlotPreviewSprite(s) ?? paletteSelectedSprite);
+        if (GUILayout.Button("Add Sprite → Pew Library (play)", GUILayout.Height(26)))
+            AddSpriteToPewLibrary(ResolveSlotPreviewSprite(s) ?? paletteSelectedSprite);
         EditorGUI.EndDisabledGroup();
 
         if (GUILayout.Button("Clear Slot Preview"))
@@ -1606,8 +1608,43 @@ public class ArthurianArtArchitectWindow : EditorWindow
             swayAmplitude = new Vector2(0f, 0.02f)
         });
         EditorUtility.SetDirty(stageProfile);
-        Debug.Log($"[DemonKnight] Quick-added parallax layer '{sp.name}'");
+        // Also register into pew ModularSpriteLibrary so play can use the same splice.
+        AddSpriteToPewLibrary(sp);
+        Debug.Log($"[DemonKnight] Quick-added parallax layer '{sp.name}' (+ pew library)");
         Repaint();
+    }
+
+    /// <summary>Register a Spliced/Sprite into ModularSpriteLibrary.basePoses + Resources copy.</summary>
+    void AddSpriteToPewLibrary(Sprite sp)
+    {
+        if (sp == null) return;
+        if (ArthurianStageLayoutProfileEnsure.IsPaperdollPlaceholderName(sp.name))
+        {
+            Debug.LogWarning("[DemonKnight] Refusing placeholder " + sp.name + " for pew library.");
+            return;
+        }
+        EnsureLibraryAsset();
+        if (targetLibrary == null) return;
+        targetLibrary.ClearPaperdollLayersKeepSprites();
+        targetLibrary.basePoses = AppendSprite(targetLibrary.basePoses, sp);
+        // Dedup by name.
+        var list = new List<Sprite>();
+        var seen = new HashSet<string>();
+        if (targetLibrary.basePoses != null)
+        {
+            foreach (var s in targetLibrary.basePoses)
+            {
+                if (s == null || !seen.Add(s.name)) continue;
+                if (ArthurianStageLayoutProfileEnsure.IsPaperdollPlaceholderName(s.name)) continue;
+                list.Add(s);
+            }
+        }
+        targetLibrary.basePoses = list.ToArray();
+        EditorUtility.SetDirty(targetLibrary);
+        AssetDatabase.SaveAssets();
+        SyncLibraryToResources();
+        TownsfolkVisualApplier.SetLibrary(null);
+        Debug.Log($"[DemonKnight] Pew library += '{sp.name}' (basePoses={list.Count}). New Game to see in pews.");
     }
 
     void RefreshSplicedPalette(bool force = false)

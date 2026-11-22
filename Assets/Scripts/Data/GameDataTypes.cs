@@ -1150,24 +1150,17 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// When Sprite category poses were never imported (posesFilled=0), bake simple
-        /// placeholder sprites on basePoses only — no Outfit/Head/Prop stack placeholders.
+        /// Do NOT seed Pose_/Outfit_/Head_ silhouette placeholders — those look like wrong
+        /// paperdoll shapes in play. Leave basePoses empty until Architect Save Splices
+        /// fills Assets/Art/Spliced/Sprite (then Verify / Escape rebuilds the library).
         /// </summary>
         public void EnsurePlaceholderSpritesIfEmpty()
         {
             EnsureSizedArrays();
-            int filled = 0;
-            if (basePoses != null)
-                for (int i = 0; i < basePoses.Length; i++)
-                    if (basePoses[i] != null) filled++;
-            if (filled > 0) return;
-
-            // Single-sprite placeholders (Architect Category: Sprite → basePoses).
-            for (int i = 0; i < 4; i++)
-                if (basePoses[i] == null)
-                    basePoses[i] = MakePlaceholderSprite($"DK_Sprite_{i}", 48, 64, new Color(0.75f, 0.75f, 0.78f, 1f), bodySilhouette: true);
-
-            // Leave outfits/heads/props empty — runtime never applies them.
+            // Intentionally no silhouette seeds. Pew Applier uses solid color when empty.
+            if (outfits == null) outfits = Array.Empty<Sprite>();
+            if (heads == null) heads = Array.Empty<ModularHeadEntry>();
+            if (props == null) props = Array.Empty<Sprite>();
         }
 
         /// <summary>

@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "a32a5bc7e8169ea0dfad42caaf04fee85b583432";
 
-    private const string ExpectedPackageId = "single-sprite-auto-wipe";
+    private const string ExpectedPackageId = "spliced-sprite-pews";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -42,7 +42,8 @@ public static class ArthurianSyncFromGitHub
         "architect-force-tip-ui",
         "single-sprite-no-paperdoll",
         "runtime-single-sprite",
-        "single-sprite-play-wipe", // superseded — menu never landed; auto-wipe OnLoad
+        "single-sprite-play-wipe",
+        "single-sprite-auto-wipe",
         "sync-keep-editor-menus",
     };
 
@@ -488,6 +489,9 @@ public static class ArthurianSyncFromGitHub
                         if (IsStalePackageId(gotId))
                             throw new Exception("stale PackageVersion Id=" + gotId
                                 + " — need " + ExpectedPackageId);
+                        // Never accept breakglass even if HardTip somehow wins.
+                        if (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0)
+                            throw new Exception("rejected architect-breakglass-hosts PackageVersion");
                     }
                     if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
                     {
@@ -836,27 +840,27 @@ public static class ArthurianSyncFromGitHub
         AssetDatabase.Refresh();
         Debug.Log("[DemonKnight] " + ArchitectTipMarkersReport());
 
-        // Post-Sync: ALWAYS wipe paperdoll residue (no separate Art Tools menu required).
+        // Post-Sync: escape breakglass hosts if needed, then rebuild pew library from Spliced/Sprite.
         string modularReport = null;
         try
         {
-            string wipe = DemonKnightPackageVersion.WipeModularPaperdollAssets();
-            Debug.Log("[DemonKnight] Post-Sync PackageVersion wipe:\n" + wipe);
-            try
+            if (ArthurianStageLayoutProfileEnsure.HostsLookStalePublic())
             {
-                modularReport = ArthurianMenuBootstrap.ClearPaperdollLibraryInternal(showDialog: false);
+                modularReport = ArthurianStageLayoutProfileEnsure.EscapeStaleHostsAndRebuildPewLibrary();
+                Debug.Log("[DemonKnight] Post-Sync EscapeBreakglass:\n" + modularReport);
             }
-            catch
+            else
             {
-                // Bootstrap tip may not have compiled yet — PackageVersion wipe is enough.
-                modularReport = wipe;
+                string wipe = DemonKnightPackageVersion.WipeModularPaperdollAssets();
+                string rebuild = ArthurianStageLayoutProfileEnsure.RebuildPewLibraryFromSplices();
+                modularReport = wipe + "\n" + rebuild;
+                Debug.Log("[DemonKnight] Post-Sync spliced pew rebuild:\n" + modularReport);
             }
-            Debug.Log("[DemonKnight] Post-Sync modular clear:\n" + modularReport);
         }
         catch (Exception ex)
         {
-            errors.Add("Clear paperdoll / modular wipe: " + ex.Message);
-            Debug.LogWarning("[DemonKnight] Post-Sync modular wipe failed: " + ex.Message);
+            errors.Add("Escape/rebuild pew library: " + ex.Message);
+            Debug.LogWarning("[DemonKnight] Post-Sync pew library failed: " + ex.Message);
         }
         try
         {
@@ -901,9 +905,9 @@ public static class ArthurianSyncFromGitHub
                    + $"(disk Id now: {ReadPackageIdFromDisk() ?? "?"}).\n"
                    + "If still sync-keep-editor-menus: Arthurian → FORCE Upgrade Sync Hosts From main.\n"
                    + "Arthurian menus kept: Bootstrap / Force Delete+Sync / Diagnose.\n"
-                   + "Modular paperdoll auto-WIPED after Sync (no Clear menu required).\n"
-                   + "Stop Play → New Game to rebuild pews.\n"
-                   + "Bind log must show outfit=NULL.\n"
+                   + "Pew library rebuilt from Assets/Art/Spliced/Sprite (Pose_/Outfit_ wiped).\n"
+                   + "If Architect still shows breakglass: Arthurian → Escape Breakglass → Tip Hosts.\n"
+                   + "Stop Play → New Game. Bind: body=<spliced> outfit=NULL.\n"
                    + "Do NOT rebuild the scene.";
             if (!string.IsNullOrEmpty(modularReport))
                 msg += "\n\n" + modularReport;

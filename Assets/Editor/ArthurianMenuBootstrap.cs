@@ -285,26 +285,13 @@ public static class ArthurianMenuBootstrap
             AssetDatabase.CreateAsset(art, artPath);
         }
 
-        // Prefer PackageVersion SerializedObject wipe (works even mid-upgrade).
-        try { DemonKnightPackageVersion.WipeModularPaperdollAssets(); } catch { /* ignore */ }
-        int cleared = art.ClearPaperdollLayersKeepSprites();
-        // Drop legacy Prepared_Pose sheets from basePoses when Spliced/Sprite exports exist — else keep / placeholder.
-        TryImportSplicedSpritesIntoBasePoses(art);
-        if (CountSprites(art.basePoses) == 0)
-        {
-            art.EnsurePlaceholderSpritesIfEmpty();
-            BakePlaceholderSpritesIntoProject(art, "Assets/Art/Modular/Placeholders");
-        }
-        EditorUtility.SetDirty(art);
-        AssetDatabase.SaveAssets();
-
-        string syncReport = VerifyAndSyncModularLibraryInternal(showDialog: false);
+        string rebuild = ArthurianStageLayoutProfileEnsure.RebuildPewLibraryFromSplices();
+        string wipe = "";
+        try { wipe = DemonKnightPackageVersion.WipeModularPaperdollAssets(); } catch { /* ignore */ }
         string report =
-            $"Cleared paperdoll residue entries≈{cleared}.\n" +
-            $"outfits/heads/props emptied; anim clips kept=Sprite-only.\n" +
-            syncReport +
-            "\nStageLayoutProfile is pew/battle SLOTS only — not required for sprite wipe.\n" +
-            "Stop Play → New Game. Bind log must show outfit=NULL head=NULL.";
+            wipe + "\n" + rebuild + "\n" +
+            "StageLayoutProfile is pew/battle SLOTS only — not required for sprite wipe.\n" +
+            "Stop Play → New Game. Bind log: body=<spliced> outfit=NULL head=NULL.";
         if (showDialog)
             EditorUtility.DisplayDialog("Paperdoll Library Cleared", report, "OK");
         return report;
@@ -341,83 +328,27 @@ public static class ArthurianMenuBootstrap
             Debug.Log("[DemonKnight] Created empty ModularSpriteLibrary at " + artPath);
         }
 
-        art.EnsureSizedArrays();
-        int wiped = 0;
-        if (art.HasPaperdollResidue())
-            wiped = art.ClearPaperdollLayersKeepSprites();
-        TryImportSplicedSpritesIntoBasePoses(art);
-
-        bool usedPlaceholders = CountSprites(art.basePoses) == 0;
-        if (usedPlaceholders)
-        {
-            art.EnsurePlaceholderSpritesIfEmpty();
-            // Persist placeholders as textures under the library so Resources copy keeps refs.
-            BakePlaceholderSpritesIntoProject(art, "Assets/Art/Modular/Placeholders");
-        }
-        EditorUtility.SetDirty(art);
-        AssetDatabase.SaveAssets();
-
-        int poses = CountSprites(art.basePoses);
-        int outfits = CountSprites(art.outfits);
-        int heads = 0;
-        if (art.heads != null)
-            for (int i = 0; i < art.heads.Length; i++)
-                if (art.heads[i] != null && art.heads[i].sprite != null) heads++;
-        string artAssetPath = AssetDatabase.GetAssetPath(art);
-
-        if (AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath) != null)
-            AssetDatabase.DeleteAsset(resPath);
-        AssetDatabase.CopyAsset(artAssetPath, resPath);
-        // Also copy placeholder textures folder if present.
-        if (AssetDatabase.IsValidFolder("Assets/Art/Modular/Placeholders"))
-        {
-            EnsureFolderPath("Assets/Resources/Art/Modular/Placeholders");
-            string[] texGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/Art/Modular/Placeholders" });
-            foreach (string g in texGuids)
-            {
-                string src = AssetDatabase.GUIDToAssetPath(g);
-                string name = Path.GetFileName(src);
-                string dst = "Assets/Resources/Art/Modular/Placeholders/" + name;
-                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(dst) != null)
-                    AssetDatabase.DeleteAsset(dst);
-                AssetDatabase.CopyAsset(src, dst);
-            }
-        }
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-
+        string rebuild = ArthurianStageLayoutProfileEnsure.RebuildPewLibraryFromSplices();
         TownsfolkVisualApplier.SetLibrary(null);
         ArthurianStageLayoutProfileEnsure.EnsureAsset();
 
+        art = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(artPath);
         var res = AssetDatabase.LoadAssetAtPath<ModularSpriteLibrary>(resPath);
-        if (res != null)
-        {
-            res.EnsureSizedArrays();
-            if (res.HasPaperdollResidue())
-                res.ClearPaperdollLayersKeepSprites();
-            if (CountSprites(res.basePoses) == 0)
-            {
-                // CopyAsset can drop ephemeral refs — re-seed + bake under Resources.
-                res.EnsurePlaceholderSpritesIfEmpty();
-                BakePlaceholderSpritesIntoProject(res, "Assets/Resources/Art/Modular/Placeholders");
-            }
-            EditorUtility.SetDirty(res);
-            AssetDatabase.SaveAssets();
-        }
+        int poses = art != null ? CountSprites(art.basePoses) : 0;
+        int outfits = art != null ? CountSprites(art.outfits) : 0;
         int resPoses = res != null ? CountSprites(res.basePoses) : 0;
         int resOutfits = res != null ? CountSprites(res.outfits) : -1;
 
         string report =
-            $"Source: {artAssetPath}\n" +
-            $"sprites(basePoses) {poses} · outfits {outfits} (want 0) · heads {heads} (want 0)\n" +
-            (wiped > 0 ? $"Wiped paperdoll residue≈{wiped}\n" : "") +
-            $"Runtime copy: {resPath}\n" +
-            $"Resources sprites filled: {resPoses} · outfits: {resOutfits}\n" +
-            (usedPlaceholders
-                ? "Seeded PLACEHOLDER sprites (no Spliced/Sprite exports yet).\nArchitect → Save Splices (Category Sprite) when ready.\n"
+            rebuild + "\n" +
+            $"Source: {artPath}\n" +
+            $"spliced sprites {poses} · outfits {outfits} (want 0)\n" +
+            $"Runtime copy: {resPath} · Resources sprites={resPoses} outfits={resOutfits}\n" +
+            (poses == 0
+                ? "No Spliced/Sprite yet — pews are solid color (not Pose_/Outfit_ shapes).\nArchitect Tab 1 → Save Splices.\n"
                 : "") +
-            "Stop Play → Main Menu → New Game to rebuild pews.\n" +
-            "Bind log must show: body=… outfit=NULL head=NULL";
+            "Stop Play → New Game. Bind: body=<spliced> outfit=NULL head=NULL\n" +
+            DemonKnightPackageVersion.WipeStatusForDiagnose();
 
         if (showDialog)
             EditorUtility.DisplayDialog("Modular Library Synced", report, "OK");
@@ -976,7 +907,8 @@ public static class ArthurianMenuBootstrap
             string id = ReadPackageIdFromDisk() ?? "";
             if (id == "architect-force-tip-ui" || id == "single-sprite-no-paperdoll"
                 || id == "architect-breakglass-hosts" || id == "architect-disk-tip-proof"
-                || id == "runtime-single-sprite" || id == "single-sprite-play-wipe")
+                || id == "runtime-single-sprite" || id == "single-sprite-play-wipe"
+                || id == "single-sprite-auto-wipe")
                 return true;
             if (ArthurianSyncFromGitHub.IsStalePackageId(id)) return true;
             return false;

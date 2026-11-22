@@ -4,8 +4,9 @@ using UnityEngine.UI;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Single-sprite pew/portrait bind (no paperdoll Body/Outfit/Head stack).
-    /// Matches Art Architect Category: Sprite → ModularSpriteLibrary.basePoses.
+    /// Single-sprite pew/portrait bind from ModularSpriteLibrary.basePoses
+    /// (Architect Save Splices → Assets/Art/Spliced/Sprite). Never stacks Outfit/Head.
+    /// Skips Pose_/Outfit_/Head_ placeholder shapes.
     /// </summary>
     public static class TownsfolkVisualApplier
     {
@@ -35,55 +36,84 @@ namespace ArthurianAutobattler
             var lib = Library;
             Sprite sprite = ResolveSingleSprite(appearance, lib, fallback);
 
-            if (sprite == null)
+            if (sprite == null || IsPaperdollPlaceholder(sprite))
             {
                 if (!_loggedEmptyLibrary)
                 {
                     _loggedEmptyLibrary = true;
                     int poses = lib != null && lib.basePoses != null ? lib.basePoses.Length : -1;
-                    int filled = 0;
-                    if (lib?.basePoses != null)
-                        for (int i = 0; i < lib.basePoses.Length; i++)
-                            if (lib.basePoses[i] != null) filled++;
+                    int filled = CountUsablePoses(lib);
                     Debug.LogWarning(
-                        "[DemonKnight] Pew boxes = single-sprite library empty at runtime. " +
-                        $"lib={(lib != null ? "found" : "NULL")} posesArray={poses} posesFilled={filled}. " +
-                        "Save Splices (Category Sprite) or Verify & Sync Modular Library, then New Game.");
+                        "[DemonKnight] Pew single-sprite library empty (no Spliced/Sprite). " +
+                        $"lib={(lib != null ? "found" : "NULL")} posesArray={poses} usableSpliced={filled}. " +
+                        "Architect Tab 1 → Save Splices, or Escape Breakglass → Tip Hosts + Spliced Pew Library.");
                 }
-                ApplyLegacyFallback(layers, fallback);
+                ApplyEmptySilhouette(layers, fallback);
                 DisableExtraLayers(layers);
                 return;
             }
 
-            // Full-color sprite — no paperdoll skin/hair tint stacking.
             SetLayer(layers.body, sprite, Color.white, enabled: true);
             DisableExtraLayers(layers);
         }
 
-        /// <summary>Pick one sprite: library pose index, then recruit body/avatar.</summary>
+        /// <summary>Pick one usable spliced sprite; never Pose_/Outfit_/Head_ placeholders.</summary>
         public static Sprite ResolveSingleSprite(
             TownsfolkAppearance appearance,
             ModularSpriteLibrary lib,
             RecruitInstance fallback = null)
         {
-            if (lib != null)
+            if (lib != null && lib.basePoses != null && lib.basePoses.Length > 0)
             {
                 int idx = appearance != null ? appearance.poseIndex : 0;
-                Sprite sp = lib.GetPose(idx);
-                if (sp != null) return sp;
-                // First non-null pose if index empty.
-                if (lib.basePoses != null)
+                idx = Mathf.Clamp(idx, 0, lib.basePoses.Length - 1);
+                Sprite sp = lib.basePoses[idx];
+                if (IsUsablePewSprite(sp)) return sp;
+                for (int i = 0; i < lib.basePoses.Length; i++)
                 {
-                    for (int i = 0; i < lib.basePoses.Length; i++)
-                        if (lib.basePoses[i] != null) return lib.basePoses[i];
+                    sp = lib.basePoses[i];
+                    if (IsUsablePewSprite(sp)) return sp;
                 }
             }
             if (fallback != null)
             {
-                if (fallback.bodySprite != null) return fallback.bodySprite;
-                if (fallback.randomAvatar != null) return fallback.randomAvatar;
+                if (IsUsablePewSprite(fallback.bodySprite)) return fallback.bodySprite;
+                if (IsUsablePewSprite(fallback.randomAvatar)) return fallback.randomAvatar;
             }
             return null;
+        }
+
+        public static bool IsUsablePewSprite(Sprite sp)
+        {
+            if (sp == null) return false;
+            return !IsPaperdollPlaceholder(sp);
+        }
+
+        public static bool IsPaperdollPlaceholder(Sprite sp)
+        {
+            if (sp == null) return true;
+            string name = sp.name ?? "";
+            if (name.StartsWith("Pose_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.StartsWith("Outfit_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.StartsWith("Head_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.StartsWith("Prop_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.StartsWith("DK_Pose_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.StartsWith("DK_Outfit_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.StartsWith("DK_Head_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.StartsWith("DK_Sprite_", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (name.IndexOf("Prepared_Pose", System.StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (name.IndexOf("Prepared_Outfit", System.StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (name.IndexOf("Prepared_Head", System.StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
+
+        static int CountUsablePoses(ModularSpriteLibrary lib)
+        {
+            if (lib?.basePoses == null) return 0;
+            int n = 0;
+            for (int i = 0; i < lib.basePoses.Length; i++)
+                if (IsUsablePewSprite(lib.basePoses[i])) n++;
+            return n;
         }
 
         static void DisableExtraLayers(LayerSet layers)
@@ -93,21 +123,15 @@ namespace ArthurianAutobattler
             SetLayer(layers.prop, null, Color.white, enabled: false);
         }
 
-        static void ApplyLegacyFallback(LayerSet layers, RecruitInstance recruit)
+        /// <summary>Solid color box — never paperdoll silhouette placeholders.</summary>
+        static void ApplyEmptySilhouette(LayerSet layers, RecruitInstance recruit)
         {
-            Sprite body = recruit != null
-                ? (recruit.bodySprite != null ? recruit.bodySprite : recruit.randomAvatar)
-                : null;
-
-            if (layers.body != null)
-            {
-                layers.body.enabled = true;
-                layers.body.sprite = body;
-                if (body != null)
-                    layers.body.color = Color.white;
-                else if (recruit != null)
-                    layers.body.color = PlaceholderColor(recruit.unitType);
-            }
+            if (layers.body == null) return;
+            layers.body.enabled = true;
+            layers.body.sprite = null;
+            layers.body.color = recruit != null
+                ? PlaceholderColor(recruit.unitType)
+                : new Color(0.35f, 0.32f, 0.28f, 0.85f);
         }
 
         static void SetLayer(Image img, Sprite sprite, Color color, bool enabled)
@@ -117,8 +141,8 @@ namespace ArthurianAutobattler
             img.preserveAspect = true;
             img.sprite = sprite;
             img.color = color;
-            img.enabled = enabled && sprite != null;
-            if (sprite == null)
+            img.enabled = enabled && (sprite != null || color.a > 0.01f);
+            if (sprite == null && !enabled)
                 img.enabled = false;
         }
 
@@ -130,7 +154,6 @@ namespace ArthurianAutobattler
             _ => new Color(0.45f, 0.40f, 0.35f, 0.90f)
         };
 
-        /// <summary>Ensure Body (+ unused Outfit/Head/Prop children kept disabled by Apply).</summary>
         public static LayerSet EnsureChildLayers(Transform root, bool createIfMissing = true)
         {
             var set = new LayerSet

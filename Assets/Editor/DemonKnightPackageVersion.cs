@@ -11,26 +11,21 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "single-sprite-auto-wipe";
-    public const string GitHint = "onload-auto-wipe-modular-no-menu-required";
-    public const string BuiltUtc = "2026-11-22T03:35:50Z";
+    public const string Id = "spliced-sprite-pews";
+    public const string GitHint = "escape-breakglass-pews-from-spliced-sprite-folder";
+    public const string BuiltUtc = "2026-11-22T09:29:56Z";
 
-    /// <summary>Fallback SHA only — OnLoad prefers API tip + raw@main first.</summary>
+    /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "a32a5bc7e8169ea0dfad42caaf04fee85b583432";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
+    const string SplicedFolder = "Assets/Art/Spliced/Sprite";
 
-    /// <summary>Last wipe summary for Diagnose (session).</summary>
     public static string LastWipeReport { get; private set; } = "(wipe not run this session)";
 
-    /// <summary>
-    /// After this file compiles (FORCE / paste / tip):
-    /// 1) Always wipe ModularSpriteLibrary paperdoll residue (no Art Tools menu required).
-    /// 2) Pull Sync/Bootstrap/Architect from tip/main when hosts still stale.
-    /// </summary>
     [InitializeOnLoadMethod]
     static void DkForceTipHostsAndWipeLibrary()
     {
@@ -39,7 +34,6 @@ public static class DemonKnightPackageVersion
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             try
             {
-                // 1) Library wipe first — works even when MenuBootstrap tip menus never landed.
                 LastWipeReport = WipeModularPaperdollAssets();
                 Debug.Log("[DemonKnight] PackageVersion OnLoad library wipe:\n" + LastWipeReport);
 
@@ -47,46 +41,27 @@ public static class DemonKnightPackageVersion
                 string syncPath = Path.Combine(root, "Assets", "Editor", "ArthurianSyncFromGitHub.cs");
                 string archPath = Path.Combine(root, "Assets", "Editor", "ArthurianArtArchitectWindow.cs");
                 string bootPath = Path.Combine(root, "Assets", "Editor", "ArthurianMenuBootstrap.cs");
-                bool need = !File.Exists(syncPath);
-                if (File.Exists(syncPath))
-                {
-                    string syncBody = File.ReadAllText(syncPath);
-                    need = syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0
-                           || (syncBody.IndexOf("body.Contains(\"404: Not Found\")", StringComparison.Ordinal) >= 0
-                               && syncBody.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0)
-                           || syncBody.IndexOf("HardTipCommitSha", StringComparison.Ordinal) < 0
-                           || syncBody.IndexOf("StalePackageIds", StringComparison.Ordinal) < 0
-                           || syncBody.IndexOf(Id, StringComparison.Ordinal) < 0
-                           || syncBody.IndexOf("ClearPaperdollLibraryInternal", StringComparison.Ordinal) < 0;
-                }
-                if (File.Exists(bootPath))
-                {
-                    string boot = File.ReadAllText(bootPath);
-                    if (boot.IndexOf("Clear Paperdoll Library", StringComparison.Ordinal) < 0
-                        || boot.IndexOf(Id, StringComparison.Ordinal) < 0)
-                        need = true;
-                }
-                else need = true;
+                bool need = !File.Exists(syncPath) || !File.Exists(archPath) || !File.Exists(bootPath);
 
-                bool archStale = !File.Exists(archPath);
-                if (File.Exists(archPath))
+                if (!need)
                 {
-                    string a = File.ReadAllText(archPath);
-                    archStale = a.IndexOf("Paper-Doll Unit Generator", StringComparison.Ordinal) >= 0
-                                || a.IndexOf("enum SheetCategory", StringComparison.Ordinal) >= 0
-                                || a.IndexOf("UiBuildId", StringComparison.Ordinal) < 0
-                                || a.IndexOf("SpriteCategory", StringComparison.Ordinal) < 0
-                                || a.IndexOf(Id, StringComparison.Ordinal) < 0
-                                || a.IndexOf("architect-disk-tip-proof", StringComparison.Ordinal) >= 0
-                                || a.IndexOf("architect-breakglass-hosts", StringComparison.Ordinal) >= 0
-                                || a.IndexOf("runtime-single-sprite\"", StringComparison.Ordinal) >= 0
-                                || a.IndexOf("single-sprite-play-wipe\"", StringComparison.Ordinal) >= 0;
+                    string arch = File.ReadAllText(archPath);
+                    string sync = File.ReadAllText(syncPath);
+                    string boot = File.ReadAllText(bootPath);
+                    if (arch.IndexOf(Id, StringComparison.Ordinal) < 0) need = true;
+                    if (sync.IndexOf(Id, StringComparison.Ordinal) < 0) need = true;
+                    if (ContainsStaleMarker(arch) || ContainsStaleMarker(sync) || ContainsStaleMarker(boot))
+                        need = true;
+                    if (sync.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0) need = true;
+                    if (sync.IndexOf("StalePackageIds", StringComparison.Ordinal) < 0) need = true;
+                    if (boot.IndexOf("Clear Paperdoll Library", StringComparison.Ordinal) < 0) need = true;
                 }
-                if (!need && !archStale) return;
+
+                if (!need) return;
 
                 Debug.LogWarning(
-                    "[DemonKnight] PackageVersion OnLoad: pull tip Sync/Bootstrap/Architect "
-                    + "(want Id=" + Id + "; prefer API tip + main, HardTip last).");
+                    "[DemonKnight] PackageVersion OnLoad: pull tip hosts (want Id=" + Id
+                    + "; tip/main FIRST — never HardTip-first breakglass).");
 
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
                 string tip = TryResolveTipSha() ?? "main";
@@ -95,6 +70,7 @@ public static class DemonKnightPackageVersion
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
                     "Assets/Editor/ArthurianMenuBootstrap.cs",
                     "Assets/Editor/ArthurianArtArchitectWindow.cs",
+                    "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
                     "Assets/Editor/DemonKnightPackageVersion.cs",
                 };
                 int ok = 0;
@@ -105,12 +81,14 @@ public static class DemonKnightPackageVersion
                         string body = DownloadTip(rel, tip);
                         if (string.IsNullOrEmpty(body) || body.Length < 80 || IsTiny404(body))
                             throw new Exception("bad body");
-                        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
-                            && body.Length < 500)
-                            throw new Exception("PackageVersion too small " + body.Length);
-                        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
-                            && body.IndexOf(Id, StringComparison.Ordinal) < 0)
-                            throw new Exception("PackageVersion missing tip Id " + Id);
+                        if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (body.Length < 500) throw new Exception("PackageVersion too small " + body.Length);
+                            if (body.IndexOf(Id, StringComparison.Ordinal) < 0)
+                                throw new Exception("missing tip Id " + Id);
+                            if (body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0)
+                                throw new Exception("rejected breakglass PackageVersion");
+                        }
                         string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
                         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                         try
@@ -140,11 +118,28 @@ public static class DemonKnightPackageVersion
         };
     }
 
-    /// <summary>
-    /// Self-contained wipe — no MenuBootstrap / ClearPaperdollLayersKeepSprites required.
-    /// Clears Outfit/Head/Prop arrays + non-Sprite anim clips on every ModularSpriteLibrary asset,
-    /// deletes Outfit_/Head_/Prop_ placeholder textures, copies Art → Resources.
-    /// </summary>
+    static bool ContainsStaleMarker(string body)
+    {
+        if (string.IsNullOrEmpty(body)) return true;
+        string[] stale =
+        {
+            "architect-breakglass-hosts",
+            "architect-disk-tip-proof",
+            "architect-force-tip-ui",
+            "runtime-single-sprite",
+            "single-sprite-play-wipe",
+            "single-sprite-auto-wipe",
+        };
+        foreach (string s in stale)
+        {
+            if (body.IndexOf("\"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
+            if (body.IndexOf("Id = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
+            if (body.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
+            if (body.IndexOf("ExpectedPackageId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
+        }
+        return false;
+    }
+
     public static string WipeModularPaperdollAssets()
     {
         var log = new StringBuilder();
@@ -155,6 +150,7 @@ public static class DemonKnightPackageVersion
         {
             EnsureFolderPath("Assets/Art/Modular");
             EnsureFolderPath("Assets/Resources/Art/Modular");
+            EnsureFolderPath(SplicedFolder);
 
             var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (AssetDatabase.LoadMainAssetAtPath(ArtLibPath) != null) paths.Add(ArtLibPath);
@@ -166,12 +162,15 @@ public static class DemonKnightPackageVersion
                     paths.Add(p);
             }
 
+            var spliced = LoadSplicedSprites();
+            log.AppendLine("Spliced/Sprite count=" + spliced.Count);
+
             foreach (string path in paths)
             {
                 var obj = AssetDatabase.LoadMainAssetAtPath(path);
                 if (obj == null) continue;
                 libs++;
-                clearedSlots += WipeLibraryObject(obj);
+                clearedSlots += WipeLibraryObject(obj, spliced);
                 EditorUtility.SetDirty(obj);
                 log.AppendLine("Wiped " + path);
             }
@@ -179,13 +178,16 @@ public static class DemonKnightPackageVersion
             deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Outfit_");
             deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Head_");
             deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Prop_");
+            deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Pose_");
+            deletedTex += DeleteMatchingTextures("Assets/Art/Modular/Placeholders", "Sprite_");
             deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Outfit_");
             deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Head_");
             deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Prop_");
+            deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Pose_");
+            deletedTex += DeleteMatchingTextures("Assets/Resources/Art/Modular/Placeholders", "Sprite_");
 
             AssetDatabase.SaveAssets();
 
-            // Force Resources copy from Art (play reads Resources).
             if (AssetDatabase.LoadMainAssetAtPath(ArtLibPath) != null)
             {
                 if (AssetDatabase.LoadMainAssetAtPath(ResLibPath) != null)
@@ -194,28 +196,19 @@ public static class DemonKnightPackageVersion
                 var res = AssetDatabase.LoadMainAssetAtPath(ResLibPath);
                 if (res != null)
                 {
-                    WipeLibraryObject(res);
+                    WipeLibraryObject(res, spliced);
                     EditorUtility.SetDirty(res);
                 }
                 AssetDatabase.SaveAssets();
                 log.AppendLine("Copied Art → Resources " + ResLibPath);
             }
-            else if (AssetDatabase.LoadMainAssetAtPath(ResLibPath) != null)
-            {
-                // No Art copy — wipe Resources in place.
-                var res = AssetDatabase.LoadMainAssetAtPath(ResLibPath);
-                if (res != null)
-                {
-                    clearedSlots += WipeLibraryObject(res);
-                    EditorUtility.SetDirty(res);
-                    AssetDatabase.SaveAssets();
-                }
-            }
 
             AssetDatabase.Refresh();
-            log.AppendLine($"libs={libs} clearedSlots≈{clearedSlots} deletedPlaceholderTex={deletedTex}");
-            log.AppendLine("outfit/head/prop arrays emptied; non-Sprite anim clips removed.");
-            log.AppendLine("Stop Play → New Game. Bind log must show outfit=NULL.");
+            log.AppendLine("libs=" + libs + " clearedSlots≈" + clearedSlots + " deletedPlaceholderTex=" + deletedTex);
+            if (spliced.Count == 0)
+                log.AppendLine("Library empty of splices — pews use solid color (NOT Pose_/Outfit_ shapes). Save Splices Tab 1.");
+            else
+                log.AppendLine("Pew library uses Spliced/Sprite only. New Game → body=<spliced> outfit=NULL.");
         }
         catch (Exception ex)
         {
@@ -227,10 +220,9 @@ public static class DemonKnightPackageVersion
         return LastWipeReport;
     }
 
-    /// <summary>Diagnose one-liner: Resources outfits/heads + LastWipeReport head.</summary>
     public static string WipeStatusForDiagnose()
     {
-        int outfits = 0, heads = 0, poses = 0, legacyClips = 0;
+        int outfits = 0, heads = 0, poses = 0, legacyClips = 0, placeholders = 0;
         try
         {
             var res = AssetDatabase.LoadMainAssetAtPath(ResLibPath);
@@ -241,18 +233,58 @@ public static class DemonKnightPackageVersion
             outfits = CountFilledArray(so.FindProperty("outfits"));
             heads = CountFilledHeads(so.FindProperty("heads"));
             legacyClips = CountLegacyAnimClips(so.FindProperty("animClips"));
+            placeholders = CountPlaceholderBasePoses(so.FindProperty("basePoses"));
         }
         catch (Exception ex)
         {
             return "Modular wipe status: ERROR " + ex.Message + "\nLast wipe: " + LastWipeReport;
         }
 
-        string ok = (outfits == 0 && heads == 0 && legacyClips == 0) ? "CLEAN" : "DIRTY (need wipe)";
-        return $"Modular wipe status: {ok} — sprites(basePoses)={poses} outfits={outfits} heads={heads} legacyClips={legacyClips}\n"
+        string ok = (outfits == 0 && heads == 0 && legacyClips == 0 && placeholders == 0)
+            ? "CLEAN"
+            : "DIRTY (Pose_/Outfit_/Head_ residue)";
+        return "Modular wipe status: " + ok + " — splicedSprites=" + poses + " outfits=" + outfits
+               + " heads=" + heads + " legacyClips=" + legacyClips + " placeholderPoses=" + placeholders + "\n"
                + "Last wipe: " + LastWipeReport;
     }
 
-    static int WipeLibraryObject(UnityEngine.Object obj)
+    static List<Sprite> LoadSplicedSprites()
+    {
+        var list = new List<Sprite>();
+        if (!AssetDatabase.IsValidFolder(SplicedFolder)) return list;
+        string[] guids = AssetDatabase.FindAssets("t:Sprite", new[] { SplicedFolder });
+        var seen = new HashSet<string>();
+        foreach (string g in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(g);
+            if (!seen.Add(path)) continue;
+            var sp = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (sp == null) continue;
+            if (IsPlaceholderName(sp.name)) continue;
+            list.Add(sp);
+        }
+        list.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        return list;
+    }
+
+    public static bool IsPlaceholderName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return true;
+        if (name.StartsWith("Pose_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("Outfit_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("Head_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("Prop_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("DK_Pose_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("DK_Outfit_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("DK_Head_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.StartsWith("DK_Sprite_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (name.IndexOf("Prepared_Pose", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (name.IndexOf("Prepared_Outfit", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (name.IndexOf("Prepared_Head", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        return false;
+    }
+
+    static int WipeLibraryObject(UnityEngine.Object obj, List<Sprite> spliced)
     {
         int n = 0;
         var so = new SerializedObject(obj);
@@ -260,6 +292,35 @@ public static class DemonKnightPackageVersion
         n += ClearHeadArray(so.FindProperty("heads"));
         n += ClearSpriteArray(so.FindProperty("props"));
         n += StripLegacyAnimClips(so.FindProperty("animClips"));
+
+        var poses = so.FindProperty("basePoses");
+        if (poses != null && poses.isArray)
+        {
+            if (spliced != null && spliced.Count > 0)
+            {
+                poses.arraySize = spliced.Count;
+                for (int i = 0; i < spliced.Count; i++)
+                    poses.GetArrayElementAtIndex(i).objectReferenceValue = spliced[i];
+                n += spliced.Count;
+            }
+            else
+            {
+                for (int i = 0; i < poses.arraySize; i++)
+                {
+                    var sp = poses.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
+                    if (sp != null && IsPlaceholderName(sp.name))
+                    {
+                        poses.GetArrayElementAtIndex(i).objectReferenceValue = null;
+                        n++;
+                    }
+                }
+                bool any = false;
+                for (int i = 0; i < poses.arraySize; i++)
+                    if (poses.GetArrayElementAtIndex(i).objectReferenceValue != null) { any = true; break; }
+                if (!any) poses.arraySize = 0;
+            }
+        }
+
         so.ApplyModifiedPropertiesWithoutUndo();
         return n;
     }
@@ -280,8 +341,7 @@ public static class DemonKnightPackageVersion
         int had = 0;
         for (int i = 0; i < prop.arraySize; i++)
         {
-            var el = prop.GetArrayElementAtIndex(i);
-            var sp = el?.FindPropertyRelative("sprite");
+            var sp = prop.GetArrayElementAtIndex(i)?.FindPropertyRelative("sprite");
             if (sp != null && sp.objectReferenceValue != null) had++;
         }
         prop.arraySize = 0;
@@ -294,8 +354,7 @@ public static class DemonKnightPackageVersion
         int removed = 0;
         for (int i = prop.arraySize - 1; i >= 0; i--)
         {
-            var el = prop.GetArrayElementAtIndex(i);
-            var cat = el?.FindPropertyRelative("category");
+            var cat = prop.GetArrayElementAtIndex(i)?.FindPropertyRelative("category");
             string c = cat != null ? cat.stringValue : "";
             if (string.Equals(c, "Sprite", StringComparison.OrdinalIgnoreCase)) continue;
             prop.DeleteArrayElementAtIndex(i);
@@ -334,6 +393,18 @@ public static class DemonKnightPackageVersion
             var cat = prop.GetArrayElementAtIndex(i)?.FindPropertyRelative("category");
             string c = cat != null ? cat.stringValue : "";
             if (!string.Equals(c, "Sprite", StringComparison.OrdinalIgnoreCase)) n++;
+        }
+        return n;
+    }
+
+    static int CountPlaceholderBasePoses(SerializedProperty prop)
+    {
+        if (prop == null || !prop.isArray) return 0;
+        int n = 0;
+        for (int i = 0; i < prop.arraySize; i++)
+        {
+            var sp = prop.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
+            if (sp != null && IsPlaceholderName(sp.name)) n++;
         }
         return n;
     }
@@ -427,8 +498,14 @@ public static class DemonKnightPackageVersion
                     wc.Headers.Add("User-Agent", "DemonKnight-PackageVersion-OnLoad/" + Id);
                     wc.Headers.Add("Cache-Control", "no-cache, no-store");
                     string body = wc.DownloadString(url);
-                    if (!IsTiny404(body) && body.Length > 80) return body;
-                    last = new Exception("tiny/404 from " + url);
+                    if (IsTiny404(body) || body.Length <= 80) { last = new Exception("tiny"); continue; }
+                    if (rel.EndsWith("DemonKnightPackageVersion.cs", StringComparison.OrdinalIgnoreCase)
+                        && body.IndexOf("Id = \"architect-breakglass-hosts\"", StringComparison.Ordinal) >= 0)
+                    {
+                        last = new Exception("skip breakglass PackageVersion");
+                        continue;
+                    }
+                    return body;
                 }
                 catch (Exception ex) { last = ex; }
             }
