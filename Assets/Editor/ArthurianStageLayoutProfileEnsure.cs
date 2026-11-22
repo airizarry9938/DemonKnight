@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "force-sync-appliers-hardfix";
+    const string TipPackageId = "sheet-splicer-chroma-despill";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
@@ -53,6 +53,8 @@ public static class ArthurianStageLayoutProfileEnsure
         "hidden-potential-bloodline",
         "architect-persist-scene-bg",
         "fix-scene-bg-applier-cs0103",
+        "class-sprite-pools",
+        "force-sync-appliers-hardfix",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]

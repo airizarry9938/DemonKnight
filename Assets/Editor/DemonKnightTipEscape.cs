@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "force-sync-appliers-hardfix";
+    public const string TipPackageId = "sheet-splicer-chroma-despill";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -24,7 +24,7 @@ public static class DemonKnightTipEscape
         "Assets/Editor/DemonKnightPackageVersion.cs",
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
-        // Embed host BEFORE stubs — Appliers live in GameDataTypes (force-sync-appliers-hardfix).
+        // Embed host BEFORE stubs — Appliers live in GameDataTypes (force-sync-appliers-hardfix EMBEDDED marker).
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
@@ -40,7 +40,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (force-sync-appliers-hardfix)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (sheet-splicer-chroma-despill)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -124,6 +124,7 @@ public static class DemonKnightTipEscape
             "architect-persist-scene-bg",
             "fix-scene-bg-applier-cs0103",
             "class-sprite-pools",
+            "force-sync-appliers-hardfix",
         };
         foreach (string s in stale)
         {

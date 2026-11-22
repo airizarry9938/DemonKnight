@@ -17,7 +17,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "force-sync-appliers-hardfix";
+    public const string UiBuildId = "sheet-splicer-chroma-despill";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -67,13 +67,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
     string sliceOutputFolder = DefaultSliceFolder;
     string targetExportFolder = DefaultExportFolder;
 
-    // Save Splices chroma key (#FF00FF) + optional corner detect + magenta defringe
+    // Save Splices chroma key (#FF00FF) + multi-pass magenta despill / fringe trim / alpha bleed
     static readonly Color MagentaChromaKey = new Color(1f, 0f, 1f, 1f); // #FF00FF
     Color saveChromaKey = MagentaChromaKey;
     bool autoDetectCornerColor;
     float colorTolerance = 0.34f; // stronger default — cut magenta sheet bleed (0.01–0.65)
-    bool defringeMagentaEdges = true;
-    int defringePasses = 2;
+    /// <summary>0–1. Edge Despill / Fringe Trim strength (Pass 2). Default cleans AI magenta halos.</summary>
+    float edgeDespillStrength = 0.72f;
+    // Live Splicer preview cache (despilled thumbs before Save)
+    readonly List<Texture2D> despillPreviewTex = new List<Texture2D>();
+    int despillPreviewHash;
+    int despillPreviewSelected = -1;
+    Texture2D despillPreviewLarge;
 
     // Interactive Manual Box Splicer (default crop tool)
     CropToolMode cropTool = CropToolMode.ManualBox;
@@ -172,6 +177,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         PersistStageProfile("OnDisable");
         PersistSceneBgProfile("OnDisable");
         PersistClassPoolProfile("OnDisable");
+        ClearDespillPreviewCache();
     }
 
     void OnArchitectPlayModeChanged(PlayModeStateChange state)
@@ -393,7 +399,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         clipLoop = EditorGUILayout.Toggle("Loop", clipLoop);
 
         EditorGUILayout.Space(6);
-        EditorGUILayout.LabelField("Save Splices — Chroma Key", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Save Splices — Multi-Pass Magenta & Chroma", EditorStyles.boldLabel);
         EditorGUILayout.BeginHorizontal();
         saveChromaKey = EditorGUILayout.ColorField("Chroma Key", saveChromaKey);
         if (GUILayout.Button("#FF00FF", GUILayout.Width(70)))
@@ -401,11 +407,15 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
         autoDetectCornerColor = EditorGUILayout.ToggleLeft(
             "Auto-Detect Corner Color (overrides key from sheet/frame corners)", autoDetectCornerColor);
+        EditorGUILayout.BeginHorizontal();
         colorTolerance = EditorGUILayout.Slider("Color Tolerance", colorTolerance, 0.01f, 0.65f);
-        defringeMagentaEdges = EditorGUILayout.ToggleLeft(
-            "Defringe Magenta Edges (after key → Color.clear)", defringeMagentaEdges);
-        if (defringeMagentaEdges)
-            defringePasses = EditorGUILayout.IntSlider("Defringe Passes", defringePasses, 1, 4);
+        edgeDespillStrength = EditorGUILayout.Slider(
+            "Edge Despill / Fringe Trim", edgeDespillStrength, 0f, 1f);
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.HelpBox(
+            "Pass 1: key + magenta-bias BG remove · Pass 2: edge despill/fringe trim · "
+            + "Pass 3: alpha-bleed RGB pad (bilinear-safe). Live preview below uses these settings.",
+            MessageType.None);
 
         int selectedCount = CountSelectedFrames();
         EditorGUILayout.BeginHorizontal();
@@ -942,7 +952,10 @@ public class ArthurianArtArchitectWindow : EditorWindow
             EditorGUILayout.HelpBox("No cropped frames yet.", MessageType.None);
             return;
         }
-        EditorGUILayout.LabelField($"Cropped frames ({croppedFrames.Count}) — click to select", EditorStyles.boldLabel);
+        EnsureDespillPreviewCache();
+        EditorGUILayout.LabelField(
+            $"Cropped frames ({croppedFrames.Count}) — despilled preview (before Save)",
+            EditorStyles.boldLabel);
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Select All", GUILayout.Width(90)))
             for (int i = 0; i < frameSelected.Count; i++) frameSelected[i] = true;
@@ -952,7 +965,6 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
         const float thumb = 56f;
         int cols = Mathf.Max(1, Mathf.FloorToInt((position.width - 40f) / (thumb + 6f)));
-        int row = 0;
         EditorGUILayout.BeginHorizontal();
         for (int i = 0; i < croppedFrames.Count; i++)
         {
@@ -960,25 +972,130 @@ public class ArthurianArtArchitectWindow : EditorWindow
             {
                 EditorGUILayout.EndHorizontal();
                 EditorGUILayout.BeginHorizontal();
-                row++;
             }
             var sp = croppedFrames[i];
             Rect r = GUILayoutUtility.GetRect(thumb, thumb, GUILayout.Width(thumb), GUILayout.Height(thumb));
-            if (sp != null)
+            DrawCheckerboard(r);
+            Texture2D prev = (i < despillPreviewTex.Count) ? despillPreviewTex[i] : null;
+            if (prev != null)
+                GUI.DrawTexture(r, prev, ScaleMode.ScaleToFit, true);
+            else if (sp != null)
                 DrawSprite(r, sp, Color.white);
             else
                 EditorGUI.DrawRect(r, new Color(0.2f, 0.2f, 0.2f));
-            if (frameSelected[i])
+            if (i < frameSelected.Count && frameSelected[i])
                 DrawRectOutline(r, new Color(1f, 0.85f, 0.2f, 1f), 2f);
+            if (despillPreviewSelected == i)
+                DrawRectOutline(r, new Color(0.35f, 0.85f, 1f, 1f), 2f);
             if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition))
             {
-                frameSelected[i] = !frameSelected[i];
+                if (Event.current.button == 0)
+                {
+                    if (i < frameSelected.Count)
+                        frameSelected[i] = !frameSelected[i];
+                    despillPreviewSelected = i;
+                    RebuildLargeDespillPreview(i);
+                }
                 Event.current.Use();
                 Repaint();
             }
             GUI.Label(new Rect(r.x, r.yMax - 14f, r.width, 14f), i.ToString(), EditorStyles.miniLabel);
         }
         EditorGUILayout.EndHorizontal();
+
+        // Large live despilled preview of the focused frame
+        if (despillPreviewLarge != null)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField(
+                "Live Edge Despill preview (Pass 1–3) — frame "
+                + Mathf.Max(0, despillPreviewSelected),
+                EditorStyles.miniBoldLabel);
+            float side = Mathf.Clamp(Mathf.Max(despillPreviewLarge.width, despillPreviewLarge.height) * 2f, 96f, 220f);
+            Rect big = GUILayoutUtility.GetRect(side, side, GUILayout.Width(side), GUILayout.Height(side));
+            DrawCheckerboard(big);
+            GUI.DrawTexture(big, despillPreviewLarge, ScaleMode.ScaleToFit, true);
+        }
+    }
+
+    int ComputeDespillPreviewHash()
+    {
+        unchecked
+        {
+            int h = croppedFrames.Count * 397;
+            h = (h * 31) + colorTolerance.GetHashCode();
+            h = (h * 31) + edgeDespillStrength.GetHashCode();
+            h = (h * 31) + saveChromaKey.GetHashCode();
+            h = (h * 31) + (autoDetectCornerColor ? 1 : 0);
+            for (int i = 0; i < croppedFrames.Count; i++)
+            {
+                var sp = croppedFrames[i];
+                h = (h * 31) + (sp != null ? sp.GetInstanceID() : 0);
+            }
+            return h;
+        }
+    }
+
+    void ClearDespillPreviewCache()
+    {
+        for (int i = 0; i < despillPreviewTex.Count; i++)
+        {
+            if (despillPreviewTex[i] != null)
+                DestroyImmediate(despillPreviewTex[i]);
+        }
+        despillPreviewTex.Clear();
+        if (despillPreviewLarge != null)
+        {
+            DestroyImmediate(despillPreviewLarge);
+            despillPreviewLarge = null;
+        }
+        despillPreviewHash = 0;
+    }
+
+    void EnsureDespillPreviewCache()
+    {
+        int hash = ComputeDespillPreviewHash();
+        if (hash == despillPreviewHash && despillPreviewTex.Count == croppedFrames.Count)
+            return;
+        ClearDespillPreviewCache();
+        despillPreviewHash = hash;
+        for (int i = 0; i < croppedFrames.Count; i++)
+            despillPreviewTex.Add(BuildDespillPreviewTexture(croppedFrames[i]));
+        if (despillPreviewSelected < 0 || despillPreviewSelected >= croppedFrames.Count)
+        {
+            despillPreviewSelected = -1;
+            for (int i = 0; i < frameSelected.Count; i++)
+            {
+                if (frameSelected[i]) { despillPreviewSelected = i; break; }
+            }
+            if (despillPreviewSelected < 0 && croppedFrames.Count > 0)
+                despillPreviewSelected = 0;
+        }
+        if (despillPreviewSelected >= 0)
+            RebuildLargeDespillPreview(despillPreviewSelected);
+    }
+
+    void RebuildLargeDespillPreview(int index)
+    {
+        if (despillPreviewLarge != null)
+        {
+            DestroyImmediate(despillPreviewLarge);
+            despillPreviewLarge = null;
+        }
+        if (index < 0 || index >= croppedFrames.Count) return;
+        despillPreviewLarge = BuildDespillPreviewTexture(croppedFrames[index]);
+    }
+
+    Texture2D BuildDespillPreviewTexture(Sprite src)
+    {
+        if (src == null || src.texture == null) return null;
+        Texture2D readable = ExtractSpriteTexture(src);
+        if (readable == null) return null;
+        Color key = saveChromaKey;
+        if (autoDetectCornerColor)
+            key = DetectCornerKeyColor(readable);
+        ApplyMultiPassChromaDespill(readable, key, colorTolerance, edgeDespillStrength);
+        return readable;
     }
 
     void AutoPrepareSheet()
@@ -1185,21 +1302,22 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
         RegisterSpritesIntoLibrary(saved);
         RefreshSplicedPalette(force: true);
+        ClearDespillPreviewCache();
         Debug.Log($"[DemonKnight] Saved {saved.Count} splices → {folder} + ModularSpriteLibrary");
         string keyDesc = autoDetectCornerColor ? "Auto-Corner" : ColorUtility.ToHtmlStringRGB(saveChromaKey);
         EditorUtility.DisplayDialog(
             "Save Splices to Folder",
             $"Wrote {saved.Count} PNG(s)\n"
             + $"Chroma {keyDesc} tol={colorTolerance:0.00}"
-            + (defringeMagentaEdges ? $" + magenta defringe×{defringePasses}" : "") + "\n"
-            + "Importer: Sprite / alphaIsTransparency / FromInput / Point / Uncompressed / Bottom-Center\n"
+            + $" + Edge Despill {edgeDespillStrength:0.00} (3-pass)\n"
+            + "Importer: Sprite 2D+UI / Point / alphaIsTransparency / no mip / Compression None / Bottom-Center\n"
             + $"→ {folder}\nRegistered into ModularSpriteLibrary.",
             "OK");
     }
 
     /// <summary>
     /// Re-key every PNG under Target Export Folder (default Assets/Art/Spliced/Sprite)
-    /// with current chroma/defringe settings and reimport alphaIsTransparency.
+    /// with current multi-pass chroma/despill settings and reimport Sprite Point importer.
     /// </summary>
     void RebakeExistingSplicesInExportFolder()
     {
@@ -1245,13 +1363,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (saved.Count > 0)
             RegisterSpritesIntoLibrary(saved);
         RefreshSplicedPalette(force: true);
+        ClearDespillPreviewCache();
         ClearPaperdollLibraryLocal();
         EditorUtility.DisplayDialog(
             "Re-bake Existing Splices",
             $"Re-keyed {ok} PNG(s), miss={miss}\n"
             + $"Chroma tol={colorTolerance:0.00}"
-            + (defringeMagentaEdges ? $" + defringe×{defringePasses}" : "") + "\n"
-            + "alphaIsTransparency + FromInput baked.\n→ " + folder,
+            + $" + Edge Despill {edgeDespillStrength:0.00} (3-pass)\n"
+            + "Sprite Point / alphaIsTransparency / no mip / Compression None.\n→ " + folder,
             "OK");
     }
 
@@ -1264,9 +1383,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         Color key = saveChromaKey;
         if (autoDetectCornerColor)
             key = DetectCornerKeyColor(readable);
-        // Always also punch pure #FF00FF when keying (magenta sheets).
-        ApplyChromaKeyClearAndDefringe(
-            readable, key, colorTolerance, defringeMagentaEdges, defringePasses);
+        // Multi-pass: key+magenta-bias → edge despill → alpha-bleed RGB pad.
+        ApplyMultiPassChromaDespill(readable, key, colorTolerance, edgeDespillStrength);
 
         // EncodeToPNG preserves alpha — bake clear pixels into the file.
         byte[] png = readable.EncodeToPNG();
@@ -1316,39 +1434,49 @@ public class ArthurianArtArchitectWindow : EditorWindow
     }
 
     /// <summary>
-    /// Pixel pass: near-key → Color.clear; optional magenta edge defringe; mutates tex in place.
-    /// Stronger defaults: higher tol + multi-pass defringe so sheet BG does not show on pews.
+    /// Multi-pass Magenta &amp; Chroma Keying (crop/save + live preview).
+    /// Pass 1: BG removal — RGB Euclidean distance from key PLUS magenta-bias (R&amp;B ≫ G).
+    /// Pass 2: Edge Despill &amp; Fringe Trim — 4-adjacent opaque→transparent edges; strength slider.
+    /// Pass 3: Alpha-bleed color padding — copy opaque edge RGB into adjacent transparent (a=0).
     /// </summary>
-    static void ApplyChromaKeyClearAndDefringe(
-        Texture2D tex, Color key, float tolerance, bool defringeMagenta, int passes = 2)
+    static void ApplyMultiPassChromaDespill(
+        Texture2D tex, Color key, float tolerance, float edgeDespill)
     {
         if (tex == null) return;
         int w = tex.width, h = tex.height;
         Color[] pixels = tex.GetPixels();
         float tol = Mathf.Clamp(tolerance, 0.01f, 0.65f);
-        float softTol = tol * 1.35f;
+        float softTol = tol * 1.45f;
+        float strength = Mathf.Clamp01(edgeDespill);
 
-        // Pass 1: chroma key → Color.clear (also always clear near #FF00FF + magenta cast).
+        // ── Pass 1: Background removal (key distance + magenta-bias blotches) ──
         for (int i = 0; i < pixels.Length; i++)
         {
             Color p = pixels[i];
             if (p.a < 0.008f) { pixels[i] = Color.clear; continue; }
             float dKey = ColorRgbDistance(p, key);
             float dMag = ColorRgbDistance(p, MagentaChromaKey);
-            float magCast = (p.r + p.b) * 0.5f - p.g;
             bool nearKey = dKey <= tol || dMag <= tol;
-            // Soft punch: magenta-cast pixels near key range → clear (kills sheet bleed).
-            bool softMagenta = magCast > 0.18f && p.r > 0.35f && p.b > 0.35f && p.g < 0.55f
+
+            // Magenta-bias: R and B significantly exceed G (AI compression blotches around #FF00FF).
+            float magBias = Mathf.Min(p.r, p.b) - p.g;
+            bool magentaBiasKill = magBias > 0.22f
+                                   && p.r > 0.40f && p.b > 0.40f && p.g < 0.62f
+                                   && (dKey <= softTol || dMag <= softTol || magBias > 0.38f);
+            // Soft punch for near-key magenta cast even when Euclidean is slightly over tol.
+            float magCast = (p.r + p.b) * 0.5f - p.g;
+            bool softMagenta = magCast > 0.16f && p.r > 0.32f && p.b > 0.32f && p.g < 0.58f
                                && (dKey <= softTol || dMag <= softTol);
-            if (nearKey || softMagenta)
+
+            if (nearKey || magentaBiasKill || softMagenta)
                 pixels[i] = Color.clear;
         }
 
-        // Pass 2+: defringe magenta edges (semi-magenta pixels next to clear) — multi-pass.
-        if (defringeMagenta)
+        // ── Pass 2: Edge Despill & Fringe Trim (4-adjacent to transparent) ──
+        if (strength > 0.001f)
         {
-            int n = Mathf.Clamp(passes, 1, 4);
-            for (int pass = 0; pass < n; pass++)
+            int passes = strength < 0.35f ? 1 : (strength < 0.75f ? 2 : 3);
+            for (int pass = 0; pass < passes; pass++)
             {
                 var outPx = (Color[])pixels.Clone();
                 for (int y = 0; y < h; y++)
@@ -1357,53 +1485,104 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     {
                         int i = y * w + x;
                         Color p = pixels[i];
-                        if (p.a < 0.008f) continue;
-                        if (!IsMagentaFringe(p)) continue;
-                        if (!HasClearNeighbor(pixels, w, h, x, y)) continue;
-                        outPx[i] = DefringeMagentaPixel(p);
+                        if (p.a < 0.04f) continue;
+                        if (!HasClearNeighbor4(pixels, w, h, x, y)) continue;
+
+                        float mag = (p.r + p.b) * 0.5f - p.g;
+                        float excessRb = Mathf.Max(0f, Mathf.Min(p.r, p.b) - p.g);
+                        // Strong pink/magenta fringe → alpha 0
+                        float strongThresh = Mathf.Lerp(0.42f, 0.14f, strength);
+                        if (mag > strongThresh && p.r > 0.28f && p.b > 0.28f)
+                        {
+                            outPx[i] = Color.clear;
+                            continue;
+                        }
+                        // Faint spill → desaturate excess R/B toward G (neutral dark outlines, not pink)
+                        if (excessRb > 0.02f || mag > 0.04f)
+                        {
+                            float pull = excessRb * Mathf.Lerp(0.55f, 1.55f, strength);
+                            p.r = Mathf.Clamp01(p.r - pull);
+                            p.b = Mathf.Clamp01(p.b - pull);
+                            // Extra nudge when still magenta-cast
+                            float magLeft = (p.r + p.b) * 0.5f - p.g;
+                            if (magLeft > 0.05f)
+                            {
+                                float t = magLeft * strength * 0.85f;
+                                p.r = Mathf.Lerp(p.r, p.g, t);
+                                p.b = Mathf.Lerp(p.b, p.g, t);
+                            }
+                            float luma = p.r * 0.3f + p.g * 0.59f + p.b * 0.11f;
+                            magLeft = (p.r + p.b) * 0.5f - p.g;
+                            if (luma < 0.05f || magLeft > Mathf.Lerp(0.35f, 0.16f, strength))
+                            {
+                                outPx[i] = Color.clear;
+                                continue;
+                            }
+                            p.a *= Mathf.Clamp01(1f - excessRb * Mathf.Lerp(0.8f, 2.4f, strength));
+                            if (p.a < 0.06f) { outPx[i] = Color.clear; continue; }
+                            outPx[i] = p;
+                        }
                     }
                 }
                 pixels = outPx;
             }
         }
 
+        // ── Pass 3: Alpha-bleed color padding (RGB into transparent; alpha stays 0) ──
+        {
+            var padded = (Color[])pixels.Clone();
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x;
+                    if (pixels[i].a >= 0.04f) continue;
+                    if (!TryAverageOpaqueNeighbor4(pixels, w, h, x, y, out Color avgRgb))
+                        continue;
+                    padded[i] = new Color(avgRgb.r, avgRgb.g, avgRgb.b, 0f);
+                }
+            }
+            pixels = padded;
+        }
+
         tex.SetPixels(pixels);
         tex.Apply(false, false);
     }
 
-    static bool HasClearNeighbor(Color[] pixels, int w, int h, int x, int y)
+    static bool HasClearNeighbor4(Color[] pixels, int w, int h, int x, int y)
     {
-        for (int dy = -1; dy <= 1; dy++)
-        for (int dx = -1; dx <= 1; dx++)
+        // 4-adjacent only (N/E/S/W) — matches Edge Despill / Fringe Trim spec.
+        int[] dxs = { 0, 1, 0, -1 };
+        int[] dys = { 1, 0, -1, 0 };
+        for (int k = 0; k < 4; k++)
         {
-            if (dx == 0 && dy == 0) continue;
-            int nx = x + dx, ny = y + dy;
+            int nx = x + dxs[k], ny = y + dys[k];
             if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
             if (pixels[ny * w + nx].a < 0.04f) return true;
         }
         return false;
     }
 
-    static bool IsMagentaFringe(Color p)
+    static bool TryAverageOpaqueNeighbor4(
+        Color[] pixels, int w, int h, int x, int y, out Color avg)
     {
-        // More aggressive: catch faint magenta halo left by soft anti-alias against #FF00FF.
-        float mag = (p.r + p.b) * 0.5f - p.g;
-        return mag > 0.06f && p.r > 0.18f && p.b > 0.18f;
-    }
-
-    static Color DefringeMagentaPixel(Color p)
-    {
-        float excess = Mathf.Max(0f, Mathf.Min(p.r, p.b) - p.g);
-        // Pull toward green channel more aggressively.
-        p.r = Mathf.Clamp01(p.r - excess * 1.35f);
-        p.b = Mathf.Clamp01(p.b - excess * 1.35f);
-        float luma = p.r * 0.3f + p.g * 0.59f + p.b * 0.11f;
-        float magLeft = (p.r + p.b) * 0.5f - p.g;
-        if (luma < 0.06f || magLeft > 0.22f)
-            return Color.clear;
-        p.a *= Mathf.Clamp01(1f - excess * 2.2f);
-        if (p.a < 0.08f) return Color.clear;
-        return p;
+        float r = 0f, g = 0f, b = 0f;
+        int n = 0;
+        int[] dxs = { 0, 1, 0, -1 };
+        int[] dys = { 1, 0, -1, 0 };
+        for (int k = 0; k < 4; k++)
+        {
+            int nx = x + dxs[k], ny = y + dys[k];
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            Color p = pixels[ny * w + nx];
+            if (p.a < 0.04f) continue;
+            r += p.r; g += p.g; b += p.b;
+            n++;
+        }
+        if (n == 0) { avg = Color.clear; return false; }
+        float inv = 1f / n;
+        avg = new Color(r * inv, g * inv, b * inv, 0f);
+        return true;
     }
 
     static float ColorRgbDistance(Color a, Color b)
@@ -1446,24 +1625,38 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
     }
 
+    /// <summary>
+    /// After each PNG save/import under Assets/Art/Spliced/Sprite:
+    /// Sprite (2D and UI), Filter Mode Point, Alpha Is Transparency, no mip maps, Compression None.
+    /// </summary>
     static void ConfigureSingleSpritePointBottomCenter(string assetPath)
     {
         var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
         if (importer == null) return;
-        importer.textureType = TextureImporterType.Sprite;
+        importer.textureType = TextureImporterType.Sprite; // Sprite (2D and UI)
         importer.spriteImportMode = SpriteImportMode.Single;
         importer.alphaSource = TextureImporterAlphaSource.FromInput;
         importer.alphaIsTransparency = true;
         importer.mipmapEnabled = false;
         importer.filterMode = FilterMode.Point;
-        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.textureCompression = TextureImporterCompression.Uncompressed; // Compression None
         importer.isReadable = true;
+        var platform = new TextureImporterPlatformSettings
+        {
+            name = "DefaultTexturePlatform",
+            overridden = true,
+            format = TextureImporterFormat.RGBA32,
+            maxTextureSize = 8192,
+            textureCompression = TextureImporterCompression.Uncompressed
+        };
+        importer.SetPlatformTextureSettings(platform);
         var settings = new TextureImporterSettings();
         importer.ReadTextureSettings(settings);
         settings.textureType = TextureImporterType.Sprite;
         settings.spriteMode = (int)SpriteImportMode.Single;
         settings.alphaSource = TextureImporterAlphaSource.FromInput;
         settings.alphaIsTransparency = true;
+        settings.mipmapEnabled = false;
         settings.filterMode = FilterMode.Point;
         settings.spriteAlignment = (int)SpriteAlignment.BottomCenter;
         settings.spritePivot = new Vector2(0.5f, 0f); // Bottom-Center
