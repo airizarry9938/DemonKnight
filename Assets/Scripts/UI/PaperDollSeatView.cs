@@ -76,7 +76,7 @@ namespace ArthurianAutobattler
                     $"[DemonKnight] First pew Bind '{recruit.characterName}' (single-sprite): " +
                     $"appearance={(recruit.appearance != null ? "yes" : "NULL")} " +
                     $"body={bodyName} outfit={outfitName} head={headName} " +
-                    "(outfit/head must be NULL — tip fix-seatshow-cs0436; body from Spliced/Sprite)");
+                    "(outfit/head must be NULL — tip assign-only-pew-drag; body from Spliced/Sprite)");
             }
 
             if (moodLayer != null)
@@ -116,6 +116,35 @@ namespace ArthurianAutobattler
             // Phase 4 — modular Idle clips / breath bob + unscouted tint.
             var anim = ModularSpriteAnimator.EnsureOn(gameObject);
             anim?.ConfigurePaperDoll(this, recruit);
+        }
+
+        /// <summary>Force body to Stage Placer–assigned sprite (no library RNG).</summary>
+        public void ApplyAssignedBodySprite(Sprite sp)
+        {
+            var layers = EnsureModularLayers();
+            HideNonModularImages(layers);
+            if (layers.body == null) return;
+            layers.body.sprite = sp;
+            layers.body.color = Color.white;
+            layers.body.enabled = sp != null;
+            layers.body.preserveAspect = true;
+            if (layers.outfit != null) { layers.outfit.sprite = null; layers.outfit.enabled = false; }
+            if (layers.head != null) { layers.head.sprite = null; layers.head.enabled = false; }
+            if (layers.prop != null) { layers.prop.sprite = null; layers.prop.enabled = false; }
+        }
+
+        /// <summary>Solid seat marker — no library copy when assign-mode seat has no sprite.</summary>
+        public void ClearBodyToSolid()
+        {
+            var layers = EnsureModularLayers();
+            HideNonModularImages(layers);
+            if (layers.body == null) return;
+            layers.body.sprite = null;
+            layers.body.color = new Color(0.12f, 0.10f, 0.09f, 0.40f);
+            layers.body.enabled = true;
+            if (layers.outfit != null) { layers.outfit.sprite = null; layers.outfit.enabled = false; }
+            if (layers.head != null) { layers.head.sprite = null; layers.head.enabled = false; }
+            if (layers.prop != null) { layers.prop.sprite = null; layers.prop.enabled = false; }
         }
 
         public void BindEmpty()
@@ -890,7 +919,7 @@ static class DemonKnightPaperDollTipEscapeHook
                     int q2 = q1 >= 0 ? t.IndexOf('"', q1 + 1) : -1;
                     if (q1 >= 0 && q2 > q1) diskId = t.Substring(q1 + 1, q2 - q1 - 1);
                 }
-                if (diskId == "fix-seatshow-cs0436") return;
+                if (diskId == "assign-only-pew-drag") return;
                 if (diskId != "architect-breakglass-hosts"
                     && diskId != "architect-disk-tip-proof"
                     && diskId != "single-sprite-auto-wipe"
@@ -929,7 +958,7 @@ static class DemonKnightPaperDollTipEscapeHook
                         string body = wc.DownloadString(url);
                         if (string.IsNullOrEmpty(body) || body.Length < 80) continue;
                         if (rel.EndsWith("PackageVersion.cs")
-                            && body.IndexOf("fix-seatshow-cs0436", System.StringComparison.Ordinal) < 0)
+                            && body.IndexOf("assign-only-pew-drag", System.StringComparison.Ordinal) < 0)
                             continue;
                         string dest = System.IO.Path.Combine(root, rel.Replace('/', System.IO.Path.DirectorySeparatorChar));
                         System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);

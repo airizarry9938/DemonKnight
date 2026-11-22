@@ -16,7 +16,7 @@ using UnityEngine;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-seatshow-cs0436";
+    public const string UiBuildId = "assign-only-pew-drag";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -101,6 +101,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
     Sprite cachedChurchSprite;
     Vector2 tab1ChurchPreviewPan;
     float tab1ChurchPreviewZoom = 1f;
+    bool scalingSlot;
+    int churchDragSeat = -1;
+    Rect lastChurchContentRect;
 
     // Single menu path only — do not also register under DemonKnight/.
     [MenuItem("Arthurian/Art & Stage Architect", false, 35)]
@@ -1443,8 +1446,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
             AutoArrangeOverflowFormation();
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.HelpBox(
-            "Church preview uses play pew scale (base 88×112 × row scale). "
-            + "Sprites only on pewSeatIndex/13 rows 0–2 — same as Play.",
+            "Assigned sprites only (no auto-fill). Drag seats to move; SE handle or Seat scale slider. "
+            + "Positions save as normalized 0–1 on StageLayoutProfile (play reads them).",
             MessageType.Info);
 
         EditorGUILayout.BeginHorizontal();
@@ -1566,13 +1569,15 @@ public class ArthurianArtArchitectWindow : EditorWindow
     }
 
     /// <summary>
-    /// Church pew preview matching Play: SomersetPewLayout positions + 88×112×rowScale,
-    /// only visual rows 0–2 (pewSeatIndex/13).
+    /// Church pew preview: only assigned StageLayoutProfile sprites (no palette RNG fill).
+    /// Drag move + SE scale handle; positions stored as normalized 0–1 (play-matched).
     /// </summary>
     void DrawPlayPewLayoutOnChurch(Rect canvas, Rect content, List<SlotTransformConfig> slots, Event e)
     {
+        lastChurchContentRect = content;
+        EnsureChurchSlotsSeededFromPlayLayout(slots);
+
         var anchors = SomersetPewLayout.CreateDefaultPews();
-        // Back rows first so front pews draw on top (same as PopulatePews).
         var order = new List<int>(SomersetPewLayout.TotalSeats);
         for (int i = 0; i < SomersetPewLayout.TotalSeats; i++) order.Add(i);
         order.Sort((a, b) =>
@@ -1585,57 +1590,179 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
         float pxScale = content.width / ChurchRefWidth;
         float pyScale = content.height / ChurchRefHeight;
+        int assignedDrawn = 0;
 
         foreach (int seatIndex in order)
         {
             if (!SeatShowsSpriteSafe(seatIndex)) continue;
+            if (seatIndex >= slots.Count || slots[seatIndex] == null) continue;
+            var s = slots[seatIndex];
 
-            Vector2 norm = GetPlayNormalizedSeatPosition(anchors, seatIndex);
-            // Normalized 0,0 = bottom-left (play); GUI y grows downward.
-            Vector2 screen = new Vector2(
-                content.x + norm.x * content.width,
-                content.yMax - norm.y * content.height);
+            Vector2 norm = GetChurchNormalizedPosition(s, anchors, seatIndex);
+            Vector2 screen = NormToScreen(content, norm);
 
-            float seatScale = GetPlaySeatScale(anchors, seatIndex);
-            float pw = PlayPewBaseSize.x * seatScale * pxScale;
-            float ph = PlayPewBaseSize.y * seatScale * pyScale;
-            // Pivot ~Bottom-Center (play pivot 0.5, 0.12)
+            float rowScale = GetPlaySeatScale(anchors, seatIndex);
+            float mul = Mathf.Clamp(s.scale.x > 0.01f ? s.scale.x : 1f, 0.2f, 3f);
+            float pw = PlayPewBaseSize.x * rowScale * mul * pxScale;
+            float ph = PlayPewBaseSize.y * rowScale * mul * pyScale;
             Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.88f, pw, ph);
 
-            Sprite preview = null;
-            if (seatIndex < slots.Count && slots[seatIndex] != null)
-                preview = ResolveSlotPreviewSprite(slots[seatIndex]);
-            if (preview == null && paletteSelectedSprite != null
-                && seatIndex == selectedSlot)
+            // Assigned only — never cycle splicedPalette onto empty seats.
+            Sprite preview = ResolveSlotPreviewSprite(s);
+            if (preview == null && paletteSelectedSprite != null && seatIndex == selectedSlot)
                 preview = paletteSelectedSprite;
-            if (preview == null && splicedPalette.Count > 0)
-                preview = splicedPalette[seatIndex % splicedPalette.Count];
 
+            bool sel = seatIndex == selectedSlot;
             if (preview != null)
+            {
                 DrawSprite(pr, preview, Color.white);
+                assignedDrawn++;
+            }
             else
-                EditorGUI.DrawRect(pr, new Color(0.2f, 0.25f, 0.35f, 0.35f));
+            {
+                // Empty marker only (no sprite copy).
+                EditorGUI.DrawRect(pr, new Color(0.15f, 0.18f, 0.28f, sel ? 0.45f : 0.22f));
+                DrawRectOutline(pr, new Color(1f, 1f, 1f, sel ? 0.35f : 0.12f), 1f);
+            }
 
             float handle = Mathf.Clamp(pw * 0.28f, 14f, 22f);
             Rect hr = new Rect(screen.x - handle * 0.5f, screen.y - handle * 0.5f, handle, handle);
-            bool sel = seatIndex == selectedSlot;
-            EditorGUI.DrawRect(hr, sel ? new Color(1f, 0.85f, 0.25f, 0.95f) : new Color(0.35f, 0.65f, 0.95f, 0.75f));
+            EditorGUI.DrawRect(hr, sel ? new Color(1f, 0.85f, 0.25f, 0.95f) : new Color(0.35f, 0.65f, 0.95f, 0.55f));
             GUI.Label(hr, seatIndex.ToString("00"), EditorStyles.centeredGreyMiniLabel);
 
-            if (e.type == EventType.MouseDown && e.button == 0
-                && (hr.Contains(e.mousePosition) || pr.Contains(e.mousePosition)))
+            // SE scale handle (selected assigned seats).
+            Rect scaleHandle = new Rect(pr.xMax - 10f, pr.yMax - 10f, 12f, 12f);
+            if (sel)
             {
-                selectedSlot = seatIndex;
-                draggingSlot = false; // play layout is locked to SomersetPewLayout
+                EditorGUI.DrawRect(scaleHandle, new Color(1f, 0.55f, 0.2f, 0.95f));
+                GUI.Label(new Rect(pr.x, pr.y - 14f, pr.width, 14f),
+                    $"scale {mul:0.00}", EditorStyles.miniLabel);
+            }
+
+            if (e.type == EventType.MouseDown && e.button == 0)
+            {
+                if (sel && scaleHandle.Contains(e.mousePosition))
+                {
+                    selectedSlot = seatIndex;
+                    churchDragSeat = seatIndex;
+                    scalingSlot = true;
+                    draggingSlot = false;
+                    e.Use();
+                    Repaint();
+                }
+                else if (hr.Contains(e.mousePosition) || pr.Contains(e.mousePosition))
+                {
+                    selectedSlot = seatIndex;
+                    churchDragSeat = seatIndex;
+                    draggingSlot = true;
+                    scalingSlot = false;
+                    e.Use();
+                    Repaint();
+                }
+            }
+        }
+
+        if ((draggingSlot || scalingSlot) && churchDragSeat >= 0 && churchDragSeat < slots.Count
+            && slots[churchDragSeat] != null)
+        {
+            var s = slots[churchDragSeat];
+            if (e.type == EventType.MouseDrag && e.button == 0)
+            {
+                Undo.RecordObject(stageProfile, scalingSlot ? "Scale Church Pew" : "Move Church Pew");
+                if (scalingSlot)
+                {
+                    Vector2 norm = GetChurchNormalizedPosition(s, anchors, churchDragSeat);
+                    Vector2 pivot = NormToScreen(content, norm);
+                    float dist = Vector2.Distance(e.mousePosition, pivot);
+                    float baseDist = Mathf.Max(20f, PlayPewBaseSize.y * GetPlaySeatScale(anchors, churchDragSeat) * pyScale * 0.5f);
+                    float mul = Mathf.Clamp(dist / baseDist, 0.2f, 3f);
+                    s.scale = new Vector2(mul, mul);
+                }
+                else
+                {
+                    Vector2 norm = ScreenToNorm(content, e.mousePosition);
+                    s.position = new Vector2(
+                        Mathf.Clamp01(norm.x),
+                        Mathf.Clamp01(norm.y));
+                    s.sortingOrder = Mathf.RoundToInt(-s.position.y * 100f);
+                }
+                EditorUtility.SetDirty(stageProfile);
                 e.Use();
                 Repaint();
+            }
+            if (e.type == EventType.MouseUp && e.button == 0)
+            {
+                draggingSlot = false;
+                scalingSlot = false;
+                churchDragSeat = -1;
+                e.Use();
+            }
+        }
+
+        // Selected seat scale slider (precise).
+        if (selectedSlot >= 0 && selectedSlot < slots.Count && slots[selectedSlot] != null
+            && SeatShowsSpriteSafe(selectedSlot))
+        {
+            var s = slots[selectedSlot];
+            float mul = Mathf.Clamp(s.scale.x > 0.01f ? s.scale.x : 1f, 0.2f, 3f);
+            Rect sliderR = new Rect(canvas.x + 8f, canvas.y + 6f, Mathf.Min(220f, canvas.width - 16f), 18f);
+            EditorGUI.BeginChangeCheck();
+            float nMul = EditorGUI.Slider(sliderR, "Seat scale", mul, 0.2f, 3f);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(stageProfile, "Scale Church Pew");
+                s.scale = new Vector2(nMul, nMul);
+                EditorUtility.SetDirty(stageProfile);
             }
         }
 
         GUI.Label(
             new Rect(canvas.x + 6f, canvas.yMax - 18f, canvas.width - 12f, 16f),
-            "Play pew scale · 3 sprite rows · church bg (drag disabled — layout from SomersetPewLayout)",
+            $"Assigned sprites only ({assignedDrawn}) · drag move · SE handle / slider scale · 3 rows",
             EditorStyles.miniLabel);
+    }
+
+    static Vector2 NormToScreen(Rect content, Vector2 norm)
+        => new Vector2(
+            content.x + norm.x * content.width,
+            content.yMax - norm.y * content.height);
+
+    static Vector2 ScreenToNorm(Rect content, Vector2 screen)
+    {
+        float x = content.width > 1f ? (screen.x - content.x) / content.width : 0.5f;
+        float y = content.height > 1f ? (content.yMax - screen.y) / content.height : 0.5f;
+        return new Vector2(x, y);
+    }
+
+    static bool IsChurchNormalizedPosition(Vector2 pos)
+        => pos.x >= 0f && pos.x <= 1f && pos.y >= 0f && pos.y <= 1f;
+
+    Vector2 GetChurchNormalizedPosition(SlotTransformConfig s, PewAnchor[] anchors, int seatIndex)
+    {
+        if (s != null && IsChurchNormalizedPosition(s.position))
+            return s.position;
+        return GetPlayNormalizedSeatPosition(anchors, seatIndex);
+    }
+
+    void EnsureChurchSlotsSeededFromPlayLayout(List<SlotTransformConfig> slots)
+    {
+        if (slots == null || stageProfile == null) return;
+        var anchors = SomersetPewLayout.CreateDefaultPews();
+        bool any = false;
+        for (int i = 0; i < slots.Count && i < SomersetPewLayout.TotalSeats; i++)
+        {
+            if (slots[i] == null) continue;
+            if (IsChurchNormalizedPosition(slots[i].position)) continue;
+            // Old ChurchPewDefault world coords → seed play layout normalized.
+            slots[i].position = GetPlayNormalizedSeatPosition(anchors, i);
+            if (slots[i].scale.x < 0.05f) slots[i].scale = Vector2.one;
+            any = true;
+        }
+        if (any)
+        {
+            EditorUtility.SetDirty(stageProfile);
+            Debug.Log("[DemonKnight] Seeded church pew slots to play-normalized 0–1 positions.");
+        }
     }
 
     /// <summary>
@@ -1736,13 +1863,17 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     void DrawTab1ChurchPewPreview()
     {
-        EditorGUILayout.LabelField("Church pew preview (play scale)", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Church pew preview (assigned only)", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "SomersetChurchInterior behind splices at play pew size (88×112 × row scale). "
-            + "3 sprite rows only. Assign sheet frames or open Tab 2 Stage Placer for slots.",
+            "Shows StageLayoutProfile assigned pew sprites only — never auto-fills empty seats. "
+            + "Assign on Tab 2 (palette → slot). Drag/scale on Tab 2 church canvas.",
             MessageType.None);
+        if (stageProfile == null)
+            stageProfile = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(StageProfilePath);
         EditorGUILayout.BeginHorizontal();
         tab1ChurchPreviewZoom = EditorGUILayout.Slider("Preview Zoom", tab1ChurchPreviewZoom, 0.6f, 2f);
+        if (GUILayout.Button("Open Tab 2", GUILayout.Width(90)))
+            tab = ArchitectTab.StagePlacer;
         if (GUILayout.Button("Reset", GUILayout.Width(60)))
         {
             tab1ChurchPreviewZoom = 1f;
@@ -1753,37 +1884,33 @@ public class ArthurianArtArchitectWindow : EditorWindow
         Rect canvas = GUILayoutUtility.GetRect(10, 220, GUILayout.ExpandWidth(true), GUILayout.MinHeight(200));
         Rect content = DrawChurchBackgroundInRect(canvas, tab1ChurchPreviewPan, tab1ChurchPreviewZoom);
 
-        var frames = new List<Sprite>();
-        for (int i = 0; i < croppedFrames.Count; i++)
-        {
-            if (i < frameSelected.Count && frameSelected[i] && croppedFrames[i] != null)
-                frames.Add(croppedFrames[i]);
-        }
-        if (frames.Count == 0)
-        {
-            RefreshSplicedPalette();
-            frames.AddRange(splicedPalette);
-        }
-
         float pxScale = content.width / ChurchRefWidth;
         float pyScale = content.height / ChurchRefHeight;
         var anchors = SomersetPewLayout.CreateDefaultPews();
+        var slots = stageProfile != null ? stageProfile.churchPewSlots : null;
+        if (slots != null) EnsureChurchSlotsSeededFromPlayLayout(slots);
+
         int drawn = 0;
-        for (int seat = 0; seat < SomersetPewLayout.TotalSeats; seat++)
+        if (slots != null)
         {
-            if (!SeatShowsSpriteSafe(seat)) continue;
-            Vector2 norm = GetPlayNormalizedSeatPosition(anchors, seat);
-            Vector2 screen = new Vector2(
-                content.x + norm.x * content.width,
-                content.yMax - norm.y * content.height);
-            float seatScale = GetPlaySeatScale(anchors, seat);
-            float pw = PlayPewBaseSize.x * seatScale * pxScale;
-            float ph = PlayPewBaseSize.y * seatScale * pyScale;
-            Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.88f, pw, ph);
-            Sprite sp = frames.Count > 0 ? frames[drawn % frames.Count] : null;
-            if (sp != null) DrawSprite(pr, sp, Color.white);
-            else EditorGUI.DrawRect(pr, new Color(0.25f, 0.3f, 0.4f, 0.4f));
-            drawn++;
+            for (int seat = 0; seat < SomersetPewLayout.TotalSeats && seat < slots.Count; seat++)
+            {
+                if (!SeatShowsSpriteSafe(seat)) continue;
+                var s = slots[seat];
+                if (s == null) continue;
+                Sprite sp = ResolveSlotPreviewSprite(s);
+                if (sp == null) continue; // assigned only — skip empty
+
+                Vector2 norm = GetChurchNormalizedPosition(s, anchors, seat);
+                Vector2 screen = NormToScreen(content, norm);
+                float rowScale = GetPlaySeatScale(anchors, seat);
+                float mul = Mathf.Clamp(s.scale.x > 0.01f ? s.scale.x : 1f, 0.2f, 3f);
+                float pw = PlayPewBaseSize.x * rowScale * mul * pxScale;
+                float ph = PlayPewBaseSize.y * rowScale * mul * pyScale;
+                Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.88f, pw, ph);
+                DrawSprite(pr, sp, Color.white);
+                drawn++;
+            }
         }
 
         Event e = Event.current;
@@ -1796,7 +1923,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         GUI.Label(
             new Rect(canvas.x + 6f, canvas.yMax - 16f, canvas.width - 12f, 14f),
-            drawn + " pew sprites · play scale · church bg",
+            drawn == 0
+                ? "No assigned pew sprites — Tab 2 → Assign Palette Sprite → Slot"
+                : drawn + " assigned · no auto-fill",
             EditorStyles.miniLabel);
     }
 

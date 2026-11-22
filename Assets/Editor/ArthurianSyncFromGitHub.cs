@@ -32,7 +32,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "627d5253989ad29f8c6522c0d92d5d1b6563e4fb";
 
-    private const string ExpectedPackageId = "fix-seatshow-cs0436";
+    private const string ExpectedPackageId = "assign-only-pew-drag";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -50,6 +50,7 @@ public static class ArthurianSyncFromGitHub
         "breakglass-local-wipe",
         "pew-3rows-chroma-scale",
         "church-bg-pew-preview",
+        "fix-seatshow-cs0436",
         "sync-keep-editor-menus",
     };
 

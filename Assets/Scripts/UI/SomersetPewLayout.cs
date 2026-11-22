@@ -244,20 +244,27 @@ namespace ArthurianAutobattler
         public void ApplySeatTransform(RectTransform seatRt, int globalSeatIndex, Vector2 baseSize, float jitterXPixels)
         {
             if (seatRt == null) return;
-
             Vector2 norm = GetNormalizedSeatPosition(globalSeatIndex);
             float scale = GetSeatScale(globalSeatIndex);
+            ApplyNormalizedSeatTransform(seatRt, norm, baseSize, scale, jitterXPixels);
+        }
 
-            // Map 0–1 pew coords into the drawn sprite region (handles preserveAspect letterboxing).
+        /// <summary>
+        /// Place a seat from StageLayoutProfile church authoring (normalized 0–1 + scale mul).
+        /// </summary>
+        public void ApplyNormalizedSeatTransform(
+            RectTransform seatRt, Vector2 normalized, Vector2 baseSize, float scaleMul, float jitterXPixels)
+        {
+            if (seatRt == null) return;
             GetContentNormalizedRange(out Vector2 cMin, out Vector2 cMax);
             Vector2 anchor = new Vector2(
-                Mathf.Lerp(cMin.x, cMax.x, norm.x),
-                Mathf.Lerp(cMin.y, cMax.y, norm.y));
+                Mathf.Lerp(cMin.x, cMax.x, Mathf.Clamp01(normalized.x)),
+                Mathf.Lerp(cMin.y, cMax.y, Mathf.Clamp01(normalized.y)));
 
             seatRt.anchorMin = seatRt.anchorMax = anchor;
             seatRt.pivot = new Vector2(0.5f, 0.12f);
             seatRt.anchoredPosition = new Vector2(Mathf.Clamp(jitterXPixels, -2f, 2f), 0f);
-            seatRt.sizeDelta = baseSize * scale;
+            seatRt.sizeDelta = baseSize * Mathf.Max(0.15f, scaleMul);
             seatRt.localScale = Vector3.one;
             seatRt.localRotation = Quaternion.identity;
         }

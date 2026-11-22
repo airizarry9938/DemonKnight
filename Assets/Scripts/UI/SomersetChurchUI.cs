@@ -1692,6 +1692,7 @@ namespace ArthurianAutobattler
 
             foreach (Transform child in pewSeatLayer) Destroy(child.gameObject);
             seats.Clear();
+            InvalidateChurchAssignCache();
 
             town ??= new List<RecruitInstance>();
             var bySeat = new Dictionary<int, RecruitInstance>();
@@ -1742,7 +1743,19 @@ namespace ArthurianAutobattler
                     recruit.appearance.BindSeatSalt(seatIndex);
                     jitterX = recruit.appearance.PewJitterX;
                 }
-                pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize, jitterX);
+                // StageLayoutProfile church authoring (normalized 0–1 + scale) when set.
+                SlotTransformConfig authored = GetAuthoredChurchSlot(seatIndex);
+                if (authored != null
+                    && authored.position.x >= 0f && authored.position.x <= 1f
+                    && authored.position.y >= 0f && authored.position.y <= 1f)
+                {
+                    float mul = authored.scale.x > 0.01f ? authored.scale.x : 1f;
+                    float rowScale = pewLayout.GetSeatScale(seatIndex);
+                    pewLayout.ApplyNormalizedSeatTransform(
+                        rt, authored.position, baseSeatSize, rowScale * mul, jitterX);
+                }
+                else
+                    pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize, jitterX);
 
                 // Visual sprites on 3 rows only (pewSeatIndex / 13 → 0,1,2). Row 3 = hidden.
                 bool showSprite = SomersetPewLayout.SeatShowsSprite(seatIndex);
@@ -1752,12 +1765,27 @@ namespace ArthurianAutobattler
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
                 {
+                    bool assignMode = ChurchHasAnyAssignedSprites();
+                    Sprite assigned = authored?.previewOrOverrideSprite;
                     if (showSprite && recruit != null)
+                    {
                         view.Bind(
                             recruit,
                             onLeftClick: () => ToggleUnitSelectionMenu(recruit),
                             onHover: () => ShowHoverPreview(recruit),
                             onRightClick: () => CloseUnitSelectionMenu());
+                        if (assignMode)
+                        {
+                            // Only Stage Placer–assigned sprites; no library RNG copies on other seats.
+                            if (assigned != null) view.ApplyAssignedBodySprite(assigned);
+                            else view.ClearBodyToSolid();
+                        }
+                    }
+                    else if (showSprite && assigned != null)
+                    {
+                        view.BindEmpty();
+                        view.ApplyAssignedBodySprite(assigned);
+                    }
                     else view.BindEmpty();
                     seats.Add(view);
                 }
@@ -1797,6 +1825,54 @@ namespace ArthurianAutobattler
                 + $"sprite rows 0–{SomersetPewLayout.VisualSpriteRowCount - 1} only "
                 + $"(hide pewSeatIndex/{SomersetPewLayout.PewSeatRowSize} ≥ {SomersetPewLayout.VisualSpriteRowCount}).");
             RefreshHUD();
+        }
+
+        static StageLayoutProfile _churchProfileCache;
+        static bool _churchAssignCacheValid;
+        static bool _churchHasAssigned;
+
+        static SlotTransformConfig GetAuthoredChurchSlot(int seatIndex)
+        {
+            try
+            {
+                _churchProfileCache ??= StageLayoutProfile.Load();
+                var slots = _churchProfileCache?.churchPewSlots;
+                if (slots == null || seatIndex < 0 || seatIndex >= slots.Count) return null;
+                return slots[seatIndex];
+            }
+            catch { return null; }
+        }
+
+        static bool ChurchHasAnyAssignedSprites()
+        {
+            if (_churchAssignCacheValid) return _churchHasAssigned;
+            _churchHasAssigned = false;
+            try
+            {
+                _churchProfileCache ??= StageLayoutProfile.Load();
+                var slots = _churchProfileCache?.churchPewSlots;
+                if (slots != null)
+                {
+                    for (int i = 0; i < slots.Count; i++)
+                    {
+                        if (slots[i]?.previewOrOverrideSprite != null)
+                        {
+                            _churchHasAssigned = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            catch { /* ignore */ }
+            _churchAssignCacheValid = true;
+            return _churchHasAssigned;
+        }
+
+        /// <summary>Call when Stage Placer assignments change (editor) or before PopulatePews.</summary>
+        public static void InvalidateChurchAssignCache()
+        {
+            _churchAssignCacheValid = false;
+            _churchProfileCache = null;
         }
 
         /// <summary>Row 3+ (pewSeatIndex/13 ≥ 3): no visible sprite; 52 seats remain in data.</summary>
