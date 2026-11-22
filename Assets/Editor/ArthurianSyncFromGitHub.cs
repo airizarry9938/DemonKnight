@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "fa8771cc844a15e218cddb9a42f7170f4f561fac";
 
-    private const string ExpectedPackageId = "legends-fullwidth-column";
+    private const string ExpectedPackageId = "fix-wave-advance-stuck";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -62,6 +62,7 @@ public static class ArthurianSyncFromGitHub
         "sync-keep-editor-menus",
         "force-sync-appliers-hardfix",
         "sheet-splicer-chroma-despill",
+        "legends-fullwidth-column",
     };
 
     /// <summary>
@@ -1297,6 +1298,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("AutosaveWarband")
                    && body.Contains("mustDisbandPartyAfterCurrentWave")
                    && body.Contains("AdvanceNightCounterAfterWaveWin")
+                   && body.Contains("ContinueAfterWaveVictory")
+                   && body.Contains("pendingMidRunWaveVictory")
                    && body.Contains("AwardWaveVictoryVeteranRanks")
                    && body.Contains("RedrawVeteranStarIcons")
                    && body.Contains("StartTownRecruitPhase")
@@ -1455,6 +1458,8 @@ public static class ArthurianSyncFromGitHub
         {
             return body.Contains("DemonKnightCompatApi")
                    && body.Contains("TriggerWaveVictoryScreen")
+                   && body.Contains("ContinueAfterWaveVictory")
+                   && body.Contains("pendingMidRunWaveVictory")
                    && body.Contains("Next Night")
                    && body.Contains("PromoteVictoryCanvas")
                    && body.Contains("StyleVictoryActionButton")
@@ -1646,7 +1651,7 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("fix-scene-bg-applier-cs0103")
                    || body.Contains("force-sync-appliers-hardfix")
                    || body.Contains("sheet-splicer-chroma-despill")
-                   || body.Contains("legends-fullwidth-column");
+                   || body.Contains("fix-wave-advance-stuck");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))

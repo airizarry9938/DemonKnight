@@ -235,8 +235,15 @@ namespace ArthurianAutobattler
             recruitedParty.Clear();
             WarbandAutosave.Clear();
             currentNight = 1;
+            pendingMidRunWaveVictory = false;
             PlayerPrefs.SetInt(NightPrefsKey, 1);
             PlayerPrefs.Save();
+            if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
+            if (battleEngine != null)
+            {
+                battleEngine.isBattling = false;
+                battleEngine.currentBattleNumber = 1;
+            }
             BeginTownNight(
                 keepSurvivors: false,
                 restoreGoldFromSave: false,
@@ -315,6 +322,7 @@ namespace ArthurianAutobattler
             disableTownTimer = false;
             lastWaveWon = null;
             mustDisbandPartyAfterCurrentWave = false;
+            pendingMidRunWaveVictory = false;
             townSecondsSpentThisPhase = 0f;
             trainingVouchers = 0;
             soulsLostThisRun = 0;
@@ -386,6 +394,13 @@ namespace ArthurianAutobattler
         private bool advancingNight;
 
         /// <summary>
+        /// Set by mid-run wave victory screen. Next Night must keep
+        /// <see cref="AutoBattlerEngine.currentBattleNumber"/> (already bumped in EndBattle)
+        /// instead of calling defeat-style <see cref="AdvanceNightAndRestart"/> which resets wave→1.
+        /// </summary>
+        public bool pendingMidRunWaveVictory;
+
+        /// <summary>
         /// Mid-wave victory: bump Night HUD (1→2→3…) without Merlin Next Night reload.
         /// Keeps the player in the same town loop; only the night counter / label change.
         /// </summary>
@@ -402,8 +417,65 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Called from Merlin's "Enter Next Timeline" after defeat/victory.
-        /// Autosaves surviving warband, advances night, restores them into the next town phase.
+        /// Mid-run Victory → Next Night: advance night HUD, keep wave index
+        /// (EndBattle already did currentBattleNumber++), return to church.
+        /// Must NOT reset currentBattleNumber to 1 — that stuck players on Wave 1 forever.
+        /// </summary>
+        public void ContinueAfterWaveVictory()
+        {
+            if (advancingNight)
+            {
+                Debug.LogWarning(
+                    "[DemonKnight] ContinueAfterWaveVictory ignored — already advancing.");
+                return;
+            }
+            advancingNight = true;
+            pendingMidRunWaveVictory = false;
+            try
+            {
+                if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
+                if (battleEngine != null)
+                    battleEngine.isBattling = false;
+
+                int waveKeep = CurrentWaveNumber();
+                int fromNight = Mathf.Max(1, currentNight);
+                // Keep night aligned with the upcoming wave (1→2→3… through finalBossWave).
+                currentNight = Mathf.Max(fromNight + 1, waveKeep);
+                PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+                PlayerPrefs.Save();
+                Debug.LogError(
+                    $"[DemonKnight] Wave victory continue — Night {fromNight} → {currentNight}, "
+                    + $"wave kept at {waveKeep} (NOT reset to 1).");
+
+                int gold = townUI != null ? townUI.playerGold : StartingGold;
+                AutosaveWarband(gold);
+
+                // Mid-run: keep perks; only defeat/New Game clears them.
+                townTimeLimit = UnityEngine.Random.Range(300f, 600f);
+
+                if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
+                if (townCanvasObj != null) townCanvasObj.SetActive(true);
+
+                ContinueTimelineFromAutosave();
+                // Defense: autosave restore must not clobber the kept wave.
+                if (battleEngine != null && battleEngine.currentBattleNumber < waveKeep)
+                    battleEngine.currentBattleNumber = waveKeep;
+
+                RefreshNightHUD();
+                var church = ResolveChurchUI();
+                church?.SetNight(currentNight);
+                church?.RefreshHUD();
+            }
+            finally
+            {
+                advancingNight = false;
+            }
+        }
+
+        /// <summary>
+        /// Defeat / full-run Merlin "Next Night" (or legacy Enter Next Timeline):
+        /// advance night and restart wave index at 1 for a fresh night of the campaign.
+        /// Mid-run wave wins must use <see cref="ContinueAfterWaveVictory"/> instead.
         /// </summary>
         public void AdvanceNightAndRestart()
         {
@@ -414,23 +486,24 @@ namespace ArthurianAutobattler
                 return;
             }
             advancingNight = true;
+            pendingMidRunWaveVictory = false;
             try
             {
                 int from = Mathf.Max(1, currentNight);
                 currentNight = from + 1;
                 PlayerPrefs.SetInt(NightPrefsKey, currentNight);
                 PlayerPrefs.Save();
-                Debug.Log($"[DemonKnight] Night advance {from} → {currentNight}");
+                Debug.Log($"[DemonKnight] Night advance {from} → {currentNight} (wave reset to 1 — defeat/timeline)");
 
                 // Capture survivors AFTER night bump — automatic, no Save menu.
-                int gold = townUI != null ? townUI.playerGold : StartingGold;
-                AutosaveWarband(gold);
-
                 if (battleEngine != null)
                 {
                     battleEngine.isBattling = false;
                     battleEngine.currentBattleNumber = 1;
                 }
+
+                int gold = townUI != null ? townUI.playerGold : StartingGold;
+                AutosaveWarband(gold);
 
                 if (PerkDraftManager.Instance != null)
                     PerkDraftManager.Instance.unlockedPerks.Clear();
@@ -464,6 +537,11 @@ namespace ArthurianAutobattler
                 if (data.night > 0) currentNight = data.night;
                 PlayerPrefs.SetInt(NightPrefsKey, currentNight);
                 PlayerPrefs.Save();
+
+                // Restore wave index from autosave (mid-run victory keeps battleNumber > 1).
+                if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
+                if (battleEngine != null && data.battleNumber > 0)
+                    battleEngine.currentBattleNumber = Mathf.Max(1, data.battleNumber);
 
                 recruitedParty = WarbandAutosave.ToRecruitList(data);
                 veterans = WarbandAutosave.ToVeteranList(data);
