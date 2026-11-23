@@ -1,4 +1,4 @@
-Architect named pool profiles (tip: fix-architect-load-pool-profiles)
+Architect named pool profiles (tip: fix-architect-save-load-pool-ux)
 
 Folders:
   Body/   — Tab 4 Class Sprites / Unit Pools (BODY) snapshots

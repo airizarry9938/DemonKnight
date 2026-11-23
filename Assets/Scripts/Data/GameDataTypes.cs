@@ -925,7 +925,7 @@ namespace ArthurianAutobattler
     {
         /// <summary>
         /// Same as StageLayoutProfile.PewRowSize (13). Local const (kept for call sites).
-        /// tip: fix-architect-load-pool-profiles — StageLayoutProfile also lives in this file.
+        /// tip: fix-architect-save-load-pool-ux — StageLayoutProfile also lives in this file.
         /// </summary>
         public const int PewRowSize = 13;
 
@@ -1003,9 +1003,9 @@ namespace ArthurianAutobattler
     }
 
 
-    // ===== fix-architect-load-pool-profiles — helpers + Profile SOs LIVE HERE (MustRestore) =====
+    // ===== fix-architect-save-load-pool-ux — helpers + Profile SOs LIVE HERE (MustRestore) =====
     // Helpers + all five Architect Profile ScriptableObjects permanently in GameDataTypes.
-    // Named *Profile.cs files are deleted/stubbed (CS0101 kill). tip: fix-architect-load-pool-profiles
+    // Named *Profile.cs files are deleted/stubbed (CS0101 kill). tip: fix-architect-save-load-pool-ux
     [Serializable]
     public class SlotTransformConfig
     {
@@ -1077,11 +1077,11 @@ namespace ArthurianAutobattler
 
 
     // ===== Architect Profile ScriptableObjects LIVE HERE (MustRestore) =====
-    // tip: fix-architect-load-pool-profiles — named *Profile.cs removed from Sync/HardWrite.
+    // tip: fix-architect-save-load-pool-ux — named *Profile.cs removed from Sync/HardWrite.
     // Ensure remaps YAML m_Script via CreateInstance probe (multi-class MonoScript fileID).
 
-    // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-architect-load-pool-profiles) =====
-    // tip: fix-architect-load-pool-profiles — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-architect-save-load-pool-ux) =====
+    // tip: fix-architect-save-load-pool-ux — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Numbered Somerset church pews (52), player battle slots (52), enemy slots (20),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
@@ -1297,8 +1297,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== SceneBackgroundProfile (moved into GameDataTypes — tip fix-architect-load-pool-profiles) =====
-    // tip: fix-architect-load-pool-profiles — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== SceneBackgroundProfile (moved into GameDataTypes — tip fix-architect-save-load-pool-ux) =====
+    // tip: fix-architect-save-load-pool-ux — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect-assigned scene/screen backgrounds (image or video). Resources path: SceneBackgroundProfile.
     /// Assign-only — empty slots keep each screen's built-in default art.
@@ -1416,8 +1416,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== ClassSpritePoolProfile (moved into GameDataTypes — tip fix-architect-load-pool-profiles) =====
-    // tip: fix-architect-load-pool-profiles — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== ClassSpritePoolProfile (moved into GameDataTypes — tip fix-architect-save-load-pool-ux) =====
+    // tip: fix-architect-save-load-pool-ux — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect class sprite pools (Peasant / Warrior / Knight). Resources path:
     /// ClassSpritePoolProfile. StageLayoutProfile pew slots stay position/scale guides —
@@ -1442,7 +1442,7 @@ namespace ArthurianAutobattler
 
         public static ClassSpritePoolProfile Load()
         {
-            // tip: fix-architect-load-pool-profiles — Play always uses live Resources/ClassSpritePoolProfile
+            // tip: fix-architect-save-load-pool-ux — Play always uses live Resources/ClassSpritePoolProfile
             // (exact ResourcesPath). Named Save/Load snapshots under ArchitectPools/ are NEVER picked here.
             ClassSpritePoolProfile p = null;
             try { p = Resources.Load<ClassSpritePoolProfile>(ResourcesPath); }
@@ -1481,7 +1481,7 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// True for the live Resources profile Play uses. False for named ArchitectPools snapshots.
-        /// tip: fix-architect-load-pool-profiles
+        /// tip: fix-architect-save-load-pool-ux
         /// </summary>
         public static bool IsLiveResourcesPool(UnityEngine.Object o, string resourcesPath)
         {
@@ -1655,8 +1655,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== LegendPewPortraitProfile (moved into GameDataTypes — tip fix-architect-load-pool-profiles) =====
-    // tip: fix-architect-load-pool-profiles — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== LegendPewPortraitProfile (moved into GameDataTypes — tip fix-architect-save-load-pool-ux) =====
+    // tip: fix-architect-save-load-pool-ux — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>One Legend face-portrait slot (Architect Tab 5).</summary>
     [Serializable]
     public class LegendPortraitEntry
@@ -1714,7 +1714,7 @@ namespace ArthurianAutobattler
 
         public static LegendPewPortraitProfile Load()
         {
-            // tip: fix-architect-load-pool-profiles — live Resources/LegendPewPortraitProfile only (skip ArchitectPools/).
+            // tip: fix-architect-save-load-pool-ux — live Resources/LegendPewPortraitProfile only (skip ArchitectPools/).
             LegendPewPortraitProfile p = null;
             try { p = Resources.Load<LegendPewPortraitProfile>(ResourcesPath); }
             catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
@@ -1896,8 +1896,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== BattleGoodEvilSpritePoolProfile (moved into GameDataTypes — tip fix-architect-load-pool-profiles) =====
-    // tip: fix-architect-load-pool-profiles — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== BattleGoodEvilSpritePoolProfile (moved into GameDataTypes — tip fix-architect-save-load-pool-ux) =====
+    // tip: fix-architect-save-load-pool-ux — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect Tab 6 — Autobattle Good vs Evil battle sprites for UnitVisualActor.
     /// Distinct from Tab 4 pew BODY pools and Tab 5 FACE portraits. Resources path:
@@ -1954,7 +1954,7 @@ namespace ArthurianAutobattler
 
         public static BattleGoodEvilSpritePoolProfile Load()
         {
-            // tip: fix-architect-load-pool-profiles — live Resources/BattleGoodEvilSpritePoolProfile only (skip ArchitectPools/).
+            // tip: fix-architect-save-load-pool-ux — live Resources/BattleGoodEvilSpritePoolProfile only (skip ArchitectPools/).
             BattleGoodEvilSpritePoolProfile p = null;
             try { p = Resources.Load<BattleGoodEvilSpritePoolProfile>(ResourcesPath); }
             catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
@@ -2221,9 +2221,9 @@ namespace ArthurianAutobattler
     }
 
     // ===== DA-59 Phase25 helpers (Force Sync nuclear — do not remove) =====
-    // Architect *Profile ScriptableObjects ALSO live above in this file (tip fix-architect-load-pool-profiles).
+    // Architect *Profile ScriptableObjects ALSO live above in this file (tip fix-architect-save-load-pool-ux).
     // Appliers stay embedded below.
-    // tip: fix-architect-load-pool-profiles
+    // tip: fix-architect-save-load-pool-ux
     /// <summary>
     /// Multi-frame clip for modular paper-doll parts (Pose / Outfit / Head / Weapon / EnemyBoss).
     /// Standard clip names: "Idle", "Attack", "Hit", "Death".
@@ -2546,7 +2546,7 @@ namespace ArthurianAutobattler
     // MustRestore of those paths still fails when Force Delete runs under a STALE compiled Sync
     // host (ScriptPaths/MustRestore arrays baked into the old assembly). GameDataTypes has been
     // MustRestore since DA-59 — even old Sync hosts re-land this file from tip → types exist.
-    // tip: fix-architect-load-pool-profiles — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
+    // tip: fix-architect-save-load-pool-ux — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
 
     /// <summary>
     /// Applies Architect-assigned SceneBackgroundProfile entries (jpg/png or mp4)
@@ -2563,7 +2563,7 @@ namespace ArthurianAutobattler
         {
             get
             {
-                // tip: fix-architect-load-pool-profiles — never keep empty CreateInstance forever.
+                // tip: fix-architect-save-load-pool-ux — never keep empty CreateInstance forever.
                 if (_cache != null && _cache.isRuntimeStandIn)
                 {
                     bool any = false;
@@ -2612,7 +2612,7 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Runtime scene-enter hook — invalidate, rematerialize, apply image/video to a UI host.
-        /// tip: fix-architect-load-pool-profiles
+        /// tip: fix-architect-save-load-pool-ux
         /// </summary>
         public static bool ApplyOnSceneEnter(
             SceneBackgroundSlot slot,
@@ -2860,7 +2860,7 @@ namespace ArthurianAutobattler
                     try
                     {
                         // SoftPromote belt: Load soft-fails when Profile MonoScript still missing after Sync.
-                        // tip: fix-architect-load-pool-profiles
+                        // tip: fix-architect-save-load-pool-ux
                         _cache = ClassSpritePoolProfile.Load();
                         if (_cache != null)
                         {
@@ -2896,7 +2896,7 @@ namespace ArthurianAutobattler
             {
                 var profile = Profile;
                 if (profile == null) return null;
-                // tip: fix-architect-load-pool-profiles — rematerialize preferred picks; never clear pools.
+                // tip: fix-architect-save-load-pool-ux — rematerialize preferred picks; never clear pools.
                 profile.RematerializeSpritesFromPaths();
                 if (profile.isRuntimeStandIn && profile.CountUsable(type) == 0) return null;
 
@@ -3247,7 +3247,7 @@ namespace ArthurianAutobattler
             {
                 var profile = Profile;
                 if (profile == null) return null;
-                // tip: fix-architect-load-pool-profiles — rematerialize preferred picks; never clear pools.
+                // tip: fix-architect-save-load-pool-ux — rematerialize preferred picks; never clear pools.
                 profile.RematerializeSpritesFromPaths();
 
                 // Boss slots first (UnitType.Boss*)
