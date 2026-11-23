@@ -1265,6 +1265,8 @@ namespace ArthurianAutobattler
                     for (int i = 0; i < all.Length; i++)
                     {
                         if (all[i] == null) continue;
+                        // tip: fix-stage-placer-profiles — never bind named ArchitectPools/Stage snapshots.
+                        if (!ClassSpritePoolProfile.IsLiveResourcesPool(all[i], ResourcesPath)) continue;
                         all[i].EnsureSlotCounts();
                         all[i].isRuntimeStandIn = false;
                         all[i].RematerializeSpritesFromPaths();

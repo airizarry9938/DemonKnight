@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-architect-48-seat-preview";
+    public const string TipPackageId = "fix-stage-placer-profiles";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -48,7 +48,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-architect-48-seat-preview)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-stage-placer-profiles)", false, 0)]
     public static void EscapeMenu()
     {
         // Manual Escape clears session gates so a stuck Downloads project can recover.
@@ -185,6 +185,7 @@ public static class DemonKnightTipEscape
             "fix-architect-load-pool-profiles",
             "fix-architect-save-load-pool-ux",
             "fix-architect-pool-load-list",
+            "fix-architect-48-seat-preview",
         };
         foreach (string s in stale)
         {
@@ -212,6 +213,9 @@ public static class DemonKnightTipEscape
         // tip: fix-architect-48-seat-preview — Layout prefs + 48 hitbox preview.
         if (archBody.IndexOf("DrawChurchLayoutPrefsPanel", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("churchHitboxSize", StringComparison.Ordinal) < 0) return true;
+        // tip: fix-stage-placer-profiles — Stage Placer named Save/Load.
+        if (archBody.IndexOf("SaveNamedStageLayoutProfile", StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("ArchitectPoolsStageFolder", StringComparison.Ordinal) < 0) return true;
         string gdtPath = Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs");
         if (!File.Exists(gdtPath)) return true;
         string gdtBody = File.ReadAllText(gdtPath);
@@ -236,6 +240,7 @@ public static class DemonKnightTipEscape
         if (!File.Exists(bootPath)) return true;
         string bootBody = File.ReadAllText(bootPath);
         if (bootBody.IndexOf("NukeNamedProfileFiles", StringComparison.Ordinal) < 0
+            && bootBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
             && bootBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
@@ -254,8 +259,10 @@ public static class DemonKnightTipEscape
         if (!File.Exists(churchPath)) return true;
         string churchBody = File.ReadAllText(churchPath);
         if (churchBody.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0) return true;
-        if (churchBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
-        if (gdtBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
+        if (churchBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+            && churchBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
+        if (gdtBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+            && gdtBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
         // tip: fix-architect-48-seat-preview — CS0104 TownRNG Random belt (Force Sync / Escape).
         string townRngPath = Path.Combine(root, "Assets", "Scripts", "Systems", "TownRNGGenerator.cs");
         if (!File.Exists(townRngPath)) return true;
@@ -350,7 +357,8 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                         || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
                         || body.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
-                        || body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
+                        || (body.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                            && body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)))
                     throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                 if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class TownRNGGenerator", StringComparison.Ordinal) < 0

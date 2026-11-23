@@ -23,17 +23,17 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-architect-48-seat-preview / TownRNG CS0104). Prefer API tip / raw@main FIRST.
-    private const string FallbackCommitSha = "986ea7e49464fcf0cc5db1ae191641f6dc6f9f02";
+    // Ship pin = this tip feature SHA (fix-stage-placer-profiles). Prefer API tip / raw@main FIRST.
+    private const string FallbackCommitSha = "e4cae74306215a9dba900571c8646965a4095773";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "986ea7e49464fcf0cc5db1ae191641f6dc6f9f02";
+    public const string HardTipCommitSha = "e4cae74306215a9dba900571c8646965a4095773";
 
-    private const string ExpectedPackageId = "fix-architect-48-seat-preview";
+    private const string ExpectedPackageId = "fix-stage-placer-profiles";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -94,6 +94,7 @@ public static class ArthurianSyncFromGitHub
         "fix-architect-load-pool-profiles",
         "fix-architect-save-load-pool-ux",
         "fix-architect-pool-load-list",
+        "fix-architect-48-seat-preview",
     };
 
     /// <summary>
@@ -1337,7 +1338,8 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
-                || text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)
+                || (text.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                    && text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
                 throw new Exception("GameDataTypes Appliers/helpers/Profile SOs/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
@@ -1417,7 +1419,8 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("ChurchBottomDialogue", StringComparison.Ordinal) < 0
                 || text.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
                 || text.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
-                || text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)
+                || (text.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                    && text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
                 throw new Exception("SomersetChurchUI missing tip church/HUD markers (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(rel, dest, relaxPackageId: true);
@@ -1455,7 +1458,8 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("SaveNamedClassPoolProfile", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("ArchitectPools", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                    && archBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist / Save Pool Profile (" + source + ")");
@@ -1692,7 +1696,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
                    && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
-                   && body.Contains("fix-architect-48-seat-preview");
+                   && (body.Contains("fix-stage-placer-profiles")
+                       || body.Contains("fix-architect-48-seat-preview"));
         }
 
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
@@ -1754,7 +1759,8 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-architect-48-seat-preview")
+                   && (body.Contains("fix-stage-placer-profiles")
+                       || body.Contains("fix-architect-48-seat-preview")
                        || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
                        || body.Contains("fix-build-persist-embed"));
@@ -2119,7 +2125,8 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-architect-48-seat-preview")
+        if (!body.Contains("fix-stage-placer-profiles")
+            && !body.Contains("fix-architect-48-seat-preview")
             && !body.Contains("fix-architect-save-load-pool-ux")
             && !body.Contains("fix-architect-load-pool-profiles")
             && !body.Contains("fix-profile-so-script-assets")
@@ -2149,6 +2156,10 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("FinalizeNamedPoolSave")) return false;
         if (!body.Contains("RebuildNamedPoolNameList")) return false;
         if (!body.Contains("t:ClassSpritePoolProfile")) return false;
+        // tip: fix-stage-placer-profiles — Stage Placer Save/Load SoftPromote.
+        if (!body.Contains("SaveNamedStageLayoutProfile")) return false;
+        if (!body.Contains("ArchitectPoolsStageFolder")) return false;
+        if (!body.Contains("t:StageLayoutProfile")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;
         if (body.Contains("enum SheetCategory")) return false;

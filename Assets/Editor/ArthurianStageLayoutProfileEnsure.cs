@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-architect-48-seat-preview";
+    const string TipPackageId = "fix-stage-placer-profiles";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -87,6 +87,8 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-architect-apply-persist-facing",
         "fix-architect-load-pool-profiles",
         "fix-architect-save-load-pool-ux",
+        "fix-architect-pool-load-list",
+        "fix-architect-48-seat-preview",
     };
 
     const string OnLoadSessionGate = "DemonKnight.Ensure.OnLoadDone." + TipPackageId;
