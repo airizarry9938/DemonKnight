@@ -23,17 +23,17 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-profile-so-script-assets). Prefer API tip / raw@main FIRST.
-    private const string FallbackCommitSha = "3f02c63dc5e2bfe6809de805bd18c619ab955666";
+    // Ship pin = this tip feature SHA (fix-named-profile-sync-cs0246). Prefer API tip / raw@main FIRST.
+    private const string FallbackCommitSha = "c8bbca6c543a6ce35aa348227b07eb958cdfe826";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "3f02c63dc5e2bfe6809de805bd18c619ab955666";
+    public const string HardTipCommitSha = "c8bbca6c543a6ce35aa348227b07eb958cdfe826";
 
-    private const string ExpectedPackageId = "fix-profile-so-script-assets";
+    private const string ExpectedPackageId = "fix-named-profile-sync-cs0246";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -79,6 +79,7 @@ public static class ArthurianSyncFromGitHub
         "fix-build-persist-embed",
         "fix-pew-body-pool-empty",
         "fix-class-pool-kind-cs0019",
+        "fix-profile-so-script-assets",
     };
 
     /// <summary>
@@ -95,7 +96,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArchitectBuildPersist.cs", // stub — type embedded in ArchitectWindow
-        // Named MonoScript Profile SOs (Unity requires class name == file name).
+        // Named MonoScript Profile SOs + shared types (Unity requires class name == file name).
+        // tip: fix-named-profile-sync-cs0246
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -140,6 +142,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
+        "Assets/Editor/DemonKnightTipEscape.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
     };
 
@@ -149,8 +152,11 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
+        // TipEscape early — OnLoad can HardRestore Profiles even when Sync assembly is stale.
+        "Assets/Editor/DemonKnightTipEscape.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // Architect *Profile SOs = named MonoScript files (tip fix-profile-so-script-assets).
+        // Architect *Profile SOs + shared types = named MonoScript files.
+        // tip: fix-named-profile-sync-cs0246 — MUST be early (before GameDataTypes consumers).
         // Still do NOT download SpriteAnimClip/ModularSpriteLibrary/
         // ModularSpriteAnimator/StageParallaxController/DiceManager standalones (CS0101).
         "Assets/Scripts/Data/StageLayoutProfile.cs",
@@ -163,7 +169,6 @@ public static class ArthurianSyncFromGitHub
         // BuildPersist early — before Architect Save Promote* consumer (CS0103).
         "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
-        "Assets/Editor/DemonKnightTipEscape.cs",
         // Applier TYPES are EMBEDDED in GameDataTypes.cs (force-sync-appliers-hardfix).
         // These paths are stubs only — overwrite leftovers to prevent CS0101.
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
@@ -226,8 +231,9 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
+        "Assets/Editor/DemonKnightTipEscape.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // Named MonoScript Profiles + Applier embed host (tip fix-profile-so-script-assets).
+        // Named MonoScript Profiles + shared types + Applier embed host (tip fix-named-profile-sync-cs0246).
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -270,7 +276,10 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private static readonly string[] MustRestoreUiHelpers =
     {
-        // Named MonoScript Profiles — must survive Force Delete (Unity SO MonoScript binding).
+        // TipEscape host — OnLoad HardRestores Profiles when Sync assembly is still stale.
+        "Assets/Editor/DemonKnightTipEscape.cs",
+        // Named MonoScript Profiles + shared types — must survive Force Delete (CS0246).
+        // tip: fix-named-profile-sync-cs0246
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -300,7 +309,7 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// Standalones that redefine types still embedded elsewhere (CS0101).
     /// StageLayoutProfile (+ other Architect *Profiles) are REAL named MonoScripts now — NOT killed.
-    /// tip: fix-profile-so-script-assets
+    /// tip: fix-named-profile-sync-cs0246
     /// </summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
@@ -925,7 +934,7 @@ public static class ArthurianSyncFromGitHub
                     if (IsMustRestoreUiHelper(rel)) continue;
                     // Never wipe GameDataTypes even if somehow missing from MustRestore (Applier embed).
                     if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)) continue;
-                    // Never wipe named MonoScript Profile SOs (Unity SO binding — tip fix-profile-so-script-assets).
+                    // Never wipe named MonoScript Profile SOs (Unity SO binding — tip fix-named-profile-sync-cs0246).
                     if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
                         || rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase)
                         || rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
@@ -1274,7 +1283,7 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
                 || text.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0
-                || text.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0)
+                || text.IndexOf("fix-named-profile-sync-cs0246", StringComparison.Ordinal) < 0)
                 throw new Exception("GameDataTypes Appliers/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
@@ -1292,8 +1301,8 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// Last-resort: re-download named MonoScript Profile SOs after every Force Sync.
     /// Unity requires each SO class in Assets/Scripts/Data/&lt;ExactClassName&gt;.cs.
-    /// Independent of MustRestore so a stale Sync cannot leave "No script asset for *Profile".
-    /// tip: fix-profile-so-script-assets
+    /// Independent of MustRestore so a stale Sync cannot leave CS0246 / missing shared types.
+    /// tip: fix-named-profile-sync-cs0246
     /// </summary>
     static void HardRestoreNamedProfileScripts(
         string projectRoot,
@@ -1309,13 +1318,13 @@ public static class ArthurianSyncFromGitHub
             "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
             "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
         };
-        string[] markers =
+        string[][] markers =
         {
-            "class StageLayoutProfile",
-            "class SceneBackgroundProfile",
-            "class ClassSpritePoolProfile",
-            "class LegendPewPortraitProfile",
-            "class BattleGoodEvilSpritePoolProfile",
+            new[] { "class StageLayoutProfile", "class SlotTransformConfig", "class StageParallaxLayer" },
+            new[] { "class SceneBackgroundProfile", "enum SceneBackgroundSlot", "class SceneBackgroundEntry" },
+            new[] { "class ClassSpritePoolProfile" },
+            new[] { "class LegendPewPortraitProfile" },
+            new[] { "class BattleGoodEvilSpritePoolProfile", "class BattleSpriteSlotEntry" },
         };
         for (int i = 0; i < rels.Length; i++)
         {
@@ -1324,9 +1333,13 @@ public static class ArthurianSyncFromGitHub
             {
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 string text = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
-                if (text.IndexOf(markers[i], StringComparison.Ordinal) < 0
-                    || text.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0)
-                    throw new Exception(rel + " missing SO class/tip (" + source + ")");
+                foreach (string m in markers[i])
+                {
+                    if (text.IndexOf(m, StringComparison.Ordinal) < 0)
+                        throw new Exception(rel + " missing " + m + " (" + source + ")");
+                }
+                if (text.IndexOf("fix-named-profile-sync-cs0246", StringComparison.Ordinal) < 0)
+                    throw new Exception(rel + " missing tip marker (" + source + ")");
                 WriteReplacing(dest, text, deleteFirst: true);
                 VerifyOnDisk(rel, dest, relaxPackageId: true);
                 if (!okFiles.Contains(rel)) okFiles.Add(rel);
@@ -1396,7 +1409,7 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-named-profile-sync-cs0246", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist (" + source + ")");
@@ -1423,7 +1436,7 @@ public static class ArthurianSyncFromGitHub
                     + "// Types live in ArthurianArtArchitectWindow.cs (Force Sync embed — avoids CS0103 when this" + "\n"
                     + "// standalone path is wiped by Force Delete under a stale compiled Sync host)." + "\n"
                     + "// This stub overwrites any leftover full copy so we never get CS0101 duplicates." + "\n"
-                    + "// tip: fix-profile-so-script-assets" + "\n"
+                    + "// tip: fix-named-profile-sync-cs0246" + "\n"
                     + "#endif" + "\n";
             }
             WriteReplacing(stubDest, stubBody, deleteFirst: true);
@@ -1560,7 +1573,7 @@ public static class ArthurianSyncFromGitHub
         if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
         {
             // MenuListSortMode must live here so LegendCodexUI / SomersetChurchUI never CS0246.
-            // Architect *Profile SOs are named MonoScript files (tip fix-profile-so-script-assets) — must NOT be redefined here.
+            // Architect *Profile SOs are named MonoScript files (tip fix-named-profile-sync-cs0246) — must NOT be redefined here.
             return body.Contains("enum MenuListSortMode")
                    && body.Contains("HighestHp")
                    && body.Contains("HighestAttack")
@@ -1592,44 +1605,48 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
                    && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
-                   && body.Contains("fix-profile-so-script-assets");
+                   && body.Contains("fix-named-profile-sync-cs0246");
         }
 
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("class StageLayoutProfile")
+                   && body.Contains("class SlotTransformConfig")
+                   && body.Contains("class StageParallaxLayer")
                    && body.Contains("ChurchPewCount = 52")
                    && body.Contains("previewOrOverrideSprite")
                    && body.Contains("RematerializeSpritesFromPaths")
-                   && body.Contains("fix-profile-so-script-assets");
+                   && body.Contains("fix-named-profile-sync-cs0246");
         }
         if (rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("class SceneBackgroundProfile")
                    && body.Contains("enum SceneBackgroundSlot")
+                   && body.Contains("class SceneBackgroundEntry")
                    && body.Contains("RematerializeSpritesFromPaths")
-                   && body.Contains("fix-profile-so-script-assets");
+                   && body.Contains("fix-named-profile-sync-cs0246");
         }
         if (rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("class ClassSpritePoolProfile")
                    && body.Contains("peasantSprites")
                    && body.Contains("TryLoadSpriteAtPath")
-                   && body.Contains("fix-profile-so-script-assets");
+                   && body.Contains("fix-named-profile-sync-cs0246");
         }
         if (rel.EndsWith("LegendPewPortraitProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("class LegendPewPortraitProfile")
                    && body.Contains("CanonicalLegendSlots")
                    && body.Contains("RematerializeSpritesFromPaths")
-                   && body.Contains("fix-profile-so-script-assets");
+                   && body.Contains("fix-named-profile-sync-cs0246");
         }
         if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
             return body.Contains("class BattleGoodEvilSpritePoolProfile")
+                   && body.Contains("class BattleSpriteSlotEntry")
                    && body.Contains("CanonicalBossSlots")
                    && body.Contains("RematerializeSpritesFromPaths")
-                   && body.Contains("fix-profile-so-script-assets");
+                   && body.Contains("fix-named-profile-sync-cs0246");
         }
 
         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase))
@@ -1645,7 +1662,7 @@ public static class ArthurianSyncFromGitHub
         }
 
         // Remaining Phase 2–5 standalones are NOT synced (still embedded elsewhere).
-        // StageLayoutProfile.cs (+ sibling *Profile.cs) ARE synced — named MonoScripts (tip fix-profile-so-script-assets).
+        // StageLayoutProfile.cs (+ sibling *Profile.cs) ARE synced — named MonoScripts (tip fix-named-profile-sync-cs0246).
         if (rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase)
@@ -1660,7 +1677,7 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-profile-so-script-assets")
+                   && (body.Contains("fix-named-profile-sync-cs0246")
                        || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
                        || body.Contains("fix-build-persist-embed"));
@@ -2006,7 +2023,8 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-profile-so-script-assets")
+        if (!body.Contains("fix-named-profile-sync-cs0246")
+            && !body.Contains("fix-profile-so-script-assets")
             && !body.Contains("fix-class-pool-kind-cs0019")
             && !body.Contains("fix-pew-body-pool-empty")
             && !body.Contains("fix-build-persist-embed")) return false;

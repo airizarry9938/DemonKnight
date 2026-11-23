@@ -1005,7 +1005,7 @@ namespace ArthurianAutobattler
     // ===== DA-59 Phase25 helpers (Force Sync nuclear — do not remove) =====
     // Architect *Profile ScriptableObjects live in Assets/Scripts/Data/<ExactClassName>.cs
     // (Unity MonoScript requires SO class name == file name). Appliers stay embedded below.
-    // tip: fix-profile-so-script-assets
+    // tip: fix-named-profile-sync-cs0246
     /// <summary>
     /// Multi-frame clip for modular paper-doll parts (Pose / Outfit / Head / Weapon / EnemyBoss).
     /// Standard clip names: "Idle", "Attack", "Hit", "Death".

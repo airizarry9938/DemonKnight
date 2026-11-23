@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-profile-so-script-assets — named MonoScript for Unity SO binding
+    // tip: fix-named-profile-sync-cs0246 — named MonoScript for Unity SO binding
     /// <summary>
     /// Architect class sprite pools (Peasant / Warrior / Knight). Resources path:
     /// ClassSpritePoolProfile. StageLayoutProfile pew slots stay position/scale guides —

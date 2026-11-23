@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-profile-so-script-assets — named MonoScript for Unity SO binding
+    // tip: fix-named-profile-sync-cs0246 — named MonoScript for Unity SO binding
     /// <summary>Named screens that Architect can assign jpg/png or mp4 backgrounds to.</summary>
     public enum SceneBackgroundSlot
     {
