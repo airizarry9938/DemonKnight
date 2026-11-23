@@ -1347,7 +1347,7 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Restore Missing image sprites from path backups (Resources / StreamingAssets).
-        /// tip: fix-pew-body-pool-empty
+        /// tip: fix-class-pool-kind-cs0019
         /// </summary>
         public int RematerializeSpritesFromPaths()
         {
@@ -2609,7 +2609,7 @@ namespace ArthurianAutobattler
         /// Optional fallback: Tab 6 Good battle troop pools ONLY when Tab 4 body pool is empty
         /// (documented — battle tokens are not the preferred pew pipeline).
         /// Never returns Tab 5 face-pool sprites as bodySprite (soft-fail skip).
-        /// tip: fix-pew-body-pool-empty
+        /// tip: fix-class-pool-kind-cs0019
         /// </summary>
         public static Sprite ResolvePewVisual(RecruitInstance recruit)
         {
@@ -3146,7 +3146,7 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Pew BODY emergency fallback when Tab 4 ClassSpritePool is empty (sprites + paths).
         /// Uses Tab 6 Good troop pools (Peasant/Warrior/Knight) ONLY — never Evil, never faces.
-        /// Documented optional path; preferred pipeline remains Tab 4. tip: fix-pew-body-pool-empty
+        /// Documented optional path; preferred pipeline remains Tab 4. tip: fix-class-pool-kind-cs0019
         /// </summary>
         public static Sprite TryPewBodyFallbackFromGoodTroops(RecruitInstance recruit)
         {

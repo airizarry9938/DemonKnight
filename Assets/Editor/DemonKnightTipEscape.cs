@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-pew-body-pool-empty";
+    public const string TipPackageId = "fix-class-pool-kind-cs0019";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -42,7 +42,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-pew-body-pool-empty)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-class-pool-kind-cs0019)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -153,13 +153,17 @@ public static class DemonKnightTipEscape
             "battle-good-evil-sprite-pools",
             "fix-architect-build-persist-cs0103",
             "fix-build-persist-embed",
+            "fix-pew-body-pool-empty",
         };
         foreach (string s in stale)
         {
             if (pvBody.IndexOf("Id = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
             if (archBody.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
         }
-        // tip fix-pew-body-pool-empty: multi-class MonoScript fileID remap + PersistAll on close.
+        // tip fix-class-pool-kind-cs0019: ClassPoolKind→UnitType CS0019; keep pew-body Persist/fileID belt.
+        // Escape wrote tip fix-pew-body-pool-empty with ClassPoolKind == UnitType (broken Architect) — force pull.
+        if (archBody.IndexOf("selectedClassPool == UnitType.", StringComparison.Ordinal) >= 0) return true;
+        if (archBody.IndexOf("ClassPoolKind.Warrior => UnitType.Warrior", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
         string ensureBody = File.ReadAllText(ensurePath);

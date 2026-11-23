@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-pew-body-pool-empty";
+    public const string UiBuildId = "fix-class-pool-kind-cs0019";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -235,7 +235,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Flush every Architect profile to disk + SoftPromote into Resources/ArchitectArt.
-    /// tip: fix-pew-body-pool-empty — assigns must survive window close / domain reload.
+    /// tip: fix-class-pool-kind-cs0019 — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
     /// </summary>
     void PersistAllProfiles(string reason)
     {
@@ -2514,9 +2514,16 @@ public class ArthurianArtArchitectWindow : EditorWindow
         classPoolScroll = EditorGUILayout.BeginScrollView(classPoolScroll, GUILayout.MinHeight(320f));
         if (pool.Count == 0)
         {
+            // ClassPoolKind ≠ UnitType (CS0019) — map UI enum → gameplay UnitType first.
+            UnitType classPoolUnit = selectedClassPool switch
+            {
+                ClassPoolKind.Warrior => UnitType.Warrior,
+                ClassPoolKind.Knight => UnitType.Knight,
+                _ => UnitType.Peasant
+            };
             int pathBackups = CountNonEmptyPaths(
-                selectedClassPool == UnitType.Peasant ? classPoolProfile?.peasantAssetPaths
-                : selectedClassPool == UnitType.Warrior ? classPoolProfile?.warriorAssetPaths
+                classPoolUnit == UnitType.Peasant ? classPoolProfile?.peasantAssetPaths
+                : classPoolUnit == UnitType.Warrior ? classPoolProfile?.warriorAssetPaths
                 : classPoolProfile?.knightAssetPaths);
 
             if (pathBackups > 0)
@@ -2535,7 +2542,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     + "• Empty seats fall back to StageLayout assign-guides / solid color.\n"
                     + "• Optional: if Tab 6 Good battle pools have troops, Play may use those as "
                     + "pew BODY fallback ONLY while Tab 4 stays empty (prefer filling Tab 4).\n"
-                    + "• Assigns stick after close — tip fix-pew-body-pool-empty Persists on OnDisable/OnDestroy.",
+                    + "• Assigns stick after close — tip fix-class-pool-kind-cs0019 Persists on OnDisable/OnDestroy.",
                     MessageType.Warning);
             }
         }
@@ -4138,12 +4145,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
 }
 
 
-// ===== fix-pew-body-pool-empty EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
+// ===== fix-class-pool-kind-cs0019 EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
 // Standalone ArthurianArchitectBuildPersist.cs is a stub only. Type lives HERE so MustRestore
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-pew-body-pool-empty (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-class-pool-kind-cs0019 (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -4152,7 +4159,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-pew-body-pool-empty";
+    public const string TipId = "fix-class-pool-kind-cs0019";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

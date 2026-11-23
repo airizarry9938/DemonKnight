@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-pew-body-pool-empty";
+    const string TipPackageId = "fix-class-pool-kind-cs0019";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -73,6 +73,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "battle-good-evil-sprite-pools",
         "fix-architect-build-persist-cs0103",
         "fix-build-persist-embed",
+        "fix-pew-body-pool-empty",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
@@ -562,7 +563,7 @@ public static class ArthurianStageLayoutProfileEnsure
     /// After embed into GameDataTypes.cs, SO assets need BOTH the host .cs GUID and the
     /// multi-class MonoScript local fileID (not hardcoded 11500000). Wrong fileID → Unity
     /// logs "referenced script … is missing", Resources.Load returns null, Ensure wiped
-    /// pools on reopen. tip: fix-pew-body-pool-empty
+    /// pools on reopen. tip: fix-class-pool-kind-cs0019
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {

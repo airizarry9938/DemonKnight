@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-pew-body-pool-empty";
-    public const string GitHint = "fix-pew-body-pool-empty";
-    public const string BuiltUtc = "2026-11-23T03:40:00Z";
+    public const string Id = "fix-class-pool-kind-cs0019";
+    public const string GitHint = "fix-class-pool-kind-cs0019";
+    public const string BuiltUtc = "2026-11-23T04:25:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "63985eda93c024467cc66bf4a7a62f28772018f6";
@@ -245,6 +245,9 @@ public static class DemonKnightPackageVersion
             "fix-somerset-church-ui-cs0246",
             "body-face-pool-build-persist",
             "battle-good-evil-sprite-pools",
+            "fix-architect-build-persist-cs0103",
+            "fix-build-persist-embed",
+            "fix-pew-body-pool-empty",
         };
         foreach (string s in stale)
         {
