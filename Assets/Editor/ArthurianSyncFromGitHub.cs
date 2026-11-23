@@ -89,7 +89,6 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArchitectBuildPersist.cs",
-        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         // Embed host for SceneBackgroundApplier + ClassSpritePoolApplier (CS0103 hard fix).
         "Assets/Scripts/Data/GameDataTypes.cs",
     };
