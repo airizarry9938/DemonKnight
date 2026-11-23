@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-named-profile-sync-cs0246 — named MonoScript for Unity SO binding
+    // tip: fix-tipescape-profile-embeds — named MonoScript for Unity SO binding
     /// <summary>One Legend face-portrait slot (Architect Tab 5).</summary>
     [Serializable]
     public class LegendPortraitEntry

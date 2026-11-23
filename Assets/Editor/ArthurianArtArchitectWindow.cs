@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-named-profile-sync-cs0246";
+    public const string UiBuildId = "fix-tipescape-profile-embeds";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -235,7 +235,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Flush every Architect profile to disk + SoftPromote into Resources/ArchitectArt.
-    /// tip: fix-named-profile-sync-cs0246 — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
+    /// tip: fix-tipescape-profile-embeds — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
     /// </summary>
     void PersistAllProfiles(string reason)
     {
@@ -2542,7 +2542,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     + "• Empty seats fall back to StageLayout assign-guides / solid color.\n"
                     + "• Optional: if Tab 6 Good battle pools have troops, Play may use those as "
                     + "pew BODY fallback ONLY while Tab 4 stays empty (prefer filling Tab 4).\n"
-                    + "• Assigns stick after close — tip fix-named-profile-sync-cs0246 Persists on OnDisable/OnDestroy.",
+                    + "• Assigns stick after close — tip fix-tipescape-profile-embeds Persists on OnDisable/OnDestroy.",
                     MessageType.Warning);
             }
         }
@@ -4088,6 +4088,13 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         try
         {
+            // SoftPromote: if Profile MonoScripts still missing, arg may be null / type unload — soft-fail.
+            // tip: fix-tipescape-profile-embeds
+            if (arg == null)
+            {
+                Debug.LogWarning("[DemonKnight] SoftPromote " + methodName + " soft-fail: null profile (types missing?)");
+                return;
+            }
             Type t = ResolveArchitectBuildPersistType();
             if (t == null)
             {
@@ -4127,30 +4134,45 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
     }
 
-    static void SoftPromoteStageLayoutIntoResources(StageLayoutProfile p) =>
+    static void SoftPromoteStageLayoutIntoResources(StageLayoutProfile p)
+    {
+        if (p == null) { Debug.LogWarning("[DemonKnight] SoftPromote StageLayout soft-fail: null profile"); return; }
         SoftInvokePromote("PromoteStageLayoutIntoResources", p);
+    }
 
-    static void SoftPromoteSceneBackgroundIntoResources(SceneBackgroundProfile p) =>
+    static void SoftPromoteSceneBackgroundIntoResources(SceneBackgroundProfile p)
+    {
+        if (p == null) { Debug.LogWarning("[DemonKnight] SoftPromote SceneBg soft-fail: null profile"); return; }
         SoftInvokePromote("PromoteSceneBackgroundIntoResources", p);
+    }
 
-    static void SoftPromoteClassPoolIntoResources(ClassSpritePoolProfile p) =>
+    static void SoftPromoteClassPoolIntoResources(ClassSpritePoolProfile p)
+    {
+        if (p == null) { Debug.LogWarning("[DemonKnight] SoftPromote ClassPool soft-fail: null profile"); return; }
         SoftInvokePromote("PromoteClassPoolIntoResources", p);
+    }
 
-    static void SoftPromoteLegendPewIntoResources(LegendPewPortraitProfile p) =>
+    static void SoftPromoteLegendPewIntoResources(LegendPewPortraitProfile p)
+    {
+        if (p == null) { Debug.LogWarning("[DemonKnight] SoftPromote LegendPew soft-fail: null profile"); return; }
         SoftInvokePromote("PromoteLegendPewIntoResources", p);
+    }
 
-    static void SoftPromoteBattleGoodEvilIntoResources(BattleGoodEvilSpritePoolProfile p) =>
+    static void SoftPromoteBattleGoodEvilIntoResources(BattleGoodEvilSpritePoolProfile p)
+    {
+        if (p == null) { Debug.LogWarning("[DemonKnight] SoftPromote Battle soft-fail: null profile"); return; }
         SoftInvokePromote("PromoteBattleGoodEvilIntoResources", p);
+    }
 
 }
 
 
-// ===== fix-named-profile-sync-cs0246 EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
+// ===== fix-tipescape-profile-embeds EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
 // Standalone ArthurianArchitectBuildPersist.cs is a stub only. Type lives HERE so MustRestore
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-named-profile-sync-cs0246 (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-tipescape-profile-embeds (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -4159,7 +4181,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-named-profile-sync-cs0246";
+    public const string TipId = "fix-tipescape-profile-embeds";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-named-profile-sync-cs0246";
-    public const string GitHint = "fix-named-profile-sync-cs0246";
-    public const string BuiltUtc = "2026-11-23T05:45:00Z";
+    public const string Id = "fix-tipescape-profile-embeds";
+    public const string GitHint = "fix-tipescape-profile-embeds";
+    public const string BuiltUtc = "2026-11-23T06:30:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "c8bbca6c543a6ce35aa348227b07eb958cdfe826";
+    public const string HardTipSha = "ee4b08fb3efee63834900ac36ffd0a35204a9e60";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -70,6 +70,11 @@ public static class DemonKnightPackageVersion
                 // while wiping/never pulling named MonoScript Profiles + shared types.
                 if (NamedProfileScriptsNeedRestore(root)) need = true;
 
+
+                // Always Soft HardWrite — no-op when Profiles present; embed if wiped mid-session.
+                try { DemonKnightTipEscape.HardWriteNamedProfilesIfMissing(root); }
+                catch { /* TipEscape may lack HardWrite until next compile */ }
+
                 if (!need) return;
 
                 Debug.LogWarning(
@@ -83,7 +88,7 @@ public static class DemonKnightPackageVersion
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
                     // Named MonoScript Profile SOs + shared types BEFORE GameDataTypes Appliers.
-                    // tip: fix-named-profile-sync-cs0246
+                    // tip: fix-tipescape-profile-embeds
                     "Assets/Scripts/Data/StageLayoutProfile.cs",
                     "Assets/Scripts/Data/SceneBackgroundProfile.cs",
                     "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -195,6 +200,20 @@ public static class DemonKnightPackageVersion
                         Debug.LogWarning($"[DemonKnight] PackageVersion OnLoad miss {rel}: {ex.Message}");
                     }
                 }
+
+                // Nuclear: write Profiles from TipEscape embeds (raw first, embed fallback).
+                // tip: fix-tipescape-profile-embeds — GitHub raw optional.
+                try
+                {
+                    int hw = DemonKnightTipEscape.HardWriteNamedProfilesIfMissing(root);
+                    if (hw > 0)
+                        Debug.Log("[DemonKnight] PackageVersion OnLoad HardWriteNamedProfiles wrote " + hw);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[DemonKnight] PackageVersion HardWriteNamedProfiles: " + ex.Message);
+                }
+
                 // Belt: stub any leftover full Applier standalones after tip pull.
                 try { ArthurianSyncFromGitHub.StubApplierStandalonesOver(root, null); } catch { /* Sync type may be stale */ }
                 if (ok > 0) AssetDatabase.Refresh();
@@ -247,7 +266,7 @@ public static class DemonKnightPackageVersion
 
     /// <summary>
     /// True when any named MonoScript Profile SO (or its shared types) is missing/corrupt on disk.
-    /// tip: fix-named-profile-sync-cs0246 — Force Sync CS0246 after #51 wipe/never-pull.
+    /// tip: fix-tipescape-profile-embeds — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
     /// </summary>
     public static bool NamedProfileScriptsNeedRestore(string root = null)
     {
@@ -343,6 +362,7 @@ public static class DemonKnightPackageVersion
             "fix-pew-body-pool-empty",
             "fix-class-pool-kind-cs0019",
             "fix-profile-so-script-assets",
+            "fix-named-profile-sync-cs0246",
         };
         foreach (string s in stale)
         {

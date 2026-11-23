@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-named-profile-sync-cs0246 — named MonoScript for Unity SO binding
+    // tip: fix-tipescape-profile-embeds — named MonoScript for Unity SO binding
     [Serializable]
     public class SlotTransformConfig
     {
