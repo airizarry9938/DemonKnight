@@ -532,6 +532,7 @@ namespace ArthurianAutobattler
                 trainedHP = src.trainedHP,
                 trainedATK = src.trainedATK,
                 trainedSPD = src.trainedSPD,
+                lastTrainWaveNumber = src.lastTrainWaveNumber,
                 hireCostForcedZero = src.hireCostForcedZero,
                 modularPoseId = src.modularPoseId,
                 modularOutfitId = src.modularOutfitId,

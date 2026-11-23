@@ -222,10 +222,10 @@ public static class ArthurianSceneBuilder
             new Color(0.12f, 0.14f, 0.12f, 0.92f));
         crowdPanel.SetActive(false);
 
-        // Compact unit stats (floats upper-right of selected pew at runtime).
-        // Dialogue/quotes live on ChurchBottomDialogue — not inside Panel_Dossier.
+        // Larger unit stats panel (floats upper-right of selected pew at runtime).
+        // No ChurchBottomDialogue — Andrew removed the bottom NPC quote bar.
         GameObject dossier = CreatePanel(townCanvasObj.transform, "Panel_Dossier",
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(200f, 40f), new Vector2(420f, 460f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(200f, 40f), new Vector2(520f, 560f),
             new Color(0.10f, 0.09f, 0.08f, 0.96f));
         dossier.SetActive(false);
 
@@ -234,50 +234,50 @@ public static class ArthurianSceneBuilder
         var avatarRt = avatarObj.GetComponent<RectTransform>();
         avatarRt.anchorMin = avatarRt.anchorMax = new Vector2(0f, 0f);
         avatarRt.pivot = new Vector2(0f, 0f);
-        avatarRt.anchoredPosition = new Vector2(16f, 340f);
-        avatarRt.sizeDelta = new Vector2(88f, 88f);
+        avatarRt.anchoredPosition = new Vector2(16f, 420f);
+        avatarRt.sizeDelta = new Vector2(100f, 100f);
         townUI.selectedAvatarImage = avatarObj.GetComponent<Image>();
         townUI.selectedAvatarImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
         townUI.selectedAvatarImage.enabled = false;
 
-        GameObject bottomDlg = CreatePanel(townCanvasObj.transform, "ChurchBottomDialogue",
-            new Vector2(0.08f, 0.02f), new Vector2(0.92f, 0.14f), Vector2.zero, Vector2.zero,
-            new Color(0.06f, 0.07f, 0.09f, 0.88f));
-        var bottomPanelRt = bottomDlg.GetComponent<RectTransform>();
-        bottomPanelRt.offsetMin = Vector2.zero;
-        bottomPanelRt.offsetMax = Vector2.zero;
-        townUI.characterDialogueText = CreateTMP(bottomDlg.transform, "Dialogue",
-            "The tavern murmurs. Hover a citizen — right-click for stats.", 18, TextAlignmentOptions.TopLeft,
-            Vector2.zero, Vector2.zero);
-        var bottomDlgRt = townUI.characterDialogueText.rectTransform;
-        bottomDlgRt.anchorMin = new Vector2(0.02f, 0.45f);
-        bottomDlgRt.anchorMax = new Vector2(0.98f, 0.95f);
-        bottomDlgRt.offsetMin = Vector2.zero;
-        bottomDlgRt.offsetMax = Vector2.zero;
+        // Status feedback on the panel (not a bottom-of-screen quote bar).
+        townUI.characterDialogueText = CreateTMP(dossier.transform, "StatusLine",
+            "", 15, TextAlignmentOptions.Left,
+            new Vector2(16f, 8f), new Vector2(488f, 28f));
+        var statusRt = townUI.characterDialogueText.rectTransform;
+        statusRt.anchorMin = statusRt.anchorMax = new Vector2(0f, 0f);
+        statusRt.pivot = new Vector2(0f, 0f);
 
         townUI.dossierStatsText = CreateTMP(dossier.transform, "DossierStats",
             "Click a pew citizen for hire / train / intel.", 15, TextAlignmentOptions.TopLeft,
-            new Vector2(116f, 220f), new Vector2(288f, 220f));
+            new Vector2(128f, 280f), new Vector2(376f, 240f));
         var statsRt = townUI.dossierStatsText.rectTransform;
         statsRt.anchorMin = statsRt.anchorMax = new Vector2(0f, 0f);
         statsRt.pivot = new Vector2(0f, 0f);
 
-        townUI.tier1RevealButton = CreateButton(dossier.transform, "ScoutBtn", "Scout (Free)",
-            new Vector2(16f, 168f), new Vector2(126f, 36f), new Color(0.25f, 0.28f, 0.35f));
-        townUI.tier2RevealButton = CreateButton(dossier.transform, "InvestigateBtn", "Investigate",
-            new Vector2(150f, 168f), new Vector2(126f, 36f), new Color(0.25f, 0.28f, 0.35f));
-        townUI.tier3RevealButton = CreateButton(dossier.transform, "FullReportBtn", "Full Report",
-            new Vector2(284f, 168f), new Vector2(120f, 36f), new Color(0.25f, 0.28f, 0.35f));
+        const float pad = 16f;
+        const float gap = 12f;
+        float inner = 520f - pad * 2f;
+        float third = (inner - gap * 2f) / 3f;
+
+        townUI.tier1RevealButton = CreateButton(dossier.transform, "ScoutBtn", "Scout 10g",
+            new Vector2(pad, 220f), new Vector2(third, 40f), new Color(0.25f, 0.28f, 0.35f));
+        townUI.tier2RevealButton = CreateButton(dossier.transform, "InvestigateBtn", "Investigate 20g",
+            new Vector2(pad + third + gap, 220f), new Vector2(third, 40f), new Color(0.25f, 0.28f, 0.35f));
+        townUI.tier3RevealButton = CreateButton(dossier.transform, "FullReportBtn", "Full Report 30g",
+            new Vector2(pad + (third + gap) * 2f, 220f), new Vector2(third, 40f), new Color(0.25f, 0.28f, 0.35f));
         townUI.hireRecruitButton = CreateButton(dossier.transform, "HireBtn", "Recruit",
-            new Vector2(16f, 116f), new Vector2(388f, 40f), new Color(0.18f, 0.40f, 0.22f));
+            new Vector2(pad, 160f), new Vector2(inner, 44f), new Color(0.18f, 0.40f, 0.22f));
         townUI.hireButtonText = townUI.hireRecruitButton.GetComponentInChildren<TextMeshProUGUI>();
 
-        townUI.trainTankButton = CreateButton(dossier.transform, "TrainTank", "Train Tank 15g",
-            new Vector2(16f, 64f), new Vector2(190f, 40f), new Color(0.35f, 0.22f, 0.15f));
-        townUI.trainRangedButton = CreateButton(dossier.transform, "TrainRanged", "Train Ranged 15g",
-            new Vector2(214f, 64f), new Vector2(190f, 40f), new Color(0.20f, 0.30f, 0.35f));
-        townUI.mediateRivalryButton = CreateButton(dossier.transform, "Mediate", "Mediate 100g",
-            new Vector2(16f, 12f), new Vector2(388f, 40f), new Color(0.30f, 0.20f, 0.35f));
+        townUI.trainRangedButton = CreateButton(dossier.transform, "TrainATK", "ATK 50g",
+            new Vector2(pad, 100f), new Vector2(third, 44f), new Color(0.20f, 0.30f, 0.35f));
+        townUI.trainTankButton = CreateButton(dossier.transform, "TrainHP", "HP 50g",
+            new Vector2(pad + third + gap, 100f), new Vector2(third, 44f), new Color(0.35f, 0.22f, 0.15f));
+        townUI.trainSpeedButton = CreateButton(dossier.transform, "TrainSPD", "SPD 50g",
+            new Vector2(pad + (third + gap) * 2f, 100f), new Vector2(third, 44f), new Color(0.22f, 0.28f, 0.18f));
+        townUI.mediateRivalryButton = CreateButton(dossier.transform, "Mediate", "Mediate",
+            new Vector2(pad, 48f), new Vector2(inner, 40f), new Color(0.30f, 0.20f, 0.35f));
 
         // Legend Codex modal — near full-screen so all 10 recipes + Fuse buttons fit.
         GameObject codexPanel = CreatePanel(townCanvasObj.transform, "CodexPanel",
@@ -449,7 +449,7 @@ public static class ArthurianSceneBuilder
         churchUI.modalCloseButtons = new[] { diceClose, diceMin };
         churchUI.warbandListContainer = warbandList.transform;
         churchUI.dossierModal = dossier;
-        // Dossier content lives on the shared bottom panel (wired on townUI).
+        // Dossier content lives on the shared floating stats panel (wired on townUI).
         churchUI.dossierDialogue = townUI.characterDialogueText;
         churchUI.dossierStats = townUI.dossierStatsText;
         churchUI.dossierPortrait = townUI.selectedAvatarImage;
@@ -460,6 +460,7 @@ public static class ArthurianSceneBuilder
         churchUI.tier3Button = townUI.tier3RevealButton;
         churchUI.trainTankButton = townUI.trainTankButton;
         churchUI.trainRangedButton = townUI.trainRangedButton;
+        churchUI.trainSpeedButton = townUI.trainSpeedButton;
         churchUI.mediateButton = townUI.mediateRivalryButton;
 
         // Camera framing for 2D battlefield

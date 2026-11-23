@@ -53,8 +53,12 @@ namespace ArthurianAutobattler
         public Button tier1Button;
         public Button tier2Button;
         public Button tier3Button;
+        [Tooltip("Legacy Tank train — remapped at runtime to Train HP.")]
         public Button trainTankButton;
+        [Tooltip("Legacy Ranged train — remapped at runtime to Train ATK.")]
         public Button trainRangedButton;
+        [Tooltip("Train Speed 50g (+20 SPD). Created at runtime if missing.")]
+        public Button trainSpeedButton;
         public Button mediateButton;
         public Button hireButton;
         public TextMeshProUGUI hireButtonLabel;
@@ -118,15 +122,15 @@ namespace ArthurianAutobattler
             if (GameLoopManager.Instance != null)
                 SetNight(GameLoopManager.Instance.CurrentWaveNumber());
 
-            // Dice/codex/warband start closed. Selection menu starts closed;
-            // bottom dialogue strip stays visible for hover quotes.
+            // Dice/codex/warband start closed. Selection menu starts closed.
+            // Bottom NPC quote strip removed (Andrew church UX).
             diceModalUserOpen = false;
             warbandModalUserOpen = false;
             CloseFloatingModals();
             ForceNamedTavernDicePanelsInactive();
             HideAllDicePanelsHard();
             if (dossierModal != null) dossierModal.SetActive(false);
-            EnsureBottomDialogueStrip();
+            HideBottomDialogueStrip();
         }
 
         private System.Collections.IEnumerator RelayoutHudNextFrame()
@@ -271,16 +275,9 @@ namespace ArthurianAutobattler
                 tier3Button.onClick = new Button.ButtonClickedEvent();
                 tier3Button.onClick.AddListener(() => UnlockIntel(3));
             }
-            if (trainTankButton != null)
-            {
-                trainTankButton.onClick = new Button.ButtonClickedEvent();
-                trainTankButton.onClick.AddListener(() => Train(CombatRole.FrontlineTank));
-            }
-            if (trainRangedButton != null)
-            {
-                trainRangedButton.onClick = new Button.ButtonClickedEvent();
-                trainRangedButton.onClick.AddListener(() => Train(CombatRole.BacklineRanged));
-            }
+            WireTrainStatButton(trainTankButton, RecruitInstance.TrainStatKind.HP);
+            WireTrainStatButton(trainRangedButton, RecruitInstance.TrainStatKind.Attack);
+            WireTrainStatButton(trainSpeedButton, RecruitInstance.TrainStatKind.Speed);
             if (mediateButton != null)
             {
                 mediateButton.onClick = new Button.ButtonClickedEvent();
@@ -465,8 +462,7 @@ namespace ArthurianAutobattler
                 if (found != null) dossierModal = found.gameObject;
             }
 
-            // Dialogue/gossip live on the bottom strip only — never reuse Panel_Dossier/Dialogue
-            // (that caused the unit dialog to show twice: stats panel + bottom bar).
+            // Status feedback lives on the floating stats panel (bottom NPC quote bar removed).
             if (dossierStats == null) dossierStats = town.dossierStatsText;
             if (dossierPortrait == null) dossierPortrait = town.selectedAvatarImage;
             if (hireButton == null) hireButton = town.hireRecruitButton;
@@ -476,6 +472,7 @@ namespace ArthurianAutobattler
             if (tier3Button == null) tier3Button = town.tier3RevealButton;
             if (trainTankButton == null) trainTankButton = town.trainTankButton;
             if (trainRangedButton == null) trainRangedButton = town.trainRangedButton;
+            if (trainSpeedButton == null) trainSpeedButton = town.trainSpeedButton;
             if (mediateButton == null) mediateButton = town.mediateRivalryButton;
             if (goToWarButton == null) goToWarButton = town.goToWarButton;
             if (buyRoundButton == null) buyRoundButton = town.tavernRoundButton;
@@ -1493,8 +1490,7 @@ namespace ArthurianAutobattler
         /// <summary>Brief dossier/HUD feedback when March is blocked (empty party).</summary>
         public void FlashMarchBlocked(string reason)
         {
-            if (dossierDialogue != null)
-                dossierDialogue.text = $"<color=#FF6666>{reason}</color>";
+            WriteStatusFeedback($"<color=#FF6666>{reason}</color>");
             Debug.LogWarning($"[DemonKnight] {reason}");
         }
 
@@ -1988,27 +1984,25 @@ namespace ArthurianAutobattler
         };
 
         /// <summary>
-        /// Hover only: bottom dialogue + NPC quotes. Does NOT open the selection menu
+        /// Hover preview — no bottom NPC quote bar. Does NOT open the selection menu
         /// and does NOT lock hire selection — player can keep hovering freely.
         /// </summary>
         public void ShowHoverPreview(RecruitInstance recruit)
         {
             if (recruit == null) return;
             AutoWireDossierFromTownUI();
-            EnsureBottomDialogueStrip();
-            WriteBottomDialogue(recruit);
+            HideBottomDialogueStrip();
         }
 
         /// <summary>
         /// LMB toggles the unit selection menu (hire / train / intel).
-        /// Hover still only updates the bottom dialogue strip. RMB closes via
-        /// <see cref="CloseUnitSelectionMenu"/>.
+        /// RMB closes via <see cref="CloseUnitSelectionMenu"/>.
         /// </summary>
         public void ToggleUnitSelectionMenu(RecruitInstance recruit)
         {
             if (recruit == null) return;
             AutoWireDossierFromTownUI();
-            EnsureBottomDialogueStrip();
+            HideBottomDialogueStrip();
             CompactUnitStatsPanel();
 
             bool alreadyOpenOnThis = dossierModal != null
@@ -2030,10 +2024,8 @@ namespace ArthurianAutobattler
             }
             LockSeatHighlight(recruit);
             RefreshDossier();
-            WriteBottomDialogue(recruit);
             Town?.SelectRecruit(recruit, null);
-            // Town.SelectRecruit may refill Panel_Dossier/Dialogue — keep it hidden.
-            HideStatsPanelDialogueChildren();
+            EnsurePanelStatusLine();
             Debug.Log($"[DemonKnight] Unit menu OPEN for {recruit.characterName} (LMB, pew {recruit.pewSeatIndex}).");
         }
 
@@ -2053,122 +2045,207 @@ namespace ArthurianAutobattler
         /// <summary>Legacy LMB path — opens/toggles unit stats menu.</summary>
         private void OnSeatClicked(RecruitInstance recruit) => ToggleUnitSelectionMenu(recruit);
 
-        void WriteBottomDialogue(RecruitInstance recruit)
+        void WriteStatusFeedback(string richText)
         {
-            if (recruit == null) return;
-            EnsureBottomDialogueStrip();
-            int grudge = GrudgeSaveManager.Instance != null
-                ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(recruit.unitID) : 0;
-            int discount = MerlinResurrectionManager.Instance != null
-                ? MerlinResurrectionManager.Instance.GetGlobalCostDiscount() : 0;
-
+            EnsurePanelStatusLine();
             if (dossierDialogue != null)
-                dossierDialogue.text = recruit.FormatHireDialogue(grudge, discount);
-            if (gossipText != null)
-                gossipText.text = BuildGossip(recruit);
+                dossierDialogue.text = richText ?? "";
+        }
+
+        /// <summary>Andrew: remove the bottom NPC quote / dialog strip on the church pew screen.</summary>
+        void HideBottomDialogueStrip()
+        {
+            HideNamedBottomDialogue(transform);
+            var town = Town;
+            if (town != null)
+                HideNamedBottomDialogue(town.transform);
+            // Scene-built strip may sit under the town canvas root.
+            foreach (var t in FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (t == null) continue;
+                if (!string.Equals(t.name, "ChurchBottomDialogue", StringComparison.Ordinal)) continue;
+                t.gameObject.SetActive(false);
+            }
+            if (gossipText != null) gossipText.gameObject.SetActive(false);
+        }
+
+        static void HideNamedBottomDialogue(Transform root)
+        {
+            if (root == null) return;
+            var strip = root.Find("ChurchBottomDialogue");
+            if (strip != null) strip.gameObject.SetActive(false);
         }
 
         /// <summary>
-        /// Bottom-bar dialogue + NPC quotes only. Never use Panel_Dossier/Dialogue (duplicate).
+        /// One-line status on the floating stats panel (train/mediate feedback).
+        /// Replaces the removed bottom NPC quote bar.
         /// </summary>
-        void EnsureBottomDialogueStrip()
-        {
-            AutoWireDossierFromTownUI();
-            HideStatsPanelDialogueChildren();
-
-            Transform strip = transform.Find("ChurchBottomDialogue");
-            if (strip == null)
-            {
-                var go = new GameObject("ChurchBottomDialogue", typeof(RectTransform), typeof(Image));
-                go.transform.SetParent(transform, false);
-                strip = go.transform;
-                var srt = go.GetComponent<RectTransform>();
-                srt.anchorMin = new Vector2(0.08f, 0.02f);
-                srt.anchorMax = new Vector2(0.92f, 0.14f);
-                srt.offsetMin = Vector2.zero;
-                srt.offsetMax = Vector2.zero;
-                go.GetComponent<Image>().color = new Color(0.06f, 0.07f, 0.09f, 0.88f);
-                go.GetComponent<Image>().raycastTarget = false;
-
-                var dlgGo = new GameObject("Dialogue", typeof(RectTransform), typeof(TextMeshProUGUI));
-                dlgGo.transform.SetParent(strip, false);
-                var drt = dlgGo.GetComponent<RectTransform>();
-                drt.anchorMin = new Vector2(0.02f, 0.45f);
-                drt.anchorMax = new Vector2(0.98f, 0.95f);
-                drt.offsetMin = Vector2.zero;
-                drt.offsetMax = Vector2.zero;
-                var dlg = dlgGo.GetComponent<TextMeshProUGUI>();
-                dlg.fontSize = 20f;
-                dlg.color = new Color(0.95f, 0.9f, 0.75f);
-                dlg.alignment = TextAlignmentOptions.TopLeft;
-                dlg.raycastTarget = false;
-                dlg.textWrappingMode = TextWrappingModes.Normal;
-
-                var gGo = new GameObject("Gossip", typeof(RectTransform), typeof(TextMeshProUGUI));
-                gGo.transform.SetParent(strip, false);
-                var grt = gGo.GetComponent<RectTransform>();
-                grt.anchorMin = new Vector2(0.02f, 0.05f);
-                grt.anchorMax = new Vector2(0.98f, 0.45f);
-                grt.offsetMin = Vector2.zero;
-                grt.offsetMax = Vector2.zero;
-                var gtmp = gGo.GetComponent<TextMeshProUGUI>();
-                gtmp.fontSize = 16f;
-                gtmp.color = new Color(0.75f, 0.82f, 0.9f);
-                gtmp.alignment = TextAlignmentOptions.TopLeft;
-                gtmp.raycastTarget = false;
-                gtmp.textWrappingMode = TextWrappingModes.Normal;
-            }
-
-            // Always bind church dialogue refs to the bottom strip (never Panel_Dossier).
-            var stripDlg = strip.Find("Dialogue")?.GetComponent<TextMeshProUGUI>();
-            var stripGossip = strip.Find("Gossip")?.GetComponent<TextMeshProUGUI>();
-            if (stripDlg != null) dossierDialogue = stripDlg;
-            if (stripGossip != null) gossipText = stripGossip;
-            strip.gameObject.SetActive(true);
-            strip.SetAsLastSibling();
-        }
-
-        /// <summary>Hide Dialogue (and gossip) children on the unit stats panel so quotes aren't duplicated.</summary>
-        void HideStatsPanelDialogueChildren()
+        void EnsurePanelStatusLine()
         {
             if (dossierModal == null) return;
-            foreach (Transform child in dossierModal.transform)
+            Transform status = dossierModal.transform.Find("StatusLine");
+            if (status == null)
             {
-                if (child == null) continue;
-                string n = child.name ?? "";
-                if (n.Equals("Dialogue", StringComparison.OrdinalIgnoreCase)
-                    || n.Equals("Gossip", StringComparison.OrdinalIgnoreCase))
-                    child.gameObject.SetActive(false);
+                // Reuse Dialogue child if scene still has it; else create StatusLine.
+                var legacy = dossierModal.transform.Find("Dialogue");
+                if (legacy != null)
+                {
+                    legacy.gameObject.name = "StatusLine";
+                    status = legacy;
+                }
+                else
+                {
+                    var go = new GameObject("StatusLine", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    go.transform.SetParent(dossierModal.transform, false);
+                    status = go.transform;
+                }
             }
-            var town = Town;
-            if (town?.characterDialogueText != null
-                && town.characterDialogueText.transform.IsChildOf(dossierModal.transform))
-                town.characterDialogueText.gameObject.SetActive(false);
+
+            var rt = status as RectTransform;
+            if (rt != null)
+            {
+                rt.anchorMin = rt.anchorMax = new Vector2(0f, 0f);
+                rt.pivot = new Vector2(0f, 0f);
+                rt.anchoredPosition = new Vector2(16f, 8f);
+                rt.sizeDelta = new Vector2(488f, 28f);
+            }
+            var tmp = status.GetComponent<TextMeshProUGUI>();
+            if (tmp != null)
+            {
+                tmp.fontSize = 15f;
+                tmp.color = new Color(0.92f, 0.88f, 0.72f);
+                tmp.alignment = TextAlignmentOptions.Left;
+                tmp.raycastTarget = false;
+                tmp.textWrappingMode = TextWrappingModes.NoWrap;
+                dossierDialogue = tmp;
+            }
+            status.gameObject.SetActive(true);
+
+            var gossip = dossierModal.transform.Find("Gossip");
+            if (gossip != null) gossip.gameObject.SetActive(false);
         }
 
-        /// <summary>Lengthened stats panel (hire/train/intel) — room for stats + actions, no dialogue block.</summary>
+        /// <summary>Larger stats panel — intel / hire / ATK·HP·SPD train evenly spaced.</summary>
         void CompactUnitStatsPanel()
         {
             if (dossierModal == null) return;
-            HideStatsPanelDialogueChildren();
+            HideBottomDialogueStrip();
+            EnsureTrainStatButtons();
+            EnsurePanelStatusLine();
             var rt = dossierModal.GetComponent<RectTransform>();
             if (rt == null) return;
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0f, 0f);
-            // Taller + a bit wider so stats text and recruit options aren't stuffed.
-            rt.sizeDelta = new Vector2(420f, 460f);
+            // Larger hover/select unit menu.
+            rt.sizeDelta = new Vector2(520f, 560f);
 
-            // Top: portrait + stats. Bottom: intel / hire / train with breathing room.
-            PlaceChild(dossierModal.transform, "SelectedAvatar", new Vector2(16f, 340f), new Vector2(88f, 88f));
-            PlaceChild(dossierModal.transform, "DossierStats", new Vector2(116f, 220f), new Vector2(288f, 220f));
-            PlaceChild(dossierModal.transform, "ScoutBtn", new Vector2(16f, 168f), new Vector2(126f, 36f));
-            PlaceChild(dossierModal.transform, "InvestigateBtn", new Vector2(150f, 168f), new Vector2(126f, 36f));
-            PlaceChild(dossierModal.transform, "FullReportBtn", new Vector2(284f, 168f), new Vector2(120f, 36f));
-            PlaceChild(dossierModal.transform, "HireBtn", new Vector2(16f, 116f), new Vector2(388f, 40f));
-            PlaceChild(dossierModal.transform, "TrainTank", new Vector2(16f, 64f), new Vector2(190f, 40f));
-            PlaceChild(dossierModal.transform, "TrainRanged", new Vector2(214f, 64f), new Vector2(190f, 40f));
-            PlaceChild(dossierModal.transform, "Mediate", new Vector2(16f, 12f), new Vector2(388f, 40f));
+            const float pad = 16f;
+            const float gap = 12f;
+            float inner = 520f - pad * 2f;
+            float third = (inner - gap * 2f) / 3f;
+
+            PlaceChild(dossierModal.transform, "SelectedAvatar", new Vector2(pad, 420f), new Vector2(100f, 100f));
+            PlaceChild(dossierModal.transform, "DossierStats", new Vector2(128f, 280f), new Vector2(376f, 240f));
+
+            PlaceChild(dossierModal.transform, "ScoutBtn",
+                new Vector2(pad, 220f), new Vector2(third, 40f));
+            PlaceChild(dossierModal.transform, "InvestigateBtn",
+                new Vector2(pad + third + gap, 220f), new Vector2(third, 40f));
+            PlaceChild(dossierModal.transform, "FullReportBtn",
+                new Vector2(pad + (third + gap) * 2f, 220f), new Vector2(third, 40f));
+
+            PlaceChild(dossierModal.transform, "HireBtn", new Vector2(pad, 160f), new Vector2(inner, 44f));
+
+            // Evenly spaced Attack / HP / Speed train row (legacy TrainTank/Ranged remapped).
+            PlaceChild(dossierModal.transform, "TrainATK",
+                new Vector2(pad, 100f), new Vector2(third, 44f));
+            PlaceChild(dossierModal.transform, "TrainHP",
+                new Vector2(pad + third + gap, 100f), new Vector2(third, 44f));
+            PlaceChild(dossierModal.transform, "TrainSPD",
+                new Vector2(pad + (third + gap) * 2f, 100f), new Vector2(third, 44f));
+            // Hide legacy tank/ranged names if still present under old names.
+            HideChild(dossierModal.transform, "TrainTank");
+            HideChild(dossierModal.transform, "TrainRanged");
+
+            PlaceChild(dossierModal.transform, "Mediate", new Vector2(pad, 48f), new Vector2(inner, 40f));
+            PlaceChild(dossierModal.transform, "StatusLine", new Vector2(pad, 8f), new Vector2(inner, 28f));
+        }
+
+        static void HideChild(Transform parent, string name)
+        {
+            if (parent == null) return;
+            var t = parent.Find(name);
+            if (t != null) t.gameObject.SetActive(false);
+        }
+
+        /// <summary>Ensure Train ATK / HP / SPD buttons exist and are wired (maps legacy Tank/Ranged).</summary>
+        void EnsureTrainStatButtons()
+        {
+            if (dossierModal == null) return;
+            var root = dossierModal.transform;
+
+            // Remap legacy scene buttons onto the new names when needed.
+            RemapOrCreateTrainButton(root, "TrainHP", "Train Tank 15g", "HP 50g",
+                new Color(0.35f, 0.22f, 0.15f), ref trainTankButton, "TrainTank");
+            RemapOrCreateTrainButton(root, "TrainATK", "Train Ranged 15g", "ATK 50g",
+                new Color(0.20f, 0.30f, 0.35f), ref trainRangedButton, "TrainRanged");
+            RemapOrCreateTrainButton(root, "TrainSPD", null, "SPD 50g",
+                new Color(0.22f, 0.28f, 0.18f), ref trainSpeedButton, null);
+
+            WireTrainStatButton(trainTankButton, RecruitInstance.TrainStatKind.HP);
+            WireTrainStatButton(trainRangedButton, RecruitInstance.TrainStatKind.Attack);
+            WireTrainStatButton(trainSpeedButton, RecruitInstance.TrainStatKind.Speed);
+        }
+
+        void RemapOrCreateTrainButton(
+            Transform root,
+            string newName,
+            string legacyLabel,
+            string label,
+            Color color,
+            ref Button slot,
+            string legacyName)
+        {
+            Transform t = root.Find(newName);
+            if (t == null && !string.IsNullOrEmpty(legacyName))
+            {
+                var legacy = root.Find(legacyName);
+                if (legacy != null)
+                {
+                    legacy.gameObject.name = newName;
+                    t = legacy;
+                }
+            }
+            if (t == null)
+            {
+                var go = new GameObject(newName, typeof(RectTransform), typeof(Image), typeof(Button));
+                go.transform.SetParent(root, false);
+                go.GetComponent<Image>().color = color;
+                var labelGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                labelGo.transform.SetParent(go.transform, false);
+                var lrt = labelGo.GetComponent<RectTransform>();
+                lrt.anchorMin = Vector2.zero;
+                lrt.anchorMax = Vector2.one;
+                lrt.offsetMin = Vector2.zero;
+                lrt.offsetMax = Vector2.zero;
+                var tmp = labelGo.GetComponent<TextMeshProUGUI>();
+                tmp.text = label;
+                tmp.fontSize = 16f;
+                tmp.alignment = TextAlignmentOptions.Center;
+                tmp.color = Color.white;
+                t = go.transform;
+            }
+            ApplyHudButtonLabel(t.GetComponent<Button>(), label);
+            slot = t.GetComponent<Button>();
+            t.gameObject.SetActive(true);
+        }
+
+        void WireTrainStatButton(Button btn, RecruitInstance.TrainStatKind kind)
+        {
+            if (btn == null) return;
+            btn.onClick = new Button.ButtonClickedEvent();
+            btn.onClick.AddListener(() => TrainStat(kind));
         }
 
         static void PlaceChild(Transform parent, string name, Vector2 anchored, Vector2 size)
@@ -2277,7 +2354,9 @@ namespace ArthurianAutobattler
         private void RefreshDossier()
         {
             if (selected == null) return;
-            EnsureBottomDialogueStrip();
+            HideBottomDialogueStrip();
+            EnsureTrainStatButtons();
+            EnsurePanelStatusLine();
             int grudge = GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selected.unitID) : 0;
             int discount = MerlinResurrectionManager.Instance != null
@@ -2285,10 +2364,8 @@ namespace ArthurianAutobattler
 
             ApplyDossierPortrait(selected);
 
-            // Stats only on the floating panel — dialogue/quotes stay on the bottom bar.
             if (dossierStats != null)
                 dossierStats.text = selected.GetDisplayDescription(grudge, discount);
-            WriteBottomDialogue(selected);
 
             int cost = selected.GetFinalHireCost(grudge, discount);
             ApplyRecruitButtonLabel(cost);
@@ -2297,7 +2374,9 @@ namespace ArthurianAutobattler
             {
                 tier1Button.interactable = selected.intelTierUnlocked < 1;
                 ApplyHudButtonLabel(tier1Button,
-                    selected.intelTierUnlocked >= 1 ? "Scout done" : "Scout (Free)");
+                    selected.intelTierUnlocked >= 1
+                        ? "Scout done"
+                        : $"Scout ({RecruitInstance.IntelTier1Cost}g)");
             }
             if (tier2Button != null)
             {
@@ -2316,15 +2395,32 @@ namespace ArthurianAutobattler
                         : $"Full Report ({RecruitInstance.IntelTier3Cost}g)");
             }
             if (hireButton != null) hireButton.interactable = true;
+
+            int wave = GameLoopManager.Instance != null
+                ? GameLoopManager.Instance.CurrentWaveNumber()
+                : 0;
             var loopTrain = GameLoopManager.Instance;
-            bool canTrainPay = (Town != null && Town.playerGold >= 15)
-                               || (loopTrain != null && loopTrain.trainingVouchers > 0);
-            if (trainTankButton != null) trainTankButton.interactable = canTrainPay;
+            bool alreadyTrained = selected.HasTrainedThisWave(wave);
+            bool canTrainPay = !alreadyTrained
+                               && ((Town != null && Town.playerGold >= RecruitInstance.TrainStatCostGold)
+                                   || (loopTrain != null && loopTrain.trainingVouchers > 0));
+            string trainLbl(string stat) => alreadyTrained
+                ? $"{stat} ✓"
+                : $"{stat} {RecruitInstance.TrainStatCostGold}g";
             if (trainRangedButton != null)
             {
-                // Warriors may move BACK via formation, but cannot Train Ranged / crossbow.
-                bool warriorBlocked = selected != null && !selected.AllowsTrainRangedKit;
-                trainRangedButton.interactable = canTrainPay && !warriorBlocked;
+                trainRangedButton.interactable = canTrainPay;
+                ApplyHudButtonLabel(trainRangedButton, trainLbl("ATK"));
+            }
+            if (trainTankButton != null)
+            {
+                trainTankButton.interactable = canTrainPay;
+                ApplyHudButtonLabel(trainTankButton, trainLbl("HP"));
+            }
+            if (trainSpeedButton != null)
+            {
+                trainSpeedButton.interactable = canTrainPay;
+                ApplyHudButtonLabel(trainSpeedButton, trainLbl("SPD"));
             }
             int mediateCost = GameLoopManager.MediateCostGold;
             if (mediateButton != null)
@@ -2421,39 +2517,40 @@ namespace ArthurianAutobattler
             RefreshHUD();
         }
 
-        private void Train(CombatRole role)
+        private void TrainStat(RecruitInstance.TrainStatKind kind)
         {
             if (selected == null || Town == null) return;
             var loop = GameLoopManager.Instance;
-            bool useVoucher = loop != null && loop.trainingVouchers > 0;
-            if (!useVoucher && Town.playerGold < 15) return;
-            if (role == CombatRole.BacklineRanged && !selected.AllowsTrainRangedKit)
+            int wave = loop != null ? loop.CurrentWaveNumber() : 0;
+            if (selected.HasTrainedThisWave(wave))
             {
-                if (dossierDialogue != null)
-                    dossierDialogue.text =
-                        "<color=#FF6644>Warriors cannot Train Ranged.</color> Move them to BACK in the warband — they keep NO REACH there.";
+                WriteStatusFeedback("<color=#FFAA66>Already trained this wave.</color> One Train per unit per wave.");
                 RefreshDossier();
                 return;
             }
-            if (!selected.TrainRole(role, out string bonus))
+            bool useVoucher = loop != null && loop.trainingVouchers > 0;
+            if (!useVoucher && Town.playerGold < RecruitInstance.TrainStatCostGold)
             {
-                if (dossierDialogue != null)
-                    dossierDialogue.text = "<color=#FFAA66>Already trained that role.</color>";
+                WriteStatusFeedback($"<color=#FFAA66>Need {RecruitInstance.TrainStatCostGold}g to train.</color>");
+                RefreshDossier();
+                return;
+            }
+            if (!selected.TrainChosenStat(kind, wave, out string bonus))
+            {
+                WriteStatusFeedback("<color=#FFAA66>Train failed.</color>");
                 RefreshDossier();
                 return;
             }
             if (useVoucher)
             {
                 loop.trainingVouchers--;
-                if (dossierDialogue != null)
-                    dossierDialogue.text =
-                        $"<color=#7CFF9A>Trained as {role} — {bonus}!</color> (voucher; {loop.trainingVouchers} left)";
+                WriteStatusFeedback(
+                    $"<color=#7CFF9A>Trained {bonus}!</color> (voucher; {loop.trainingVouchers} left)");
             }
             else
             {
-                Town.playerGold -= 15;
-                if (dossierDialogue != null)
-                    dossierDialogue.text = $"<color=#7CFF9A>Trained as {role} — {bonus}!</color>";
+                Town.playerGold -= RecruitInstance.TrainStatCostGold;
+                WriteStatusFeedback($"<color=#7CFF9A>Trained {bonus}!</color>");
             }
             RefreshDossier();
             RefreshHUD();
@@ -2471,20 +2568,16 @@ namespace ArthurianAutobattler
 
             if (GameLoopManager.Instance.rivalriesSuspendedThisWave)
             {
-                if (dossierDialogue != null)
-                    dossierDialogue.text = "<color=#7CFF9A>Rivalries already mediated for this wave.</color>";
+                WriteStatusFeedback("<color=#7CFF9A>Rivalries already mediated for this wave.</color>");
                 RefreshDossier();
                 return;
             }
 
             Town.playerGold -= cost;
             GameLoopManager.Instance.rivalriesSuspendedThisWave = true;
-            if (dossierDialogue != null)
-            {
-                dossierDialogue.text =
-                    $"<color=#7CFF9A>Mediated ({cost}g).</color> Rivalries canceled for this wave — "
-                    + "formerly incompatible souls may recruit together until March ends.";
-            }
+            WriteStatusFeedback(
+                $"<color=#7CFF9A>Mediated ({cost}g).</color> Rivalries canceled for this wave — "
+                + "formerly incompatible souls may recruit together until March ends.");
             Debug.Log($"[DemonKnight] Mediate {cost}g — rivalries suspended this wave.");
             RefreshDossier();
             RefreshHUD();
@@ -2526,7 +2619,7 @@ namespace ArthurianAutobattler
             if (Town.playerGold < cost) return;
             if (!PartySynergyEvaluator.CanJoinParty(selected, party, out string reason))
             {
-                if (dossierDialogue != null) dossierDialogue.text = $"<color=red>{reason}</color>";
+                WriteStatusFeedback($"<color=red>{reason}</color>");
                 return;
             }
 
@@ -2590,11 +2683,8 @@ namespace ArthurianAutobattler
             if (loop != null)
                 loop.tavernRoundHireDiscountActive = true;
 
-            if (dossierDialogue != null)
-            {
-                dossierDialogue.text =
-                    $"<color=yellow>Tavern Round ({cost}g)!</color> All hires −{GameLoopManager.TavernRoundHireDiscount}g this wave.";
-            }
+            WriteStatusFeedback(
+                $"<color=yellow>Tavern Round ({cost}g)!</color> All hires −{GameLoopManager.TavernRoundHireDiscount}g this wave.");
 
             // Refresh hire button price with the new discount.
             if (selected != null)
@@ -3068,8 +3158,8 @@ namespace ArthurianAutobattler
             string numBit = unitNum > 0 ? $"#{unitNum}  " : "";
             string reachWarn = m.IsMeleeStuckInBackRow
                 ? (m.unitType == UnitType.Warrior
-                    ? "\n<color=#FF6644><b>NO REACH</b> — Warriors cannot Train Ranged. Move to FRONT</color>"
-                    : "\n<color=#FF6644><b>NO REACH</b> — Train Ranged (crossbow) or move to FRONT</color>")
+                    ? "\n<color=#FF6644><b>NO REACH</b> — Warriors cannot attack from BACK. Move to FRONT</color>"
+                    : "\n<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Move to FRONT</color>")
                 : (m.assignedRole == CombatRole.BacklineRanged && m.canAttackFromBack
                    && m.unitType != UnitType.Warrior && !RecruitInstance.IsRangedUnitType(m.unitType)
                     ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
@@ -3289,6 +3379,7 @@ namespace ArthurianAutobattler
             RaiseButtonLabelFloor(tier3Button, 20f);
             RaiseButtonLabelFloor(trainTankButton, 20f);
             RaiseButtonLabelFloor(trainRangedButton, 20f);
+            RaiseButtonLabelFloor(trainSpeedButton, 20f);
             RaiseButtonLabelFloor(mediateButton, 20f);
             RaiseButtonLabelFloor(hireButton, 22f);
             RaiseButtonLabelFloor(buyRoundButton, 20f);
