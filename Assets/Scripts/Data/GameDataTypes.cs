@@ -2420,7 +2420,7 @@ namespace ArthurianAutobattler
     /// and optional townsfolk pew face overlays. Body avatars stay on ClassSpritePoolApplier.
     /// Soft-fails when empty / cross-assigned — callers keep CharacterDatabase / StageLayout fallbacks.
     /// Embedded in GameDataTypes (PR #33 Force Sync CS0103 lesson — no standalone applier file).
-    /// tip: body-face-pool-build-persist
+    /// tip: battle-good-evil-sprite-pools (Tab 5 FACE stays; Tab 6 is BattleGoodEvil)
     /// </summary>
     public static class LegendPewPortraitApplier
     {
@@ -2613,6 +2613,495 @@ namespace ArthurianAutobattler
             if (list == null || sp == null) return false;
             for (int i = 0; i < list.Count; i++)
                 if (list[i] == sp) return true;
+            return false;
+        }
+    }
+
+    /// <summary>One Good-side Legend / Evil boss battle-sprite slot (Architect Tab 6).</summary>
+    [Serializable]
+    public class BattleSpriteSlotEntry
+    {
+        public UnitType unitType;
+        public string displayName;
+        public Sprite battleSprite;
+        public string assetPath;
+        [Tooltip("Soft slots (e.g. Merlin) stay listed but are optional.")]
+        public bool softOptional;
+    }
+
+    /// <summary>
+    /// Architect Tab 6 — Autobattle Good vs Evil battle sprites for UnitVisualActor.
+    /// Distinct from Tab 4 pew BODY pools and Tab 5 FACE portraits. Resources path:
+    /// BattleGoodEvilSpritePoolProfile. tip: battle-good-evil-sprite-pools
+    /// </summary>
+    [CreateAssetMenu(fileName = "BattleGoodEvilSpritePoolProfile", menuName = "DemonKnight/Battle Good Evil Sprite Pool Profile")]
+    public class BattleGoodEvilSpritePoolProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "BattleGoodEvilSpritePoolProfile";
+
+        /// <summary>14 playable legends + soft Merlin (same order as Tab 5 CanonicalLegendSlots).</summary>
+        public static readonly UnitType[] CanonicalGoodLegendSlots = LegendPewPortraitProfile.CanonicalLegendSlots;
+
+        /// <summary>Wave 3–10+ bosses (lore-boss-wave-order).</summary>
+        public static readonly UnitType[] CanonicalBossSlots =
+        {
+            UnitType.BossBlackKnight,   // Wave 3
+            UnitType.BossMeleagant,     // Wave 4
+            UnitType.BossKingLot,       // Wave 5
+            UnitType.BossVortigern,     // Wave 6
+            UnitType.BossAccolon,       // Wave 7
+            UnitType.BossQuestingBeast, // Wave 8
+            UnitType.BossGreenKnight,   // Wave 9
+            UnitType.BossNimue,         // Wave 10+
+        };
+
+        [Header("Good — troop battle pools (multi-sprite)")]
+        public List<Sprite> peasantBattleSprites = new List<Sprite>();
+        public List<Sprite> warriorBattleSprites = new List<Sprite>();
+        public List<Sprite> knightBattleSprites = new List<Sprite>();
+        public List<Sprite> priestBattleSprites = new List<Sprite>();
+
+        public List<string> peasantBattleAssetPaths = new List<string>();
+        public List<string> warriorBattleAssetPaths = new List<string>();
+        public List<string> knightBattleAssetPaths = new List<string>();
+        public List<string> priestBattleAssetPaths = new List<string>();
+
+        [Header("Good — playable Legend battle slots (single sprite each)")]
+        public List<BattleSpriteSlotEntry> goodLegendSlots = new List<BattleSpriteSlotEntry>();
+
+        [Header("Evil — wave-unit battle pools")]
+        public List<Sprite> demonImpBattleSprites = new List<Sprite>();
+        public List<Sprite> hellhoundBattleSprites = new List<Sprite>();
+        public List<Sprite> dreadLordBattleSprites = new List<Sprite>();
+
+        public List<string> demonImpBattleAssetPaths = new List<string>();
+        public List<string> hellhoundBattleAssetPaths = new List<string>();
+        public List<string> dreadLordBattleAssetPaths = new List<string>();
+
+        [Header("Evil — Wave 3–10+ boss battle slots")]
+        public List<BattleSpriteSlotEntry> evilBossSlots = new List<BattleSpriteSlotEntry>();
+
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
+        public static BattleGoodEvilSpritePoolProfile Load()
+        {
+            BattleGoodEvilSpritePoolProfile p = null;
+            try { p = Resources.Load<BattleGoodEvilSpritePoolProfile>(ResourcesPath); }
+            catch { /* missing script — fall through */ }
+            if (p != null)
+            {
+                p.EnsureSlotsAndLists();
+                p.isRuntimeStandIn = false;
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<BattleGoodEvilSpritePoolProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureSlotsAndLists();
+                        all[i].isRuntimeStandIn = false;
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset */ }
+            p = CreateInstance<BattleGoodEvilSpritePoolProfile>();
+            p.name = "BattleGoodEvilSpritePoolProfile_Runtime";
+            p.isRuntimeStandIn = true;
+            p.EnsureSlotsAndLists();
+            return p;
+        }
+
+        public void EnsureSlotsAndLists()
+        {
+            peasantBattleSprites ??= new List<Sprite>();
+            warriorBattleSprites ??= new List<Sprite>();
+            knightBattleSprites ??= new List<Sprite>();
+            priestBattleSprites ??= new List<Sprite>();
+            peasantBattleAssetPaths ??= new List<string>();
+            warriorBattleAssetPaths ??= new List<string>();
+            knightBattleAssetPaths ??= new List<string>();
+            priestBattleAssetPaths ??= new List<string>();
+
+            demonImpBattleSprites ??= new List<Sprite>();
+            hellhoundBattleSprites ??= new List<Sprite>();
+            dreadLordBattleSprites ??= new List<Sprite>();
+            demonImpBattleAssetPaths ??= new List<string>();
+            hellhoundBattleAssetPaths ??= new List<string>();
+            dreadLordBattleAssetPaths ??= new List<string>();
+
+            goodLegendSlots ??= new List<BattleSpriteSlotEntry>();
+            evilBossSlots ??= new List<BattleSpriteSlotEntry>();
+
+            EnsureSlotList(goodLegendSlots, CanonicalGoodLegendSlots, softMerlin: true);
+            EnsureSlotList(evilBossSlots, CanonicalBossSlots, softMerlin: false);
+        }
+
+        static void EnsureSlotList(List<BattleSpriteSlotEntry> list, UnitType[] wantTypes, bool softMerlin)
+        {
+            for (int i = 0; i < wantTypes.Length; i++)
+            {
+                UnitType want = wantTypes[i];
+                BattleSpriteSlotEntry found = null;
+                for (int j = 0; j < list.Count; j++)
+                {
+                    if (list[j] != null && list[j].unitType == want)
+                    {
+                        found = list[j];
+                        break;
+                    }
+                }
+                if (found == null)
+                {
+                    found = new BattleSpriteSlotEntry
+                    {
+                        unitType = want,
+                        displayName = DefaultBattleDisplayName(want),
+                        softOptional = softMerlin && want == UnitType.Merlin
+                    };
+                    list.Add(found);
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(found.displayName))
+                        found.displayName = DefaultBattleDisplayName(want);
+                    if (softMerlin)
+                        found.softOptional = want == UnitType.Merlin;
+                }
+            }
+        }
+
+        public static string DefaultBattleDisplayName(UnitType t) => t switch
+        {
+            UnitType.KingArthur => "King Arthur",
+            UnitType.SirLancelot => "Sir Lancelot",
+            UnitType.MorganLeFay => "Morgan le Fay",
+            UnitType.LadyOfTheLake => "Lady of the Lake",
+            UnitType.SirGawain => "Sir Gawain",
+            UnitType.SirGalahad => "Sir Galahad",
+            UnitType.SirTristan => "Sir Tristan",
+            UnitType.SirPercival => "Sir Percival",
+            UnitType.SirKay => "Sir Kay",
+            UnitType.SirBedivere => "Sir Bedivere",
+            UnitType.LadyGuinevere => "Lady Guinevere",
+            UnitType.Guinevere => "Lady Guinevere",
+            UnitType.ArchPriestOfGlastonbury => "Arch-Priest of Glastonbury",
+            UnitType.Priest => "Priest",
+            UnitType.TheGreenKnight => "The Green Knight",
+            UnitType.Merlin => "Merlin (soft)",
+            UnitType.DemonImp => "Demon Imp",
+            UnitType.DemonHellhound => "Hellhound",
+            UnitType.DemonDreadLord => "Dread Lord",
+            UnitType.BossBlackKnight => "Black Knight (W3)",
+            UnitType.BossMeleagant => "Meleagant (W4)",
+            UnitType.BossKingLot => "King Lot (W5)",
+            UnitType.BossVortigern => "Vortigern (W6)",
+            UnitType.BossAccolon => "Accolon (W7)",
+            UnitType.BossQuestingBeast => "Questing Beast (W8)",
+            UnitType.BossGreenKnight => "Green Knight Boss (W9)",
+            UnitType.BossNimue => "Nimue (W10+)",
+            _ => t.ToString()
+        };
+
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            n += ClassSpritePoolProfile.RematerializeList(peasantBattleSprites, peasantBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(warriorBattleSprites, warriorBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(knightBattleSprites, knightBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(priestBattleSprites, priestBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(demonImpBattleSprites, demonImpBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(hellhoundBattleSprites, hellhoundBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(dreadLordBattleSprites, dreadLordBattleAssetPaths);
+            n += RematerializeSlots(goodLegendSlots);
+            n += RematerializeSlots(evilBossSlots);
+            return n;
+        }
+
+        static int RematerializeSlots(List<BattleSpriteSlotEntry> slots)
+        {
+            if (slots == null) return 0;
+            int n = 0;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var e = slots[i];
+                if (e == null || e.battleSprite != null) continue;
+                if (string.IsNullOrEmpty(e.assetPath)) continue;
+                Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(e.assetPath);
+                if (sp == null) continue;
+                e.battleSprite = sp;
+                n++;
+            }
+            return n;
+        }
+
+        public List<Sprite> GetTroopOrWavePool(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantBattleSprites,
+                UnitType.Warrior => warriorBattleSprites,
+                UnitType.Knight => knightBattleSprites,
+                UnitType.Priest => priestBattleSprites,
+                UnitType.DemonImp => demonImpBattleSprites,
+                UnitType.DemonHellhound => hellhoundBattleSprites,
+                UnitType.DemonDreadLord => dreadLordBattleSprites,
+                _ => null
+            };
+        }
+
+        public List<string> GetTroopOrWavePaths(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantBattleAssetPaths,
+                UnitType.Warrior => warriorBattleAssetPaths,
+                UnitType.Knight => knightBattleAssetPaths,
+                UnitType.Priest => priestBattleAssetPaths,
+                UnitType.DemonImp => demonImpBattleAssetPaths,
+                UnitType.DemonHellhound => hellhoundBattleAssetPaths,
+                UnitType.DemonDreadLord => dreadLordBattleAssetPaths,
+                _ => null
+            };
+        }
+
+        public BattleSpriteSlotEntry FindLegendSlot(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            // LadyGuinevere / Guinevere alias
+            for (int i = 0; i < goodLegendSlots.Count; i++)
+            {
+                var e = goodLegendSlots[i];
+                if (e == null) continue;
+                if (e.unitType == type) return e;
+                if ((type == UnitType.Guinevere || type == UnitType.LadyGuinevere)
+                    && (e.unitType == UnitType.Guinevere || e.unitType == UnitType.LadyGuinevere))
+                    return e;
+            }
+            return null;
+        }
+
+        public BattleSpriteSlotEntry FindBossSlot(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            for (int i = 0; i < evilBossSlots.Count; i++)
+            {
+                var e = evilBossSlots[i];
+                if (e != null && e.unitType == type) return e;
+            }
+            return null;
+        }
+
+        public Sprite GetLegendBattleSprite(UnitType type)
+        {
+            var e = FindLegendSlot(type);
+            return e != null ? e.battleSprite : null;
+        }
+
+        public Sprite GetBossBattleSprite(UnitType type)
+        {
+            var e = FindBossSlot(type);
+            return e != null ? e.battleSprite : null;
+        }
+
+        public int CountUsablePool(UnitType type)
+        {
+            var pool = GetTroopOrWavePool(type);
+            if (pool == null) return 0;
+            int n = 0;
+            for (int i = 0; i < pool.Count; i++)
+                if (pool[i] != null) n++;
+            return n;
+        }
+
+        public int CountAssignedLegendBattles()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            for (int i = 0; i < goodLegendSlots.Count; i++)
+            {
+                var e = goodLegendSlots[i];
+                if (e == null || e.softOptional) continue;
+                if (e.battleSprite != null) n++;
+            }
+            return n;
+        }
+
+        public int CountAssignedBossBattles()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            for (int i = 0; i < evilBossSlots.Count; i++)
+            {
+                var e = evilBossSlots[i];
+                if (e != null && e.battleSprite != null) n++;
+            }
+            return n;
+        }
+    }
+
+    /// <summary>
+    /// Resolves Architect Tab 6 battle sprites for BattlefieldVisualizer / UnitVisualActor.
+    /// Soft-fails when empty — callers keep CharacterDatabase / demon fallbacks.
+    /// Embedded in GameDataTypes (Force Sync CS0103 lesson). tip: battle-good-evil-sprite-pools
+    /// </summary>
+    public static class BattleGoodEvilSpritePoolApplier
+    {
+        static BattleGoodEvilSpritePoolProfile _cache;
+
+        public static void InvalidateCache() => _cache = null;
+
+        public static BattleGoodEvilSpritePoolProfile Profile
+        {
+            get
+            {
+                if (_cache != null && _cache.isRuntimeStandIn
+                    && _cache.CountUsablePool(UnitType.Peasant)
+                    + _cache.CountUsablePool(UnitType.Warrior)
+                    + _cache.CountUsablePool(UnitType.Knight)
+                    + _cache.CountUsablePool(UnitType.Priest)
+                    + _cache.CountUsablePool(UnitType.DemonImp)
+                    + _cache.CountUsablePool(UnitType.DemonHellhound)
+                    + _cache.CountUsablePool(UnitType.DemonDreadLord)
+                    + _cache.CountAssignedLegendBattles()
+                    + _cache.CountAssignedBossBattles() == 0)
+                    _cache = null;
+
+                if (_cache == null)
+                {
+                    try
+                    {
+                        _cache = BattleGoodEvilSpritePoolProfile.Load();
+                        if (_cache != null)
+                        {
+                            int restored = _cache.RematerializeSpritesFromPaths();
+                            if (restored > 0)
+                                Debug.Log($"[DemonKnight] BattleGoodEvil rematerialized {restored} sprite(s) from path backups.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning("[DemonKnight] BattleGoodEvilSpritePoolProfile.Load soft-fail: " + ex.Message);
+                        return null;
+                    }
+                }
+                return _cache;
+            }
+        }
+
+        /// <summary>
+        /// Prefer Architect Tab 6 battle sprite for this unit type.
+        /// Pools use deterministic hash(unitId); legend/boss slots are 1:1.
+        /// Returns null when empty — Visualizer falls back to CharacterDatabase / demon art.
+        /// </summary>
+        public static Sprite ResolveBattleSprite(UnitType type, string unitId = null)
+        {
+            try
+            {
+                var profile = Profile;
+                if (profile == null) return null;
+
+                // Boss slots first (UnitType.Boss*)
+                string typeName = type.ToString();
+                if (typeName.StartsWith("Boss", StringComparison.Ordinal))
+                {
+                    Sprite boss = profile.GetBossBattleSprite(type);
+                    if (boss != null && !IsForbiddenForBattle(boss)) return boss;
+                    return null;
+                }
+
+                // Legend single slots
+                if (RecruitInstance.IsLegendUnit(type) && type != UnitType.Priest && type != UnitType.Captain)
+                {
+                    Sprite legend = profile.GetLegendBattleSprite(type);
+                    if (legend != null && !IsForbiddenForBattle(legend)) return legend;
+                    return null;
+                }
+
+                // Troop / wave-unit pools
+                List<Sprite> pool = profile.GetTroopOrWavePool(type);
+                if (pool == null || pool.Count == 0) return null;
+                var usable = new List<Sprite>();
+                for (int i = 0; i < pool.Count; i++)
+                {
+                    Sprite sp = pool[i];
+                    if (sp == null) continue;
+                    if (IsForbiddenForBattle(sp))
+                    {
+                        Debug.LogWarning(
+                            "[DemonKnight] Soft-fail: face/body-cross sprite '" + sp.name
+                            + "' skipped in battle pool for " + type + ".");
+                        continue;
+                    }
+                    usable.Add(sp);
+                }
+                if (usable.Count == 0) return null;
+                int seed = ClassSpritePoolApplier.StableHash(
+                    !string.IsNullOrEmpty(unitId) ? "battle:" + unitId : "battle:" + type);
+                int want = Math.Abs(seed) % usable.Count;
+                return usable[want];
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] BattleGoodEvilSpritePoolApplier.Resolve soft-fail: " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>True when sprite belongs to Tab 5 FACE pools (must not drive battle tokens).</summary>
+        public static bool IsForbiddenForBattle(Sprite sp)
+        {
+            if (sp == null) return true;
+            try
+            {
+                if (LegendPewPortraitApplier.IsFacePoolSprite(sp)) return true;
+            }
+            catch { /* soft-fail */ }
+            return false;
+        }
+
+        /// <summary>True when sprite is listed in any Tab 6 battle pool/slot.</summary>
+        public static bool IsBattlePoolSprite(Sprite sp)
+        {
+            if (sp == null) return false;
+            try
+            {
+                var profile = Profile;
+                if (profile == null) return false;
+                if (ListContains(profile.peasantBattleSprites, sp)) return true;
+                if (ListContains(profile.warriorBattleSprites, sp)) return true;
+                if (ListContains(profile.knightBattleSprites, sp)) return true;
+                if (ListContains(profile.priestBattleSprites, sp)) return true;
+                if (ListContains(profile.demonImpBattleSprites, sp)) return true;
+                if (ListContains(profile.hellhoundBattleSprites, sp)) return true;
+                if (ListContains(profile.dreadLordBattleSprites, sp)) return true;
+                if (SlotListContains(profile.goodLegendSlots, sp)) return true;
+                if (SlotListContains(profile.evilBossSlots, sp)) return true;
+            }
+            catch { /* soft-fail */ }
+            return false;
+        }
+
+        static bool ListContains(List<Sprite> list, Sprite sp)
+        {
+            if (list == null || sp == null) return false;
+            for (int i = 0; i < list.Count; i++)
+                if (list[i] == sp) return true;
+            return false;
+        }
+
+        static bool SlotListContains(List<BattleSpriteSlotEntry> list, Sprite sp)
+        {
+            if (list == null || sp == null) return false;
+            for (int i = 0; i < list.Count; i++)
+                if (list[i] != null && list[i].battleSprite == sp) return true;
             return false;
         }
     }

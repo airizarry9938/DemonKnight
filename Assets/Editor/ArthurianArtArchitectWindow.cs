@@ -11,13 +11,13 @@ using UnityEngine.Video;
 /// <summary>
 /// Master Spec Phase 3 — Art &amp; Stage Architect.
 /// Menu: Arthurian → Art &amp; Stage Architect
-/// Tabs: Sheet Splicer | Stage Placer | Scene Backgrounds | Class Sprites / Unit Pools | Legend / Pew Portraits
+/// Tabs: Sheet Splicer | Stage Placer | Scene Backgrounds | Class Sprites / Unit Pools | Legend / Pew Portraits | Battle Good/Evil
 /// Single sprite category only (no paperdoll / multi-layer body·outfit·head).
 /// </summary>
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "body-face-pool-build-persist";
+    public const string UiBuildId = "battle-good-evil-sprite-pools";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -28,6 +28,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const string SceneBgProfilePath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolProfilePath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewProfilePath = "Assets/Resources/LegendPewPortraitProfile.asset";
+    const string BattleGoodEvilProfilePath = "Assets/Resources/BattleGoodEvilSpritePoolProfile.asset";
     /// <summary>Same art as SomersetChurchUI / SomersetPewLayout (play stage).</summary>
     const string ChurchBackgroundPath = "Assets/Art/Backgrounds/SomersetChurchInterior.jpg";
     /// <summary>Reference pixel size of SomersetChurchInterior (play layout tuned to this).</summary>
@@ -36,13 +37,16 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// <summary>Must match SomersetChurchUI.baseSeatSize tip (play pew sprite size).</summary>
     static readonly Vector2 PlayPewBaseSize = new Vector2(88f, 112f);
 
-    enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits }
+    enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits, BattleGoodEvil }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
     enum BattleSlotSide { Player, Enemy }
     enum CropToolMode { ManualBox, GridCrop, AutoIsland }
     enum BoxPivotMode { BottomCenter, Center, Custom }
     enum ClassPoolKind { Peasant, Warrior, Knight }
     enum PewFacePoolKind { Peasant, Warrior, Knight }
+    enum BattleGoodPoolKind { Peasant, Warrior, Knight, Priest }
+    enum BattleEvilPoolKind { DemonImp, Hellhound, DreadLord }
+    enum BattleSideSection { GoodTroops, GoodLegends, EvilWave, EvilBosses }
 
     ArchitectTab tab;
     Vector2 scroll;
@@ -59,6 +63,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
     PewFacePoolKind selectedPewFacePool = PewFacePoolKind.Peasant;
     Sprite pewFaceAddSprite;
     int legendPewSection; // 0 = Legends, 1 = Townsfolk pew faces
+    BattleGoodEvilSpritePoolProfile battleGoodEvilProfile;
+    Vector2 battleGoodEvilScroll;
+    Vector2 battleLegendSlotScroll;
+    Vector2 battleBossSlotScroll;
+    BattleSideSection battleSideSection = BattleSideSection.GoodTroops;
+    BattleGoodPoolKind selectedBattleGoodPool = BattleGoodPoolKind.Peasant;
+    BattleEvilPoolKind selectedBattleEvilPool = BattleEvilPoolKind.DemonImp;
+    Sprite battlePoolAddSprite;
 
     // ── Tab 1: Splicer ─────────────────────────────────────────────────────
     Texture2D sheetTexture;
@@ -136,7 +148,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         win.minSize = new Vector2(780, 560);
         win.Show();
         win.Focus();
-        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 5 tabs.");
+        Debug.Log($"[DemonKnight] Opened Art & Stage Architect ({UiBuildId}) — Category: Sprite, 6 tabs.");
     }
 
     public static void CloseAllArchitectWindows()
@@ -191,13 +203,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
         legendPewProfile?.EnsureSlotsAndLists();
         int faceRestored = legendPewProfile != null ? legendPewProfile.RematerializeSpritesFromPaths() : 0;
 
+        battleGoodEvilProfile = ArthurianStageLayoutProfileEnsure.EnsureBattleGoodEvilSpritePoolAsset();
+        battleGoodEvilProfile?.EnsureSlotsAndLists();
+        int battleRestored = battleGoodEvilProfile != null ? battleGoodEvilProfile.RematerializeSpritesFromPaths() : 0;
+
         try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
         try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
+        try { BattleGoodEvilSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
         try { SomersetChurchUI.InvalidateChurchAssignCache(); } catch { /* ignore */ }
 
-        if (poolRestored > 0 || faceRestored > 0)
+        if (poolRestored > 0 || faceRestored > 0 || battleRestored > 0)
             Debug.Log(
-                $"[DemonKnight] Architect reload ({reason}): rematerialized pools={poolRestored} faces={faceRestored}.");
+                $"[DemonKnight] Architect reload ({reason}): rematerialized pools={poolRestored} faces={faceRestored} battle={battleRestored}.");
     }
 
     void OnDisable()
@@ -207,6 +224,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         PersistSceneBgProfile("OnDisable");
         PersistClassPoolProfile("OnDisable");
         PersistLegendPewProfile("OnDisable");
+        PersistBattleGoodEvilProfile("OnDisable");
     }
 
     void OnArchitectPlayModeChanged(PlayModeStateChange state)
@@ -218,6 +236,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             PersistSceneBgProfile("PlayMode:" + state);
             PersistClassPoolProfile("PlayMode:" + state);
             PersistLegendPewProfile("PlayMode:" + state);
+            PersistBattleGoodEvilProfile("PlayMode:" + state);
         }
     }
 
@@ -232,6 +251,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             case ArchitectTab.SceneBackgrounds: DrawSceneBackgroundsTab(); break;
             case ArchitectTab.ClassSprites: DrawClassSpritesTab(); break;
             case ArchitectTab.LegendPewPortraits: DrawLegendPewPortraitsTab(); break;
+            case ArchitectTab.BattleGoodEvil: DrawBattleGoodEvilTab(); break;
         }
         EditorGUILayout.EndScrollView();
     }
@@ -249,6 +269,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
             tab = ArchitectTab.ClassSprites;
         if (GUILayout.Toggle(tab == ArchitectTab.LegendPewPortraits, "5 · Legend / Pew Portraits", EditorStyles.toolbarButton))
             tab = ArchitectTab.LegendPewPortraits;
+        if (GUILayout.Toggle(tab == ArchitectTab.BattleGoodEvil, "6 · Battle Good / Evil", EditorStyles.toolbarButton))
+            tab = ArchitectTab.BattleGoodEvil;
         GUILayout.FlexibleSpace();
         GUILayout.Label(UiBuildId, EditorStyles.miniLabel);
         EditorGUILayout.EndHorizontal();
@@ -356,6 +378,113 @@ public class ArthurianArtArchitectWindow : EditorWindow
         AssetDatabase.SaveAssets();
         try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
         try { CharacterDatabase.InvalidateCache(); } catch { /* ignore */ }
+    }
+
+    void PersistBattleGoodEvilProfile(string reason)
+    {
+        if (battleGoodEvilProfile == null) return;
+        string path = AssetDatabase.GetAssetPath(battleGoodEvilProfile);
+        if (string.IsNullOrEmpty(path))
+        {
+            var disk = ArthurianStageLayoutProfileEnsure.EnsureBattleGoodEvilSpritePoolAsset();
+            if (disk != null && !ReferenceEquals(disk, battleGoodEvilProfile))
+            {
+                CopyBattleGoodEvilLists(battleGoodEvilProfile, disk);
+                battleGoodEvilProfile = disk;
+                path = AssetDatabase.GetAssetPath(battleGoodEvilProfile);
+                Debug.LogWarning(
+                    "[DemonKnight] Architect was editing a non-asset BattleGoodEvilSpritePoolProfile — copied into "
+                    + path + " (" + reason + ").");
+            }
+        }
+        if (battleGoodEvilProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(battleGoodEvilProfile)))
+            return;
+        battleGoodEvilProfile.RematerializeSpritesFromPaths();
+        SyncBattleGoodEvilAssetPaths(battleGoodEvilProfile);
+        ArthurianArchitectBuildPersist.PromoteBattleGoodEvilIntoResources(battleGoodEvilProfile);
+        SyncBattleGoodEvilAssetPaths(battleGoodEvilProfile);
+        EditorUtility.SetDirty(battleGoodEvilProfile);
+        AssetDatabase.SaveAssets();
+        try { BattleGoodEvilSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
+    }
+
+    static void CopyBattleGoodEvilLists(BattleGoodEvilSpritePoolProfile from, BattleGoodEvilSpritePoolProfile to)
+    {
+        if (from == null || to == null) return;
+        from.EnsureSlotsAndLists();
+        to.EnsureSlotsAndLists();
+        to.peasantBattleSprites = new List<Sprite>(from.peasantBattleSprites);
+        to.warriorBattleSprites = new List<Sprite>(from.warriorBattleSprites);
+        to.knightBattleSprites = new List<Sprite>(from.knightBattleSprites);
+        to.priestBattleSprites = new List<Sprite>(from.priestBattleSprites);
+        to.peasantBattleAssetPaths = new List<string>(from.peasantBattleAssetPaths);
+        to.warriorBattleAssetPaths = new List<string>(from.warriorBattleAssetPaths);
+        to.knightBattleAssetPaths = new List<string>(from.knightBattleAssetPaths);
+        to.priestBattleAssetPaths = new List<string>(from.priestBattleAssetPaths);
+        to.demonImpBattleSprites = new List<Sprite>(from.demonImpBattleSprites);
+        to.hellhoundBattleSprites = new List<Sprite>(from.hellhoundBattleSprites);
+        to.dreadLordBattleSprites = new List<Sprite>(from.dreadLordBattleSprites);
+        to.demonImpBattleAssetPaths = new List<string>(from.demonImpBattleAssetPaths);
+        to.hellhoundBattleAssetPaths = new List<string>(from.hellhoundBattleAssetPaths);
+        to.dreadLordBattleAssetPaths = new List<string>(from.dreadLordBattleAssetPaths);
+        CopyBattleSlots(from.goodLegendSlots, to.goodLegendSlots);
+        CopyBattleSlots(from.evilBossSlots, to.evilBossSlots);
+    }
+
+    static void CopyBattleSlots(List<BattleSpriteSlotEntry> from, List<BattleSpriteSlotEntry> to)
+    {
+        if (from == null || to == null) return;
+        for (int i = 0; i < from.Count; i++)
+        {
+            var src = from[i];
+            if (src == null) continue;
+            BattleSpriteSlotEntry dest = null;
+            for (int j = 0; j < to.Count; j++)
+            {
+                if (to[j] != null && to[j].unitType == src.unitType) { dest = to[j]; break; }
+            }
+            if (dest == null)
+            {
+                dest = new BattleSpriteSlotEntry
+                {
+                    unitType = src.unitType,
+                    displayName = src.displayName,
+                    softOptional = src.softOptional
+                };
+                to.Add(dest);
+            }
+            dest.battleSprite = src.battleSprite;
+            dest.assetPath = src.assetPath;
+            dest.displayName = src.displayName;
+            dest.softOptional = src.softOptional;
+        }
+    }
+
+    static void SyncBattleGoodEvilAssetPaths(BattleGoodEvilSpritePoolProfile p)
+    {
+        if (p == null) return;
+        p.EnsureSlotsAndLists();
+        SyncPathList(p.peasantBattleSprites, p.peasantBattleAssetPaths);
+        SyncPathList(p.warriorBattleSprites, p.warriorBattleAssetPaths);
+        SyncPathList(p.knightBattleSprites, p.knightBattleAssetPaths);
+        SyncPathList(p.priestBattleSprites, p.priestBattleAssetPaths);
+        SyncPathList(p.demonImpBattleSprites, p.demonImpBattleAssetPaths);
+        SyncPathList(p.hellhoundBattleSprites, p.hellhoundBattleAssetPaths);
+        SyncPathList(p.dreadLordBattleSprites, p.dreadLordBattleAssetPaths);
+        SyncBattleSlotPaths(p.goodLegendSlots);
+        SyncBattleSlotPaths(p.evilBossSlots);
+    }
+
+    static void SyncBattleSlotPaths(List<BattleSpriteSlotEntry> slots)
+    {
+        if (slots == null) return;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var e = slots[i];
+            if (e == null || e.battleSprite == null) continue;
+            string ap = AssetDatabase.GetAssetPath(e.battleSprite);
+            if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
+        }
     }
 
     static void CopyClassPoolLists(ClassSpritePoolProfile from, ClassSpritePoolProfile to)
@@ -2224,9 +2353,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Class Sprites / Unit Pools", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "BODY sprites only (full pew / combat avatar). Peasant / Warrior / Knight pools. "
-            + "Church spawn + battle pick from the matching class pool (deterministic by unitID). "
-            + "Do NOT put face portraits here — those belong on Tab 5. "
+            "BODY sprites only (full pew avatar). Peasant / Warrior / Knight pools. "
+            + "Church pews pick from the matching class pool (deterministic by unitID). "
+            + "Do NOT put face portraits here (Tab 5) or Autobattle-only art (Tab 6). "
             + "Cross-assign soft-fails (sprite skipped, no crash). "
             + "Empty pool → StageLayout assign-guide / solid fallback. "
             + "Persists on " + ClassPoolProfilePath + " (must ship in player builds under Resources).",
@@ -2652,6 +2781,338 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndScrollView();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Tab 6 — Battle Good / Evil sprite pools (UnitVisualActor Autobattle)
+    // Keep separate from Tab 4 BODY pew pools and Tab 5 FACE portraits.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    void DrawBattleGoodEvilTab()
+    {
+        EditorGUILayout.LabelField("Battle Good / Evil Sprite Pools", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Autobattle UnitVisualActor sprites only. "
+            + "GOOD: Peasant / Warrior / Knight / Priest pools + each playable Legend slot. "
+            + "EVIL: DemonImp / Hellhound / DreadLord wave pools + Wave 3–10+ boss slots. "
+            + "Distinct from Tab 4 BODY (pew) and Tab 5 FACE — cross-assign soft-fails. "
+            + "Persists on " + BattleGoodEvilProfilePath + " (must ship in player builds under Resources).",
+            MessageType.Info);
+
+        battleGoodEvilProfile = (BattleGoodEvilSpritePoolProfile)EditorGUILayout.ObjectField(
+            "BattleGoodEvilSpritePoolProfile", battleGoodEvilProfile, typeof(BattleGoodEvilSpritePoolProfile), false);
+        if (battleGoodEvilProfile == null
+            || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(battleGoodEvilProfile)))
+        {
+            if (GUILayout.Button("Ensure Battle Good/Evil Pool Profile Asset"))
+                battleGoodEvilProfile = ArthurianStageLayoutProfileEnsure.EnsureBattleGoodEvilSpritePoolAsset();
+            if (battleGoodEvilProfile == null) return;
+        }
+        battleGoodEvilProfile.EnsureSlotsAndLists();
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Save BattleGoodEvilSpritePoolProfile", GUILayout.Height(26)))
+            PersistBattleGoodEvilProfile("SaveButton");
+        if (GUILayout.Button("Ping Asset", GUILayout.Width(90)))
+        {
+            Selection.activeObject = battleGoodEvilProfile;
+            EditorGUIUtility.PingObject(battleGoodEvilProfile);
+        }
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.LabelField(
+            "Asset: " + AssetDatabase.GetAssetPath(battleGoodEvilProfile), EditorStyles.miniLabel);
+        EditorGUILayout.LabelField(
+            $"Good legends {battleGoodEvilProfile.CountAssignedLegendBattles()}/14 · "
+            + $"Bosses {battleGoodEvilProfile.CountAssignedBossBattles()}/8 · "
+            + $"P {battleGoodEvilProfile.CountUsablePool(UnitType.Peasant)} · "
+            + $"Priest {battleGoodEvilProfile.CountUsablePool(UnitType.Priest)} · "
+            + $"Imp {battleGoodEvilProfile.CountUsablePool(UnitType.DemonImp)}",
+            EditorStyles.miniLabel);
+
+        EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+        if (GUILayout.Toggle(battleSideSection == BattleSideSection.GoodTroops, "Good · Troops", EditorStyles.toolbarButton))
+            battleSideSection = BattleSideSection.GoodTroops;
+        if (GUILayout.Toggle(battleSideSection == BattleSideSection.GoodLegends, "Good · Legends", EditorStyles.toolbarButton))
+            battleSideSection = BattleSideSection.GoodLegends;
+        if (GUILayout.Toggle(battleSideSection == BattleSideSection.EvilWave, "Evil · Wave", EditorStyles.toolbarButton))
+            battleSideSection = BattleSideSection.EvilWave;
+        if (GUILayout.Toggle(battleSideSection == BattleSideSection.EvilBosses, "Evil · Bosses", EditorStyles.toolbarButton))
+            battleSideSection = BattleSideSection.EvilBosses;
+        EditorGUILayout.EndHorizontal();
+
+        switch (battleSideSection)
+        {
+            case BattleSideSection.GoodTroops: DrawBattleTroopPools(good: true); break;
+            case BattleSideSection.GoodLegends: DrawBattleLegendSlots(); break;
+            case BattleSideSection.EvilWave: DrawBattleTroopPools(good: false); break;
+            case BattleSideSection.EvilBosses: DrawBattleBossSlots(); break;
+        }
+    }
+
+    void DrawBattleTroopPools(bool good)
+    {
+        if (good)
+        {
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            if (GUILayout.Toggle(selectedBattleGoodPool == BattleGoodPoolKind.Peasant, "Peasant", EditorStyles.toolbarButton))
+                selectedBattleGoodPool = BattleGoodPoolKind.Peasant;
+            if (GUILayout.Toggle(selectedBattleGoodPool == BattleGoodPoolKind.Warrior, "Warrior", EditorStyles.toolbarButton))
+                selectedBattleGoodPool = BattleGoodPoolKind.Warrior;
+            if (GUILayout.Toggle(selectedBattleGoodPool == BattleGoodPoolKind.Knight, "Knight", EditorStyles.toolbarButton))
+                selectedBattleGoodPool = BattleGoodPoolKind.Knight;
+            if (GUILayout.Toggle(selectedBattleGoodPool == BattleGoodPoolKind.Priest, "Priest", EditorStyles.toolbarButton))
+                selectedBattleGoodPool = BattleGoodPoolKind.Priest;
+            EditorGUILayout.EndHorizontal();
+        }
+        else
+        {
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            if (GUILayout.Toggle(selectedBattleEvilPool == BattleEvilPoolKind.DemonImp, "DemonImp", EditorStyles.toolbarButton))
+                selectedBattleEvilPool = BattleEvilPoolKind.DemonImp;
+            if (GUILayout.Toggle(selectedBattleEvilPool == BattleEvilPoolKind.Hellhound, "Hellhound", EditorStyles.toolbarButton))
+                selectedBattleEvilPool = BattleEvilPoolKind.Hellhound;
+            if (GUILayout.Toggle(selectedBattleEvilPool == BattleEvilPoolKind.DreadLord, "DreadLord", EditorStyles.toolbarButton))
+                selectedBattleEvilPool = BattleEvilPoolKind.DreadLord;
+            EditorGUILayout.EndHorizontal();
+        }
+
+        UnitType poolType = good
+            ? selectedBattleGoodPool switch
+            {
+                BattleGoodPoolKind.Warrior => UnitType.Warrior,
+                BattleGoodPoolKind.Knight => UnitType.Knight,
+                BattleGoodPoolKind.Priest => UnitType.Priest,
+                _ => UnitType.Peasant
+            }
+            : selectedBattleEvilPool switch
+            {
+                BattleEvilPoolKind.Hellhound => UnitType.DemonHellhound,
+                BattleEvilPoolKind.DreadLord => UnitType.DemonDreadLord,
+                _ => UnitType.DemonImp
+            };
+        List<Sprite> pool = battleGoodEvilProfile.GetTroopOrWavePool(poolType);
+
+        EditorGUILayout.BeginHorizontal();
+        battlePoolAddSprite = (Sprite)EditorGUILayout.ObjectField(
+            "Add Sprite", battlePoolAddSprite, typeof(Sprite), false);
+        EditorGUI.BeginDisabledGroup(battlePoolAddSprite == null);
+        if (GUILayout.Button("Add to pool", GUILayout.Width(110)))
+        {
+            if (TryAddBattlePoolSprite(pool, battlePoolAddSprite))
+            {
+                battlePoolAddSprite = null;
+                PersistBattleGoodEvilProfile("AddBattlePoolSprite");
+            }
+        }
+        EditorGUI.EndDisabledGroup();
+        if (GUILayout.Button("Add selected palette", GUILayout.Width(150))
+            && paletteSelectedSprite != null)
+        {
+            if (TryAddBattlePoolSprite(pool, paletteSelectedSprite))
+                PersistBattleGoodEvilProfile("AddPaletteToBattlePool");
+        }
+        EditorGUILayout.EndHorizontal();
+
+        if (GUILayout.Button("Clear this pool", GUILayout.Width(140)))
+        {
+            if (EditorUtility.DisplayDialog(
+                    "Clear battle pool",
+                    "Remove all sprites from the " + poolType + " battle pool?",
+                    "Clear", "Cancel"))
+            {
+                Undo.RecordObject(battleGoodEvilProfile, "Clear Battle Pool");
+                pool.Clear();
+                PersistBattleGoodEvilProfile("ClearBattlePool");
+            }
+        }
+
+        battleGoodEvilScroll = EditorGUILayout.BeginScrollView(battleGoodEvilScroll, GUILayout.MinHeight(280f));
+        if (pool == null || pool.Count == 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Pool empty — Autobattle falls back to CharacterDatabase / demon color blocks.",
+                MessageType.Warning);
+        }
+        else
+        {
+            for (int i = 0; i < pool.Count; i++)
+            {
+                EditorGUILayout.BeginVertical("box");
+                EditorGUILayout.BeginHorizontal();
+                EditorGUI.BeginChangeCheck();
+                pool[i] = (Sprite)EditorGUILayout.ObjectField(
+                    "#" + i, pool[i], typeof(Sprite), false, GUILayout.Height(64f));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(battleGoodEvilProfile, "Edit Battle Pool Sprite");
+                    PersistBattleGoodEvilProfile("EditBattlePoolSprite");
+                }
+                if (GUILayout.Button("×", GUILayout.Width(28), GUILayout.Height(64f)))
+                {
+                    Undo.RecordObject(battleGoodEvilProfile, "Remove Battle Pool Sprite");
+                    pool.RemoveAt(i);
+                    PersistBattleGoodEvilProfile("RemoveBattlePoolSprite");
+                    i--;
+                }
+                EditorGUILayout.EndHorizontal();
+                if (i >= 0 && i < pool.Count && pool[i] != null)
+                {
+                    Rect prev = GUILayoutUtility.GetRect(48f, 48f, GUILayout.ExpandWidth(false));
+                    DrawSprite(prev, pool[i], Color.white);
+                    EditorGUILayout.LabelField(pool[i].name, EditorStyles.miniLabel);
+                }
+                EditorGUILayout.EndVertical();
+            }
+        }
+        EditorGUILayout.EndScrollView();
+        DrawBattlePaletteQuickAdd(pool);
+    }
+
+    void DrawBattleLegendSlots()
+    {
+        EditorGUILayout.HelpBox(
+            "One battle sprite per playable Legend (Merlin soft). Used by UnitVisualActor on March.",
+            MessageType.None);
+        battleLegendSlotScroll = EditorGUILayout.BeginScrollView(battleLegendSlotScroll, GUILayout.MinHeight(360f));
+        var slots = battleGoodEvilProfile.goodLegendSlots;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var e = slots[i];
+            if (e == null) continue;
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.BeginHorizontal();
+            string label = string.IsNullOrEmpty(e.displayName) ? e.unitType.ToString() : e.displayName;
+            if (e.softOptional) label += " (soft)";
+            EditorGUI.BeginChangeCheck();
+            e.battleSprite = (Sprite)EditorGUILayout.ObjectField(
+                label, e.battleSprite, typeof(Sprite), false, GUILayout.Height(56f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                if (e.battleSprite != null && LegendPewPortraitApplier.IsFacePoolSprite(e.battleSprite))
+                {
+                    EditorUtility.DisplayDialog(
+                        "Battle vs Face",
+                        "That sprite is in a Tab 5 FACE pool.\nTab 6 is Autobattle sprites only.",
+                        "OK");
+                    e.battleSprite = null;
+                }
+                else
+                {
+                    Undo.RecordObject(battleGoodEvilProfile, "Assign Legend Battle Sprite");
+                    PersistBattleGoodEvilProfile("EditLegendBattle");
+                }
+            }
+            if (GUILayout.Button("Clear", GUILayout.Width(56), GUILayout.Height(56f)))
+            {
+                Undo.RecordObject(battleGoodEvilProfile, "Clear Legend Battle Sprite");
+                e.battleSprite = null;
+                PersistBattleGoodEvilProfile("ClearLegendBattle");
+            }
+            EditorGUILayout.EndHorizontal();
+            if (e.battleSprite != null)
+            {
+                Rect prev = GUILayoutUtility.GetRect(48f, 48f, GUILayout.ExpandWidth(false));
+                DrawSprite(prev, e.battleSprite, Color.white);
+            }
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndScrollView();
+    }
+
+    void DrawBattleBossSlots()
+    {
+        EditorGUILayout.HelpBox(
+            "Wave 3–10+ boss battle sprites (lore-boss-wave-order). Soft-fail empty → CharacterDatabase / dreadLord fallback.",
+            MessageType.None);
+        battleBossSlotScroll = EditorGUILayout.BeginScrollView(battleBossSlotScroll, GUILayout.MinHeight(360f));
+        var slots = battleGoodEvilProfile.evilBossSlots;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var e = slots[i];
+            if (e == null) continue;
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.BeginHorizontal();
+            string label = string.IsNullOrEmpty(e.displayName) ? e.unitType.ToString() : e.displayName;
+            EditorGUI.BeginChangeCheck();
+            e.battleSprite = (Sprite)EditorGUILayout.ObjectField(
+                label, e.battleSprite, typeof(Sprite), false, GUILayout.Height(56f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                if (e.battleSprite != null && LegendPewPortraitApplier.IsFacePoolSprite(e.battleSprite))
+                {
+                    EditorUtility.DisplayDialog(
+                        "Battle vs Face",
+                        "That sprite is in a Tab 5 FACE pool.\nTab 6 is Autobattle sprites only.",
+                        "OK");
+                    e.battleSprite = null;
+                }
+                else
+                {
+                    Undo.RecordObject(battleGoodEvilProfile, "Assign Boss Battle Sprite");
+                    PersistBattleGoodEvilProfile("EditBossBattle");
+                }
+            }
+            if (GUILayout.Button("Clear", GUILayout.Width(56), GUILayout.Height(56f)))
+            {
+                Undo.RecordObject(battleGoodEvilProfile, "Clear Boss Battle Sprite");
+                e.battleSprite = null;
+                PersistBattleGoodEvilProfile("ClearBossBattle");
+            }
+            EditorGUILayout.EndHorizontal();
+            if (e.battleSprite != null)
+            {
+                Rect prev = GUILayoutUtility.GetRect(48f, 48f, GUILayout.ExpandWidth(false));
+                DrawSprite(prev, e.battleSprite, Color.white);
+            }
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndScrollView();
+    }
+
+    void DrawBattlePaletteQuickAdd(List<Sprite> pool)
+    {
+        EditorGUILayout.Space(8);
+        EditorGUILayout.LabelField("Spliced palette (quick add)", EditorStyles.boldLabel);
+        RefreshSplicedPalette();
+        paletteScroll = EditorGUILayout.BeginScrollView(paletteScroll, GUILayout.Height(120f));
+        EditorGUILayout.BeginHorizontal();
+        for (int i = 0; i < splicedPalette.Count; i++)
+        {
+            Sprite sp = splicedPalette[i];
+            if (sp == null) continue;
+            Rect r = GUILayoutUtility.GetRect(56f, 56f, GUILayout.Width(56f), GUILayout.Height(56f));
+            if (Event.current.type == EventType.Repaint)
+                DrawSprite(r, sp, Color.white);
+            if (GUI.Button(r, GUIContent.none, GUIStyle.none))
+            {
+                paletteSelectedSprite = sp;
+                if (TryAddBattlePoolSprite(pool, sp))
+                    PersistBattleGoodEvilProfile("PaletteClickBattlePool");
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.EndScrollView();
+    }
+
+    bool TryAddBattlePoolSprite(List<Sprite> pool, Sprite sp)
+    {
+        if (pool == null || sp == null) return false;
+        if (LegendPewPortraitApplier.IsFacePoolSprite(sp))
+        {
+            Debug.LogWarning(
+                "[DemonKnight] Soft-fail: refusing face-pool sprite '" + sp.name
+                + "' as Tab 6 BATTLE. Use Tab 5 for faces.");
+            EditorUtility.DisplayDialog(
+                "Battle vs Face",
+                "That sprite is already in a Tab 5 FACE pool.\n"
+                + "Tab 6 is Autobattle UnitVisualActor sprites only.\n"
+                + "Assign faces on Tab 5; pew bodies on Tab 4.",
+                "OK");
+            return false;
+        }
+        Undo.RecordObject(battleGoodEvilProfile, "Add Battle Pool Sprite");
+        pool.Add(sp);
+        return true;
     }
 
     /// <summary>

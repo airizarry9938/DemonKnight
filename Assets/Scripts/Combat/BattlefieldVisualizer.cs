@@ -378,7 +378,7 @@ namespace ArthurianAutobattler
                     ? humanSprites[u.unitID]
                     : null;
                 if (art == null)
-                    art = ResolveBattleSprite(u.unitType);
+                    art = ResolveBattleSprite(u.unitType, u.unitID);
                 float scale = ResolveVisualScale(u.unitType);
                 int slot = u.battleSlotIndex >= 0 ? u.battleSlotIndex : i;
                 actor.Initialize(u, art, CalculateSlotPosition(true, slot), false, scale);
@@ -392,7 +392,7 @@ namespace ArthurianAutobattler
                 if (activeActors.ContainsKey(d.unitID)) continue;
 
                 UnitVisualActor actor = SpawnActor();
-                Sprite art = ResolveBattleSprite(d.unitType) ?? GetDemonSprite(d.unitType);
+                Sprite art = ResolveBattleSprite(d.unitType, d.unitID) ?? GetDemonSprite(d.unitType);
                 float scale = ResolveVisualScale(d.unitType);
                 // Enemies / bosses face left (flipX = true).
                 actor.Initialize(d, art, CalculateSlotPosition(false, i), true, scale);
@@ -400,8 +400,19 @@ namespace ArthurianAutobattler
             }
         }
 
-        static Sprite ResolveBattleSprite(UnitType type)
+        /// <summary>
+        /// Architect Tab 6 Good/Evil battle pools win when assigned; else CharacterDatabase.
+        /// Soft-fails empty — demons still use GetDemonSprite fallback.
+        /// </summary>
+        static Sprite ResolveBattleSprite(UnitType type, string unitId = null)
         {
+            try
+            {
+                Sprite fromArchitect = BattleGoodEvilSpritePoolApplier.ResolveBattleSprite(type, unitId);
+                if (fromArchitect != null) return fromArchitect;
+            }
+            catch { /* soft-fail */ }
+
             var db = CharacterDatabase.Load();
             return db != null ? db.GetBattleSprite(type) : null;
         }
