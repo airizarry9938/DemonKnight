@@ -23,15 +23,15 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-architect-pool-load-list). Prefer API tip / raw@main FIRST.
-    private const string FallbackCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
+    // Ship pin = this tip feature SHA (fix-architect-48-seat-preview / TownRNG CS0104). Prefer API tip / raw@main FIRST.
+    private const string FallbackCommitSha = "986ea7e49464fcf0cc5db1ae191641f6dc6f9f02";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
+    public const string HardTipCommitSha = "986ea7e49464fcf0cc5db1ae191641f6dc6f9f02";
 
     private const string ExpectedPackageId = "fix-architect-48-seat-preview";
 
