@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-townrng-name-pools";
+    public const string UiBuildId = "fix-architect-48-seat-preview";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -43,8 +43,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// <summary>Reference pixel size of SomersetChurchInterior (play layout tuned to this).</summary>
     const float ChurchRefWidth = 1408f;
     const float ChurchRefHeight = 768f;
-    /// <summary>Must match SomersetChurchUI.baseSeatSize tip (play pew sprite size).</summary>
-    static readonly Vector2 PlayPewBaseSize = new Vector2(110f, 140f); // tip: fix-townrng-name-pools
+    /// <summary>Fallback hitbox when StageLayoutProfile prefs missing (Architect Layout tab).</summary>
+    static readonly Vector2 PlayPewBaseSize = new Vector2(64f, 84f); // tip: fix-architect-48-seat-preview
 
     enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits, BattleGoodEvil }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
@@ -1167,6 +1167,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
         to.enableRainFX = from.enableRainFX;
         to.enableLightningFlashes = from.enableLightningFlashes;
         to.enableCandleFlicker = from.enableCandleFlicker;
+        // tip: fix-architect-48-seat-preview — layout prefs SoftPromote with profile.
+        to.churchHitboxSize = from.churchHitboxSize;
+        to.churchSpriteScale = from.churchSpriteScale;
+        to.churchSeatGap = from.churchSeatGap;
+        to.churchSeatSpreadMul = from.churchSeatSpreadMul;
         to.EnsureSlotCounts();
     }
 
@@ -2465,8 +2470,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (stageView == StageViewMode.SomersetChurch)
         {
             usePlayPewLayoutPreview = EditorGUILayout.ToggleLeft(
-                "Play pew layout + scale (SomersetPewLayout · 12×4 · 3 sprite rows · 110×140)",
+                "Play pew layout + scale (SomersetPewLayout · 12×4 · 48 seats · Layout preview)",
                 usePlayPewLayoutPreview);
+            DrawChurchLayoutPrefsPanel();
         }
 
         EditorGUILayout.BeginHorizontal();
@@ -2504,6 +2510,54 @@ public class ArthurianArtArchitectWindow : EditorWindow
         return battleSide == BattleSlotSide.Player
             ? stageProfile.playerBattleSlots
             : stageProfile.enemyBattleSlots;
+    }
+
+    /// <summary>
+    /// Architect Layout tab: live hitbox/sprite prefs (persist via StageLayoutProfile SoftPromote).
+    /// tip: fix-architect-48-seat-preview
+    /// </summary>
+    void DrawChurchLayoutPrefsPanel()
+    {
+        if (stageProfile == null) return;
+        stageProfile.EnsureChurchLayoutPrefs();
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.LabelField("Layout preview · 48 pew hitboxes (12×4)", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Hitbox = clickable seat size (must fit 4 per pew). Sprite scale is independent — "
+            + "unit art can be larger/smaller than the hitbox. SoftPromote Persist saves these prefs.",
+            MessageType.Info);
+        EditorGUI.BeginChangeCheck();
+        Vector2 hb = stageProfile.churchHitboxSize;
+        hb.x = EditorGUILayout.Slider("Hitbox width", hb.x, 28f, 96f);
+        hb.y = EditorGUILayout.Slider("Hitbox height", hb.y, 36f, 120f);
+        stageProfile.churchHitboxSize = hb;
+        stageProfile.churchSpriteScale = EditorGUILayout.Slider(
+            "Unit sprite scale", stageProfile.churchSpriteScale, 0.35f, 2.5f);
+        stageProfile.churchSeatGap = EditorGUILayout.Slider(
+            "Seat gap (spacing)", stageProfile.churchSeatGap, 0f, 0.06f);
+        stageProfile.churchSeatSpreadMul = EditorGUILayout.Slider(
+            "Pew strip width ×", stageProfile.churchSeatSpreadMul, 0.5f, 1.6f);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Reset layout defaults", GUILayout.Height(22)))
+        {
+            Undo.RecordObject(stageProfile, "Reset Church Layout Prefs");
+            stageProfile.churchHitboxSize = SomersetPewLayout.DefaultHitboxSize;
+            stageProfile.churchSpriteScale = SomersetPewLayout.DefaultSpriteScale;
+            stageProfile.churchSeatGap = 0.008f;
+            stageProfile.churchSeatSpreadMul = 1f;
+            PersistStageProfile("ResetChurchLayoutPrefs");
+        }
+        GUILayout.Label(
+            $"{StageLayoutProfile.ChurchPewCount} seats · hitbox {hb.x:0}×{hb.y:0} · sprite ×{stageProfile.churchSpriteScale:0.00}",
+            EditorStyles.miniLabel);
+        EditorGUILayout.EndHorizontal();
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(stageProfile, "Edit Church Layout Prefs");
+            PersistStageProfile("ChurchLayoutPrefs");
+            Repaint();
+        }
+        EditorGUILayout.EndVertical();
     }
 
     void DrawStageCanvas()
@@ -2626,6 +2680,17 @@ public class ArthurianArtArchitectWindow : EditorWindow
         float pxScale = content.width / ChurchRefWidth;
         float pyScale = content.height / ChurchRefHeight;
         int assignedDrawn = 0;
+        // tip: fix-architect-48-seat-preview — layout prefs drive hitbox vs sprite independently.
+        if (stageProfile != null) stageProfile.EnsureChurchLayoutPrefs();
+        Vector2 hitbox = stageProfile != null
+            ? stageProfile.ResolveChurchHitboxSize()
+            : PlayPewBaseSize;
+        float spriteScale = stageProfile != null
+            ? stageProfile.ResolveChurchSpriteScale()
+            : SomersetPewLayout.DefaultSpriteScale;
+        float seatGap = stageProfile != null ? stageProfile.ResolveChurchSeatGap() : 0.008f;
+        float spreadMul = stageProfile != null ? stageProfile.ResolveChurchSeatSpreadMul() : 1f;
+        int boxesDrawn = 0;
 
         foreach (int seatIndex in order)
         {
@@ -2633,13 +2698,16 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (seatIndex >= slots.Count || slots[seatIndex] == null) continue;
             var s = slots[seatIndex];
 
-            Vector2 norm = GetChurchNormalizedPosition(s, anchors, seatIndex);
+            Vector2 norm = GetChurchNormalizedPosition(s, anchors, seatIndex, spreadMul, seatGap);
             Vector2 screen = NormToScreen(content, norm);
 
             float rowScale = GetPlaySeatScale(anchors, seatIndex);
             float mul = Mathf.Clamp(s.scale.x > 0.01f ? s.scale.x : 1f, 0.2f, 3f);
-            float pw = PlayPewBaseSize.x * rowScale * mul * pxScale;
-            float ph = PlayPewBaseSize.y * rowScale * mul * pyScale;
+            float hw = hitbox.x * rowScale * mul * pxScale;
+            float hh = hitbox.y * rowScale * mul * pyScale;
+            Rect hit = new Rect(screen.x - hw * 0.5f, screen.y - hh * 0.88f, hw, hh);
+            float pw = hw * spriteScale;
+            float ph = hh * spriteScale;
             Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.88f, pw, ph);
 
             // Assigned only — never cycle splicedPalette onto empty seats.
@@ -2648,6 +2716,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 preview = paletteSelectedSprite;
 
             bool sel = seatIndex == selectedSlot;
+            // Hitbox outline always (all 48) — cyan wash so 4-per-pew packing is visible.
+            EditorGUI.DrawRect(hit, new Color(0.20f, 0.55f, 0.75f, sel ? 0.28f : 0.14f));
+            DrawRectOutline(hit, sel ? new Color(1f, 0.85f, 0.25f, 0.95f) : new Color(0.45f, 0.80f, 1f, 0.55f), sel ? 2f : 1f);
+            boxesDrawn++;
+
             if (preview != null)
             {
                 DrawSprite(pr, preview, Color.white);
@@ -2655,23 +2728,22 @@ public class ArthurianArtArchitectWindow : EditorWindow
             }
             else
             {
-                // Empty marker only (no sprite copy).
-                EditorGUI.DrawRect(pr, new Color(0.15f, 0.18f, 0.28f, sel ? 0.45f : 0.22f));
-                DrawRectOutline(pr, new Color(1f, 1f, 1f, sel ? 0.35f : 0.12f), 1f);
+                // Empty marker inside hitbox (no sprite copy).
+                EditorGUI.DrawRect(pr, new Color(0.15f, 0.18f, 0.28f, sel ? 0.35f : 0.12f));
             }
 
-            float handle = Mathf.Clamp(pw * 0.28f, 14f, 22f);
+            float handle = Mathf.Clamp(hw * 0.28f, 14f, 22f);
             Rect hr = new Rect(screen.x - handle * 0.5f, screen.y - handle * 0.5f, handle, handle);
             EditorGUI.DrawRect(hr, sel ? new Color(1f, 0.85f, 0.25f, 0.95f) : new Color(0.35f, 0.65f, 0.95f, 0.55f));
             GUI.Label(hr, seatIndex.ToString("00"), EditorStyles.centeredGreyMiniLabel);
 
             // SE scale handle (selected assigned seats).
-            Rect scaleHandle = new Rect(pr.xMax - 10f, pr.yMax - 10f, 12f, 12f);
+            Rect scaleHandle = new Rect(hit.xMax - 10f, hit.yMax - 10f, 12f, 12f);
             if (sel)
             {
                 EditorGUI.DrawRect(scaleHandle, new Color(1f, 0.55f, 0.2f, 0.95f));
-                GUI.Label(new Rect(pr.x, pr.y - 14f, pr.width, 14f),
-                    $"scale {mul:0.00}", EditorStyles.miniLabel);
+                GUI.Label(new Rect(hit.x, hit.y - 14f, hit.width, 14f),
+                    $"seat×{mul:0.00} sprite×{spriteScale:0.00}", EditorStyles.miniLabel);
             }
 
             if (e.type == EventType.MouseDown && e.button == 0)
@@ -2685,7 +2757,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     e.Use();
                     Repaint();
                 }
-                else if (hr.Contains(e.mousePosition) || pr.Contains(e.mousePosition))
+                else if (hr.Contains(e.mousePosition) || hit.Contains(e.mousePosition) || pr.Contains(e.mousePosition))
                 {
                     selectedSlot = seatIndex;
                     churchDragSeat = seatIndex;
@@ -2709,7 +2781,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     Vector2 norm = GetChurchNormalizedPosition(s, anchors, churchDragSeat);
                     Vector2 pivot = NormToScreen(content, norm);
                     float dist = Vector2.Distance(e.mousePosition, pivot);
-                    float baseDist = Mathf.Max(20f, PlayPewBaseSize.y * GetPlaySeatScale(anchors, churchDragSeat) * pyScale * 0.5f);
+                    Vector2 hbDrag = stageProfile != null ? stageProfile.ResolveChurchHitboxSize() : PlayPewBaseSize;
+                    float baseDist = Mathf.Max(20f, hbDrag.y * GetPlaySeatScale(anchors, churchDragSeat) * pyScale * 0.5f);
                     float mul = Mathf.Clamp(dist / baseDist, 0.2f, 3f);
                     s.scale = new Vector2(mul, mul);
                 }
@@ -2754,7 +2827,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
         GUI.Label(
             new Rect(canvas.x + 6f, canvas.yMax - 18f, canvas.width - 12f, 16f),
-            $"Assigned sprites only ({assignedDrawn}) · drag move · SE handle / slider scale · 3 rows",
+            $"48 hitboxes ({boxesDrawn}) · assigned sprites {assignedDrawn} · hitbox≠sprite scale · 12×4",
             EditorStyles.miniLabel);
     }
 
@@ -2774,10 +2847,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
         => pos.x >= 0f && pos.x <= 1f && pos.y >= 0f && pos.y <= 1f;
 
     Vector2 GetChurchNormalizedPosition(SlotTransformConfig s, PewAnchor[] anchors, int seatIndex)
+        => GetChurchNormalizedPosition(s, anchors, seatIndex, 1f, 0f);
+
+    Vector2 GetChurchNormalizedPosition(
+        SlotTransformConfig s, PewAnchor[] anchors, int seatIndex, float spreadMul, float gap01)
     {
         if (s != null && IsChurchNormalizedPosition(s.position))
             return s.position;
-        return GetPlayNormalizedSeatPosition(anchors, seatIndex);
+        return GetPlayNormalizedSeatPosition(anchors, seatIndex, spreadMul, gap01);
     }
 
     void EnsureChurchSlotsSeededFromPlayLayout(List<SlotTransformConfig> slots)
@@ -2792,6 +2869,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
             // Old ChurchPewDefault world coords → seed play layout normalized.
             slots[i].position = GetPlayNormalizedSeatPosition(anchors, i);
             if (slots[i].scale.x < 0.05f) slots[i].scale = Vector2.one;
+            any = true;
+        }
+        // Always pad to exactly 48 (stale SoftPromote assets sometimes shipped fewer guides).
+        stageProfile.EnsureSlotCounts();
+        if (slots.Count != SomersetPewLayout.TotalSeats)
+        {
+            Debug.LogWarning(
+                $"[DemonKnight] churchPewSlots count was {slots.Count} — EnsureSlotCounts → {SomersetPewLayout.TotalSeats}.");
             any = true;
         }
         if (any)
@@ -3753,35 +3838,22 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// </summary>
     static bool SeatShowsSpriteSafe(int pewSeatIndex)
     {
-        // tip: fix-townrng-name-pools — 12 pews × 4; hide pew-row ≥ 3.
+        // tip: fix-architect-48-seat-preview — all 4 rows × 12 pews = 48 hitboxes.
         const int total = 48;
         const int seatsPerPew = 4;
         const int pewColumns = 3;
-        const int visualRows = 3;
+        const int visualRows = 4;
         int pew = Mathf.Clamp(pewSeatIndex, 0, total - 1) / seatsPerPew;
         int pewRow = pew / pewColumns;
         return pewRow < visualRows;
     }
 
     static Vector2 GetPlayNormalizedSeatPosition(PewAnchor[] pews, int globalSeatIndex)
-    {
-        if (pews == null || pews.Length == 0) return new Vector2(0.5f, 0.5f);
-        int remaining = Mathf.Clamp(globalSeatIndex, 0, SomersetPewLayout.TotalSeats - 1);
-        int pewIndex = 0;
-        int slot = 0;
-        for (int p = 0; p < pews.Length; p++)
-        {
-            int cap = Mathf.Max(1, pews[p].seatCapacity);
-            if (remaining < cap) { pewIndex = p; slot = remaining; break; }
-            remaining -= cap;
-            pewIndex = p;
-        }
-        PewAnchor pew = pews[Mathf.Clamp(pewIndex, 0, pews.Length - 1)];
-        int capN = Mathf.Max(1, pew.seatCapacity);
-        float t = capN == 1 ? 0.5f : slot / (float)(capN - 1);
-        float x = pew.normalizedCenter.x + Mathf.Lerp(-pew.seatSpread * 0.5f, pew.seatSpread * 0.5f, t);
-        return new Vector2(x, pew.normalizedCenter.y);
-    }
+        => GetPlayNormalizedSeatPosition(pews, globalSeatIndex, 1f, 0f);
+
+    static Vector2 GetPlayNormalizedSeatPosition(
+        PewAnchor[] pews, int globalSeatIndex, float spreadMul, float gap01)
+        => SomersetPewLayout.GetStaticNormalizedSeatPosition(pews, globalSeatIndex, spreadMul, gap01);
 
     static float GetPlaySeatScale(PewAnchor[] pews, int globalSeatIndex)
     {
@@ -3891,8 +3963,10 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 Vector2 screen = NormToScreen(content, norm);
                 float rowScale = GetPlaySeatScale(anchors, seat);
                 float mul = Mathf.Clamp(s.scale.x > 0.01f ? s.scale.x : 1f, 0.2f, 3f);
-                float pw = PlayPewBaseSize.x * rowScale * mul * pxScale;
-                float ph = PlayPewBaseSize.y * rowScale * mul * pyScale;
+                Vector2 hb = stageProfile != null ? stageProfile.ResolveChurchHitboxSize() : PlayPewBaseSize;
+                float spr = stageProfile != null ? stageProfile.ResolveChurchSpriteScale() : 1.15f;
+                float pw = hb.x * rowScale * mul * spr * pxScale;
+                float ph = hb.y * rowScale * mul * spr * pyScale;
                 Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.88f, pw, ph);
                 DrawSprite(pr, sp, Color.white);
                 drawn++;
@@ -4717,7 +4791,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-townrng-name-pools";
+    public const string TipId = "fix-architect-48-seat-preview";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

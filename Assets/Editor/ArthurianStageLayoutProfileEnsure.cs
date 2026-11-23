@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-townrng-name-pools";
+    const string TipPackageId = "fix-architect-48-seat-preview";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -36,6 +36,7 @@ public static class ArthurianStageLayoutProfileEnsure
 
     static readonly string[] StaleHostMarkers =
     {
+        "fix-townrng-name-pools",
         "architect-breakglass-hosts",
         "architect-disk-tip-proof",
         "architect-force-tip-ui",

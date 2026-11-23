@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-townrng-name-pools";
+    public const string TipPackageId = "fix-architect-48-seat-preview";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -46,7 +46,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-townrng-name-pools)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-architect-48-seat-preview)", false, 0)]
     public static void EscapeMenu()
     {
         // Manual Escape clears session gates so a stuck Downloads project can recover.
@@ -131,6 +131,7 @@ public static class DemonKnightTipEscape
 
         string[] stale =
         {
+            "fix-townrng-name-pools",
             "fix-48-pew-seats",
             "architect-breakglass-hosts",
             "architect-disk-tip-proof",
@@ -206,6 +207,9 @@ public static class DemonKnightTipEscape
         if (archBody.IndexOf("FinalizeNamedPoolSave", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("RebuildNamedPoolNameList", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("CreateNamedPoolInstance", StringComparison.Ordinal) < 0) return true;
+        // tip: fix-architect-48-seat-preview — Layout prefs + 48 hitbox preview.
+        if (archBody.IndexOf("DrawChurchLayoutPrefsPanel", StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("churchHitboxSize", StringComparison.Ordinal) < 0) return true;
         string gdtPath = Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs");
         if (!File.Exists(gdtPath)) return true;
         string gdtBody = File.ReadAllText(gdtPath);
@@ -230,7 +234,7 @@ public static class DemonKnightTipEscape
         if (!File.Exists(bootPath)) return true;
         string bootBody = File.ReadAllText(bootPath);
         if (bootBody.IndexOf("NukeNamedProfileFiles", StringComparison.Ordinal) < 0
-            && bootBody.IndexOf("fix-townrng-name-pools", StringComparison.Ordinal) < 0) return true;
+            && bootBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
         string ensureBody = File.ReadAllText(ensurePath);
@@ -334,7 +338,7 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                         || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                         || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
-                        || body.IndexOf("fix-townrng-name-pools", StringComparison.Ordinal) < 0))
+                        || body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
                     throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                 if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0

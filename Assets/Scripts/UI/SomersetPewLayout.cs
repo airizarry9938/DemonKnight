@@ -9,7 +9,7 @@ namespace ArthurianAutobattler
     /// columns Left/Center/Right × rows front→altar).
     /// Coordinates are normalized 0–1 over the drawn church sprite
     /// (0,0 = bottom-left, 1,1 = top-right), tuned to SomersetChurchInterior.jpg.
-    /// tip: fix-townrng-name-pools
+    /// tip: fix-architect-48-seat-preview
     /// </summary>
     [Serializable]
     public class PewAnchor
@@ -37,15 +37,20 @@ namespace ArthurianAutobattler
         public const int SeatsPerPew = 4;
 
         /// <summary>
-        /// Visual sprite pew-rows only (pewSeatIndex / 4 → pew, / 3 → row).
-        /// Gameplay keeps 48 seats; pew-row ≥ this shows no sprite (hidden/empty).
+        /// All 4 pew-rows show hitboxes/sprites (12×4 = 48). Prior tips hid row 3
+        /// (VisualSpriteRowCount=3 → 36, with oversized 110×140 boxes reading as ~33).
         /// </summary>
-        public const int VisualSpriteRowCount = 3;
+        public const int VisualSpriteRowCount = 4;
         /// <summary>Legacy alias — seats per pew (Gossip / adjacency group size).</summary>
         public const int PewSeatRowSize = SeatsPerPew;
 
+        /// <summary>Default church hitbox (fits 4 per pew strip). Override via StageLayoutProfile.</summary>
+        public static readonly Vector2 DefaultHitboxSize = new Vector2(64f, 84f);
+        /// <summary>Default unit sprite scale relative to hitbox (Architect Layout tab).</summary>
+        public const float DefaultSpriteScale = 1.15f;
+
         /// <summary>
-        /// True when this seat should draw a pew sprite (pew-rows 0–2).
+        /// True when this seat should draw a pew sprite / hitbox (all 4 rows = 48 seats).
         /// Visual identity comes from ClassSpritePoolApplier (by unit class) at church spawn;
         /// StageLayoutProfile pew slots remain position/scale placement guides only.
         /// </summary>
@@ -53,7 +58,7 @@ namespace ArthurianAutobattler
             => GetStaticPewRow(pewSeatIndex) < VisualSpriteRowCount;
 
         /// <summary>Bump when default pew anchors change so Play Mode refreshes stale scene data.</summary>
-        public const int CurrentLayoutVersion = 5;
+        public const int CurrentLayoutVersion = 6;
 
         [Header("Background (full-screen church art)")]
         public RectTransform backgroundRect;
@@ -79,12 +84,11 @@ namespace ArthurianAutobattler
                 new[] { 0.238f, 0.500f, 0.765f }  // back / altar / windows
             };
 
-            // Three visible sprite rows (pews 0–2); row 3 seats stay in data but hidden in UI.
-            // Larger scales so pew sprites read clearly on church art.
-            float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
-            float[] rowScale = { 1.32f, 1.18f, 1.05f, 0.01f };
-            // Wider strips so 4 avatar hitboxes fit per pew (tip: fix-townrng-name-pools).
-            float[] rowSpread = { 0.220f, 0.200f, 0.180f, 0.150f };
+            // All 4 pew-rows visible (48 hitboxes). tip: fix-architect-48-seat-preview
+            float[] rowY = { 0.355f, 0.490f, 0.625f, 0.760f };
+            float[] rowScale = { 1.18f, 1.08f, 0.98f, 0.90f };
+            // Wide enough strips for 4 compact hitboxes (64×84) without overflow clipping.
+            float[] rowSpread = { 0.240f, 0.220f, 0.200f, 0.180f };
 
             // Uniform 12×4 = 48.
             int[,] caps =
@@ -184,6 +188,11 @@ namespace ArthurianAutobattler
 
         /// <summary>Normalized position of a seat within the background.</summary>
         public Vector2 GetNormalizedSeatPosition(int globalSeatIndex)
+            => GetNormalizedSeatPosition(globalSeatIndex, spreadMul: 1f, gap01: 0f);
+
+        /// <param name="spreadMul">Multiplies pew seatSpread (Architect Layout strip width).</param>
+        /// <param name="gap01">Normalized gap between seats (shrinks usable strip).</param>
+        public Vector2 GetNormalizedSeatPosition(int globalSeatIndex, float spreadMul, float gap01)
         {
             EnsureValid();
             int pewIndex = GetPewIndexForSeat(globalSeatIndex);
@@ -191,11 +200,42 @@ namespace ArthurianAutobattler
             PewAnchor pew = pews[pewIndex];
             int cap = Mathf.Max(1, pew.seatCapacity);
 
+            float spread = pew.seatSpread * Mathf.Max(0.25f, spreadMul);
+            float gap = Mathf.Clamp(gap01, 0f, 0.08f);
+            if (cap > 1 && gap > 0f)
+                spread = Mathf.Max(0.04f, spread - gap * (cap - 1));
+
             // Spread seats left→right along the pew bench.
             float t = cap == 1 ? 0.5f : slot / (float)(cap - 1);
-            float x = pew.normalizedCenter.x + Mathf.Lerp(-pew.seatSpread * 0.5f, pew.seatSpread * 0.5f, t);
+            float x = pew.normalizedCenter.x + Mathf.Lerp(-spread * 0.5f, spread * 0.5f, t);
             float y = pew.normalizedCenter.y;
             return new Vector2(x, y);
+        }
+
+        /// <summary>Static play-layout seat pos (Architect preview / StageLayout defaults).</summary>
+        public static Vector2 GetStaticNormalizedSeatPosition(
+            PewAnchor[] pews, int globalSeatIndex, float spreadMul = 1f, float gap01 = 0f)
+        {
+            if (pews == null || pews.Length == 0) return new Vector2(0.5f, 0.5f);
+            int remaining = Mathf.Clamp(globalSeatIndex, 0, TotalSeats - 1);
+            int pewIndex = 0;
+            int slot = 0;
+            for (int p = 0; p < pews.Length; p++)
+            {
+                int cap = Mathf.Max(1, pews[p] != null ? pews[p].seatCapacity : SeatsPerPew);
+                if (remaining < cap) { pewIndex = p; slot = remaining; break; }
+                remaining -= cap;
+                pewIndex = p;
+            }
+            PewAnchor pew = pews[Mathf.Clamp(pewIndex, 0, pews.Length - 1)] ?? new PewAnchor();
+            int capN = Mathf.Max(1, pew.seatCapacity);
+            float spread = pew.seatSpread * Mathf.Max(0.25f, spreadMul);
+            float gap = Mathf.Clamp(gap01, 0f, 0.08f);
+            if (capN > 1 && gap > 0f)
+                spread = Mathf.Max(0.04f, spread - gap * (capN - 1));
+            float t = capN == 1 ? 0.5f : slot / (float)(capN - 1);
+            float x = pew.normalizedCenter.x + Mathf.Lerp(-spread * 0.5f, spread * 0.5f, t);
+            return new Vector2(x, pew.normalizedCenter.y);
         }
 
         public float GetSeatScale(int globalSeatIndex)
