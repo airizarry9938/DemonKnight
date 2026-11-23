@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-architect-save-load-pool-ux";
+    public const string UiBuildId = "fix-architect-pool-load-list";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -33,7 +33,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const string ClassPoolProfilePath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewProfilePath = "Assets/Resources/LegendPewPortraitProfile.asset";
     const string BattleGoodEvilProfilePath = "Assets/Resources/BattleGoodEvilSpritePoolProfile.asset";
-    /// <summary>Named Save/Load Pool Profile snapshots (tip fix-architect-save-load-pool-ux).</summary>
+    /// <summary>Named Save/Load Pool Profile snapshots (tip fix-architect-pool-load-list).</summary>
     const string ArchitectPoolsRoot = "Assets/Resources/ArchitectPools";
     const string ArchitectPoolsBodyFolder = ArchitectPoolsRoot + "/Body";
     const string ArchitectPoolsFaceFolder = ArchitectPoolsRoot + "/Face";
@@ -249,7 +249,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Flush every Architect profile to disk + SoftPromote into Resources/ArchitectArt.
-    /// tip: fix-architect-save-load-pool-ux — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
+    /// tip: fix-architect-pool-load-list — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
     /// </summary>
     void PersistAllProfiles(string reason)
     {
@@ -359,7 +359,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (sceneBgProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sceneBgProfile)))
             return;
-        // tip: fix-architect-save-load-pool-ux — SoftPromote images+videos into Resources; never clear.
+        // tip: fix-architect-pool-load-list — SoftPromote images+videos into Resources; never clear.
         SoftPromoteSceneBackgroundIntoResources(sceneBgProfile);
         sceneBgProfile.RematerializeSpritesFromPaths();
         EditorUtility.SetDirty(sceneBgProfile);
@@ -420,7 +420,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (classPoolProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(classPoolProfile)))
             return;
-        // tip: fix-architect-save-load-pool-ux — Sync path backups FIRST (so individual ObjectField
+        // tip: fix-architect-pool-load-list — Sync path backups FIRST (so individual ObjectField
         // picks survive SoftPromote / rematerialize), then SoftPromote into Resources, then Save.
         // Never Clear() pools here.
         SyncClassPoolAssetPaths(classPoolProfile);
@@ -452,7 +452,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (legendPewProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(legendPewProfile)))
             return;
-        // tip: fix-architect-save-load-pool-ux — Sync → SoftPromote → Rematerialize (no clear).
+        // tip: fix-architect-pool-load-list — Sync → SoftPromote → Rematerialize (no clear).
         SyncLegendPewAssetPaths(legendPewProfile);
         SoftPromoteLegendPewIntoResources(legendPewProfile);
         SyncLegendPewAssetPaths(legendPewProfile);
@@ -482,7 +482,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (battleGoodEvilProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(battleGoodEvilProfile)))
             return;
-        // tip: fix-architect-save-load-pool-ux — Sync → SoftPromote → Rematerialize (no clear).
+        // tip: fix-architect-pool-load-list — Sync → SoftPromote → Rematerialize (no clear).
         SyncBattleGoodEvilAssetPaths(battleGoodEvilProfile);
         SoftPromoteBattleGoodEvilIntoResources(battleGoodEvilProfile);
         SyncBattleGoodEvilAssetPaths(battleGoodEvilProfile);
@@ -571,14 +571,17 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
     }
 
-    // ── Named Save / Load Pool Profile (tip fix-architect-save-load-pool-ux) ──
+    // ── Named Save / Load Pool Profile (tip fix-architect-pool-load-list) ──
     // Load popup + Load button ALWAYS visible (never EditorPrefs / empty-list early return).
+    // After Save: SaveAssets + Refresh + ForceReserialize; rebuild name list immediately.
+    // Scan: filesystem *.asset under role folder AND FindAssets t:ClassSpritePoolProfile/etc (subfolders).
 
     const string NamedPoolNoneSavedLabel = "(none saved)";
 
     void DrawNamedPoolProfileBar(
         string kindLabel,
         string folder,
+        string typeFilter,
         ref string saveName,
         ref int loadIndex,
         ref string[] cachedNames,
@@ -601,9 +604,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
             saveAction?.Invoke();
         EditorGUILayout.EndHorizontal();
 
-        RefreshNamedPoolNameCache(folder, ref cachedNames);
+        RefreshNamedPoolNameCache(folder, typeFilter, ref cachedNames);
         bool hasSaved = cachedNames != null && cachedNames.Length > 0;
-        // ALWAYS show popup + Load — empty list uses "(none saved)" placeholder (tip fix-architect-save-load-pool-ux).
+        // ALWAYS show popup + Load — empty list uses "(none saved)" placeholder.
         string[] displayNames = hasSaved ? cachedNames : new[] { NamedPoolNoneSavedLabel };
         EditorGUILayout.BeginHorizontal();
         loadIndex = Mathf.Clamp(loadIndex, 0, displayNames.Length - 1);
@@ -614,32 +617,88 @@ public class ArthurianArtArchitectWindow : EditorWindow
             loadAction?.Invoke(cachedNames[loadIndex]);
         EditorGUI.EndDisabledGroup();
         if (GUILayout.Button("Refresh list", GUILayout.Width(100), GUILayout.Height(22)))
+        {
             cachedNames = null;
+            RebuildNamedPoolNameList(folder, typeFilter, ref cachedNames);
+        }
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndVertical();
     }
 
-    static void RefreshNamedPoolNameCache(string folder, ref string[] cachedNames)
+    /// <summary>
+    /// tip: fix-architect-pool-load-list — dual scan so Missing-Script / delayed-import assets still list.
+    /// 1) filesystem *.asset under folder (AllDirectories)
+    /// 2) FindAssets typeFilter under folder + ArchitectPools root (subfolders)
+    /// null cache = dirty; empty array = scanned none. Never Refresh from OnLoad.
+    /// </summary>
+    static void RefreshNamedPoolNameCache(string folder, string typeFilter, ref string[] cachedNames)
     {
-        // null = dirty (re-scan). Empty array = scanned, none saved (do not FindAssets every OnGUI).
         if (cachedNames != null) return;
+        RebuildNamedPoolNameList(folder, typeFilter, ref cachedNames);
+    }
+
+    /// <summary>Force rebuild of Load dropdown names (after Save / Refresh list).</summary>
+    static void RebuildNamedPoolNameList(string folder, string typeFilter, ref string[] cachedNames)
+    {
         EnsureArchitectPoolsFolder(folder);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var names = new List<string>();
-        if (AssetDatabase.IsValidFolder(folder))
+
+        void AddName(string n)
         {
-            string[] guids = AssetDatabase.FindAssets("t:ScriptableObject", new[] { folder });
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(n)) return;
+            if (string.Equals(n, "README", StringComparison.OrdinalIgnoreCase)) return;
+            if (n.StartsWith("_", StringComparison.Ordinal)) return; // probes / temp
+            if (seen.Add(n)) names.Add(n);
+        }
+
+        // 1) Filesystem scan — finds .assets even when Missing Script (FindAssets typed miss).
+        try
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
+            string fullFolder = Path.Combine(projectRoot, folder.Replace('/', Path.DirectorySeparatorChar));
+            if (Directory.Exists(fullFolder))
+            {
+                foreach (string file in Directory.GetFiles(fullFolder, "*.asset", SearchOption.AllDirectories))
+                    AddName(Path.GetFileNameWithoutExtension(file));
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] Named pool filesystem scan: " + ex.Message);
+        }
+
+        // 2) FindAssets typed filter including subfolders under role folder.
+        if (AssetDatabase.IsValidFolder(folder) && !string.IsNullOrEmpty(typeFilter))
+        {
+            string[] guids = AssetDatabase.FindAssets(typeFilter, new[] { folder });
             for (int i = 0; i < guids.Length; i++)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guids[i]);
                 if (string.IsNullOrEmpty(path) || !path.EndsWith(".asset", StringComparison.OrdinalIgnoreCase))
                     continue;
-                string n = Path.GetFileNameWithoutExtension(path);
-                if (string.IsNullOrEmpty(n) || !seen.Add(n)) continue;
-                names.Add(n);
+                AddName(Path.GetFileNameWithoutExtension(path));
             }
-            names.Sort(StringComparer.OrdinalIgnoreCase);
         }
+
+        // 3) FindAssets under ArchitectPools root (nested / stray subfolders), keep those under role folder.
+        if (AssetDatabase.IsValidFolder(ArchitectPoolsRoot) && !string.IsNullOrEmpty(typeFilter))
+        {
+            string folderNorm = folder.Replace('\\', '/').TrimEnd('/');
+            string[] guids = AssetDatabase.FindAssets(typeFilter, new[] { ArchitectPoolsRoot });
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                if (string.IsNullOrEmpty(path) || !path.EndsWith(".asset", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string norm = path.Replace('\\', '/');
+                if (!norm.StartsWith(folderNorm + "/", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                AddName(Path.GetFileNameWithoutExtension(norm));
+            }
+        }
+
+        names.Sort(StringComparer.OrdinalIgnoreCase);
         cachedNames = names.ToArray();
     }
 
@@ -672,23 +731,60 @@ public class ArthurianArtArchitectWindow : EditorWindow
         return s;
     }
 
+    /// <summary>
+    /// tip: fix-architect-pool-load-list — user-initiated Save only.
+    /// SaveAssets + Refresh + ForceReserialize, then rebuild Load dropdown immediately.
+    /// NEVER call from InitializeOnLoad (compile-loop).
+    /// </summary>
+    static void FinalizeNamedPoolSave(
+        string dest,
+        string name,
+        string folder,
+        string typeFilter,
+        ref string[] cachedNames,
+        ref int loadIndex,
+        ref string saveNameField)
+    {
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        if (!string.IsNullOrEmpty(dest) && !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(dest)))
+            AssetDatabase.ForceReserializeAssets(new[] { dest });
+        AssetDatabase.SaveAssets();
+        cachedNames = null;
+        RebuildNamedPoolNameList(folder, typeFilter, ref cachedNames);
+        saveNameField = name;
+        loadIndex = 0;
+        if (cachedNames != null)
+        {
+            for (int i = 0; i < cachedNames.Length; i++)
+            {
+                if (string.Equals(cachedNames[i], name, StringComparison.OrdinalIgnoreCase))
+                {
+                    loadIndex = i;
+                    break;
+                }
+            }
+        }
+        Debug.Log("[DemonKnight] Save Pool Profile path → " + dest
+                  + " (listed=" + (cachedNames?.Length ?? 0) + ")");
+    }
+
     void SaveNamedClassPoolProfile()
     {
         if (classPoolProfile == null) return;
-        // Prefer the TextField the user typed (not asset .name / EditorPrefs).
         string name = SanitizePoolProfileName(classPoolSaveName);
         if (string.IsNullOrEmpty(name))
         {
             EditorUtility.DisplayDialog("Save Pool Profile", "Enter a name for this BODY pool.", "OK");
             return;
         }
-        // SoftPromote live Resources profile first, then snapshot into named asset.
         PersistClassPoolProfile("SaveNamedPool:" + name);
         EnsureArchitectPoolsFolder(ArchitectPoolsBodyFolder);
         string dest = ArchitectPoolsBodyFolder + "/" + name + ".asset";
         var named = EnsureNamedPoolAssetAtPath<ClassSpritePoolProfile>(dest);
         if (named == null)
         {
+            Debug.LogError("[DemonKnight] Save Pool Profile FAILED (BODY) → " + dest);
             EditorUtility.DisplayDialog("Save Pool Profile", "Could not create:\n" + dest, "OK");
             return;
         }
@@ -696,11 +792,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         SyncClassPoolAssetPaths(named);
         named.name = name;
         EditorUtility.SetDirty(named);
-        AssetDatabase.SaveAssets();
-        classPoolSavedNames = null; // refresh Load dropdown next OnGUI
-        classPoolSaveName = name;
-        classPoolLoadIndex = 0;
-        Debug.Log("[DemonKnight] Save Pool Profile (BODY) → " + dest + " + SoftPromote Persist live.");
+        FinalizeNamedPoolSave(
+            dest, name, ArchitectPoolsBodyFolder, "t:ClassSpritePoolProfile",
+            ref classPoolSavedNames, ref classPoolLoadIndex, ref classPoolSaveName);
         EditorUtility.DisplayDialog(
             "Save Pool Profile",
             "Saved BODY pool as '" + name + "'.\n\n" + dest + "\n\nLive Resources profile SoftPromoted for Play.",
@@ -712,6 +806,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (string.IsNullOrEmpty(name)) return;
         string path = ArchitectPoolsBodyFolder + "/" + name + ".asset";
         var named = AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(path);
+        if (named == null)
+        {
+            // Missing Script / stale fileID — remap then retry (multi-class GDT).
+            string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+                path.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(full)
+                && ArthurianStageLayoutProfileEnsure.TryRemapNamedPoolScript(full, typeof(ClassSpritePoolProfile)))
+            {
+                AssetDatabase.ImportAsset(path);
+                named = AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(path);
+            }
+        }
         if (named == null)
         {
             EditorUtility.DisplayDialog("Load Pool Profile", "Missing asset:\n" + path, "OK");
@@ -748,6 +854,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         var named = EnsureNamedPoolAssetAtPath<LegendPewPortraitProfile>(dest);
         if (named == null)
         {
+            Debug.LogError("[DemonKnight] Save Pool Profile FAILED (FACE) → " + dest);
             EditorUtility.DisplayDialog("Save Pool Profile", "Could not create:\n" + dest, "OK");
             return;
         }
@@ -755,11 +862,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         SyncLegendPewAssetPaths(named);
         named.name = name;
         EditorUtility.SetDirty(named);
-        AssetDatabase.SaveAssets();
-        legendPoolSavedNames = null;
-        legendPoolSaveName = name;
-        legendPoolLoadIndex = 0;
-        Debug.Log("[DemonKnight] Save Pool Profile (FACE) → " + dest + " + SoftPromote Persist live.");
+        FinalizeNamedPoolSave(
+            dest, name, ArchitectPoolsFaceFolder, "t:LegendPewPortraitProfile",
+            ref legendPoolSavedNames, ref legendPoolLoadIndex, ref legendPoolSaveName);
         EditorUtility.DisplayDialog(
             "Save Pool Profile",
             "Saved FACE pool as '" + name + "'.\n\n" + dest + "\n\nLive Resources profile SoftPromoted for Play.",
@@ -771,6 +876,17 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (string.IsNullOrEmpty(name)) return;
         string path = ArchitectPoolsFaceFolder + "/" + name + ".asset";
         var named = AssetDatabase.LoadAssetAtPath<LegendPewPortraitProfile>(path);
+        if (named == null)
+        {
+            string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+                path.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(full)
+                && ArthurianStageLayoutProfileEnsure.TryRemapNamedPoolScript(full, typeof(LegendPewPortraitProfile)))
+            {
+                AssetDatabase.ImportAsset(path);
+                named = AssetDatabase.LoadAssetAtPath<LegendPewPortraitProfile>(path);
+            }
+        }
         if (named == null)
         {
             EditorUtility.DisplayDialog("Load Pool Profile", "Missing asset:\n" + path, "OK");
@@ -807,6 +923,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         var named = EnsureNamedPoolAssetAtPath<BattleGoodEvilSpritePoolProfile>(dest);
         if (named == null)
         {
+            Debug.LogError("[DemonKnight] Save Pool Profile FAILED (BATTLE) → " + dest);
             EditorUtility.DisplayDialog("Save Pool Profile", "Could not create:\n" + dest, "OK");
             return;
         }
@@ -814,11 +931,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         SyncBattleGoodEvilAssetPaths(named);
         named.name = name;
         EditorUtility.SetDirty(named);
-        AssetDatabase.SaveAssets();
-        battlePoolSavedNames = null;
-        battlePoolSaveName = name;
-        battlePoolLoadIndex = 0;
-        Debug.Log("[DemonKnight] Save Pool Profile (BATTLE) → " + dest + " + SoftPromote Persist live.");
+        FinalizeNamedPoolSave(
+            dest, name, ArchitectPoolsBattleFolder, "t:BattleGoodEvilSpritePoolProfile",
+            ref battlePoolSavedNames, ref battlePoolLoadIndex, ref battlePoolSaveName);
         EditorUtility.DisplayDialog(
             "Save Pool Profile",
             "Saved BATTLE pool as '" + name + "'.\n\n" + dest + "\n\nLive Resources profile SoftPromoted for Play.",
@@ -827,20 +942,69 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Create or reopen a named pool .asset at exactly {folder}/{sanitizedName}.asset.
-    /// Deletes broken/Missing-Script leftovers so CreateAsset cannot fail on an occupied path.
-    /// tip: fix-architect-save-load-pool-ux — no AssetDatabase.Refresh (compile-loop safe).
+    /// Missing Script / multi-class GameDataTypes: Type.GetType CreateInstance + YAML m_Script fileID remap.
+    /// tip: fix-architect-pool-load-list
     /// </summary>
     static T EnsureNamedPoolAssetAtPath<T>(string dest) where T : ScriptableObject
     {
         if (string.IsNullOrEmpty(dest)) return null;
         var existing = AssetDatabase.LoadAssetAtPath<T>(dest);
         if (existing != null) return existing;
-        // Path occupied by wrong/missing script → delete without Refresh, then recreate.
-        if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(dest)))
+
+        string full = Path.Combine(
+            Directory.GetParent(Application.dataPath)!.FullName,
+            dest.Replace('/', Path.DirectorySeparatorChar));
+
+        // Path occupied by wrong/missing script → remap YAML fileID first (preserve if possible).
+        if (File.Exists(full))
+        {
+            if (ArthurianStageLayoutProfileEnsure.TryRemapNamedPoolScript(full, typeof(T)))
+            {
+                AssetDatabase.ImportAsset(dest);
+                existing = AssetDatabase.LoadAssetAtPath<T>(dest);
+                if (existing != null) return existing;
+            }
             AssetDatabase.DeleteAsset(dest);
-        var created = ScriptableObject.CreateInstance<T>();
+            try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
+            try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
+        }
+        else if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(dest)))
+        {
+            AssetDatabase.DeleteAsset(dest);
+        }
+
+        // CreateInstance via Type.GetType for multi-class GameDataTypes MonoScript fileID.
+        T created = ArthurianStageLayoutProfileEnsure.CreateNamedPoolInstance<T>();
+        if (created == null)
+        {
+            Debug.LogError(
+                "[DemonKnight] EnsureNamedPoolAssetAtPath CreateInstance failed for "
+                + typeof(T).Name + " @ " + dest);
+            return null;
+        }
         AssetDatabase.CreateAsset(created, dest);
-        return AssetDatabase.LoadAssetAtPath<T>(dest) ?? created;
+        AssetDatabase.SaveAssets();
+
+        var loaded = AssetDatabase.LoadAssetAtPath<T>(dest);
+        if (loaded == null && File.Exists(full))
+        {
+            if (ArthurianStageLayoutProfileEnsure.TryRemapNamedPoolScript(full, typeof(T)))
+            {
+                AssetDatabase.ImportAsset(dest);
+                loaded = AssetDatabase.LoadAssetAtPath<T>(dest);
+            }
+        }
+        if (loaded == null)
+        {
+            Debug.LogError(
+                "[DemonKnight] Named pool Missing Script after create: " + dest
+                + " (type " + typeof(T).Name + "). Check GameDataTypes MonoScript fileID.");
+        }
+        else
+        {
+            Debug.Log("[DemonKnight] EnsureNamedPoolAssetAtPath OK → " + dest);
+        }
+        return loaded ?? created;
     }
 
     void LoadNamedBattlePoolProfile(string name)
@@ -848,6 +1012,17 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (string.IsNullOrEmpty(name)) return;
         string path = ArchitectPoolsBattleFolder + "/" + name + ".asset";
         var named = AssetDatabase.LoadAssetAtPath<BattleGoodEvilSpritePoolProfile>(path);
+        if (named == null)
+        {
+            string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+                path.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(full)
+                && ArthurianStageLayoutProfileEnsure.TryRemapNamedPoolScript(full, typeof(BattleGoodEvilSpritePoolProfile)))
+            {
+                AssetDatabase.ImportAsset(path);
+                named = AssetDatabase.LoadAssetAtPath<BattleGoodEvilSpritePoolProfile>(path);
+            }
+        }
         if (named == null)
         {
             EditorUtility.DisplayDialog("Load Pool Profile", "Missing asset:\n" + path, "OK");
@@ -960,7 +1135,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (sprites[i] == null) continue;
             string ap = AssetDatabase.GetAssetPath(sprites[i]);
             if (string.IsNullOrEmpty(ap)) continue;
-            // tip: fix-architect-save-load-pool-ux — SoftPromote writes Resources path backups
+            // tip: fix-architect-pool-load-list — SoftPromote writes Resources path backups
             // while keeping live ObjectField sprites outside Resources. Do not overwrite a
             // Resources path with the non-Resources live asset path (that wiped pools on exit).
             if (!string.IsNullOrEmpty(paths[i])
@@ -2784,6 +2959,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         DrawNamedPoolProfileBar(
             "Tab 4 BODY",
             ArchitectPoolsBodyFolder,
+            "t:ClassSpritePoolProfile",
             ref classPoolSaveName,
             ref classPoolLoadIndex,
             ref classPoolSavedNames,
@@ -2878,7 +3054,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     + "• Empty seats fall back to StageLayout assign-guides / solid color.\n"
                     + "• Optional: if Tab 6 Good battle pools have troops, Play may use those as "
                     + "pew BODY fallback ONLY while Tab 4 stays empty (prefer filling Tab 4).\n"
-                    + "• Assigns stick after close — tip fix-architect-save-load-pool-ux Persists on OnDisable/OnDestroy.",
+                    + "• Assigns stick after close — tip fix-architect-pool-load-list Persists on OnDisable/OnDestroy.",
                     MessageType.Warning);
             }
         }
@@ -3015,6 +3191,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         DrawNamedPoolProfileBar(
             "Tab 5 FACE",
             ArchitectPoolsFaceFolder,
+            "t:LegendPewPortraitProfile",
             ref legendPoolSaveName,
             ref legendPoolLoadIndex,
             ref legendPoolSavedNames,
@@ -3268,6 +3445,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         DrawNamedPoolProfileBar(
             "Tab 6 BATTLE",
             ArchitectPoolsBattleFolder,
+            "t:BattleGoodEvilSpritePoolProfile",
             ref battlePoolSaveName,
             ref battlePoolLoadIndex,
             ref battlePoolSavedNames,
@@ -4443,7 +4621,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         try
         {
             // SoftPromote: if Profile MonoScripts still missing, arg may be null / type unload — soft-fail.
-            // tip: fix-architect-save-load-pool-ux
+            // tip: fix-architect-pool-load-list
             if (arg == null)
             {
                 Debug.LogWarning("[DemonKnight] SoftPromote " + methodName + " soft-fail: null profile (types missing?)");
@@ -4521,12 +4699,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
 }
 
 
-// ===== fix-architect-save-load-pool-ux EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
+// ===== fix-architect-pool-load-list EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
 // Standalone ArthurianArchitectBuildPersist.cs is a stub only. Type lives HERE so MustRestore
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-architect-save-load-pool-ux (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-architect-pool-load-list (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -4535,7 +4713,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-architect-save-load-pool-ux";
+    public const string TipId = "fix-architect-pool-load-list";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";
@@ -4766,7 +4944,7 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
                     if (!string.IsNullOrEmpty(ap)) e.imageAssetPath = ap;
                 }
             }
-            // tip: fix-architect-save-load-pool-ux — SoftPromote videos into Resources too
+            // tip: fix-architect-pool-load-list — SoftPromote videos into Resources too
             // (layouts/videos were not reaching scene slots after exit / player build).
             if (e.videoClip != null)
             {
@@ -4883,7 +5061,7 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
             if (sprites[i] == null) continue;
             Sprite original = sprites[i];
             Sprite promoted = PromoteSprite(original, sub + "/" + i);
-            // tip: fix-architect-save-load-pool-ux — write Resources path backup always, but
+            // tip: fix-architect-pool-load-list — write Resources path backup always, but
             // keep the live ObjectField sprite when it is still valid (SoftPromote used to swap
             // to a mid-import Missing Sprite → picks stuck briefly then vanished).
             // Build prepare passes swapLiveRefs:true so player builds bind Resources copies.
@@ -4947,7 +5125,7 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
                 }
             }
 
-            // tip: fix-architect-save-load-pool-ux — force Sprite importer so SoftPromote
+            // tip: fix-architect-pool-load-list — force Sprite importer so SoftPromote
             // ObjectField picks stick (CopyAsset alone left Texture without Sprite → Missing).
             EnsureSpriteImporter(dest, sp);
             AssetDatabase.ImportAsset(dest, ImportAssetOptions.ForceUpdate);
