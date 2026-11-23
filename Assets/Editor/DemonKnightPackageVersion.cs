@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-profile-so-script-assets";
-    public const string GitHint = "fix-profile-so-script-assets";
-    public const string BuiltUtc = "2026-11-23T05:30:00Z";
+    public const string Id = "fix-named-profile-sync-cs0246";
+    public const string GitHint = "fix-named-profile-sync-cs0246";
+    public const string BuiltUtc = "2026-11-23T05:45:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "3f02c63dc5e2bfe6809de805bd18c619ab955666";
@@ -60,10 +60,15 @@ public static class DemonKnightPackageVersion
                         need = true;
                     if (sync.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0) need = true;
                     if (sync.IndexOf("StalePackageIds", StringComparison.Ordinal) < 0) need = true;
+                    if (sync.IndexOf("HardRestoreNamedProfileScripts", StringComparison.Ordinal) < 0) need = true;
                     if (boot.IndexOf("Clear Paperdoll Library", StringComparison.Ordinal) < 0) need = true;
                     // CS0117 chicken-egg: Architect must not call PackageVersion.Wipe*
                     if (arch.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0) need = true;
                 }
+
+                // CS0246 belt: Force Sync under stale Sync can land tip PackageVersion/GameDataTypes
+                // while wiping/never pulling named MonoScript Profiles + shared types.
+                if (NamedProfileScriptsNeedRestore(root)) need = true;
 
                 if (!need) return;
 
@@ -77,7 +82,8 @@ public static class DemonKnightPackageVersion
                 {
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
-                    // Named MonoScript Profile SOs BEFORE GameDataTypes Appliers (tip fix-profile-so-script-assets).
+                    // Named MonoScript Profile SOs + shared types BEFORE GameDataTypes Appliers.
+                    // tip: fix-named-profile-sync-cs0246
                     "Assets/Scripts/Data/StageLayoutProfile.cs",
                     "Assets/Scripts/Data/SceneBackgroundProfile.cs",
                     "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -117,17 +123,34 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
-                                || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0))
+                                || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0
+                                || body.IndexOf(Id, StringComparison.Ordinal) < 0))
                             throw new Exception("GameDataTypes must keep Appliers and NOT redefine Profile SOs");
                         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
-                            && body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0)
-                            throw new Exception("StageLayoutProfile.cs missing SO class");
+                            && (body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class SlotTransformConfig", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) < 0
+                                || body.IndexOf(Id, StringComparison.Ordinal) < 0))
+                            throw new Exception("StageLayoutProfile.cs missing SO/shared types");
+                        if (rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase)
+                            && (body.IndexOf("class SceneBackgroundProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("enum SceneBackgroundSlot", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class SceneBackgroundEntry", StringComparison.Ordinal) < 0
+                                || body.IndexOf(Id, StringComparison.Ordinal) < 0))
+                            throw new Exception("SceneBackgroundProfile.cs missing SO/shared types");
                         if (rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
-                            && body.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0)
+                            && (body.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf(Id, StringComparison.Ordinal) < 0))
                             throw new Exception("ClassSpritePoolProfile.cs missing SO class");
+                        if (rel.EndsWith("LegendPewPortraitProfile.cs", StringComparison.OrdinalIgnoreCase)
+                            && (body.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf(Id, StringComparison.Ordinal) < 0))
+                            throw new Exception("LegendPewPortraitProfile.cs missing SO class");
                         if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
-                            && body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0)
-                            throw new Exception("BattleGoodEvilSpritePoolProfile.cs missing SO class");
+                            && (body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class BattleSpriteSlotEntry", StringComparison.Ordinal) < 0
+                                || body.IndexOf(Id, StringComparison.Ordinal) < 0))
+                            throw new Exception("BattleGoodEvilSpritePoolProfile.cs missing SO/shared types");
                         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
@@ -222,6 +245,60 @@ public static class DemonKnightPackageVersion
         return n;
     }
 
+    /// <summary>
+    /// True when any named MonoScript Profile SO (or its shared types) is missing/corrupt on disk.
+    /// tip: fix-named-profile-sync-cs0246 — Force Sync CS0246 after #51 wipe/never-pull.
+    /// </summary>
+    public static bool NamedProfileScriptsNeedRestore(string root = null)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(root))
+                root = Directory.GetParent(Application.dataPath)!.FullName;
+            string data = Path.Combine(root, "Assets", "Scripts", "Data");
+            var checks = new (string file, string[] markers)[]
+            {
+                ("StageLayoutProfile.cs", new[]
+                {
+                    "class StageLayoutProfile", "class SlotTransformConfig", "class StageParallaxLayer", Id
+                }),
+                ("SceneBackgroundProfile.cs", new[]
+                {
+                    "class SceneBackgroundProfile", "enum SceneBackgroundSlot", "class SceneBackgroundEntry", Id
+                }),
+                ("ClassSpritePoolProfile.cs", new[] { "class ClassSpritePoolProfile", Id }),
+                ("LegendPewPortraitProfile.cs", new[] { "class LegendPewPortraitProfile", Id }),
+                ("BattleGoodEvilSpritePoolProfile.cs", new[]
+                {
+                    "class BattleGoodEvilSpritePoolProfile", "class BattleSpriteSlotEntry", Id
+                }),
+            };
+            foreach (var (file, markers) in checks)
+            {
+                string path = Path.Combine(data, file);
+                if (!File.Exists(path)) return true;
+                string body = File.ReadAllText(path);
+                foreach (string m in markers)
+                {
+                    if (body.IndexOf(m, StringComparison.Ordinal) < 0) return true;
+                }
+            }
+            string gdt = Path.Combine(data, "GameDataTypes.cs");
+            if (File.Exists(gdt))
+            {
+                string g = File.ReadAllText(gdt);
+                // Stale embed — Profiles must be named MonoScripts, not redefined here.
+                if (g.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0) return true;
+                if (g.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0) return true;
+            }
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
     static bool ContainsStaleMarker(string body)
     {
         if (string.IsNullOrEmpty(body)) return true;
@@ -265,6 +342,7 @@ public static class DemonKnightPackageVersion
             "fix-build-persist-embed",
             "fix-pew-body-pool-empty",
             "fix-class-pool-kind-cs0019",
+            "fix-profile-so-script-assets",
         };
         foreach (string s in stale)
         {

@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-profile-so-script-assets";
+    public const string TipPackageId = "fix-named-profile-sync-cs0246";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -24,7 +24,8 @@ public static class DemonKnightTipEscape
         "Assets/Editor/DemonKnightPackageVersion.cs",
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
-        // Named MonoScript Profiles BEFORE GameDataTypes Appliers (tip fix-profile-so-script-assets).
+        // Named MonoScript Profiles + shared types BEFORE GameDataTypes Appliers.
+        // tip: fix-named-profile-sync-cs0246 — Force Sync wipe/never-pull → CS0246.
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -48,7 +49,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-profile-so-script-assets)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-named-profile-sync-cs0246)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -161,30 +162,24 @@ public static class DemonKnightTipEscape
             "fix-build-persist-embed",
             "fix-pew-body-pool-empty",
             "fix-class-pool-kind-cs0019",
+            "fix-profile-so-script-assets",
         };
         foreach (string s in stale)
         {
             if (pvBody.IndexOf("Id = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
             if (archBody.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
         }
-        // tip fix-profile-so-script-assets: ClassPoolKind→UnitType CS0019; keep pew-body Persist/fileID belt.
-        // Escape wrote tip fix-pew-body-pool-empty with ClassPoolKind == UnitType (broken Architect) — force pull.
+        // ClassPoolKind→UnitType CS0019; keep pew-body Persist/fileID belt.
         if (archBody.IndexOf("selectedClassPool == UnitType.", StringComparison.Ordinal) >= 0) return true;
         if (archBody.IndexOf("ClassPoolKind.Warrior => UnitType.Warrior", StringComparison.Ordinal) < 0) return true;
-        string stageSo = Path.Combine(root, "Assets", "Scripts", "Data", "StageLayoutProfile.cs");
-        string classSo = Path.Combine(root, "Assets", "Scripts", "Data", "ClassSpritePoolProfile.cs");
-        string battleSo = Path.Combine(root, "Assets", "Scripts", "Data", "BattleGoodEvilSpritePoolProfile.cs");
-        if (!File.Exists(stageSo) || !File.Exists(classSo) || !File.Exists(battleSo)) return true;
-        if (File.ReadAllText(stageSo).IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0) return true;
-        string gdtPath = Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs");
-        if (File.Exists(gdtPath)
-            && File.ReadAllText(gdtPath).IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0)
-            return true; // stale embed — need named MonoScript extract
+        // CS0246: ALL named Profile MonoScripts + shared types must exist on disk.
+        if (DemonKnightPackageVersion.NamedProfileScriptsNeedRestore(root)) return true;
+        if (syncBody.IndexOf("HardRestoreNamedProfileScripts", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
         string ensureBody = File.ReadAllText(ensurePath);
         if (ensureBody.IndexOf("TryResolveScriptRef", StringComparison.Ordinal) < 0) return true;
-        if (ensureBody.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0) return true;
+        if (ensureBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("TryPewBodyFallbackFromGoodTroops", StringComparison.Ordinal) < 0
             && File.ReadAllText(Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs"))
@@ -238,14 +233,33 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
                         || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
                         || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0
-                        || body.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0))
+                        || body.IndexOf(TipPackageId, StringComparison.Ordinal) < 0))
                     throw new Exception("GameDataTypes must keep Appliers and NOT redefine Profile SOs");
                 if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
-                    && body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0)
-                    throw new Exception("StageLayoutProfile.cs missing SO class");
+                    && (body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class SlotTransformConfig", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) < 0
+                        || body.IndexOf(TipPackageId, StringComparison.Ordinal) < 0))
+                    throw new Exception("StageLayoutProfile.cs missing SO/shared types");
+                if (rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class SceneBackgroundProfile", StringComparison.Ordinal) < 0
+                        || body.IndexOf("enum SceneBackgroundSlot", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class SceneBackgroundEntry", StringComparison.Ordinal) < 0
+                        || body.IndexOf(TipPackageId, StringComparison.Ordinal) < 0))
+                    throw new Exception("SceneBackgroundProfile.cs missing SO/shared types");
+                if (rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
+                        || body.IndexOf(TipPackageId, StringComparison.Ordinal) < 0))
+                    throw new Exception("ClassSpritePoolProfile.cs missing SO class");
+                if (rel.EndsWith("LegendPewPortraitProfile.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
+                        || body.IndexOf(TipPackageId, StringComparison.Ordinal) < 0))
+                    throw new Exception("LegendPewPortraitProfile.cs missing SO class");
                 if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
-                    && body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0)
-                    throw new Exception("BattleGoodEvilSpritePoolProfile.cs missing SO class");
+                    && (body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class BattleSpriteSlotEntry", StringComparison.Ordinal) < 0
+                        || body.IndexOf(TipPackageId, StringComparison.Ordinal) < 0))
+                    throw new Exception("BattleGoodEvilSpritePoolProfile.cs missing SO/shared types");
                 if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
                         || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
@@ -285,14 +299,27 @@ public static class DemonKnightTipEscape
             }
         }
 
-        // Wipe pew library placeholders when PackageVersion tip compiled later; best-effort now.
+        // Pew rebuild via reflection — TipEscape must compile even when Profile MonoScripts are
+        // missing (Ensure → StageLayoutProfile CS0246 would otherwise block OnLoad restore).
         try
         {
             if (AssetDatabase.IsValidFolder("Assets/Art/Spliced/Sprite")
                 || AssetDatabase.LoadMainAssetAtPath("Assets/Resources/Art/Modular/ModularSpriteLibrary.asset") != null)
             {
-                ArthurianStageLayoutProfileEnsure.RebuildPewLibraryFromSplices();
-                log.AppendLine("Pew library rebuild requested.");
+                var ensureType = Type.GetType("ArthurianStageLayoutProfileEnsure")
+                                 ?? Type.GetType("ArthurianStageLayoutProfileEnsure, Assembly-CSharp-Editor");
+                var rebuild = ensureType?.GetMethod(
+                    "RebuildPewLibraryFromSplices",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (rebuild != null)
+                {
+                    rebuild.Invoke(null, null);
+                    log.AppendLine("Pew library rebuild requested.");
+                }
+                else
+                {
+                    log.AppendLine("Pew rebuild deferred (Ensure type not compiled yet).");
+                }
             }
         }
         catch (Exception ex)
