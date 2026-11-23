@@ -34,6 +34,8 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
+        // tip: fix-architect-48-seat-preview — CS0104 Random + name pools; Escape must land with hosts.
+        "Assets/Scripts/Systems/TownRNGGenerator.cs",
         "Assets/Editor/ArthurianSceneBuilder.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
@@ -252,6 +254,15 @@ public static class DemonKnightTipEscape
         if (!File.Exists(churchPath)) return true;
         string churchBody = File.ReadAllText(churchPath);
         if (churchBody.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0) return true;
+        if (churchBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
+        if (gdtBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
+        // tip: fix-architect-48-seat-preview — CS0104 TownRNG Random belt (Force Sync / Escape).
+        string townRngPath = Path.Combine(root, "Assets", "Scripts", "Systems", "TownRNGGenerator.cs");
+        if (!File.Exists(townRngPath)) return true;
+        string townRngBody = File.ReadAllText(townRngPath);
+        if (townRngBody.IndexOf("UnityEngine.Random.Range", StringComparison.Ordinal) < 0) return true;
+        if (System.Text.RegularExpressions.Regex.IsMatch(
+                townRngBody, @"(?<!UnityEngine\.)Random\.(Range|value)")) return true;
         string builderPath = Path.Combine(root, "Assets", "Editor", "ArthurianSceneBuilder.cs");
         if (!File.Exists(builderPath)) return true;
         string builderBody = File.ReadAllText(builderPath);
@@ -338,8 +349,17 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                         || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                         || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
+                        || body.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
                         || body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
                     throw new Exception("SomersetChurchUI missing tip church/HUD markers");
+                if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class TownRNGGenerator", StringComparison.Ordinal) < 0
+                        || body.IndexOf("AllocateUniqueCharacterName", StringComparison.Ordinal) < 0
+                        || body.IndexOf("UnityEngine.Random.Range", StringComparison.Ordinal) < 0
+                        || body.IndexOf("UnityEngine.Random.value", StringComparison.Ordinal) < 0
+                        || System.Text.RegularExpressions.Regex.IsMatch(
+                            body, @"(?<!UnityEngine\.)Random\.(Range|value)")))
+                    throw new Exception("TownRNGGenerator missing UnityEngine.Random CS0104 belt");
                 if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
                         || body.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0))

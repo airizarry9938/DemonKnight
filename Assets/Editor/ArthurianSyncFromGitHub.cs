@@ -1414,8 +1414,11 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                 || text.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                 || text.IndexOf("TrainChosenStat", StringComparison.Ordinal) < 0
-                || text.IndexOf("ChurchBottomDialogue", StringComparison.Ordinal) < 0)
-                throw new Exception("SomersetChurchUI missing tip church markers (" + source + ")");
+                || text.IndexOf("ChurchBottomDialogue", StringComparison.Ordinal) < 0
+                || text.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
+                || text.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
+                || text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)
+                throw new Exception("SomersetChurchUI missing tip church/HUD markers (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(rel, dest, relaxPackageId: true);
             if (!okFiles.Contains(rel)) okFiles.Add(rel);
@@ -2071,6 +2074,19 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("DemonKnightPackageVersion")
                    && body.Contains("ForceUpgradeSyncHostsFromMain")
                    && body.Contains("Package Id on disk");
+        }
+
+        // tip: fix-architect-48-seat-preview — CS0104: System + UnityEngine both expose Random.
+        if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class TownRNGGenerator")
+                   && body.Contains("AllocateUniqueCharacterName")
+                   && body.Contains("ReservedFullNames")
+                   && body.Contains("UnityEngine.Random.Range")
+                   && body.Contains("UnityEngine.Random.value")
+                   && !Regex.IsMatch(body, @"(?<!UnityEngine\.)Random\.(Range|value)")
+                   && (body.Contains("fix-architect-48-seat-preview")
+                       || body.Contains("fix-townrng-name-pools"));
         }
 
         return true;

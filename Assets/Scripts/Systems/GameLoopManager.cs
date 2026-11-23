@@ -5,6 +5,7 @@ using UnityEngine.UI;
 
 namespace ArthurianAutobattler
 {
+    /// <summary>tip: fix-architect-48-seat-preview — Force Sync AtomicCritical tip marker (HardWrite/Escape coherent).</summary>
     public class GameLoopManager : MonoBehaviour
     {
         public static GameLoopManager Instance;

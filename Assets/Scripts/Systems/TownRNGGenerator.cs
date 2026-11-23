@@ -10,6 +10,7 @@ namespace ArthurianAutobattler
         public List<Sprite> warriorAvatars;
         public List<Sprite> peasantAvatars;
 
+        // tip: fix-architect-48-seat-preview — CS0104 belt: UnityEngine.Random only (System.Random clash from HashSet usings).
         // tip: fix-townrng-name-pools — 48 first names (exact order).
         private readonly string[] firstNames =
         {
@@ -137,7 +138,7 @@ namespace ArthurianAutobattler
                 return full;
             }
 
-            string emergency = firstNames[Random.Range(0, firstNames.Length)] + " " + surname;
+            string emergency = firstNames[UnityEngine.Random.Range(0, firstNames.Length)] + " " + surname;
             _usedSurnames.Add(surname);
             _usedFullNames.Add(emergency);
             return emergency;
@@ -148,7 +149,7 @@ namespace ArthurianAutobattler
             // Prefer unused epithets; 75 pool covers 48 seats with room to spare.
             for (int attempt = 0; attempt < 128; attempt++)
             {
-                string s = epithets[Random.Range(0, epithets.Length)];
+                string s = epithets[UnityEngine.Random.Range(0, epithets.Length)];
                 if (!_usedSurnames.Contains(s)) return s;
             }
             for (int i = 0; i < epithets.Length; i++)
@@ -156,7 +157,7 @@ namespace ArthurianAutobattler
                 if (!_usedSurnames.Contains(epithets[i])) return epithets[i];
             }
             // Should never hit with 48 seats / 75 surnames.
-            return epithets[Random.Range(0, epithets.Length)];
+            return epithets[UnityEngine.Random.Range(0, epithets.Length)];
         }
 
         private string PickFirstNameCandidate(bool allowReuse)
@@ -165,7 +166,7 @@ namespace ArthurianAutobattler
             {
                 for (int attempt = 0; attempt < 64; attempt++)
                 {
-                    string f = firstNames[Random.Range(0, firstNames.Length)];
+                    string f = firstNames[UnityEngine.Random.Range(0, firstNames.Length)];
                     if (!_usedFirstNames.Contains(f)) return f;
                 }
                 for (int i = 0; i < firstNames.Length; i++)
@@ -173,7 +174,7 @@ namespace ArthurianAutobattler
                     if (!_usedFirstNames.Contains(firstNames[i])) return firstNames[i];
                 }
             }
-            return firstNames[Random.Range(0, firstNames.Length)];
+            return firstNames[UnityEngine.Random.Range(0, firstNames.Length)];
         }
 
         /// <summary>Assign seats 0–47 in a fresh random order every run.</summary>
@@ -185,7 +186,7 @@ namespace ArthurianAutobattler
 
             for (int i = n - 1; i > 0; i--)
             {
-                int j = Random.Range(0, i + 1);
+                int j = UnityEngine.Random.Range(0, i + 1);
                 (seats[i], seats[j]) = (seats[j], seats[i]);
             }
 
@@ -203,7 +204,7 @@ namespace ArthurianAutobattler
             bool unlockTier1 = PerkDraftManager.Instance != null
                 && PerkDraftManager.Instance.unlockedPerks.Contains(RunPerkID.RoyalScoutingDecree);
 
-            bool lustSiren = SomersetRunes.IsSinActive(SinRuneID.Lust) && Random.value < 0.25f;
+            bool lustSiren = SomersetRunes.IsSinActive(SinRuneID.Lust) && UnityEngine.Random.value < 0.25f;
 
             var lib = modularLibrary != null ? modularLibrary : ModularSpriteLibrary.Load();
             if (lib != null) TownsfolkVisualApplier.SetLibrary(lib);
@@ -217,7 +218,7 @@ namespace ArthurianAutobattler
                 battleSlotIndex = pewSeat,
                 isDeployed = true,
                 isScouted = unlockTier1,
-                randomAvatar = (pool != null && pool.Count > 0) ? pool[Random.Range(0, pool.Count)] : null,
+                randomAvatar = (pool != null && pool.Count > 0) ? pool[UnityEngine.Random.Range(0, pool.Count)] : null,
                 intelTierUnlocked = unlockTier1 ? 1 : 0,
                 isSirenEnchantress = lustSiren,
                 appearance = TownsfolkAppearance.Generate(type, persistentID, pewSeat, lib)
@@ -254,9 +255,9 @@ namespace ArthurianAutobattler
                     // Balance V2: HP 115–145, ATK 14–19 → hire 110–160.
                     int hpLo = 115, hpHi = 146;
                     int atkLo = 14, atkHi = 20;
-                    r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
-                    r.attackDamage = Random.Range(atkLo, atkHi);
-                    r.attackSpeed = Random.Range(1.6f, 2.0f);
+                    r.maxHealth = Mathf.RoundToInt(UnityEngine.Random.Range(hpLo, hpHi) * hpMult);
+                    r.attackDamage = UnityEngine.Random.Range(atkLo, atkHi);
+                    r.attackSpeed = UnityEngine.Random.Range(1.6f, 2.0f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
                         hpLo, hpHi - 1, atkLo, atkHi - 1,
                         RecruitInstance.KnightHireFloor, RecruitInstance.KnightHireCeil);
@@ -267,9 +268,9 @@ namespace ArthurianAutobattler
                     // Balance V2: HP 45–65, ATK 7–10 → hire 35–55.
                     int hpLo = 45, hpHi = 66;
                     int atkLo = 7, atkHi = 11;
-                    r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
-                    r.attackDamage = Random.Range(atkLo, atkHi);
-                    r.attackSpeed = Random.Range(1.3f, 1.6f);
+                    r.maxHealth = Mathf.RoundToInt(UnityEngine.Random.Range(hpLo, hpHi) * hpMult);
+                    r.attackDamage = UnityEngine.Random.Range(atkLo, atkHi);
+                    r.attackSpeed = UnityEngine.Random.Range(1.3f, 1.6f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
                         hpLo, hpHi - 1, atkLo, atkHi - 1,
                         RecruitInstance.WarriorHireFloor, RecruitInstance.WarriorHireCeil);
@@ -280,9 +281,9 @@ namespace ArthurianAutobattler
                     // Balance V2: HP 14–22, ATK 2–3 → hire 10–15.
                     int hpLo = 14, hpHi = 23;
                     int atkLo = 2, atkHi = 4;
-                    r.maxHealth = Mathf.RoundToInt(Random.Range(hpLo, hpHi) * hpMult);
-                    r.attackDamage = Random.Range(atkLo, atkHi);
-                    r.attackSpeed = Random.Range(1.1f, 1.3f);
+                    r.maxHealth = Mathf.RoundToInt(UnityEngine.Random.Range(hpLo, hpHi) * hpMult);
+                    r.attackDamage = UnityEngine.Random.Range(atkLo, atkHi);
+                    r.attackSpeed = UnityEngine.Random.Range(1.1f, 1.3f);
                     r.baseHireCost = HireCostFromStats(r.maxHealth / Mathf.Max(0.01f, hpMult), r.attackDamage,
                         hpLo, hpHi - 1, atkLo, atkHi - 1,
                         RecruitInstance.PeasantHireFloor, RecruitInstance.PeasantHireCeil);
@@ -363,7 +364,7 @@ namespace ArthurianAutobattler
                 if (r.bodyPosture == BodyPosture.EagerForward) bodyPool = bodyEager;
                 else if (r.bodyPosture == BodyPosture.SlouchedExit) bodyPool = bodySlouched;
                 if (bodyPool != null && bodyPool.Count > 0)
-                    r.bodySprite = bodyPool[Random.Range(0, bodyPool.Count)];
+                    r.bodySprite = bodyPool[UnityEngine.Random.Range(0, bodyPool.Count)];
             }
 
             Sprite face = LegendPewPortraitApplier.ResolvePewFaceOverlay(r);
@@ -378,16 +379,16 @@ namespace ArthurianAutobattler
 
         private TraitTag RollPrimaryTrait()
         {
-            if (Random.value < 0.15f) return TraitTag.Loyalist;
+            if (UnityEngine.Random.value < 0.15f) return TraitTag.Loyalist;
             TraitTag[] traits = { TraitTag.Noble, TraitTag.Outlaw, TraitTag.Drunkard, TraitTag.Zealot, TraitTag.Coward };
-            return traits[Random.Range(0, traits.Length)];
+            return traits[UnityEngine.Random.Range(0, traits.Length)];
         }
 
         private TraitTag RollSecondaryTrait(TraitTag exclude)
         {
-            if (Random.value < 0.25f) return TraitTag.None;
+            if (UnityEngine.Random.value < 0.25f) return TraitTag.None;
             TraitTag[] traits = { TraitTag.Noble, TraitTag.Outlaw, TraitTag.Drunkard, TraitTag.Zealot, TraitTag.Coward, TraitTag.Loyalist };
-            TraitTag picked = traits[Random.Range(0, traits.Length)];
+            TraitTag picked = traits[UnityEngine.Random.Range(0, traits.Length)];
             return picked == exclude ? TraitTag.None : picked;
         }
     }

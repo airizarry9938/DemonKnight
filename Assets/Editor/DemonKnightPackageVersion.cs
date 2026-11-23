@@ -13,7 +13,8 @@ public static class DemonKnightPackageVersion
 {
     public const string Id = "fix-architect-48-seat-preview";
     public const string GitHint = "fix-architect-48-seat-preview";
-    public const string BuiltUtc = "2026-11-23T17:26:37Z";
+    // tip: fix-architect-48-seat-preview — CS0104 TownRNG Random + TipEscape HardWrite markers coherent.
+    public const string BuiltUtc = "2026-11-23T17:50:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
@@ -107,6 +108,8 @@ public static class DemonKnightPackageVersion
                     // Applier embed host — Appliers stay here; Profiles are named files.
                     "Assets/Scripts/Data/GameDataTypes.cs",
                     "Assets/Scripts/UI/SomersetChurchUI.cs",
+                    // tip: fix-architect-48-seat-preview — CS0104 UnityEngine.Random belt.
+                    "Assets/Scripts/Systems/TownRNGGenerator.cs",
                     "Assets/Scripts/UI/SceneBackgroundApplier.cs",
                     "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
                     "Assets/Editor/ArthurianSceneBuilder.cs",
@@ -150,8 +153,17 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                                 || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
+                                || body.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
                                 || body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
                             throw new Exception("SomersetChurchUI missing tip church/HUD markers");
+                        if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase)
+                            && (body.IndexOf("class TownRNGGenerator", StringComparison.Ordinal) < 0
+                                || body.IndexOf("AllocateUniqueCharacterName", StringComparison.Ordinal) < 0
+                                || body.IndexOf("UnityEngine.Random.Range", StringComparison.Ordinal) < 0
+                                || body.IndexOf("UnityEngine.Random.value", StringComparison.Ordinal) < 0
+                                || System.Text.RegularExpressions.Regex.IsMatch(
+                                    body, @"(?<!UnityEngine\.)Random\.(Range|value)")))
+                            throw new Exception("TownRNGGenerator missing UnityEngine.Random CS0104 belt");
                         if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
                                 || body.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0))
