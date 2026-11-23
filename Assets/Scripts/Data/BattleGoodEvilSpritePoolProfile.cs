@@ -4,19 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-tipescape-profile-embeds — named MonoScript for Unity SO binding
-    /// <summary>One Good-side Legend / Evil boss battle-sprite slot (Architect Tab 6).</summary>
-    [Serializable]
-    public class BattleSpriteSlotEntry
-    {
-        public UnitType unitType;
-        public string displayName;
-        public Sprite battleSprite;
-        public string assetPath;
-        [Tooltip("Soft slots (e.g. Merlin) stay listed but are optional.")]
-        public bool softOptional;
-    }
-
+    // tip: fix-gdt-profile-always-compile — named MonoScript SO only (BattleSpriteSlotEntry lives in GameDataTypes)
     /// <summary>
     /// Architect Tab 6 — Autobattle Good vs Evil battle sprites for UnitVisualActor.
     /// Distinct from Tab 4 pew BODY pools and Tab 5 FACE portraits. Resources path:

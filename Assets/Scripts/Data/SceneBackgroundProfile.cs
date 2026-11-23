@@ -4,33 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-tipescape-profile-embeds — named MonoScript for Unity SO binding
-    /// <summary>Named screens that Architect can assign jpg/png or mp4 backgrounds to.</summary>
-    public enum SceneBackgroundSlot
-    {
-        MainMenu = 0,
-        SomersetChurch = 1,
-        ChurchyardBattle = 2,
-        VictoryOverlay = 3,
-        MerlinResurrection = 4,
-        LegendCodex = 5,
-    }
-
-    [Serializable]
-    public class SceneBackgroundEntry
-    {
-        public SceneBackgroundSlot slot = SceneBackgroundSlot.MainMenu;
-        public string displayName = "Screen";
-        [Tooltip("Still image (jpg/png Sprite). Used when no video is assigned.")]
-        public Sprite imageSprite;
-        [Tooltip("Optional looping video (mp4 VideoClip). Wins over image when set.")]
-        public UnityEngine.Video.VideoClip videoClip;
-        [Tooltip("Editor-only asset path backup so assignments survive reimports.")]
-        public string imageAssetPath;
-        [Tooltip("Editor-only asset path backup for VideoClip.")]
-        public string videoAssetPath;
-    }
-
+    // tip: fix-gdt-profile-always-compile — named MonoScript SO only (SceneBackgroundSlot/Entry live in GameDataTypes)
     /// <summary>
     /// Architect-assigned scene/screen backgrounds (image or video). Resources path: SceneBackgroundProfile.
     /// Assign-only — empty slots keep each screen's built-in default art.

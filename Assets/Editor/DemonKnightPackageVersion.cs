@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-tipescape-profile-embeds";
-    public const string GitHint = "fix-tipescape-profile-embeds";
-    public const string BuiltUtc = "2026-11-23T06:30:00Z";
+    public const string Id = "fix-gdt-profile-always-compile";
+    public const string GitHint = "fix-gdt-profile-always-compile";
+    public const string BuiltUtc = "2026-11-23T07:00:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "ee4b08fb3efee63834900ac36ffd0a35204a9e60";
@@ -74,6 +74,10 @@ public static class DemonKnightPackageVersion
                 // Always Soft HardWrite — no-op when Profiles present; embed if wiped mid-session.
                 try { DemonKnightTipEscape.HardWriteNamedProfilesIfMissing(root); }
                 catch { /* TipEscape may lack HardWrite until next compile */ }
+                try { ArthurianMenuBootstrap.HardWriteNamedProfilesFromEmbeds(root); }
+                catch { /* Bootstrap embeds belt */ }
+                try { ArthurianSyncFromGitHub.HardWriteNamedProfilesFromEmbeds(root); }
+                catch { /* Sync embeds belt */ }
 
                 if (!need) return;
 
@@ -88,7 +92,7 @@ public static class DemonKnightPackageVersion
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
                     // Named MonoScript Profile SOs + shared types BEFORE GameDataTypes Appliers.
-                    // tip: fix-tipescape-profile-embeds
+                    // tip: fix-gdt-profile-always-compile
                     "Assets/Scripts/Data/StageLayoutProfile.cs",
                     "Assets/Scripts/Data/SceneBackgroundProfile.cs",
                     "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -202,7 +206,7 @@ public static class DemonKnightPackageVersion
                 }
 
                 // Nuclear: write Profiles from TipEscape embeds (raw first, embed fallback).
-                // tip: fix-tipescape-profile-embeds — GitHub raw optional.
+                // tip: fix-gdt-profile-always-compile — GitHub raw optional.
                 try
                 {
                     int hw = DemonKnightTipEscape.HardWriteNamedProfilesIfMissing(root);
@@ -266,7 +270,7 @@ public static class DemonKnightPackageVersion
 
     /// <summary>
     /// True when any named MonoScript Profile SO (or its shared types) is missing/corrupt on disk.
-    /// tip: fix-tipescape-profile-embeds — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
+    /// tip: fix-gdt-profile-always-compile — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
     /// </summary>
     public static bool NamedProfileScriptsNeedRestore(string root = null)
     {
@@ -275,22 +279,14 @@ public static class DemonKnightPackageVersion
             if (string.IsNullOrEmpty(root))
                 root = Directory.GetParent(Application.dataPath)!.FullName;
             string data = Path.Combine(root, "Assets", "Scripts", "Data");
+            // Named files = SO class only. Helpers live in GameDataTypes (tip fix-gdt-profile-always-compile).
             var checks = new (string file, string[] markers)[]
             {
-                ("StageLayoutProfile.cs", new[]
-                {
-                    "class StageLayoutProfile", "class SlotTransformConfig", "class StageParallaxLayer", Id
-                }),
-                ("SceneBackgroundProfile.cs", new[]
-                {
-                    "class SceneBackgroundProfile", "enum SceneBackgroundSlot", "class SceneBackgroundEntry", Id
-                }),
+                ("StageLayoutProfile.cs", new[] { "class StageLayoutProfile", Id }),
+                ("SceneBackgroundProfile.cs", new[] { "class SceneBackgroundProfile", Id }),
                 ("ClassSpritePoolProfile.cs", new[] { "class ClassSpritePoolProfile", Id }),
                 ("LegendPewPortraitProfile.cs", new[] { "class LegendPewPortraitProfile", Id }),
-                ("BattleGoodEvilSpritePoolProfile.cs", new[]
-                {
-                    "class BattleGoodEvilSpritePoolProfile", "class BattleSpriteSlotEntry", Id
-                }),
+                ("BattleGoodEvilSpritePoolProfile.cs", new[] { "class BattleGoodEvilSpritePoolProfile", Id }),
             };
             foreach (var (file, markers) in checks)
             {
@@ -301,14 +297,33 @@ public static class DemonKnightPackageVersion
                 {
                     if (body.IndexOf(m, StringComparison.Ordinal) < 0) return true;
                 }
+                // CS0101: helpers must NOT be redefined in named Profile files.
+                if (file == "StageLayoutProfile.cs"
+                    && (body.IndexOf("class SlotTransformConfig", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) >= 0))
+                    return true;
+                if (file == "SceneBackgroundProfile.cs"
+                    && (body.IndexOf("enum SceneBackgroundSlot", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("class SceneBackgroundEntry", StringComparison.Ordinal) >= 0))
+                    return true;
+                if (file == "BattleGoodEvilSpritePoolProfile.cs"
+                    && body.IndexOf("class BattleSpriteSlotEntry", StringComparison.Ordinal) >= 0)
+                    return true;
             }
             string gdt = Path.Combine(data, "GameDataTypes.cs");
-            if (File.Exists(gdt))
+            if (!File.Exists(gdt)) return true;
             {
                 string g = File.ReadAllText(gdt);
-                // Stale embed — Profiles must be named MonoScripts, not redefined here.
+                // Stale embed — Profile SOs must be named MonoScripts, not redefined here.
                 if (g.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0) return true;
                 if (g.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0) return true;
+                // Helpers MUST live in GameDataTypes (always-compile belt).
+                if (g.IndexOf("class SlotTransformConfig", StringComparison.Ordinal) < 0) return true;
+                if (g.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) < 0) return true;
+                if (g.IndexOf("enum SceneBackgroundSlot", StringComparison.Ordinal) < 0) return true;
+                if (g.IndexOf("class SceneBackgroundEntry", StringComparison.Ordinal) < 0) return true;
+                if (g.IndexOf("class BattleSpriteSlotEntry", StringComparison.Ordinal) < 0) return true;
+                if (g.IndexOf(Id, StringComparison.Ordinal) < 0) return true;
             }
             return false;
         }
