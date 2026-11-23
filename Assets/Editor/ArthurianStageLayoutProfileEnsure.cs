@@ -11,9 +11,9 @@ using UnityEngine;
 
 /// <summary>
 /// Ensures Assets/Resources/StageLayoutProfile.asset exists with 52/52/20 slots.
-/// Profile SOs live in GameDataTypes (tip fix-endless-compile-loop).
+/// Profile SOs live in GameDataTypes (tip fix-hud-bar-button-layout).
 /// Ensure CreateInstance via Type.GetType + probe remap for multi-class MonoScript fileID.
-/// tip: fix-endless-compile-loop
+/// tip: fix-hud-bar-button-layout
 ///
 /// ALSO: chicken-egg escape from architect-breakglass-hosts. This file is Force-Synced via
 /// tip SHA (not HardTip host overwrite). OnLoad pulls tip PackageVersion/Sync/Bootstrap/Architect
@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-endless-compile-loop";
+    const string TipPackageId = "fix-hud-bar-button-layout";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -86,7 +86,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string OnLoadSessionGate = "DemonKnight.Ensure.OnLoadDone." + TipPackageId;
 
     /// <summary>
-    /// tip: fix-endless-compile-loop — CreateInstance by Type from GameDataTypes assembly
+    /// tip: fix-hud-bar-button-layout — CreateInstance by Type from GameDataTypes assembly
     /// (multi-class MonoScript). Prefer Type.GetType so Ensure works even mid-recompile.
     /// NEVER touches .cs files. Soft-fails during compile/import (no CreateAsset churn).
     /// </summary>
@@ -96,7 +96,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             Debug.LogWarning(
                 "[DemonKnight] CreateProfileInstance<" + typeof(T).Name
-                + "> skipped during compile/import (tip fix-endless-compile-loop).");
+                + "> skipped during compile/import (tip fix-hud-bar-button-layout).");
             return null;
         }
         string fullName = "ArthurianAutobattler." + typeof(T).Name;
@@ -154,7 +154,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-endless-compile-loop — one-shot; SET GATE BEFORE Escape (Refresh mid-Escape = loop).
+            // tip: fix-hud-bar-button-layout — one-shot; SET GATE BEFORE Escape (Refresh mid-Escape = loop).
             if (SessionState.GetBool(OnLoadSessionGate, false)) return;
             SessionState.SetBool(OnLoadSessionGate, true);
             try
@@ -604,7 +604,7 @@ public static class ArthurianStageLayoutProfileEnsure
     /// <summary>
     /// Bind asset m_Script to GameDataTypes MonoScript for this SO type (multi-class fileID).
     /// Probe CreateAsset reads Unity's exact fileID+guid for the embedded class.
-    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-endless-compile-loop
+    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-hud-bar-button-layout
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
@@ -642,7 +642,7 @@ public static class ArthurianStageLayoutProfileEnsure
 
     /// <summary>
     /// Probe CreateAsset writes the exact MonoScript fileID+guid Unity expects for this SO type.
-    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-endless-compile-loop
+    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-hud-bar-button-layout
     /// </summary>
     static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
     {
@@ -763,7 +763,7 @@ public static class ArthurianStageLayoutProfileEnsure
         foreach (string m in StaleHostMarkers)
         {
             if (m == TipPackageId) continue;
-            // tip: fix-endless-compile-loop — only Id / UiBuildId assignments (bare "m" matches
+            // tip: fix-hud-bar-button-layout — only Id / UiBuildId assignments (bare "m" matches
             // StalePackageIds / comment lists → false-positive → Escape every OnLoad → compile loop).
             if (archBody.IndexOf("UiBuildId = \"" + m + "\"", StringComparison.Ordinal) >= 0) return true;
             if (pvBody.IndexOf("Id = \"" + m + "\"", StringComparison.Ordinal) >= 0) return true;
@@ -791,7 +791,7 @@ public static class ArthurianStageLayoutProfileEnsure
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         string tip = TryResolveTipSha() ?? "main";
         string root = Directory.GetParent(Application.dataPath)!.FullName;
-        // tip: fix-endless-compile-loop — stub leftover named *Profile.cs before host pull.
+        // tip: fix-hud-bar-button-layout — stub leftover named *Profile.cs before host pull.
         try
         {
             int n = ArthurianSyncFromGitHub.NukeNamedProfileFiles(root);
@@ -802,7 +802,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
-            // tip: fix-endless-compile-loop — Profile SOs live in GameDataTypes (MustRestore).
+            // tip: fix-hud-bar-button-layout — Profile SOs live in GameDataTypes (MustRestore).
             "Assets/Scripts/Data/GameDataTypes.cs",
             "Assets/Scripts/UI/SceneBackgroundApplier.cs",
             "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
@@ -847,7 +847,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 Debug.LogWarning($"[DemonKnight] EscapeBreakglass miss {rel}: {ex.Message}");
             }
         }
-        // tip: fix-endless-compile-loop — Refresh only when bytes changed.
+        // tip: fix-hud-bar-button-layout — Refresh only when bytes changed.
         if (ok > 0) AssetDatabase.Refresh();
         log.AppendLine($"Hosts written: {ok}/{rels.Length}");
         if (!EditorApplication.isCompiling && !EditorApplication.isUpdating)

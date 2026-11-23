@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-endless-compile-loop";
-    public const string GitHint = "fix-endless-compile-loop";
-    public const string BuiltUtc = "2026-11-23T08:30:00Z";
+    public const string Id = "fix-hud-bar-button-layout";
+    public const string GitHint = "fix-hud-bar-button-layout";
+    public const string BuiltUtc = "2026-11-23T07:15:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
@@ -34,7 +34,7 @@ public static class DemonKnightPackageVersion
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-endless-compile-loop — one-shot per editor session (domain reload still
+            // tip: fix-hud-bar-button-layout — one-shot per editor session (domain reload still
             // re-enters InitializeOnLoad; SessionState survives domain reload within a session).
             // SET GATE FIRST — WipeModularPaperdollAssets used to Refresh before gate → endless loop.
             if (SessionState.GetBool(OnLoadSessionGate, false)) return;
@@ -103,12 +103,13 @@ public static class DemonKnightPackageVersion
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
                     // Named MonoScript Profile SOs + shared types BEFORE GameDataTypes Appliers.
-                    // tip: fix-endless-compile-loop
+                    // tip: fix-hud-bar-button-layout
                     // Applier embed host — Appliers stay here; Profiles are named files.
                     "Assets/Scripts/Data/GameDataTypes.cs",
                     "Assets/Scripts/UI/SomersetChurchUI.cs",
                     "Assets/Scripts/UI/SceneBackgroundApplier.cs",
                     "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
+                    "Assets/Editor/ArthurianSceneBuilder.cs",
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
                     "Assets/Editor/ArthurianMenuBootstrap.cs",
                     "Assets/Editor/ArthurianArtArchitectWindow.cs",
@@ -147,8 +148,10 @@ public static class DemonKnightPackageVersion
                         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
-                                || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0))
-                            throw new Exception("SomersetChurchUI missing tip church markers");
+                                || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
+                                || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
+                                || body.IndexOf("fix-hud-bar-button-layout", StringComparison.Ordinal) < 0))
+                            throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                         if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
                                 || body.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0))
@@ -252,11 +255,11 @@ public static class DemonKnightPackageVersion
 
     /// <summary>
     /// True when any named MonoScript Profile SO (or its shared types) is missing/corrupt on disk.
-    /// tip: fix-endless-compile-loop — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
+    /// tip: fix-hud-bar-button-layout — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
     /// </summary>
     public static bool NamedProfileScriptsNeedRestore(string root = null)
     {
-        // tip: fix-endless-compile-loop — Profiles live in GameDataTypes; named files must not redefine them.
+        // tip: fix-hud-bar-button-layout — Profiles live in GameDataTypes; named files must not redefine them.
         if (string.IsNullOrEmpty(root))
             root = System.IO.Directory.GetParent(UnityEngine.Application.dataPath)!.FullName;
         string gdt = System.IO.Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs");
@@ -346,10 +349,11 @@ public static class DemonKnightPackageVersion
             "fix-tipescape-profile-embeds",
             "fix-gdt-profile-always-compile",
             "fix-profiles-in-gdt-always",
+            "fix-endless-compile-loop",
         };
         foreach (string s in stale)
         {
-            // tip: fix-endless-compile-loop — NEVER match bare "stale-id" (StalePackageIds lists
+            // tip: fix-hud-bar-button-layout — NEVER match bare "stale-id" (StalePackageIds lists
             // those strings in tip Sync/Bootstrap → false-positive → endless OnLoad rewrite).
             // Also avoid wantId / FooId substring traps (char before key must be non-identifier).
             if (HasPackageIdAssign(body, "Id", s)) return true;
@@ -438,7 +442,7 @@ public static class DemonKnightPackageVersion
                 log.AppendLine("Copied Art → Resources " + ResLibPath);
             }
 
-            // tip: fix-endless-compile-loop — OnLoad passes refresh:false (Refresh before SessionState gate = loop).
+            // tip: fix-hud-bar-button-layout — OnLoad passes refresh:false (Refresh before SessionState gate = loop).
             if (refresh) AssetDatabase.Refresh();
             log.AppendLine("libs=" + libs + " clearedSlots≈" + clearedSlots + " deletedPlaceholderTex=" + deletedTex);
             if (spliced.Count == 0)

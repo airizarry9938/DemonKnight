@@ -166,30 +166,48 @@ public static class ArthurianSceneBuilder
         townUI.townGridContainer = seatRt;
         townUI.recruitAvatarButtonPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/RecruitAvatarButton.prefab");
 
-        // Top HUD bar — full-bleed strip. Play preserves these RectTransforms unless
-        // SomersetChurchUI.forceEqualHudSlots is enabled (legacy equal-slot auto layout).
+        // Top HUD bar — HorizontalLayoutGroup + preferred widths (tip fix-hud-bar-button-layout).
+        // EnsureTopHubLayout reinforces the same spacing after Play / hierarchy rebuild.
         GameObject hud = CreatePanel(townCanvasObj.transform, "HUD_Bar",
-            new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -6f), new Vector2(0f, 72f),
+            new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -6f), new Vector2(0f, 84f),
             new Color(0.08f, 0.06f, 0.05f, 0.92f));
         var hudRt = hud.GetComponent<RectTransform>();
-        hudRt.offsetMin = new Vector2(12f, hudRt.offsetMin.y);
-        hudRt.offsetMax = new Vector2(-12f, -6f);
-        hudRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 72f);
+        hudRt.offsetMin = new Vector2(8f, hudRt.offsetMin.y);
+        hudRt.offsetMax = new Vector2(-8f, -6f);
+        hudRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 84f);
+        var hudHlg = hud.AddComponent<HorizontalLayoutGroup>();
+        hudHlg.padding = new RectOffset(12, 12, 10, 10);
+        hudHlg.spacing = 10f;
+        hudHlg.childAlignment = TextAnchor.MiddleLeft;
+        hudHlg.childControlWidth = true;
+        hudHlg.childControlHeight = true;
+        hudHlg.childForceExpandWidth = false;
+        hudHlg.childForceExpandHeight = false;
+
+        var menuHudBtn = CreateButton(hud.transform, "MenuButton", "☰ Esc",
+            Vector2.zero, new Vector2(110f, 56f), new Color(0.18f, 0.22f, 0.28f));
+        AddHudLayoutElement(menuHudBtn.gameObject, 110f, 56f);
 
         var nightHud = CreateTMP(hud.transform, "NightText", "Night 1", 20, TextAlignmentOptions.Center,
-            Vector2.zero, new Vector2(100f, 40f));
+            Vector2.zero, new Vector2(200f, 40f));
+        AddHudLayoutElement(nightHud.gameObject, 200f, 56f);
         townUI.timerText = CreateTMP(hud.transform, "TimerText", "Horde Arrives: 07:00", 16, TextAlignmentOptions.Center,
             Vector2.zero, new Vector2(200f, 40f));
+        AddHudLayoutElement(townUI.timerText.gameObject, 200f, 56f);
         townUI.goldText = CreateTMP(hud.transform, "GoldText", "Royal Gold: 200g", 16, TextAlignmentOptions.Center,
             Vector2.zero, new Vector2(150f, 40f));
+        AddHudLayoutElement(townUI.goldText.gameObject, 150f, 56f);
 
         var diceHudBtn = CreateButton(hud.transform, "DiceButton", "Dice",
-            Vector2.zero, new Vector2(120f, 44f), new Color(0.35f, 0.22f, 0.12f));
+            Vector2.zero, new Vector2(120f, 56f), new Color(0.35f, 0.22f, 0.12f));
+        AddHudLayoutElement(diceHudBtn.gameObject, 120f, 56f);
         var warbandBtn = CreateButton(hud.transform, "WarbandButton", "Warband (0)",
-            Vector2.zero, new Vector2(160f, 44f), new Color(0.22f, 0.28f, 0.22f));
+            Vector2.zero, new Vector2(160f, 56f), new Color(0.22f, 0.28f, 0.22f));
+        AddHudLayoutElement(warbandBtn.gameObject, 160f, 56f);
         townUI.partyCountText = warbandBtn.GetComponentInChildren<TextMeshProUGUI>();
         townUI.goToWarButton = CreateButton(hud.transform, "GoToWarButton", "MARCH TO WAR",
-            Vector2.zero, new Vector2(170f, 48f), new Color(0.55f, 0.12f, 0.12f));
+            Vector2.zero, new Vector2(170f, 56f), new Color(0.55f, 0.12f, 0.12f));
+        AddHudLayoutElement(townUI.goToWarButton.gameObject, 170f, 56f);
 
         // Tavern Dice — centered popup modal (opened from HUD Dice button / hotkey T).
         GameObject dicePanel = CreatePanel(townCanvasObj.transform, "Panel_TavernDice",
@@ -341,15 +359,17 @@ public static class ArthurianSceneBuilder
         codex.recipeListContainer = recipeList.transform;
         codex.recipeRowPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/CodexRecipeRow.prefab");
         codex.toggleCodexButton = CreateButton(hud.transform, "CodexToggle", "Legends",
-            Vector2.zero, new Vector2(120f, 44f), new Color(0.20f, 0.25f, 0.40f));
-        // Sibling order for EnsureTopHubLayout: Night, Timer, Gold, Dice, Legends, Warband, March
-        nightHud.transform.SetSiblingIndex(0);
-        townUI.timerText.transform.SetSiblingIndex(1);
-        townUI.goldText.transform.SetSiblingIndex(2);
-        diceHudBtn.transform.SetSiblingIndex(3);
-        codex.toggleCodexButton.transform.SetSiblingIndex(4);
-        warbandBtn.transform.SetSiblingIndex(5);
-        townUI.goToWarButton.transform.SetSiblingIndex(6);
+            Vector2.zero, new Vector2(120f, 56f), new Color(0.20f, 0.25f, 0.40f));
+        AddHudLayoutElement(codex.toggleCodexButton.gameObject, 120f, 56f);
+        // Sibling order: Menu | Night | Timer | Gold | Dice | Legends | Warband | March
+        menuHudBtn.transform.SetSiblingIndex(0);
+        nightHud.transform.SetSiblingIndex(1);
+        townUI.timerText.transform.SetSiblingIndex(2);
+        townUI.goldText.transform.SetSiblingIndex(3);
+        diceHudBtn.transform.SetSiblingIndex(4);
+        codex.toggleCodexButton.transform.SetSiblingIndex(5);
+        warbandBtn.transform.SetSiblingIndex(6);
+        townUI.goToWarButton.transform.SetSiblingIndex(7);
         SeedDefaultRecipes(codex);
 
         // Warband formation modal (opened from the evenly-spaced Warband HUD button)
@@ -699,6 +719,21 @@ public static class ArthurianSceneBuilder
         rt.anchorMax = Vector2.one;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
+    }
+
+
+    private static void AddHudLayoutElement(GameObject go, float preferredWidth, float preferredHeight)
+    {
+        if (go == null) return;
+        var le = go.GetComponent<LayoutElement>();
+        if (le == null) le = go.AddComponent<LayoutElement>();
+        le.ignoreLayout = false;
+        le.minWidth = 48f;
+        le.preferredWidth = preferredWidth;
+        le.flexibleWidth = 0f;
+        le.minHeight = 40f;
+        le.preferredHeight = preferredHeight;
+        le.flexibleHeight = 0f;
     }
 
     private static GameObject CreateCanvas(string name, int sortOrder)
