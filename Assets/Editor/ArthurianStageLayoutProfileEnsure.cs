@@ -11,9 +11,9 @@ using UnityEngine;
 
 /// <summary>
 /// Ensures Assets/Resources/StageLayoutProfile.asset exists with 52/52/20 slots.
-/// Profile SOs live in GameDataTypes (tip fix-architect-save-load-pool-ux).
+/// Profile SOs live in GameDataTypes (tip fix-architect-pool-load-list).
 /// Ensure CreateInstance via Type.GetType + probe remap for multi-class MonoScript fileID.
-/// tip: fix-architect-save-load-pool-ux
+/// tip: fix-architect-pool-load-list
 ///
 /// ALSO: chicken-egg escape from architect-breakglass-hosts. This file is Force-Synced via
 /// tip SHA (not HardTip host overwrite). OnLoad pulls tip PackageVersion/Sync/Bootstrap/Architect
@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-architect-save-load-pool-ux";
+    const string TipPackageId = "fix-architect-pool-load-list";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -84,12 +84,14 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-endless-compile-loop",
         "fix-hud-bar-button-layout",
         "fix-architect-apply-persist-facing",
+        "fix-architect-load-pool-profiles",
+        "fix-architect-save-load-pool-ux",
     };
 
     const string OnLoadSessionGate = "DemonKnight.Ensure.OnLoadDone." + TipPackageId;
 
     /// <summary>
-    /// tip: fix-architect-save-load-pool-ux — CreateInstance by Type from GameDataTypes assembly
+    /// tip: fix-architect-pool-load-list — CreateInstance by Type from GameDataTypes assembly
     /// (multi-class MonoScript). Prefer Type.GetType so Ensure works even mid-recompile.
     /// NEVER touches .cs files. Soft-fails during compile/import (no CreateAsset churn).
     /// </summary>
@@ -99,7 +101,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             Debug.LogWarning(
                 "[DemonKnight] CreateProfileInstance<" + typeof(T).Name
-                + "> skipped during compile/import (tip fix-architect-save-load-pool-ux).");
+                + "> skipped during compile/import (tip fix-architect-pool-load-list).");
             return null;
         }
         string fullName = "ArthurianAutobattler." + typeof(T).Name;
@@ -111,6 +113,18 @@ public static class ArthurianStageLayoutProfileEnsure
             so = ScriptableObject.CreateInstance<T>();
         return so;
     }
+
+    /// <summary>
+    /// tip: fix-architect-pool-load-list — Architect named Save uses this for multi-class GDT SOs.
+    /// </summary>
+    public static T CreateNamedPoolInstance<T>() where T : ScriptableObject
+        => CreateProfileInstance<T>();
+
+    /// <summary>
+    /// tip: fix-architect-pool-load-list — remap named pool .asset m_Script to GameDataTypes fileID.
+    /// </summary>
+    public static bool TryRemapNamedPoolScript(string fullPath, Type soType)
+        => TryRemapScriptGuid(fullPath, soType);
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
     public static void EnsureFromMenu()
@@ -157,7 +171,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-architect-save-load-pool-ux — one-shot; SET GATE BEFORE Escape (Refresh mid-Escape = loop).
+            // tip: fix-architect-pool-load-list — one-shot; SET GATE BEFORE Escape (Refresh mid-Escape = loop).
             if (SessionState.GetBool(OnLoadSessionGate, false)) return;
             SessionState.SetBool(OnLoadSessionGate, true);
             try
@@ -607,7 +621,7 @@ public static class ArthurianStageLayoutProfileEnsure
     /// <summary>
     /// Bind asset m_Script to GameDataTypes MonoScript for this SO type (multi-class fileID).
     /// Probe CreateAsset reads Unity's exact fileID+guid for the embedded class.
-    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-architect-save-load-pool-ux
+    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-architect-pool-load-list
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
@@ -645,7 +659,7 @@ public static class ArthurianStageLayoutProfileEnsure
 
     /// <summary>
     /// Probe CreateAsset writes the exact MonoScript fileID+guid Unity expects for this SO type.
-    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-architect-save-load-pool-ux
+    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-architect-pool-load-list
     /// </summary>
     static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
     {
@@ -766,7 +780,7 @@ public static class ArthurianStageLayoutProfileEnsure
         foreach (string m in StaleHostMarkers)
         {
             if (m == TipPackageId) continue;
-            // tip: fix-architect-save-load-pool-ux — only Id / UiBuildId assignments (bare "m" matches
+            // tip: fix-architect-pool-load-list — only Id / UiBuildId assignments (bare "m" matches
             // StalePackageIds / comment lists → false-positive → Escape every OnLoad → compile loop).
             if (archBody.IndexOf("UiBuildId = \"" + m + "\"", StringComparison.Ordinal) >= 0) return true;
             if (pvBody.IndexOf("Id = \"" + m + "\"", StringComparison.Ordinal) >= 0) return true;
@@ -794,7 +808,7 @@ public static class ArthurianStageLayoutProfileEnsure
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         string tip = TryResolveTipSha() ?? "main";
         string root = Directory.GetParent(Application.dataPath)!.FullName;
-        // tip: fix-architect-save-load-pool-ux — stub leftover named *Profile.cs before host pull.
+        // tip: fix-architect-pool-load-list — stub leftover named *Profile.cs before host pull.
         try
         {
             int n = ArthurianSyncFromGitHub.NukeNamedProfileFiles(root);
@@ -805,7 +819,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
-            // tip: fix-architect-save-load-pool-ux — Profile SOs live in GameDataTypes (MustRestore).
+            // tip: fix-architect-pool-load-list — Profile SOs live in GameDataTypes (MustRestore).
             "Assets/Scripts/Data/GameDataTypes.cs",
             "Assets/Scripts/UI/SceneBackgroundApplier.cs",
             "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
@@ -850,7 +864,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 Debug.LogWarning($"[DemonKnight] EscapeBreakglass miss {rel}: {ex.Message}");
             }
         }
-        // tip: fix-architect-save-load-pool-ux — Refresh only when bytes changed.
+        // tip: fix-architect-pool-load-list — Refresh only when bytes changed.
         if (ok > 0) AssetDatabase.Refresh();
         log.AppendLine($"Hosts written: {ok}/{rels.Length}");
         if (!EditorApplication.isCompiling && !EditorApplication.isUpdating)
