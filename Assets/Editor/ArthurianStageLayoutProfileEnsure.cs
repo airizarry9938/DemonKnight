@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-battle-ground-layout";
+    const string TipPackageId = "fix-evil-facing-profile-build";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -90,22 +90,29 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-architect-pool-load-list",
         "fix-architect-48-seat-preview",
         "fix-stage-placer-profiles",
+        "fix-battle-ground-layout",
     };
 
     const string OnLoadSessionGate = "DemonKnight.Ensure.OnLoadDone." + TipPackageId;
 
+    /// <summary>tip: fix-evil-facing-profile-build — never CreateInstance / wipe assets mid-compile.</summary>
+    static bool ScriptsBusy => EditorApplication.isCompiling || EditorApplication.isUpdating;
+
+    const string ScriptRefCachePrefix = "DemonKnight.ProfileScriptRef.";
+    const string EnsureDeferGate = "DemonKnight.Ensure.DeferAfterCompile." + TipPackageId;
+
     /// <summary>
-    /// tip: fix-architect-pool-load-list — CreateInstance by Type from GameDataTypes assembly
-    /// (multi-class MonoScript). Prefer Type.GetType so Ensure works even mid-recompile.
-    /// NEVER touches .cs files. Soft-fails during compile/import (no CreateAsset churn).
+    /// tip: fix-evil-facing-profile-build — CreateInstance by Type from GameDataTypes assembly
+    /// (multi-class MonoScript). NEVER during compile/import (build preprocess crash).
+    /// NEVER touches .cs files.
     /// </summary>
     static T CreateProfileInstance<T>() where T : ScriptableObject
     {
-        if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+        if (ScriptsBusy)
         {
             Debug.LogWarning(
                 "[DemonKnight] CreateProfileInstance<" + typeof(T).Name
-                + "> skipped during compile/import (tip fix-architect-pool-load-list).");
+                + "> skipped during compile/import (tip fix-evil-facing-profile-build).");
             return null;
         }
         string fullName = "ArthurianAutobattler." + typeof(T).Name;
@@ -116,6 +123,39 @@ public static class ArthurianStageLayoutProfileEnsure
         if (so == null)
             so = ScriptableObject.CreateInstance<T>();
         return so;
+    }
+
+    /// <summary>One-shot delayCall after compile so Ensure can remap without mid-compile CreateInstance.</summary>
+    static void ScheduleEnsureAfterCompile(string reason)
+    {
+        if (SessionState.GetBool(EnsureDeferGate, false)) return;
+        SessionState.SetBool(EnsureDeferGate, true);
+        Debug.LogWarning(
+            "[DemonKnight] Ensure deferred until scripts finish compile (" + reason
+            + ") — tip fix-evil-facing-profile-build.");
+        EditorApplication.delayCall += () =>
+        {
+            if (ScriptsBusy)
+            {
+                // Keep waiting — clear gate so next call can re-arm, then re-schedule.
+                SessionState.EraseBool(EnsureDeferGate);
+                ScheduleEnsureAfterCompile("still-busy");
+                return;
+            }
+            SessionState.EraseBool(EnsureDeferGate);
+            try
+            {
+                EnsureAsset();
+                EnsureSceneBackgroundAsset();
+                EnsureClassSpritePoolAsset();
+                EnsureLegendPewPortraitAsset();
+                EnsureBattleGoodEvilSpritePoolAsset();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] Deferred Ensure soft-fail: " + ex.Message);
+            }
+        };
     }
 
     /// <summary>
@@ -236,7 +276,8 @@ public static class ArthurianStageLayoutProfileEnsure
             catch { yamlBackup = null; }
         }
 
-        // Prefer remapping m_Script GUID (embed into GameDataTypes) over wipe — preserves seat sprites.
+        // Prefer remapping m_Script to GameDataTypes MonoScript fileID — preserves seat sprites.
+        // tip: fix-evil-facing-profile-build
         if (fileOnDisk && !string.IsNullOrEmpty(yamlBackup))
         {
             if (TryRemapStageLayoutScriptGuid(full))
@@ -253,6 +294,14 @@ public static class ArthurianStageLayoutProfileEnsure
                     return existing;
                 }
             }
+        }
+
+        // Mid-compile typed Load fails with "No script asset" even when YAML is correct —
+        // NEVER delete/recreate; defer until scripts compile. tip: fix-evil-facing-profile-build
+        if (ScriptsBusy)
+        {
+            ScheduleEnsureAfterCompile("StageLayoutProfile");
+            return null;
         }
 
         if (fileOnDisk)
@@ -344,10 +393,22 @@ public static class ArthurianStageLayoutProfileEnsure
                     return existing;
                 }
             }
+            // tip: fix-evil-facing-profile-build — never wipe mid-compile.
+            if (ScriptsBusy)
+            {
+                ScheduleEnsureAfterCompile("SceneBackgroundProfile");
+                return null;
+            }
             AssetDatabase.DeleteAsset(SceneBgAssetPath);
             try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
             try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
             AssetDatabase.Refresh();
+        }
+
+        if (ScriptsBusy)
+        {
+            ScheduleEnsureAfterCompile("SceneBackgroundProfile-create");
+            return null;
         }
 
         var created = CreateProfileInstance<SceneBackgroundProfile>();
@@ -423,10 +484,21 @@ public static class ArthurianStageLayoutProfileEnsure
                     return existing;
                 }
             }
+            if (ScriptsBusy)
+            {
+                ScheduleEnsureAfterCompile("ClassSpritePoolProfile");
+                return null;
+            }
             AssetDatabase.DeleteAsset(ClassPoolAssetPath);
             try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
             try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
             AssetDatabase.Refresh();
+        }
+
+        if (ScriptsBusy)
+        {
+            ScheduleEnsureAfterCompile("ClassSpritePoolProfile-create");
+            return null;
         }
 
         var created = CreateProfileInstance<ClassSpritePoolProfile>();
@@ -494,10 +566,21 @@ public static class ArthurianStageLayoutProfileEnsure
                     return existing;
                 }
             }
+            if (ScriptsBusy)
+            {
+                ScheduleEnsureAfterCompile("LegendPewPortraitProfile");
+                return null;
+            }
             AssetDatabase.DeleteAsset(LegendPewAssetPath);
             try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
             try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
             AssetDatabase.Refresh();
+        }
+
+        if (ScriptsBusy)
+        {
+            ScheduleEnsureAfterCompile("LegendPewPortraitProfile-create");
+            return null;
         }
 
         var created = CreateProfileInstance<LegendPewPortraitProfile>();
@@ -566,10 +649,21 @@ public static class ArthurianStageLayoutProfileEnsure
                     return existing;
                 }
             }
+            if (ScriptsBusy)
+            {
+                ScheduleEnsureAfterCompile("BattleGoodEvilSpritePoolProfile");
+                return null;
+            }
             AssetDatabase.DeleteAsset(BattleGoodEvilAssetPath);
             try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
             try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
             AssetDatabase.Refresh();
+        }
+
+        if (ScriptsBusy)
+        {
+            ScheduleEnsureAfterCompile("BattleGoodEvilSpritePoolProfile-create");
+            return null;
         }
 
         var created = CreateProfileInstance<BattleGoodEvilSpritePoolProfile>();
@@ -624,8 +718,8 @@ public static class ArthurianStageLayoutProfileEnsure
 
     /// <summary>
     /// Bind asset m_Script to GameDataTypes MonoScript for this SO type (multi-class fileID).
-    /// Probe CreateAsset reads Unity's exact fileID+guid for the embedded class.
-    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-architect-pool-load-list
+    /// Remap preserves YAML assigns — never wipe pools on reopen.
+    /// tip: fix-evil-facing-profile-build
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
@@ -644,7 +738,7 @@ public static class ArthurianStageLayoutProfileEnsure
             string oldGuid = m.Groups[2].Value;
             if (string.Equals(oldGuid, newGuid, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(oldFileId, localId.ToString(), StringComparison.Ordinal))
-                return false; // fully correct — typed load failed for another reason
+                return false; // fully correct — typed load failed for another reason (often mid-compile)
             string want = "m_Script: {fileID: " + localId + ", guid: " + newGuid + ", type: 3}";
             string replaced = re.Replace(yaml, want, 1);
             if (replaced == yaml) return false;
@@ -661,14 +755,52 @@ public static class ArthurianStageLayoutProfileEnsure
         }
     }
 
+    static void CacheScriptRef(Type soType, long localId, string guid)
+    {
+        if (soType == null || string.IsNullOrEmpty(guid)) return;
+        EditorPrefs.SetString(ScriptRefCachePrefix + soType.Name, localId + "|" + guid);
+    }
+
+    static bool TryReadCachedScriptRef(Type soType, out long localId, out string newGuid)
+    {
+        localId = 11500000L;
+        newGuid = null;
+        if (soType == null) return false;
+        string raw = EditorPrefs.GetString(ScriptRefCachePrefix + soType.Name, "");
+        if (string.IsNullOrEmpty(raw)) return false;
+        int bar = raw.IndexOf('|');
+        if (bar <= 0 || bar >= raw.Length - 1) return false;
+        if (!long.TryParse(raw.Substring(0, bar), out localId)) return false;
+        newGuid = raw.Substring(bar + 1);
+        return !string.IsNullOrEmpty(newGuid) && newGuid.Length == 32;
+    }
+
     /// <summary>
-    /// Probe CreateAsset writes the exact MonoScript fileID+guid Unity expects for this SO type.
-    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-architect-pool-load-list
+    /// Resolve GameDataTypes.cs MonoScript fileID+guid for an embedded Profile SO.
+    /// Never CreateInstance during compile — use EditorPrefs cache / .meta GUID instead.
+    /// tip: fix-evil-facing-profile-build
     /// </summary>
     static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
     {
         localId = 11500000L;
         newGuid = null;
+
+        // Mid-compile: never CreateInstance / CreateAsset — prefer cache, then meta GUID only.
+        if (ScriptsBusy)
+        {
+            if (TryReadCachedScriptRef(soType, out localId, out newGuid))
+                return true;
+            newGuid = AssetDatabase.AssetPathToGUID("Assets/Scripts/Data/GameDataTypes.cs");
+            if (!string.IsNullOrEmpty(newGuid) && newGuid.Length == 32)
+            {
+                // fileID unknown mid-compile — leave caller's YAML fileID if guid already GDT,
+                // otherwise rewrite guid only is unsafe; fail soft so Ensure defers.
+                localId = 11500000L;
+                return false;
+            }
+            return false;
+        }
+
         const string probePath = "Assets/Resources/_DkScriptRemapProbe.asset";
         try
         {
@@ -694,7 +826,11 @@ public static class ArthurianStageLayoutProfileEnsure
                 {
                     localId = long.Parse(m.Groups[1].Value);
                     newGuid = m.Groups[2].Value;
-                    return !string.IsNullOrEmpty(newGuid);
+                    if (!string.IsNullOrEmpty(newGuid))
+                    {
+                        CacheScriptRef(soType, localId, newGuid);
+                        return true;
+                    }
                 }
             }
             else
@@ -716,16 +852,24 @@ public static class ArthurianStageLayoutProfileEnsure
             if (ms == null) return false;
             if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(ms, out newGuid, out localId)
                 && !string.IsNullOrEmpty(newGuid) && newGuid.Length == 32)
+            {
+                CacheScriptRef(soType, localId, newGuid);
                 return true;
+            }
             string scriptPath = AssetDatabase.GetAssetPath(ms);
             newGuid = AssetDatabase.AssetPathToGUID(scriptPath);
             localId = 11500000L;
-            return !string.IsNullOrEmpty(newGuid) && newGuid.Length == 32;
+            if (!string.IsNullOrEmpty(newGuid) && newGuid.Length == 32)
+            {
+                CacheScriptRef(soType, localId, newGuid);
+                return true;
+            }
+            return false;
         }
         catch (Exception ex)
         {
             Debug.LogWarning("[DemonKnight] TryResolveScriptRef: " + ex.Message);
-            return false;
+            return TryReadCachedScriptRef(soType, out localId, out newGuid);
         }
     }
 
@@ -886,15 +1030,20 @@ public static class ArthurianStageLayoutProfileEnsure
         try
         {
             // Prefer tip PackageVersion wipe when compiled.
+            // tip: fix-evil-facing-profile-build — WipeModularPaperdollAssets(bool) needs args;
+            // Invoke(null,null) → "Number of parameters specified does not match".
             try
             {
                 var wipeType = Type.GetType("DemonKnightPackageVersion")
                                ?? Type.GetType("DemonKnightPackageVersion, Assembly-CSharp-Editor");
-                var wipe = wipeType?.GetMethod("WipeModularPaperdollAssets",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                var flags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+                var wipe = wipeType?.GetMethod("WipeModularPaperdollAssets", flags, null, Type.EmptyTypes, null)
+                           ?? wipeType?.GetMethod("WipeModularPaperdollAssets", flags, null, new[] { typeof(bool) }, null);
                 if (wipe != null)
                 {
-                    object r = wipe.Invoke(null, null);
+                    object r = wipe.GetParameters().Length == 0
+                        ? wipe.Invoke(null, null)
+                        : wipe.Invoke(null, new object[] { true });
                     log.AppendLine("PackageVersion wipe: " + r);
                 }
             }

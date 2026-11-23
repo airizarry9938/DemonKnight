@@ -582,8 +582,8 @@ namespace ArthurianAutobattler
             outfitSr = null;
             headSr = null;
             propSr = null;
-            // tip: fix-architect-apply-persist-facing — capture after UnitVisualActor.ApplyFacingScale
-            // so breath bob / death lerp keep evil negative scale.x (faces left).
+            // tip: fix-evil-facing-profile-build — capture after UnitVisualActor.ApplyFacingScale
+            // so breath bob / death lerp keep battle facing sign (good −x / evil +x; art faces left).
             CaptureBase();
             ResolveClips();
             startOffset = UnityEngine.Random.Range(0f, 1.5f);
@@ -592,7 +592,7 @@ namespace ArthurianAutobattler
             enabled = true;
         }
 
-        /// <summary>Re-read localScale after UnitVisualActor re-asserts facing (evil −x).</summary>
+        /// <summary>Re-read localScale after UnitVisualActor re-asserts facing (art-left rule).</summary>
         public void RecaptureBaseScale()
         {
             CaptureBase();

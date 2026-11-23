@@ -395,7 +395,7 @@ namespace ArthurianAutobattler
                 UnitVisualActor actor = SpawnActor();
                 Sprite art = ResolveBattleSprite(d.unitType, d.unitID) ?? GetDemonSprite(d.unitType);
                 float scale = ResolveVisualScale(d.unitType);
-                // tip: fix-battle-ground-layout — evil RIGHT slots; faces LEFT (Initialize → negative scale.x).
+                // tip: fix-evil-facing-profile-build — evil RIGHT slots; faces LEFT (art already left → no scale flip).
                 int slot = d.battleSlotIndex >= 0 ? d.battleSlotIndex : i;
                 if (slot >= StageLayoutProfile.EnemyBattleCount)
                     slot = i % StageLayoutProfile.EnemyBattleCount;
@@ -489,7 +489,7 @@ namespace ArthurianAutobattler
             if (slots != null && index >= 0 && index < slots.Length && slots[index] != null)
                 return slots[index].position;
 
-            // Fallback: aisle-outward grid (good faces right / evil faces left visually via facing scale).
+            // Fallback: aisle-outward grid (art faces left → good −x / evil +x via ApplyFacingScale).
             Vector2 pos = StageLayoutProfile.BattleWorldPos(
                 index, isPlayer, aisleGap: 1.15f, seatGap: rowSpacing > 0.2f ? rowSpacing : 1.05f,
                 depthGap: colOffset > 0.2f ? colOffset * 0.7f : 0.85f);

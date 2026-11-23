@@ -11,13 +11,13 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-battle-ground-layout";
-    public const string GitHint = "fix-battle-ground-layout";
-    // tip: fix-battle-ground-layout — Stage Placer named Save/Load SoftPromote Persist.
-    public const string BuiltUtc = "2026-11-23T20:00:00Z";
+    public const string Id = "fix-evil-facing-profile-build";
+    public const string GitHint = "fix-evil-facing-profile-build";
+    // tip: fix-evil-facing-profile-build — Stage Placer named Save/Load SoftPromote Persist.
+    public const string BuiltUtc = "2026-11-23T22:00:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "eeb601bef276f3dc8803fd99856e7a05d6403d43";
+    public const string HardTipSha = "709eee3d773b299316702d2d073589e20be70949";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -35,7 +35,7 @@ public static class DemonKnightPackageVersion
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-battle-ground-layout — one-shot per editor session (domain reload still
+            // tip: fix-evil-facing-profile-build — one-shot per editor session (domain reload still
             // re-enters InitializeOnLoad; SessionState survives domain reload within a session).
             // SET GATE FIRST — WipeModularPaperdollAssets used to Refresh before gate → endless loop.
             if (SessionState.GetBool(OnLoadSessionGate, false)) return;
@@ -155,8 +155,8 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
                                 || (body.IndexOf(Id, StringComparison.Ordinal) < 0
-                                && body.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
-                                && body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)))
+                                && body.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
+                                && body.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0)))
                             throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                         if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class TownRNGGenerator", StringComparison.Ordinal) < 0
@@ -178,6 +178,8 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("SaveNamedStageLayoutProfile", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ArchitectPoolsStageFolder", StringComparison.Ordinal) < 0
                                 || body.IndexOf("DrawBattleMiniLayout", StringComparison.Ordinal) < 0
+                                || body.IndexOf("Art authored facing LEFT", StringComparison.Ordinal) < 0
+                                || body.IndexOf("skipped during compile/import", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ArchitectPools", StringComparison.Ordinal) < 0))
                             throw new Exception("Architect missing embedded BuildPersist / SoftPromote / Save Stage / Battle Mini");
                         // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
@@ -378,6 +380,7 @@ public static class DemonKnightPackageVersion
             "fix-architect-pool-load-list",
             "fix-architect-48-seat-preview",
             "fix-stage-placer-profiles",
+            "fix-battle-ground-layout",
         };
         foreach (string s in stale)
         {
@@ -407,7 +410,13 @@ public static class DemonKnightPackageVersion
         return false;
     }
 
-    public static string WipeModularPaperdollAssets(bool refresh = true)
+    /// <summary>
+    /// Parameterless overload for reflection Invoke(null, null) callers
+    /// (Ensure RebuildPewLibraryFromSplices). tip: fix-evil-facing-profile-build
+    /// </summary>
+    public static string WipeModularPaperdollAssets() => WipeModularPaperdollAssets(refresh: true);
+
+    public static string WipeModularPaperdollAssets(bool refresh)
     {
         var log = new StringBuilder();
         log.AppendLine("Package=" + Id);

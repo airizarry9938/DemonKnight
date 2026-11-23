@@ -23,17 +23,17 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-battle-ground-layout). Prefer API tip / raw@main FIRST.
-    private const string FallbackCommitSha = "eeb601bef276f3dc8803fd99856e7a05d6403d43";
+    // Ship pin = this tip feature SHA (fix-evil-facing-profile-build). Prefer API tip / raw@main FIRST.
+    private const string FallbackCommitSha = "709eee3d773b299316702d2d073589e20be70949";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "eeb601bef276f3dc8803fd99856e7a05d6403d43";
+    public const string HardTipCommitSha = "709eee3d773b299316702d2d073589e20be70949";
 
-    private const string ExpectedPackageId = "fix-battle-ground-layout";
+    private const string ExpectedPackageId = "fix-evil-facing-profile-build";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -96,6 +96,7 @@ public static class ArthurianSyncFromGitHub
         "fix-architect-pool-load-list",
         "fix-architect-48-seat-preview",
         "fix-stage-placer-profiles",
+        "fix-battle-ground-layout",
     };
 
     /// <summary>
@@ -1339,8 +1340,8 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
-                || (text.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
-                    && text.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                || (text.IndexOf("fix-evil-facing-profile-build", StringComparison.Ordinal) < 0
+                    && text.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
                     && text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
                 throw new Exception("GameDataTypes Appliers/helpers/Profile SOs/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
@@ -1421,8 +1422,8 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("ChurchBottomDialogue", StringComparison.Ordinal) < 0
                 || text.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
                 || text.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
-                || (text.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
-                    && text.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                || (text.IndexOf("fix-evil-facing-profile-build", StringComparison.Ordinal) < 0
+                    && text.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
                     && text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
                 throw new Exception("SomersetChurchUI missing tip church/HUD markers (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
@@ -1461,8 +1462,8 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("SaveNamedClassPoolProfile", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("ArchitectPools", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
-                    && archBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-evil-facing-profile-build", StringComparison.Ordinal) < 0
+                    && archBody.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
@@ -1700,8 +1701,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
                    && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
-                   && (body.Contains("fix-battle-ground-layout")
-                       || body.Contains("fix-stage-placer-profiles")
+                   && (body.Contains("fix-evil-facing-profile-build")
+                       || body.Contains("fix-battle-ground-layout")
                        || body.Contains("fix-architect-48-seat-preview"));
         }
 
@@ -1764,8 +1765,8 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-battle-ground-layout")
-                       || body.Contains("fix-stage-placer-profiles")
+                   && (body.Contains("fix-evil-facing-profile-build")
+                       || body.Contains("fix-battle-ground-layout")
                        || body.Contains("fix-architect-48-seat-preview")
                        || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
@@ -1968,7 +1969,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("ApplyVideoBackground")
                    && body.Contains("StageLayoutProfile")
                    && body.Contains("BattleGoodEvilSpritePoolApplier.ResolveBattleSprite")
-                   && body.Contains("fix-battle-ground-layout");
+                   && body.Contains("fix-evil-facing-profile-build");
         }
 
         if (rel.EndsWith("BattleBossDialogUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -2132,8 +2133,8 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-battle-ground-layout")
-            && !body.Contains("fix-stage-placer-profiles")
+        if (!body.Contains("fix-evil-facing-profile-build")
+            && !body.Contains("fix-battle-ground-layout")
             && !body.Contains("fix-architect-48-seat-preview")
             && !body.Contains("fix-architect-save-load-pool-ux")
             && !body.Contains("fix-architect-load-pool-profiles")
@@ -2168,8 +2169,11 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("SaveNamedStageLayoutProfile")) return false;
         if (!body.Contains("ArchitectPoolsStageFolder")) return false;
         if (!body.Contains("t:StageLayoutProfile")) return false;
-        // tip: fix-battle-ground-layout — mini battle layout + aisle-outward.
+        // tip: fix-evil-facing-profile-build — mini battle layout + aisle-outward.
         if (!body.Contains("DrawBattleMiniLayout")) return false;
+        // tip: fix-evil-facing-profile-build — good mirror / Ensure defer.
+        if (!body.Contains("Art authored facing LEFT")) return false;
+        if (!body.Contains("skipped during compile/import")) return false;
         if (!body.Contains("Auto-Arrange 48/20 Aisle-Outward")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;
