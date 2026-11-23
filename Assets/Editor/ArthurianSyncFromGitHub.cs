@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
 
-    private const string ExpectedPackageId = "fix-somerset-church-ui-cs0246";
+    private const string ExpectedPackageId = "body-face-pool-build-persist";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -72,6 +72,7 @@ public static class ArthurianSyncFromGitHub
         "fix-architect-pool-apply",
         "sprite-outline-highlight",
         "church-train-scout-ux",
+        "fix-somerset-church-ui-cs0246",
     };
 
     /// <summary>
@@ -87,6 +88,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
+        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         // Embed host for SceneBackgroundApplier + ClassSpritePoolApplier (CS0103 hard fix).
         "Assets/Scripts/Data/GameDataTypes.cs",
     };
@@ -141,6 +144,7 @@ public static class ArthurianSyncFromGitHub
         // ModularSpriteAnimator/StageParallaxController/DiceManager standalones (CS0101).
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/DemonKnightTipEscape.cs",
         // Applier TYPES are EMBEDDED in GameDataTypes.cs (force-sync-appliers-hardfix).
@@ -1420,6 +1424,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class LegendPewPortraitApplier")
                    && body.Contains("GetLegendFace")
                    && body.Contains("PickPewProfile")
+                   && body.Contains("ResolvePewFaceOverlay")
+                   && body.Contains("IsFacePoolSprite")
+                   && body.Contains("body-face-pool-build-persist")
                    // force-sync-appliers-hardfix — Appliers embedded here (not standalones).
                    && body.Contains("class SceneBackgroundApplier")
                    && body.Contains("ApplyToUiHost")
@@ -1482,7 +1489,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("Recruit {hireCost}g ({purse}g)")
                    && body.Contains("58f, 8f")
                    && body.Contains("GetMouseButtonDown(1)")
-                   && body.Contains("LegendPewPortraitApplier.ResolvePewVisual");
+                   && body.Contains("LegendPewPortraitApplier.ResolvePewVisual")
+                   && body.Contains("ApplyFaceOverlay")
+                   && body.Contains("ResolvePewFaceOverlay");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -1725,7 +1734,7 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("sprite-outline-highlight")
                    || body.Contains("fix-architect-pool-apply")
                    || body.Contains("church-train-scout-ux")
-                   || body.Contains("fix-somerset-church-ui-cs0246");
+                   || body.Contains("body-face-pool-build-persist");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
@@ -1776,6 +1785,9 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("Legend / Pew Portraits")) return false;
         if (!body.Contains("LegendPewPortraitProfile")) return false;
         if (!body.Contains("DrawLegendPewPortraitsTab")) return false;
+        if (!body.Contains("TryAddBodyPoolSprite")) return false;
+        if (!body.Contains("TryAddFacePoolSprite")) return false;
+        if (!body.Contains("body-face-pool-build-persist")) return false;
         if (!body.Contains("UiBuildId")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;

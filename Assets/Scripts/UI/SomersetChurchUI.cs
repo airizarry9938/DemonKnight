@@ -1787,11 +1787,13 @@ namespace ArthurianAutobattler
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
                 {
-                    // Occupied seats: pew face/body profiles (Tab 5) → class pools (Tab 4)
-                    // → StageLayoutProfile previewOrOverrideSprite placement-guide fallback.
+                    // Occupied seats: BODY = Tab 4 ClassSpritePool → StageLayout assign-guide.
+                    // FACE overlay = Tab 5 (optional Head) — never face as bodySprite.
                     Sprite assigned = authored?.previewOrOverrideSprite;
-                    Sprite poolSprite = recruit != null ? LegendPewPortraitApplier.ResolvePewVisual(recruit) : null;
-                    Sprite visual = poolSprite != null ? poolSprite : assigned;
+                    Sprite bodySprite = recruit != null ? LegendPewPortraitApplier.ResolvePewVisual(recruit) : null;
+                    if (bodySprite != null && LegendPewPortraitApplier.IsFacePoolSprite(bodySprite))
+                        bodySprite = null; // soft-fail cross-assign
+                    Sprite visual = bodySprite != null ? bodySprite : assigned;
                     if (showSprite && recruit != null)
                     {
                         view.Bind(
@@ -1802,6 +1804,8 @@ namespace ArthurianAutobattler
                             useLibraryArt: false);
                         if (visual != null) view.ApplyAssignedBodySprite(visual);
                         else view.ClearBodyToSolid();
+                        Sprite face = LegendPewPortraitApplier.ResolvePewFaceOverlay(recruit);
+                        view.ApplyFaceOverlay(face);
                     }
                     else if (showSprite && assigned != null)
                     {
@@ -1813,8 +1817,10 @@ namespace ArthurianAutobattler
                 }
                 else if (showSprite)
                 {
-                    // Non-PaperDoll prefab: pew face/body → class pool → StageLayout assign-only.
+                    // Non-PaperDoll prefab: BODY class pool → StageLayout assign-only (never face-as-body).
                     Sprite poolSprite = recruit != null ? LegendPewPortraitApplier.ResolvePewVisual(recruit) : null;
+                    if (poolSprite != null && LegendPewPortraitApplier.IsFacePoolSprite(poolSprite))
+                        poolSprite = null;
                     EnsureSeatImageAssignedOnly(go, poolSprite ?? authored?.previewOrOverrideSprite, recruit);
                     VictoryStarBadge.Apply(go.transform, recruit);
                     Button btn = go.GetComponent<Button>();
@@ -1851,7 +1857,7 @@ namespace ArthurianAutobattler
             }
             Debug.Log(
                 $"[DemonKnight] Populated {SomersetPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied); "
-                + $"pew/class-pool sprites={poolHits}; StageLayout assign-guides={assignedCount}; "
+                + $"body-pool sprites={poolHits}; StageLayout assign-guides={assignedCount}; "
                 + $"rows 0–{SomersetPewLayout.VisualSpriteRowCount - 1}.");
             RefreshHUD();
         }

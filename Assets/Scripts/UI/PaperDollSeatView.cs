@@ -44,9 +44,8 @@ namespace ArthurianAutobattler
             => Bind(recruit, onLeftClick, onHover, onRightClick, useLibraryArt: true);
 
         /// <param name="useLibraryArt">
-        /// False = church pews: caller paints body via class pool / StageLayout assign-guide
-        /// (no library / no clip paint). Prefer <see cref="ClassSpritePoolApplier"/> then
-        /// StageLayoutProfile previewOrOverrideSprite fallback.
+        /// False = church pews: caller paints BODY via ClassSpritePool / StageLayout assign-guide
+        /// then optional FACE overlay via ApplyFaceOverlay (Tab 5). Never face-as-body.
         /// </param>
         public void Bind(
             RecruitInstance recruit,
@@ -135,21 +134,48 @@ namespace ArthurianAutobattler
                 anim?.ConfigureAssignedOnlyPaperDoll(this, recruit);
         }
 
-        /// <summary>Force body to Stage Placer–assigned sprite (no library RNG / animator clip).</summary>
+        /// <summary>Force body to Stage Placer / Tab 4 class-pool sprite (never a Tab 5 face).</summary>
         public void ApplyAssignedBodySprite(Sprite sp)
         {
             var layers = EnsureModularLayers();
             HideNonModularImages(layers);
             if (layers.body == null) return;
+            // Soft-fail: refuse face-pool sprites as body.
+            if (sp != null && LegendPewPortraitApplier.IsFacePoolSprite(sp))
+            {
+                Debug.LogWarning("[DemonKnight] Soft-fail ApplyAssignedBodySprite: refusing face-pool sprite " + sp.name);
+                sp = null;
+            }
             layers.body.sprite = sp;
             layers.body.color = Color.white;
             layers.body.enabled = sp != null;
             layers.body.preserveAspect = true;
             if (layers.outfit != null) { layers.outfit.sprite = null; layers.outfit.enabled = false; }
-            if (layers.head != null) { layers.head.sprite = null; layers.head.enabled = false; }
             if (layers.prop != null) { layers.prop.sprite = null; layers.prop.enabled = false; }
+            // Keep existing face overlay if any — ApplyFaceOverlay sets Head separately.
             var anim = GetComponent<ModularSpriteAnimator>();
             if (anim != null) anim.LockBodySprite(true);
+        }
+
+        /// <summary>
+        /// Optional Tab 5 face-only overlay on Head. Never writes bodySprite.
+        /// Soft-fails body-pool sprites assigned as faces.
+        /// </summary>
+        public void ApplyFaceOverlay(Sprite face)
+        {
+            var layers = EnsureModularLayers();
+            if (layers.head == null) return;
+            if (face != null && LegendPewPortraitApplier.IsBodyPoolSprite(face))
+            {
+                Debug.LogWarning("[DemonKnight] Soft-fail ApplyFaceOverlay: refusing body-pool sprite " + face.name);
+                face = null;
+            }
+            layers.head.sprite = face;
+            layers.head.color = Color.white;
+            layers.head.preserveAspect = true;
+            layers.head.enabled = face != null;
+            if (Bound != null)
+                Bound.headSprite = face;
         }
 
         /// <summary>Solid / empty seat — no library copy.</summary>

@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-somerset-church-ui-cs0246";
+    const string TipPackageId = "body-face-pool-build-persist";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -66,7 +66,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "class-sprite-pools",
         "force-sync-appliers-hardfix",
         "sheet-splicer-chroma-despill",
-        "church-train-scout-ux",
+        "church-train-scout-ux", "fix-somerset-church-ui-cs0246",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
@@ -143,6 +143,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             int before = existing.churchPewSlots != null ? existing.churchPewSlots.Count : 0;
             existing.EnsureSlotCounts();
+            existing.RematerializeSpritesFromPaths();
             // Pad-only — do NOT SaveAssets on every editor load (was racing user assigns).
             if ((existing.churchPewSlots?.Count ?? 0) != before)
             {
@@ -550,6 +551,7 @@ public static class ArthurianStageLayoutProfileEnsure
             "Assets/Editor/ArthurianMenuBootstrap.cs",
             "Assets/Editor/ArthurianArtArchitectWindow.cs",
             "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+            "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         };
         int ok = 0;
         foreach (string rel in rels)

@@ -1,7 +1,6 @@
-StageLayoutProfile.asset is created locally by Arthurian → Ensure Stage Layout Profile
-(and automatically after Force Sync / editor load). Assign-only pew sprites live here.
-
-If the MonoScript GUID goes stale after GameDataTypes embed, Ensure REMAPS m_Script or
-TRANSPLANTS church/battle slot YAML into a fresh asset — it must never wipe seat sprites.
-Do not commit a YAML that still references the old standalone StageLayoutProfile.cs GUID
-without running Ensure (remap) first.
+StageLayoutProfile.asset — pew/battle seat transforms + assign-guide sprites.
+Created by Arthurian → Ensure Stage Layout Profile.
+previewAssetPath backups rematerialize in player builds (tip body-face-pool-build-persist).
+Must ship under Assets/Resources/ in the final player build.
+Prepare Architect Art for Player Build promotes seat sprites into ArchitectArt/Stage/.
+Ensure remaps stale MonoScript GUIDs — never wipe seat sprites.

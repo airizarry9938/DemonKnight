@@ -54,7 +54,16 @@ namespace ArthurianAutobattler
             }
 
             SetLayer(layers.body, sprite, Color.white, enabled: true);
-            DisableExtraLayers(layers);
+            // Optional face-only overlay from Tab 5 (Head layer) — never replaces body.
+            Sprite face = fallback != null ? LegendPewPortraitApplier.ResolvePewFaceOverlay(fallback) : null;
+            if (IsUsablePewSprite(face) && !LegendPewPortraitApplier.IsBodyPoolSprite(face))
+            {
+                SetLayer(layers.head, face, Color.white, enabled: true);
+                SetLayer(layers.outfit, null, Color.white, enabled: false);
+                SetLayer(layers.prop, null, Color.white, enabled: false);
+            }
+            else
+                DisableExtraLayers(layers);
         }
 
         /// <summary>
@@ -68,11 +77,10 @@ namespace ArthurianAutobattler
         {
             if (fallback != null)
             {
-                // Architect Tab 5 pew face/body profiles first (distinct from full-body class pools).
-                Sprite face = LegendPewPortraitApplier.PickPewProfile(fallback);
-                if (IsUsablePewSprite(face)) return face;
+                // BODY only — Tab 4 ClassSpritePool. Never Tab 5 face pools as bodySprite.
                 Sprite pool = ClassSpritePoolApplier.PickForRecruit(fallback);
-                if (IsUsablePewSprite(pool)) return pool;
+                if (IsUsablePewSprite(pool) && !LegendPewPortraitApplier.IsFacePoolSprite(pool))
+                    return pool;
             }
             if (lib != null && lib.basePoses != null && lib.basePoses.Length > 0)
             {

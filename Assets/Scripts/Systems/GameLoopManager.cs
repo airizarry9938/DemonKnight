@@ -978,25 +978,25 @@ namespace ArthurianAutobattler
             if (lib != null)
                 TownsfolkVisualApplier.SetLibrary(lib);
 
-            // Architect Tab 4/5 pools first — then ModularSpriteLibrary poses / inspector avatar pools.
-            Sprite architect = LegendPewPortraitApplier.ResolvePewVisual(r);
-            if (architect != null && TownsfolkVisualApplier.IsUsablePewSprite(architect))
+            // BODY = Tab 4 ClassSpritePool. FACE overlay = Tab 5 → headSprite (never bodySprite).
+            Sprite architectBody = LegendPewPortraitApplier.ResolvePewVisual(r);
+            if (architectBody != null && TownsfolkVisualApplier.IsUsablePewSprite(architectBody)
+                && !LegendPewPortraitApplier.IsFacePoolSprite(architectBody))
             {
-                r.bodySprite = architect;
-                r.headSprite = null;
-                r.randomAvatar = architect;
+                r.bodySprite = architectBody;
+                r.randomAvatar = architectBody;
             }
             else if (lib != null)
             {
-                // Single-sprite runtime — body only (Architect Category Sprite → basePoses).
                 var pose = lib.GetPose(r.appearance.poseIndex);
-                if (pose != null)
+                if (pose != null && !LegendPewPortraitApplier.IsFacePoolSprite(pose))
                 {
                     r.bodySprite = pose;
-                    r.headSprite = null;
                     if (r.randomAvatar == null) r.randomAvatar = pose;
                 }
             }
+            Sprite face = LegendPewPortraitApplier.ResolvePewFaceOverlay(r);
+            r.headSprite = (face != null && !LegendPewPortraitApplier.IsBodyPoolSprite(face)) ? face : null;
             // Best-effort avatar from type pools (sprites are not stored in JSON).
             List<Sprite> pool = null;
             if (r.unitType == UnitType.Knight) pool = rngGenerator.knightAvatars;
