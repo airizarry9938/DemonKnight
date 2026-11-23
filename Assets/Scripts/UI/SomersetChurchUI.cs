@@ -2027,7 +2027,7 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Architect Tab 3 — apply SceneBackgroundProfile church image/video when assigned.
-        /// tip: fix-architect-apply-persist-facing — scene-enter rematerialize + apply.
+        /// tip: fix-architect-load-pool-profiles — scene-enter rematerialize + apply.
         /// </summary>
         void ApplyArchitectChurchBackground()
         {
