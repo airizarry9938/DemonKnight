@@ -23,15 +23,15 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-architect-pool-load-list). Prefer API tip / raw@main FIRST.
-    private const string FallbackCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
+    // Ship pin = this tip feature SHA (fix-architect-48-seat-preview / TownRNG CS0104). Prefer API tip / raw@main FIRST.
+    private const string FallbackCommitSha = "986ea7e49464fcf0cc5db1ae191641f6dc6f9f02";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
+    public const string HardTipCommitSha = "986ea7e49464fcf0cc5db1ae191641f6dc6f9f02";
 
     private const string ExpectedPackageId = "fix-architect-48-seat-preview";
 
@@ -1414,8 +1414,11 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                 || text.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                 || text.IndexOf("TrainChosenStat", StringComparison.Ordinal) < 0
-                || text.IndexOf("ChurchBottomDialogue", StringComparison.Ordinal) < 0)
-                throw new Exception("SomersetChurchUI missing tip church markers (" + source + ")");
+                || text.IndexOf("ChurchBottomDialogue", StringComparison.Ordinal) < 0
+                || text.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
+                || text.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
+                || text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)
+                throw new Exception("SomersetChurchUI missing tip church/HUD markers (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(rel, dest, relaxPackageId: true);
             if (!okFiles.Contains(rel)) okFiles.Add(rel);
@@ -2071,6 +2074,19 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("DemonKnightPackageVersion")
                    && body.Contains("ForceUpgradeSyncHostsFromMain")
                    && body.Contains("Package Id on disk");
+        }
+
+        // tip: fix-architect-48-seat-preview — CS0104: System + UnityEngine both expose Random.
+        if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class TownRNGGenerator")
+                   && body.Contains("AllocateUniqueCharacterName")
+                   && body.Contains("ReservedFullNames")
+                   && body.Contains("UnityEngine.Random.Range")
+                   && body.Contains("UnityEngine.Random.value")
+                   && !Regex.IsMatch(body, @"(?<!UnityEngine\.)Random\.(Range|value)")
+                   && (body.Contains("fix-architect-48-seat-preview")
+                       || body.Contains("fix-townrng-name-pools"));
         }
 
         return true;
