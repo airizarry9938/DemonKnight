@@ -483,7 +483,7 @@ public static class ArthurianMenuBootstrap
         try
         {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            const string gate = "DemonKnight.MenuBootstrap.NukeProfiles." + "fix-stage-placer-profiles";
+            const string gate = "DemonKnight.MenuBootstrap.NukeProfiles." + "fix-battle-ground-layout";
             if (SessionState.GetBool(gate, false)) return;
             SessionState.SetBool(gate, true);
             string root = Directory.GetParent(Application.dataPath)!.FullName;
@@ -508,7 +508,7 @@ public static class ArthurianMenuBootstrap
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             // tip: fix-architect-pool-load-list — ForceArchitectTipIfStale + Refresh every reload = loop.
-            const string gate = "DemonKnight.MenuBootstrap.AutoVerify." + "fix-stage-placer-profiles";
+            const string gate = "DemonKnight.MenuBootstrap.AutoVerify." + "fix-battle-ground-layout";
             if (SessionState.GetBool(gate, false)) return;
             SessionState.SetBool(gate, true);
             try

@@ -10,7 +10,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Ensures Assets/Resources/StageLayoutProfile.asset exists with 48/52/20 slots (12×4 pews).
+/// Ensures Assets/Resources/StageLayoutProfile.asset exists with 48/48/20 slots (12×4 pews).
 /// Profile SOs live in GameDataTypes (tip fix-architect-pool-load-list).
 /// Ensure CreateInstance via Type.GetType + probe remap for multi-class MonoScript fileID.
 /// tip: fix-architect-pool-load-list
@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-stage-placer-profiles";
+    const string TipPackageId = "fix-battle-ground-layout";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -89,6 +89,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-architect-save-load-pool-ux",
         "fix-architect-pool-load-list",
         "fix-architect-48-seat-preview",
+        "fix-stage-placer-profiles",
     };
 
     const string OnLoadSessionGate = "DemonKnight.Ensure.OnLoadDone." + TipPackageId;

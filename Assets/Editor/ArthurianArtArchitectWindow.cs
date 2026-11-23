@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-stage-placer-profiles";
+    public const string UiBuildId = "fix-battle-ground-layout";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -1258,6 +1258,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
         to.churchSpriteScale = from.churchSpriteScale;
         to.churchSeatGap = from.churchSeatGap;
         to.churchSeatSpreadMul = from.churchSeatSpreadMul;
+        // tip: fix-battle-ground-layout — battle aisle/spacing SoftPromote with Save/Load.
+        to.battleAisleGap = from.battleAisleGap;
+        to.battleSeatGap = from.battleSeatGap;
+        to.battleDepthGap = from.battleDepthGap;
+        to.battleLayoutVersion = from.battleLayoutVersion;
         to.EnsureSlotCounts();
     }
 
@@ -2589,7 +2594,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
         stageView = (StageViewMode)EditorGUILayout.EnumPopup("Stage View", stageView);
         if (stageView == StageViewMode.ChurchyardBattle)
-            battleSide = (BattleSlotSide)EditorGUILayout.EnumPopup("Battle Side", battleSide);
+        {
+            battleSide = (BattleSlotSide)EditorGUILayout.EnumPopup(
+                "Inspector Side (click canvas to switch)", battleSide);
+            DrawBattleLayoutPrefsPanel();
+        }
 
         showChurchBackground = EditorGUILayout.ToggleLeft(
             "Church background (SomersetChurchInterior — match play stage)", showChurchBackground);
@@ -2608,13 +2617,24 @@ public class ArthurianArtArchitectWindow : EditorWindow
             stagePan = Vector2.zero;
             stageZoom = 28f;
         }
-        if (GUILayout.Button("Auto-Arrange 52 Overflow Formation", GUILayout.Height(28)))
+        if (GUILayout.Button("Auto-Arrange 48/20 Aisle-Outward", GUILayout.Height(28)))
             AutoArrangeOverflowFormation();
         EditorGUILayout.EndHorizontal();
-        EditorGUILayout.HelpBox(
-            "Assigned sprites only (no auto-fill). Drag seats to move; SE handle or Seat scale slider. "
-            + "Positions save as normalized 0–1 on StageLayoutProfile (play reads them).",
-            MessageType.Info);
+        if (stageView == StageViewMode.ChurchyardBattle)
+        {
+            EditorGUILayout.HelpBox(
+                "Mini battle layout · Good 48 LEFT (faces RIGHT) · Evil 20 RIGHT (faces LEFT). "
+                + "Front fills from aisle/inside outward. Full Tab 6 pool sprites on slots when set; "
+                + "else assign Preview / Palette. SoftPromote Persist + Save Profile keep layout.",
+                MessageType.Info);
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(
+                "Assigned sprites only (no auto-fill). Drag seats to move; SE handle or Seat scale slider. "
+                + "Positions save as normalized 0–1 on StageLayoutProfile (play reads them).",
+                MessageType.Info);
+        }
 
         EditorGUILayout.BeginHorizontal();
         DrawStageCanvas();
@@ -2636,6 +2656,46 @@ public class ArthurianArtArchitectWindow : EditorWindow
         return battleSide == BattleSlotSide.Player
             ? stageProfile.playerBattleSlots
             : stageProfile.enemyBattleSlots;
+    }
+
+    /// <summary>
+    /// Battle mini-layout prefs (aisle / seat / depth) — SoftPromote Persist like church prefs.
+    /// tip: fix-battle-ground-layout
+    /// </summary>
+    void DrawBattleLayoutPrefsPanel()
+    {
+        if (stageProfile == null) return;
+        stageProfile.EnsureBattleLayoutPrefs();
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.LabelField(
+            $"Battle layout · Good {StageLayoutProfile.PlayerBattleCount} LEFT · Evil {StageLayoutProfile.EnemyBattleCount} RIGHT",
+            EditorStyles.boldLabel);
+        EditorGUI.BeginChangeCheck();
+        stageProfile.battleAisleGap = EditorGUILayout.Slider(
+            "Aisle gap (inside)", stageProfile.battleAisleGap, 0.4f, 3.5f);
+        stageProfile.battleSeatGap = EditorGUILayout.Slider(
+            "Seat gap (along front)", stageProfile.battleSeatGap, 0.5f, 2.2f);
+        stageProfile.battleDepthGap = EditorGUILayout.Slider(
+            "Depth gap (back rows)", stageProfile.battleDepthGap, 0.45f, 1.8f);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Re-apply aisle-outward defaults", GUILayout.Height(22)))
+        {
+            Undo.RecordObject(stageProfile, "Reset Battle Layout Aisle-Outward");
+            stageProfile.ApplyAisleOutwardBattleDefaults(preservePreviewSprites: true);
+            PersistStageProfile("ResetBattleLayoutAisle");
+            Repaint();
+        }
+        GUILayout.Label(
+            $"front {StageLayoutProfile.PlayerFrontWidth}/{StageLayoutProfile.EnemyFrontWidth} · v{stageProfile.battleLayoutVersion}",
+            EditorStyles.miniLabel);
+        EditorGUILayout.EndHorizontal();
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(stageProfile, "Edit Battle Layout Prefs");
+            PersistStageProfile("BattleLayoutPrefs");
+            Repaint();
+        }
+        EditorGUILayout.EndVertical();
     }
 
     /// <summary>
@@ -2713,6 +2773,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
         if (churchMode)
             DrawPlayPewLayoutOnChurch(canvas, content, slots, e);
+        else if (stageView == StageViewMode.ChurchyardBattle)
+            DrawBattleMiniLayout(canvas, e); // tip: fix-battle-ground-layout — both sides + sprites
         else
             DrawAbstractSlotHandles(canvas, slots, e);
 
@@ -2779,6 +2841,113 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 draggingSlot = false;
                 PersistStageProfile("BattleSlotDragEnd");
                 e.Use();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Mini battle ground: Good 48 LEFT + Evil 20 RIGHT on one canvas with full sprite previews.
+    /// tip: fix-battle-ground-layout
+    /// </summary>
+    void DrawBattleMiniLayout(Rect canvas, Event e)
+    {
+        if (stageProfile == null) return;
+        stageProfile.EnsureSlotCounts();
+
+        Handles.BeginGUI();
+        Vector2 origin = CanvasToScreen(canvas, Vector2.zero);
+        Handles.color = new Color(1f, 0.85f, 0.35f, 0.55f);
+        Handles.DrawLine(new Vector3(origin.x, canvas.y + 8f), new Vector3(origin.x, canvas.yMax - 8f));
+        Handles.EndGUI();
+        GUI.Label(new Rect(origin.x - 78f, canvas.y + 4f, 72f, 16f), "GOOD →", EditorStyles.miniLabel);
+        GUI.Label(new Rect(origin.x + 8f, canvas.y + 4f, 72f, 16f), "← EVIL", EditorStyles.miniLabel);
+
+        DrawBattleSideHandles(canvas, stageProfile.playerBattleSlots, BattleSlotSide.Player, e);
+        DrawBattleSideHandles(canvas, stageProfile.enemyBattleSlots, BattleSlotSide.Enemy, e);
+
+        if (draggingSlot && selectedSlot >= 0)
+        {
+            var slots = ActiveSlots();
+            if (slots != null && selectedSlot < slots.Count && slots[selectedSlot] != null)
+            {
+                if (e.type == EventType.MouseDrag && e.button == 0)
+                {
+                    Undo.RecordObject(stageProfile, "Move Battle Slot");
+                    slots[selectedSlot].position = ScreenToCanvas(canvas, e.mousePosition);
+                    slots[selectedSlot].sortingOrder =
+                        Mathf.RoundToInt(-slots[selectedSlot].position.y * 10f);
+                    EditorUtility.SetDirty(stageProfile);
+                    e.Use();
+                    Repaint();
+                }
+                if (e.type == EventType.MouseUp && e.button == 0)
+                {
+                    draggingSlot = false;
+                    PersistStageProfile("BattleMiniDragEnd");
+                    e.Use();
+                }
+            }
+        }
+    }
+
+    void DrawBattleSideHandles(
+        Rect canvas, List<SlotTransformConfig> slots, BattleSlotSide side, Event e)
+    {
+        if (slots == null) return;
+        bool evil = side == BattleSlotSide.Enemy;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var s = slots[i];
+            if (s == null) continue;
+            Vector2 screen = CanvasToScreen(canvas, s.position);
+            float size = 22f * Mathf.Clamp(s.scale.x, 0.45f, 1.8f);
+            bool sel = battleSide == side && i == selectedSlot;
+
+            Sprite preview = ResolveBattleSlotPreviewSprite(s, side, i);
+            if (preview != null)
+            {
+                float pw = size * 2.6f * Mathf.Max(0.5f, s.aspectMultiplier.x);
+                float ph = size * 3.2f * Mathf.Max(0.5f, s.aspectMultiplier.y);
+                Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.88f, pw, ph);
+                // Evil faces left — mirror preview so Architect matches UnitVisualActor facing.
+                if (evil)
+                {
+                    Matrix4x4 prev = GUI.matrix;
+                    GUIUtility.ScaleAroundPivot(new Vector2(-1f, 1f), pr.center);
+                    DrawSprite(pr, preview, Color.white);
+                    GUI.matrix = prev;
+                }
+                else
+                {
+                    DrawSprite(pr, preview, Color.white);
+                }
+            }
+
+            Rect handle = new Rect(screen.x - size * 0.5f, screen.y - size * 0.5f, size, size);
+            Color box = sel
+                ? new Color(1f, 0.85f, 0.25f, 0.92f)
+                : (evil
+                    ? new Color(0.85f, 0.28f, 0.32f, 0.78f)
+                    : new Color(0.30f, 0.62f, 0.95f, 0.78f));
+            // Only draw empty handle box when no sprite — otherwise keep a thin rim so drag stays easy.
+            if (preview == null)
+                EditorGUI.DrawRect(handle, box);
+            else
+            {
+                EditorGUI.DrawRect(new Rect(handle.x, handle.y, handle.width, 2f), box);
+                EditorGUI.DrawRect(new Rect(handle.x, handle.yMax - 2f, handle.width, 2f), box);
+            }
+            GUI.Label(handle, i.ToString("00"), EditorStyles.centeredGreyMiniLabel);
+
+            float hitPad = preview != null ? size * 1.35f : size;
+            Rect hit = new Rect(screen.x - hitPad * 0.5f, screen.y - hitPad * 0.75f, hitPad, hitPad * 1.35f);
+            if (e.type == EventType.MouseDown && e.button == 0 && hit.Contains(e.mousePosition))
+            {
+                battleSide = side;
+                selectedSlot = i;
+                draggingSlot = true;
+                e.Use();
+                Repaint();
             }
         }
     }
@@ -4187,7 +4356,62 @@ public class ArthurianArtArchitectWindow : EditorWindow
     Sprite ResolveSlotPreviewSprite(SlotTransformConfig s)
     {
         if (s == null) return null;
-        return s.previewOrOverrideSprite;
+        if (s.previewOrOverrideSprite != null) return s.previewOrOverrideSprite;
+        // tip: fix-battle-ground-layout — fall back to Tab 6 pool art on battle slots.
+        if (stageView == StageViewMode.ChurchyardBattle)
+            return ResolveBattleSlotPreviewSprite(s, battleSide, s.slotNumber);
+        return null;
+    }
+
+    /// <summary>
+    /// Full unit art on battle layout slots: override first, else Tab 6 Good/Evil pools.
+    /// tip: fix-battle-ground-layout
+    /// </summary>
+    Sprite ResolveBattleSlotPreviewSprite(SlotTransformConfig s, BattleSlotSide side, int index)
+    {
+        if (s != null && s.previewOrOverrideSprite != null)
+            return s.previewOrOverrideSprite;
+        try
+        {
+            if (battleGoodEvilProfile == null)
+                battleGoodEvilProfile = BattleGoodEvilSpritePoolProfile.Load();
+            var pool = battleGoodEvilProfile;
+            if (pool == null) return null;
+            pool.RematerializeSpritesFromPaths();
+            if (side == BattleSlotSide.Player)
+            {
+                UnitType[] cycle =
+                {
+                    UnitType.Peasant, UnitType.Warrior, UnitType.Knight, UnitType.Priest
+                };
+                UnitType t = cycle[Mathf.Abs(index) % cycle.Length];
+                return FirstPoolSprite(pool.GetTroopOrWavePool(t))
+                       ?? FirstPoolSprite(pool.peasantBattleSprites)
+                       ?? FirstPoolSprite(pool.warriorBattleSprites)
+                       ?? FirstPoolSprite(pool.knightBattleSprites);
+            }
+            UnitType[] evilCycle =
+            {
+                UnitType.DemonImp, UnitType.DemonHellhound, UnitType.DemonDreadLord
+            };
+            UnitType et = evilCycle[Mathf.Abs(index) % evilCycle.Length];
+            return FirstPoolSprite(pool.GetTroopOrWavePool(et))
+                   ?? FirstPoolSprite(pool.demonImpBattleSprites)
+                   ?? FirstPoolSprite(pool.hellhoundBattleSprites)
+                   ?? FirstPoolSprite(pool.dreadLordBattleSprites);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    static Sprite FirstPoolSprite(List<Sprite> list)
+    {
+        if (list == null) return null;
+        for (int i = 0; i < list.Count; i++)
+            if (list[i] != null) return list[i];
+        return null;
     }
 
     void DrawSplicedAndCharacterPalette()
@@ -4352,30 +4576,19 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         if (stageProfile == null) return;
         stageProfile.EnsureSlotCounts();
-        Undo.RecordObject(stageProfile, "Auto-Arrange 52 Overflow Formation");
-        const int frontlineSize = 6;
-        for (int i = 0; i < StageLayoutProfile.PlayerBattleCount; i++)
-        {
-            int col = i / frontlineSize;
-            int row = i % frontlineSize;
-            float scale = col <= 1
-                ? 1f
-                : Mathf.Lerp(0.95f, 0.70f, Mathf.InverseLerp(2f, 8f, col));
-            float x = -3.5f + row * 1.1f;
-            float y = 2.0f - col * 0.85f;
-            var s = stageProfile.playerBattleSlots[i] ?? new SlotTransformConfig();
-            s.slotNumber = i;
-            s.position = new Vector2(x, y);
-            s.scale = new Vector2(scale, scale);
-            s.aspectMultiplier = Vector2.one;
-            s.sortingOrder = Mathf.RoundToInt(-y * 10f);
-            stageProfile.playerBattleSlots[i] = s;
-        }
+        Undo.RecordObject(stageProfile, "Auto-Arrange 48/20 Aisle-Outward");
+        // tip: fix-battle-ground-layout — Good 48 LEFT / Evil 20 RIGHT; front from aisle outward.
+        stageProfile.ApplyAisleOutwardBattleDefaults(preservePreviewSprites: true);
         EditorUtility.SetDirty(stageProfile);
-        AssetDatabase.SaveAssets();
+        PersistStageProfile("AutoArrangeBattle48x20");
         stageView = StageViewMode.ChurchyardBattle;
         battleSide = BattleSlotSide.Player;
-        Debug.Log("[DemonKnight] Auto-arranged playerBattleSlots 0..51 (columns of 6).");
+        Debug.Log(
+            "[DemonKnight] Auto-arranged battle layout: good 0.."
+            + (StageLayoutProfile.PlayerBattleCount - 1)
+            + " LEFT aisle-outward; evil 0.."
+            + (StageLayoutProfile.EnemyBattleCount - 1)
+            + " RIGHT aisle-outward.");
         Repaint();
     }
 
@@ -4908,7 +5121,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-stage-placer-profiles (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-battle-ground-layout (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -4917,7 +5130,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-stage-placer-profiles";
+    public const string TipId = "fix-battle-ground-layout";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

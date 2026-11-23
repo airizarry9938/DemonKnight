@@ -1,4 +1,4 @@
-Architect named profiles (tip: fix-stage-placer-profiles)
+Architect named profiles (tip: fix-battle-ground-layout)
 
 Folders:
   Stage/  — Tab 2 Stage Placer & Parallax (StageLayoutProfile) snapshots

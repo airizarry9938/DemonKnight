@@ -1,3 +1,5 @@
+tip: fix-battle-ground-layout — looping VideoPlayer fight BG (static fallback).
+
 DemonKnight — fight-scene VIDEO background (drop path)
 
 WHERE TO PUT THE CLIP (pick one; first match wins at runtime)
