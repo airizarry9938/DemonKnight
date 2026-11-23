@@ -34,7 +34,7 @@ namespace ArthurianAutobattler
 
     /// <summary>
     /// One row for the DeathsSurvivorsMorale end-screen panel.
-    /// tip: fix-survivor-stats-victory-morale
+    /// tip: fix-night-wave-hud-progression
     /// </summary>
     [Serializable]
     public class WaveCasualtyEntry
@@ -557,7 +557,7 @@ namespace ArthurianAutobattler
             return Mathf.Clamp(attackSpeed + g * 0.1f, 0.4f, 3.0f);
         }
 
-        /// <summary>tip: fix-survivor-stats-victory-morale — party death morale nerfs HP/ATK.</summary>
+        /// <summary>tip: fix-night-wave-hud-progression — party death morale nerfs HP/ATK.</summary>
         public static int ApplyPartyMoraleToStat(int value)
         {
             float m = GameLoopManager.Instance != null

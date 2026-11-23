@@ -165,6 +165,8 @@ namespace ArthurianAutobattler
         /// <summary>Last wave death / survivor rows for DeathsSurvivorsMorale panel.</summary>
         [System.NonSerialized] public readonly List<WaveCasualtyEntry> lastWaveDeaths = new List<WaveCasualtyEntry>();
         [System.NonSerialized] public readonly List<WaveCasualtyEntry> lastWaveSurvivors = new List<WaveCasualtyEntry>();
+        /// <summary>tip: fix-night-wave-hud-progression — combat-dead unitIDs pruned before Next Night.</summary>
+        [System.NonSerialized] public readonly HashSet<string> lastWaveDeadUnitIds = new HashSet<string>();
         /// <summary>This wave's morale hit as percent points (e.g. 10 = −10%), before cumulative cap display.</summary>
         [System.NonSerialized] public float lastWaveMoraleLossPercent;
 
@@ -430,12 +432,16 @@ namespace ArthurianAutobattler
         /// </summary>
         public void AdvanceNightCounterAfterWaveWin()
         {
+            // tip: fix-night-wave-hud-progression — Night advances on win; Wave already bumped in EndBattle.
             int from = Mathf.Max(1, currentNight);
-            SyncNightToCombatWave();
+            currentNight = from + 1;
+            PlayerPrefs.SetInt(NightPrefsKey, currentNight);
+            PlayerPrefs.Save();
             RefreshNightHUD();
             var church = ResolveChurchUI();
-            church?.SetNight(CurrentWaveNumber());
-            Debug.LogError($"[DemonKnight] Wave win HUD sync night {from} → {currentNight} (wave={CurrentWaveNumber()})");
+            church?.SetNight(currentNight);
+            Debug.LogError(
+                $"[DemonKnight] Wave win HUD sync night {from} → {currentNight} (wave={CurrentWaveNumber()})");
         }
 
         /// <summary>
@@ -460,15 +466,20 @@ namespace ArthurianAutobattler
                 if (battleEngine != null)
                     battleEngine.isBattling = false;
 
+                // tip: fix-night-wave-hud-progression
+                // Victory: Night advances; Wave already bumped in EndBattle (never repeat same wave).
+                // Night 1 win → Night 2 · Wave 2 (not Wave 1 again).
                 int waveKeep = CurrentWaveNumber();
                 int fromNight = Mathf.Max(1, currentNight);
-                // Night HUD mirrors combat wave (same index as horde/boss spawn).
-                currentNight = waveKeep;
+                currentNight = fromNight + 1;
                 PlayerPrefs.SetInt(NightPrefsKey, currentNight);
                 PlayerPrefs.Save();
+
+                // Dead must not carry into the next night/wave (living keep trained stats).
+                int pruned = PruneDeadFromWarbandAndPews();
                 Debug.LogError(
-                    $"[DemonKnight] Wave victory continue — HUD Night/Wave → {waveKeep} "
-                    + $"(from night {fromNight}; NOT reset to 1).");
+                    $"[DemonKnight] Wave victory continue — HUD Night {fromNight} → {currentNight} · "
+                    + $"Wave {waveKeep} (NOT reset to 1; prunedDead={pruned}).");
 
                 int gold = townUI != null ? townUI.playerGold : StartingGold;
                 AutosaveWarband(gold);
@@ -479,14 +490,12 @@ namespace ArthurianAutobattler
                 if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
                 if (townCanvasObj != null) townCanvasObj.SetActive(true);
 
-                // Keep current pews + trained/upgraded veterans already returned by ForceWaveDisband.
-                // ContinueTimelineFromAutosave → BeginTownNight → GenerateNewRunTown was resetting
-                // experienced soldiers across wave transitions.
+                // Keep current pews + trained/upgraded living veterans already returned by ForceWaveDisband.
                 ContinueMidRunKeepTownAndTrainedStats(waveKeep);
 
                 RefreshNightHUD();
                 var church = ResolveChurchUI();
-                church?.SetNight(CurrentWaveNumber());
+                church?.SetNight(currentNight);
                 church?.RefreshHUD();
                 DemonKnightCompatApi.RefreshWarbandPanel(church);
             }
@@ -519,6 +528,10 @@ namespace ArthurianAutobattler
                 var veterans = WarbandAutosave.ToVeteranList(data);
                 if (veterans != null && veterans.Count > 0)
                 {
+                    // tip: fix-night-wave-hud-progression — living only (trained tip preserved).
+                    if (lastWaveDeadUnitIds != null && lastWaveDeadUnitIds.Count > 0)
+                        veterans.RemoveAll(v => v != null && !string.IsNullOrEmpty(v.unitID)
+                                                && lastWaveDeadUnitIds.Contains(v.unitID));
                     foreach (var v in veterans)
                     {
                         if (v == null) continue;
@@ -611,6 +624,7 @@ namespace ArthurianAutobattler
         {
             lastWaveDeaths.Clear();
             lastWaveSurvivors.Clear();
+            lastWaveDeadUnitIds.Clear();
             if (playerArmy == null) return;
 
             var dead = deadIds ?? new HashSet<string>();
@@ -645,6 +659,8 @@ namespace ArthurianAutobattler
                 {
                     entry.rewardNote = $"Fallen — morale −{MoraleLossPerDeath * 100f:0}% HP/ATK";
                     lastWaveDeaths.Add(entry);
+                    if (!string.IsNullOrEmpty(u.unitID))
+                        lastWaveDeadUnitIds.Add(u.unitID);
                 }
                 else
                 {
@@ -757,20 +773,23 @@ namespace ArthurianAutobattler
             try
             {
                 int from = Mathf.Max(1, currentNight);
-                // Defeat / timeline restart: next fight is Wave 1 — HUD Night mirrors that
-                // (no "Night 2 · Wave 1" mismatch vs DemonHordeGenerator).
+                // tip: fix-night-wave-hud-progression
+                // Defeat Continue / Next Night: Night advances; combat restarts at Wave 1.
+                // Night 1 loss → Night 2 · Wave 1 (HUD must reflect the night change).
                 if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
                 if (battleEngine != null)
                 {
                     battleEngine.isBattling = false;
                     battleEngine.currentBattleNumber = 1;
                 }
-                currentNight = 1;
+                currentNight = from + 1;
                 PlayerPrefs.SetInt(NightPrefsKey, currentNight);
                 PlayerPrefs.Save();
-                Debug.Log(
-                    $"[DemonKnight] Defeat/timeline restart — HUD Night/Wave 1 "
-                    + $"(was night {from}; combat wave reset to 1).");
+
+                int pruned = PruneDeadFromWarbandAndPews();
+                Debug.LogError(
+                    $"[DemonKnight] Defeat/timeline Next Night — HUD Night {from} → {currentNight} · "
+                    + $"Wave 1 (prunedDead={pruned}).");
 
                 int gold = townUI != null ? townUI.playerGold : StartingGold;
                 AutosaveWarband(gold);
@@ -784,6 +803,14 @@ namespace ArthurianAutobattler
                 if (townCanvasObj != null) townCanvasObj.SetActive(true);
 
                 ContinueTimelineFromAutosave();
+
+                // Ensure load did not re-bump wave (defeat path is always Wave 1).
+                if (battleEngine != null)
+                    battleEngine.currentBattleNumber = 1;
+                RefreshNightHUD();
+                var church = ResolveChurchUI();
+                church?.SetNight(currentNight);
+                church?.RefreshHUD();
             }
             finally
             {
@@ -804,7 +831,9 @@ namespace ArthurianAutobattler
 
             if (data != null)
             {
-                if (data.night > 0) currentNight = data.night;
+                // Prefer the live advanced night (Next Night already bumped) over a stale save.
+                if (data.night > 0)
+                    currentNight = Mathf.Max(Mathf.Max(1, currentNight), data.night);
                 PlayerPrefs.SetInt(NightPrefsKey, currentNight);
                 PlayerPrefs.Save();
 
@@ -815,6 +844,13 @@ namespace ArthurianAutobattler
 
                 recruitedParty = WarbandAutosave.ToRecruitList(data);
                 veterans = WarbandAutosave.ToVeteranList(data);
+                // tip: fix-night-wave-hud-progression — dead never restore into next night.
+                if (veterans != null && lastWaveDeadUnitIds != null && lastWaveDeadUnitIds.Count > 0)
+                    veterans.RemoveAll(v => v != null && !string.IsNullOrEmpty(v.unitID)
+                                            && lastWaveDeadUnitIds.Contains(v.unitID));
+                if (recruitedParty != null && lastWaveDeadUnitIds != null && lastWaveDeadUnitIds.Count > 0)
+                    recruitedParty.RemoveAll(r => r != null && !string.IsNullOrEmpty(r.unitID)
+                                                  && lastWaveDeadUnitIds.Contains(r.unitID));
                 // Legacy saves: if veterans empty but survivors present after an old
                 // "keep party across nights" build, treat survivors as rehireable pew veterans
                 // when we want empty party — but if party was intentionally saved, keep it.
@@ -1108,9 +1144,18 @@ namespace ArthurianAutobattler
 
             if (diedInCombat)
             {
-                // Balance V2: death hire inflation removed (RecordArmyDeath is +0).
+                // tip: fix-night-wave-hud-progression — dead do NOT return to pews / next night.
+                if (!string.IsNullOrEmpty(r.unitID))
+                {
+                    lastWaveDeadUnitIds.Add(r.unitID);
+                    if (currentTownPool != null)
+                        currentTownPool.RemoveAll(t => t != null && t.unitID == r.unitID);
+                }
+                Debug.Log(
+                    $"[DemonKnight] {r.characterName} died in combat — pruned from pews (no carry).");
+                return;
             }
-            else if (diedAsFusionLeaf)
+            if (diedAsFusionLeaf)
             {
                 GrudgeSaveManager.Instance?.RecordArmyDeath(r.unitID);
             }
@@ -1277,14 +1322,73 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// HUD Night number = combat wave (<see cref="AutoBattlerEngine.currentBattleNumber"/>).
-        /// Keeps church bar / PlayerPrefs aligned with horde budget + boss spawn.
+        /// tip: fix-night-wave-hud-progression — remove combat-dead from hired party + pews
+        /// before Next Night. Living keep trained/★ stats. Returns pruned count.
+        /// </summary>
+        public int PruneDeadFromWarbandAndPews(HashSet<string> extraDeadIds = null)
+        {
+            var dead = new HashSet<string>();
+            if (lastWaveDeadUnitIds != null)
+            {
+                foreach (var id in lastWaveDeadUnitIds)
+                    if (!string.IsNullOrEmpty(id)) dead.Add(id);
+            }
+            if (lastWaveDeaths != null)
+            {
+                foreach (var d in lastWaveDeaths)
+                    if (d != null && !string.IsNullOrEmpty(d.unitID)) dead.Add(d.unitID);
+            }
+            if (extraDeadIds != null)
+            {
+                foreach (var id in extraDeadIds)
+                    if (!string.IsNullOrEmpty(id)) dead.Add(id);
+            }
+            if (dead.Count == 0) return 0;
+
+            int pruned = 0;
+            if (recruitedParty != null)
+            {
+                for (int i = recruitedParty.Count - 1; i >= 0; i--)
+                {
+                    var r = recruitedParty[i];
+                    if (r == null || string.IsNullOrEmpty(r.unitID) || !dead.Contains(r.unitID))
+                        continue;
+                    recruitedParty.RemoveAt(i);
+                    pruned++;
+                }
+            }
+            if (currentTownPool != null)
+            {
+                for (int i = currentTownPool.Count - 1; i >= 0; i--)
+                {
+                    var r = currentTownPool[i];
+                    if (r == null || string.IsNullOrEmpty(r.unitID) || !dead.Contains(r.unitID))
+                        continue;
+                    currentTownPool.RemoveAt(i);
+                    pruned++;
+                }
+            }
+            if (pruned > 0)
+            {
+                Debug.LogError(
+                    $"[DemonKnight] Pruned {pruned} dead unit(s) from warband/pews before next night "
+                    + $"(ids={dead.Count}).");
+                RefreshTownAfterDisband();
+            }
+            return pruned;
+        }
+
+        /// <summary>
+        /// Legacy Sync helper kept for Force Sync critical checks.
+        /// tip: fix-night-wave-hud-progression — Night and Wave are independent:
+        /// Night advances on every Next Night; Wave advances on victory only.
+        /// This no longer forces currentNight = currentBattleNumber.
         /// </summary>
         public void SyncNightToCombatWave()
         {
-            int wave = CurrentWaveNumber();
-            if (currentNight == wave) return;
-            currentNight = wave;
+            // Intentionally does not overwrite currentNight from wave.
+            // Callers should RefreshNightHUD / SetNight after night or wave changes.
+            currentNight = Mathf.Max(1, currentNight);
             PlayerPrefs.SetInt(NightPrefsKey, currentNight);
             PlayerPrefs.Save();
         }
@@ -1293,13 +1397,13 @@ namespace ArthurianAutobattler
         /// Updates the top-HUD Night/Wave label by GameObject name only.
         /// Deliberately does NOT call ChurchStageUIController.SetNight / SomersetChurchUI.SetNight
         /// so this file compiles even when those UI scripts are a stale partial Sync.
-        /// Label always uses combat wave SoT (never a stale calendar Night alone).
+        /// tip: fix-night-wave-hud-progression — Night and Wave may differ (e.g. Night 2 · Wave 1 after loss).
         /// </summary>
         public void RefreshNightHUD()
         {
-            SyncNightToCombatWave();
+            int night = Mathf.Max(1, currentNight);
             int wave = CurrentWaveNumber();
-            ApplyNightLabel(FormatNightWaveLabel(wave, wave));
+            ApplyNightLabel(FormatNightWaveLabel(night, wave));
         }
 
         /// <summary>
@@ -1313,15 +1417,15 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// HUD bar label. Night and Wave numbers are the same combat index
-        /// (<c>currentBattleNumber</c>) — Night is not a separate calendar that can drift.
-        /// e.g. "Night 3 · Wave 3: The Black Knight".
+        /// HUD bar label. tip: fix-night-wave-hud-progression —
+        /// Night (calendar) and Wave (combat) are independent and both shown.
+        /// e.g. loss → "Night 2 · Wave 1 (Horde)"; victory → "Night 2 · Wave 2 (Horde)".
         /// </summary>
         public static string FormatNightWaveLabel(int night, int wave)
         {
-            // Prefer combat wave when callers pass a mismatched night (stale SetNight arg).
-            int shown = Mathf.Max(1, wave > 0 ? wave : night);
-            return $"Night {shown} · {DescribeWave(shown)}";
+            int n = Mathf.Max(1, night);
+            int w = Mathf.Max(1, wave > 0 ? wave : n);
+            return $"Night {n} · {DescribeWave(w)}";
         }
 
         /// <summary>Wave number + boss/horde type for HUD (CharacterDatabase schedule).</summary>
@@ -1536,10 +1640,9 @@ namespace ArthurianAutobattler
             // Every wave that starts MUST end with a pew disband (win or lose).
             mustDisbandPartyAfterCurrentWave = true;
             church?.CloseAllModals();
-            // HUD must match the fight about to spawn (horde/boss use currentBattleNumber).
-            SyncNightToCombatWave();
+            // tip: fix-night-wave-hud-progression — show calendar Night + combat Wave independently.
             RefreshNightHUD();
-            church?.SetNight(CurrentWaveNumber());
+            church?.SetNight(currentNight);
             // Snapshot before March (pre-disband). Wave-end EnsureDisbanded overwrites this.
             AutosaveWarband();
             if (townCanvasObj != null) townCanvasObj.SetActive(false);

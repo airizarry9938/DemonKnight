@@ -858,8 +858,8 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Begin the next night without relying on Build Settings. Soft-restarts the
         /// GameLoop when present; only falls back to a scene reload if needed.
-        /// Mid-run wave victory → ContinueAfterWaveVictory (keep currentBattleNumber).
-        /// Defeat / full-run end → AdvanceNightAndRestart (wave resets to 1).
+        /// Mid-run wave victory → ContinueAfterWaveVictory (Night++; keep advanced Wave). tip: fix-night-wave-hud-progression
+        /// Defeat / full-run end → AdvanceNightAndRestart (Night++; Wave → 1). tip: fix-night-wave-hud-progression
         /// </summary>
         public void StartNextTimelineRun()
         {
