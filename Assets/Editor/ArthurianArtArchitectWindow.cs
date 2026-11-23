@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-architect-48-seat-preview";
+    public const string UiBuildId = "fix-stage-placer-profiles";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -38,6 +38,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const string ArchitectPoolsBodyFolder = ArchitectPoolsRoot + "/Body";
     const string ArchitectPoolsFaceFolder = ArchitectPoolsRoot + "/Face";
     const string ArchitectPoolsBattleFolder = ArchitectPoolsRoot + "/Battle";
+    /// <summary>Named Save/Load Stage Layout snapshots (tip fix-stage-placer-profiles).</summary>
+    const string ArchitectPoolsStageFolder = ArchitectPoolsRoot + "/Stage";
     /// <summary>Same art as SomersetChurchUI / SomersetPewLayout (play stage).</summary>
     const string ChurchBackgroundPath = "Assets/Art/Backgrounds/SomersetChurchInterior.jpg";
     /// <summary>Reference pixel size of SomersetChurchInterior (play layout tuned to this).</summary>
@@ -153,6 +155,10 @@ public class ArthurianArtArchitectWindow : EditorWindow
     bool scalingSlot;
     int churchDragSeat = -1;
     Rect lastChurchContentRect;
+    // tip: fix-stage-placer-profiles — named Save/Load Stage Layout Profile (SoftPromote Persist).
+    string stageLayoutSaveName = "MyStageLayout";
+    int stageLayoutLoadIndex;
+    string[] stageLayoutSavedNames; // null = dirty list
 
     // Single menu path only — do not also register under DemonKnight/.
     [MenuItem("Arthurian/Art & Stage Architect", false, 35)]
@@ -586,21 +592,29 @@ public class ArthurianArtArchitectWindow : EditorWindow
         ref int loadIndex,
         ref string[] cachedNames,
         System.Action saveAction,
-        System.Action<string> loadAction)
+        System.Action<string> loadAction,
+        string sectionTitle = null,
+        string saveButtonLabel = "Save Pool Profile",
+        string loadPopupLabel = "Load Pool Profile",
+        string helpText = null)
     {
         EditorGUILayout.Space(4);
         EditorGUILayout.BeginVertical("box");
-        EditorGUILayout.LabelField("Named Pool Profiles · " + kindLabel, EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            string.IsNullOrEmpty(sectionTitle) ? ("Named Pool Profiles · " + kindLabel) : sectionTitle,
+            EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Save Pool Profile → uses the name you type (filesystem-safe) → "
-            + folder + "/{name}.asset + SoftPromote Persist.\n"
-            + "Load Pool Profile → always visible; copies sprites into the live Resources profile Play uses, then SoftPromote Persist.",
+            string.IsNullOrEmpty(helpText)
+                ? ("Save Pool Profile → uses the name you type (filesystem-safe) → "
+                   + folder + "/{name}.asset + SoftPromote Persist.\n"
+                   + "Load Pool Profile → always visible; copies sprites into the live Resources profile Play uses, then SoftPromote Persist.")
+                : helpText,
             MessageType.Info);
 
         // Save: ALWAYS bind EditorGUILayout.TextField → sanitize on click → write {folder}/{name}.asset
         EditorGUILayout.BeginHorizontal();
         saveName = EditorGUILayout.TextField("Save as name", saveName ?? "");
-        if (GUILayout.Button("Save Pool Profile", GUILayout.Width(150), GUILayout.Height(22)))
+        if (GUILayout.Button(saveButtonLabel, GUILayout.Width(150), GUILayout.Height(22)))
             saveAction?.Invoke();
         EditorGUILayout.EndHorizontal();
 
@@ -610,7 +624,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         string[] displayNames = hasSaved ? cachedNames : new[] { NamedPoolNoneSavedLabel };
         EditorGUILayout.BeginHorizontal();
         loadIndex = Mathf.Clamp(loadIndex, 0, displayNames.Length - 1);
-        int next = EditorGUILayout.Popup("Load Pool Profile", loadIndex, displayNames);
+        int next = EditorGUILayout.Popup(loadPopupLabel, loadIndex, displayNames);
         if (next != loadIndex) loadIndex = next;
         EditorGUI.BeginDisabledGroup(!hasSaved);
         if (GUILayout.Button("Load", GUILayout.Width(70), GUILayout.Height(22)) && hasSaved)
@@ -1044,6 +1058,80 @@ public class ArthurianArtArchitectWindow : EditorWindow
         Debug.Log("[DemonKnight] Load Pool Profile (BATTLE) ← " + path + " → SoftPromote Persist live Resources.");
     }
 
+    // ── Named Save / Load Stage Layout Profile (tip fix-stage-placer-profiles) ──
+
+    void SaveNamedStageLayoutProfile()
+    {
+        if (stageProfile == null) return;
+        string name = SanitizePoolProfileName(stageLayoutSaveName);
+        if (string.IsNullOrEmpty(name))
+        {
+            EditorUtility.DisplayDialog("Save Profile", "Enter a name for this Stage Layout profile.", "OK");
+            return;
+        }
+        PersistStageProfile("SaveNamedStage:" + name);
+        EnsureArchitectPoolsFolder(ArchitectPoolsStageFolder);
+        string dest = ArchitectPoolsStageFolder + "/" + name + ".asset";
+        var named = EnsureNamedPoolAssetAtPath<StageLayoutProfile>(dest);
+        if (named == null)
+        {
+            Debug.LogError("[DemonKnight] Save Profile FAILED (STAGE) → " + dest);
+            EditorUtility.DisplayDialog("Save Profile", "Could not create:\n" + dest, "OK");
+            return;
+        }
+        CopyStageSlots(stageProfile, named);
+        named.name = name;
+        EditorUtility.SetDirty(named);
+        FinalizeNamedPoolSave(
+            dest, name, ArchitectPoolsStageFolder, "t:StageLayoutProfile",
+            ref stageLayoutSavedNames, ref stageLayoutLoadIndex, ref stageLayoutSaveName);
+        Debug.Log("[DemonKnight] Save Profile (STAGE) path → " + dest
+                  + " → SoftPromote Persist live Resources.");
+        EditorUtility.DisplayDialog(
+            "Save Profile",
+            "Saved Stage Layout as '" + name + "'.\n\n" + dest
+            + "\n\nLive Resources StageLayoutProfile SoftPromoted for Play.",
+            "OK");
+    }
+
+    void LoadNamedStageLayoutProfile(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return;
+        string path = ArchitectPoolsStageFolder + "/" + name + ".asset";
+        var named = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(path);
+        if (named == null)
+        {
+            string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+                path.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(full)
+                && ArthurianStageLayoutProfileEnsure.TryRemapNamedPoolScript(full, typeof(StageLayoutProfile)))
+            {
+                AssetDatabase.ImportAsset(path);
+                named = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(path);
+            }
+        }
+        if (named == null)
+        {
+            EditorUtility.DisplayDialog("Load Profile", "Missing asset:\n" + path, "OK");
+            stageLayoutSavedNames = null;
+            return;
+        }
+        if (stageProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(stageProfile)))
+            stageProfile = ArthurianStageLayoutProfileEnsure.EnsureAsset();
+        if (stageProfile == null)
+        {
+            EditorUtility.DisplayDialog("Load Profile", "Could not ensure live StageLayoutProfile.", "OK");
+            return;
+        }
+        named.RematerializeSpritesFromPaths();
+        Undo.RecordObject(stageProfile, "Load Named Stage Layout Profile");
+        CopyStageSlots(named, stageProfile);
+        PersistStageProfile("LoadNamedStage:" + name);
+        stageLayoutSaveName = name;
+        Debug.Log("[DemonKnight] Load Profile (STAGE) ← " + path + " → SoftPromote Persist live Resources.");
+        Repaint();
+    }
+
     static void CopyClassPoolLists(ClassSpritePoolProfile from, ClassSpritePoolProfile to)
     {
         if (from == null || to == null) return;
@@ -1161,13 +1249,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
         to.churchPewSlots = CloneSlots(from.churchPewSlots);
         to.playerBattleSlots = CloneSlots(from.playerBattleSlots);
         to.enemyBattleSlots = CloneSlots(from.enemyBattleSlots);
-        to.parallaxLayers = from.parallaxLayers != null
-            ? new List<StageParallaxLayer>(from.parallaxLayers)
-            : new List<StageParallaxLayer>();
+        to.parallaxLayers = CloneParallaxLayers(from.parallaxLayers);
         to.enableRainFX = from.enableRainFX;
         to.enableLightningFlashes = from.enableLightningFlashes;
         to.enableCandleFlicker = from.enableCandleFlicker;
-        // tip: fix-architect-48-seat-preview — layout prefs SoftPromote with profile.
+        // tip: fix-stage-placer-profiles — layout prefs SoftPromote with named Save/Load.
         to.churchHitboxSize = from.churchHitboxSize;
         to.churchSpriteScale = from.churchSpriteScale;
         to.churchSeatGap = from.churchSeatGap;
@@ -1194,7 +1280,30 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 bonusATK = s.bonusATK,
                 bonusSPD = s.bonusSPD,
                 previewOrOverrideSprite = s.previewOrOverrideSprite,
+                previewAssetPath = s.previewAssetPath,
                 assignedCharacterId = s.assignedCharacterId
+            });
+        }
+        return list;
+    }
+
+    static List<StageParallaxLayer> CloneParallaxLayers(List<StageParallaxLayer> src)
+    {
+        var list = new List<StageParallaxLayer>();
+        if (src == null) return list;
+        for (int i = 0; i < src.Count; i++)
+        {
+            var l = src[i];
+            if (l == null) { list.Add(null); continue; }
+            list.Add(new StageParallaxLayer
+            {
+                layerName = l.layerName,
+                layerSprite = l.layerSprite,
+                sortingOrder = l.sortingOrder,
+                scrollSpeed = l.scrollSpeed,
+                swayAmplitude = l.swayAmplitude,
+                swayFrequency = l.swayFrequency,
+                layerTint = l.layerTint
             });
         }
         return list;
@@ -2460,6 +2569,23 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUILayout.LabelField(
             $"Assigned pew sprites: {ArthurianStageLayoutProfileEnsure.CountAssignedSprites(stageProfile)} / {StageLayoutProfile.ChurchPewCount}  ·  asset={AssetDatabase.GetAssetPath(stageProfile)}",
             EditorStyles.miniLabel);
+
+        // tip: fix-stage-placer-profiles — Save/Load named Stage Layout (slots + layout prefs + parallax/FX).
+        DrawNamedPoolProfileBar(
+            "STAGE",
+            ArchitectPoolsStageFolder,
+            "t:StageLayoutProfile",
+            ref stageLayoutSaveName,
+            ref stageLayoutLoadIndex,
+            ref stageLayoutSavedNames,
+            SaveNamedStageLayoutProfile,
+            LoadNamedStageLayoutProfile,
+            sectionTitle: "Named Stage Layout Profiles · STAGE",
+            saveButtonLabel: "Save Profile",
+            loadPopupLabel: "Load Profile",
+            helpText: "Save Profile → name you type → "
+                + ArchitectPoolsStageFolder + "/{name}.asset + SoftPromote Persist.\n"
+                + "Load Profile → always visible; copies pew/battle seats, hitbox/sprite prefs, parallax layers & FX into the live StageLayoutProfile Play uses, then SoftPromote Persist.");
 
         stageView = (StageViewMode)EditorGUILayout.EnumPopup("Stage View", stageView);
         if (stageView == StageViewMode.ChurchyardBattle)
@@ -4782,7 +4908,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-architect-pool-load-list (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-stage-placer-profiles (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -4791,7 +4917,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-architect-48-seat-preview";
+    public const string TipId = "fix-stage-placer-profiles";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

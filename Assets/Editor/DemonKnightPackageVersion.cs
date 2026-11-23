@@ -11,10 +11,10 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-architect-48-seat-preview";
-    public const string GitHint = "fix-architect-48-seat-preview";
-    // tip: fix-architect-48-seat-preview — CS0104 TownRNG Random + TipEscape HardWrite markers coherent.
-    public const string BuiltUtc = "2026-11-23T17:50:00Z";
+    public const string Id = "fix-stage-placer-profiles";
+    public const string GitHint = "fix-stage-placer-profiles";
+    // tip: fix-stage-placer-profiles — Stage Placer named Save/Load SoftPromote Persist.
+    public const string BuiltUtc = "2026-11-23T18:35:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "986ea7e49464fcf0cc5db1ae191641f6dc6f9f02";
@@ -35,7 +35,7 @@ public static class DemonKnightPackageVersion
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-architect-pool-load-list — one-shot per editor session (domain reload still
+            // tip: fix-stage-placer-profiles — one-shot per editor session (domain reload still
             // re-enters InitializeOnLoad; SessionState survives domain reload within a session).
             // SET GATE FIRST — WipeModularPaperdollAssets used to Refresh before gate → endless loop.
             if (SessionState.GetBool(OnLoadSessionGate, false)) return;
@@ -154,7 +154,8 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
-                                || body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0))
+                                || (body.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+                                && body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)))
                             throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                         if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class TownRNGGenerator", StringComparison.Ordinal) < 0
@@ -173,8 +174,10 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                                 || body.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
                                 || body.IndexOf("SaveNamedClassPoolProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("SaveNamedStageLayoutProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("ArchitectPoolsStageFolder", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ArchitectPools", StringComparison.Ordinal) < 0))
-                            throw new Exception("Architect missing embedded BuildPersist / SoftPromote / Save Pool Profile");
+                            throw new Exception("Architect missing embedded BuildPersist / SoftPromote / Save Stage Profile");
                         // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
                         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                             || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
@@ -371,6 +374,7 @@ public static class DemonKnightPackageVersion
             "fix-architect-load-pool-profiles",
             "fix-architect-save-load-pool-ux",
             "fix-architect-pool-load-list",
+            "fix-architect-48-seat-preview",
         };
         foreach (string s in stale)
         {
