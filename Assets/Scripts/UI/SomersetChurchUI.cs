@@ -35,7 +35,7 @@ namespace ArthurianAutobattler
         public RectTransform pewSeatLayer;
         public GameObject paperDollSeatPrefab;
         /// <summary>~1.55× prior 56×72 — pew sprites read larger on church art.</summary>
-        public Vector2 baseSeatSize = new Vector2(110f, 140f); // tip: fix-48-pew-seats
+        public Vector2 baseSeatSize = new Vector2(110f, 140f); // tip: fix-townrng-name-pools
 
         [Header("Modals (mutual exclusion)")]
         public GameObject diceModal;
@@ -1389,7 +1389,7 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// HUD Night/Wave bar. tip: fix-48-pew-seats —
+        /// HUD Night/Wave bar. tip: fix-townrng-name-pools —
         /// Night (calendar from Next Night) and Wave (combat) are independent.
         /// Loss → Night 2 · Wave 1; victory → Night 2 · Wave 2.
         /// </summary>
@@ -3314,7 +3314,7 @@ namespace ArthurianAutobattler
                     ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
                     : "");
 
-            // tip: fix-48-pew-seats — show current effective stats (trained+★+morale).
+            // tip: fix-townrng-name-pools — show current effective stats (trained+★+morale).
             int hp = m.GetEffectiveMaxHealth();
             int atk = m.GetEffectiveAttackDamage();
             float spd = m.GetEffectiveAttackSpeed();
@@ -3629,7 +3629,7 @@ namespace ArthurianAutobattler
         {
             var town = Town;
             var loop = GameLoopManager.Instance;
-            // tip: fix-48-pew-seats — calendar Night + combat Wave.
+            // tip: fix-townrng-name-pools — calendar Night + combat Wave.
             if (loop != null) SetNight(loop.currentNight);
             if (goldText != null && town != null) goldText.text = $"Royal Gold: {town.playerGold}g";
             UpdateWarbandHudLabel();

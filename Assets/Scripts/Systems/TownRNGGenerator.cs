@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,20 +10,51 @@ namespace ArthurianAutobattler
         public List<Sprite> warriorAvatars;
         public List<Sprite> peasantAvatars;
 
+        // tip: fix-townrng-name-pools — 48 first names (exact order).
         private readonly string[] firstNames =
         {
-            "Gawain", "Cedric", "Alden", "Bram", "Rowan", "Gareth", "Tristan", "Lucan",
-            "Bors", "Ector", "Percival", "Lamorak", "Kay", "Bedivere", "Mordred", "Agravain",
-            "Pellinore", "Urien", "Accolon", "Dinadan", "Palamedes", "Sagramore", "Yvain",
-            "Willem", "Thomas", "Hugh", "Wat", "Piers", "Hob", "Jack", "Oswin", "Eadric"
+            "Alden", "Bram", "Rowan", "Cedric", "Lucan", "Gideon", "Caleb", "Julian",
+            "Cole", "Finn", "Jude", "Owen", "Maren", "Tessa", "Clara", "Ivy",
+            "Maeve", "Brenna", "Freya", "Nora", "Corbin", "Darius", "Kieran", "Soren",
+            "Torin", "Maddox", "Rory", "Ellis", "Damian", "Alistair", "Toby", "Wren",
+            "Marcus", "Roman", "Victor", "Hector", "Garrett", "Grant", "Nolan", "Dean",
+            "Brock", "Titus", "Cassian", "Damon", "Vera", "Elena", "Diana", "Claire"
         };
 
+        // tip: fix-townrng-name-pools — 75 surnames & nicknames (exact order).
         private readonly string[] epithets =
         {
-            "the Grim", "of Camelot", "the Drunk", "Ironhand", "the Skeptic", "Two-Coins",
-            "the Bold", "Mudfoot", "the Scarred", "Half-Helm", "the Pious", "Quickblade",
-            "the Red", "the Stout", "of the Hills", "the Unlucky", "the Loyal", "Blacktooth"
+            "Stone", "Ward", "Holt", "Cole", "Shaw", "Cross", "Grant", "Hayes",
+            "Brooks", "Reid", "Vaughn", "Marsh", "Cairn", "Barrow", "Kerr", "Doyle",
+            "Boyd", "Tate", "Penn", "Wells", "Ford", "Ross", "Gale", "Nash",
+            "Cain", "Vance", "Thorne", "Sterling", "Mercer", "Flint", "Graves", "Locke",
+            "Drake", "Frost", "Slate", "Hale", "Crow", "Rook", "Knox", "Steele",
+            "Ashford", "Fox", "Wolf", "Briggs", "Pike", "Noodle", "Biscuit", "Waffles",
+            "Crumb", "Puddle", "Pickles", "Buttons", "Mittens", "Pebbles", "Turnip", "Cabbage",
+            "Sprout", "Pockets", "Fizz", "Spud", "Butterknife", "Half-Pint", "Two-Coins", "No-Luck",
+            "Sidekick", "Meatshield", "Coinflip", "Shortstraw", "Tin-Can", "Sore-Back", "Late-Fee",
+            "Overdraft", "Glass-Jaw", "Tripwire", "Wildcard"
         };
+
+        /// <summary>
+        /// Full display names of fused Legends / wave bosses / special combat units.
+        /// TownRNG must never emit an identical First+" "+Surname copycat.
+        /// </summary>
+        private static readonly HashSet<string> ReservedFullNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Town Priest", "Vanguard Captain", "King Arthur", "Sir Lancelot", "Morgan le Fay",
+            "Lady of the Lake", "Sir Gawain", "Mordred", "Sir Galahad", "Sir Tristan",
+            "Sir Percival", "Sir Kay", "Sir Bedivere", "Lady Guinevere", "Arch Priest of Glastonbury",
+            "Nimue", "The Green Knight", "Merlin", "Merlin the Archmage",
+            "The Black Knight", "Vortigern, Usurper King", "Accolon of Gaul", "The Questing Beast",
+            "Nimue, Queen of Thorns", "Feral Dread Lord", "Rabid Hellhound", "Frenzied Imp",
+            "Hourglass Dread Lord", "Siren Enchantress"
+        };
+
+        // Per-run uniqueness (reset in GenerateNewRunTown).
+        private HashSet<string> _usedFirstNames;
+        private HashSet<string> _usedSurnames;
+        private HashSet<string> _usedFullNames;
 
         [Header("Paper-Doll Pools (optional / legacy)")]
         public List<Sprite> bodyEager;
@@ -41,9 +73,14 @@ namespace ArthurianAutobattler
 
         public List<RecruitInstance> GenerateNewRunTown()
         {
+            // tip: fix-townrng-name-pools — reset per-run name uniqueness before pew generation.
+            _usedFirstNames = new HashSet<string>(StringComparer.Ordinal);
+            _usedSurnames = new HashSet<string>(StringComparer.Ordinal);
+            _usedFullNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             // Persistent unitIDs for grudge memory; pew seats are shuffled each run.
             List<RecruitInstance> townList = new List<RecruitInstance>();
-            // tip: fix-48-pew-seats — 12 knights + 14 warriors + 22 peasants = 48.
+            // tip: fix-townrng-name-pools — 12 knights + 14 warriors + 22 peasants = 48.
             for (int i = 0; i < 12; i++) townList.Add(CreateRandomRecruit($"knight_{i}", UnitType.Knight, knightAvatars, i));
             for (int i = 0; i < 14; i++) townList.Add(CreateRandomRecruit($"warrior_{i}", UnitType.Warrior, warriorAvatars, 12 + i));
             for (int i = 0; i < 22; i++) townList.Add(CreateRandomRecruit($"peasant_{i}", UnitType.Peasant, peasantAvatars, 26 + i));
@@ -52,6 +89,91 @@ namespace ArthurianAutobattler
             townList.Sort((a, b) => a.pewSeatIndex.CompareTo(b.pewSeatIndex));
             CardFusionSystem.SanitizeBaseUnitFusionFlags(townList);
             return townList;
+        }
+
+        /// <summary>
+        /// tip: fix-townrng-name-pools — FirstName + " " + SurnameOrEpithet with per-run uniqueness:
+        /// unique surnames; unique first names until the 48-pool is exhausted; never First==Surname;
+        /// never a full-name collision with Legends / wave bosses.
+        /// </summary>
+        private string AllocateUniqueCharacterName()
+        {
+            if (_usedFirstNames == null) _usedFirstNames = new HashSet<string>(StringComparer.Ordinal);
+            if (_usedSurnames == null) _usedSurnames = new HashSet<string>(StringComparer.Ordinal);
+            if (_usedFullNames == null) _usedFullNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            string surname = PickUniqueSurname();
+            bool allowFirstReuse = _usedFirstNames.Count >= firstNames.Length;
+
+            // Bound retries: 48 first × remaining surnames is large; still belt against reserved hits.
+            for (int attempt = 0; attempt < 256; attempt++)
+            {
+                string first = PickFirstNameCandidate(allowFirstReuse);
+                if (string.Equals(first, surname, StringComparison.Ordinal))
+                    continue; // block "Cole Cole", "Grant Grant"
+                string full = first + " " + surname;
+                if (ReservedFullNames.Contains(full) || _usedFullNames.Contains(full))
+                    continue;
+                if (!allowFirstReuse && _usedFirstNames.Contains(first))
+                    continue;
+
+                _usedFirstNames.Add(first);
+                _usedSurnames.Add(surname);
+                _usedFullNames.Add(full);
+                return full;
+            }
+
+            // Extreme fallback: keep unique surname, append a disambiguator if needed.
+            for (int i = 0; i < firstNames.Length; i++)
+            {
+                string first = firstNames[i];
+                if (string.Equals(first, surname, StringComparison.Ordinal)) continue;
+                if (!allowFirstReuse && _usedFirstNames.Contains(first)) continue;
+                string full = first + " " + surname;
+                if (ReservedFullNames.Contains(full) || _usedFullNames.Contains(full)) continue;
+                _usedFirstNames.Add(first);
+                _usedSurnames.Add(surname);
+                _usedFullNames.Add(full);
+                return full;
+            }
+
+            string emergency = firstNames[Random.Range(0, firstNames.Length)] + " " + surname;
+            _usedSurnames.Add(surname);
+            _usedFullNames.Add(emergency);
+            return emergency;
+        }
+
+        private string PickUniqueSurname()
+        {
+            // Prefer unused epithets; 75 pool covers 48 seats with room to spare.
+            for (int attempt = 0; attempt < 128; attempt++)
+            {
+                string s = epithets[Random.Range(0, epithets.Length)];
+                if (!_usedSurnames.Contains(s)) return s;
+            }
+            for (int i = 0; i < epithets.Length; i++)
+            {
+                if (!_usedSurnames.Contains(epithets[i])) return epithets[i];
+            }
+            // Should never hit with 48 seats / 75 surnames.
+            return epithets[Random.Range(0, epithets.Length)];
+        }
+
+        private string PickFirstNameCandidate(bool allowReuse)
+        {
+            if (!allowReuse)
+            {
+                for (int attempt = 0; attempt < 64; attempt++)
+                {
+                    string f = firstNames[Random.Range(0, firstNames.Length)];
+                    if (!_usedFirstNames.Contains(f)) return f;
+                }
+                for (int i = 0; i < firstNames.Length; i++)
+                {
+                    if (!_usedFirstNames.Contains(firstNames[i])) return firstNames[i];
+                }
+            }
+            return firstNames[Random.Range(0, firstNames.Length)];
         }
 
         /// <summary>Assign seats 0–47 in a fresh random order every run.</summary>
@@ -89,7 +211,7 @@ namespace ArthurianAutobattler
             RecruitInstance r = new RecruitInstance
             {
                 unitID = persistentID,
-                characterName = $"{firstNames[Random.Range(0, firstNames.Length)]} {epithets[Random.Range(0, epithets.Length)]}",
+                characterName = AllocateUniqueCharacterName(),
                 unitType = type,
                 pewSeatIndex = pewSeat,
                 battleSlotIndex = pewSeat,
