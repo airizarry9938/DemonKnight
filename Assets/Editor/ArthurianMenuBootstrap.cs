@@ -34,10 +34,10 @@ public static class ArthurianMenuBootstrap
     const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Phase 2–5 standalones to DELETE (types embedded elsewhere). CS0101 kill list.</summary>
+    /// <summary>Phase 2–5 standalones to DELETE when they redefine embeds. Profiles are real named MonoScripts (tip fix-profile-so-script-assets).</summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
         "Assets/Scripts/Data/SpriteAnimClip.cs",
-        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/ModularSpriteLibrary.cs",
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
@@ -191,7 +191,7 @@ public static class ArthurianMenuBootstrap
             $"Gameplay scripts: {(hasGameplay ? "YES" : "NO")}\n" +
             $"Church pew layout: {(hasPews ? "YES" : "NO")}\n" +
             $"Scene builder: {(hasBuilder ? "YES" : "NO")}\n" +
-            $"Phase 2–5 StageLayoutProfile (embed): {(hasStageLayout ? "YES" : "MISSING — Force Sync GameDataTypes.cs")}\n" +
+            $"Phase 2–5 StageLayoutProfile (named MonoScript): {(hasStageLayout ? "YES" : "MISSING — Force Sync StageLayoutProfile.cs")}\n" +
             $"Phase 4 StageParallaxController (embed): {(hasParallax ? "YES" : "MISSING — Force Sync GameLoopManager.cs")}\n" +
             $"Phase 4 ModularSpriteAnimator (embed): {(hasModAnim ? "YES" : "MISSING — Force Sync PaperDollSeatView.cs")}\n" +
             $"Phase 5 DiceManager (embed): {(hasDiceMgr ? "YES" : "MISSING — Force Sync TavernDiceMinigame.cs")}\n\n";
@@ -278,7 +278,6 @@ public static class ArthurianMenuBootstrap
     public static string ClearPaperdollLibraryInternal(bool showDialog)
     {
         const string artPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
-        const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
         EnsureFolderPath("Assets/Art/Modular");
         EnsureFolderPath("Assets/Resources/Art/Modular");
 

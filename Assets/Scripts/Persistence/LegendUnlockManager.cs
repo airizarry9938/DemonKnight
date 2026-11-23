@@ -377,7 +377,6 @@ namespace ArthurianAutobattler
 
             if (ingredients == null) return;
             bool hadDarkhorse = false;
-            bool hadGolden = false;
             bool hadGrail = false;
             foreach (var ing in ingredients)
             {
@@ -387,9 +386,7 @@ namespace ArthurianAutobattler
                     || string.Equals(ing.hiddenTraitId, RecruitInstance.DarkhorseId, StringComparison.Ordinal)
                     || string.Equals(ing.hiddenTraitId, RecruitInstance.LegendSparkId, StringComparison.Ordinal))
                     hadDarkhorse = true;
-                if (ing.secretArchetype == SecretArchetype.GoldenEgg
-                    || string.Equals(ing.hiddenTraitId, RecruitInstance.GoldenEggId, StringComparison.Ordinal))
-                    hadGolden = true;
+                // GoldenEgg / Merlin unlock removed from playable pool — intentionally no hadGolden.
                 if (ing.hiddenTraitId == HiddenPotentialSystem.TraitGrailTouched
                     || string.Equals(ing.hiddenTraitId, RecruitInstance.GrailTouchedId, StringComparison.Ordinal))
                     hadGrail = true;
@@ -397,7 +394,6 @@ namespace ArthurianAutobattler
 
             if (hadDarkhorse)
                 Unlock("SirPercival", "ascended/fused Darkhorse recruit");
-            // hadGolden: Merlin removed from playable pool — no unlock.
             if (hadGrail)
                 Unlock("Nimue", "fused Grail-Touched soul");
         }
