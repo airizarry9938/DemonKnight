@@ -43,9 +43,10 @@ namespace ArthurianAutobattler
         {
             // Persistent unitIDs for grudge memory; pew seats are shuffled each run.
             List<RecruitInstance> townList = new List<RecruitInstance>();
+            // tip: fix-48-pew-seats — 12 knights + 14 warriors + 22 peasants = 48.
             for (int i = 0; i < 12; i++) townList.Add(CreateRandomRecruit($"knight_{i}", UnitType.Knight, knightAvatars, i));
-            for (int i = 0; i < 15; i++) townList.Add(CreateRandomRecruit($"warrior_{i}", UnitType.Warrior, warriorAvatars, 12 + i));
-            for (int i = 0; i < 25; i++) townList.Add(CreateRandomRecruit($"peasant_{i}", UnitType.Peasant, peasantAvatars, 27 + i));
+            for (int i = 0; i < 14; i++) townList.Add(CreateRandomRecruit($"warrior_{i}", UnitType.Warrior, warriorAvatars, 12 + i));
+            for (int i = 0; i < 22; i++) townList.Add(CreateRandomRecruit($"peasant_{i}", UnitType.Peasant, peasantAvatars, 26 + i));
 
             ShufflePewSeats(townList);
             townList.Sort((a, b) => a.pewSeatIndex.CompareTo(b.pewSeatIndex));
@@ -53,7 +54,7 @@ namespace ArthurianAutobattler
             return townList;
         }
 
-        /// <summary>Assign seats 0–51 in a fresh random order every run.</summary>
+        /// <summary>Assign seats 0–47 in a fresh random order every run.</summary>
         private static void ShufflePewSeats(List<RecruitInstance> townList)
         {
             int n = townList.Count;

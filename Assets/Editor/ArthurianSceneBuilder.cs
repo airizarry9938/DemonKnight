@@ -504,7 +504,7 @@ public static class ArthurianSceneBuilder
         EditorUtility.DisplayDialog(
             "Last Knights of Somerset",
             "Scene built at Assets/Scenes/CamelotMain.unity\n\n" +
-            "Church background + 12-pew seat layout (3×4) wired.\n" +
+            "Church background + 12×4 pew seat layout (48 seats) wired.\n" +
             "If the background is blank: select Assets/Art/Backgrounds/SomersetChurchInterior.jpg → Texture Type = Sprite (2D and UI) → Apply, then re-run this menu or assign the sprite on TownCanvas/ChurchBackground.\n" +
             "Tune pew anchors on TownCanvas → SomersetPewLayout if seats need nudging.",
             "OK");
