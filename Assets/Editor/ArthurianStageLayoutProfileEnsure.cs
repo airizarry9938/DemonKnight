@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "church-train-scout-ux";
+    const string TipPackageId = "fix-somerset-church-ui-cs0246";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -63,6 +63,10 @@ public static class ArthurianStageLayoutProfileEnsure
         "architect-legend-pew-portraits",
         "fix-architect-pool-apply",
         "sprite-outline-highlight",
+        "class-sprite-pools",
+        "force-sync-appliers-hardfix",
+        "sheet-splicer-chroma-despill",
+        "church-train-scout-ux",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]

@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "church-train-scout-ux";
-    public const string GitHint = "church-train-scout-ux";
-    public const string BuiltUtc = "2026-11-23T00:30:00Z";
+    public const string Id = "fix-somerset-church-ui-cs0246";
+    public const string GitHint = "mustrestore-hardrestore-somerset-church-ui";
+    public const string BuiltUtc = "2026-11-23T00:45:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "883e011ec849ef6101b67ff4827ff5ef5d8c30e0";
+    public const string HardTipSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -79,6 +79,7 @@ public static class DemonKnightPackageVersion
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
                     // Applier embed host FIRST — CS0103 hard fix under stale Sync.
                     "Assets/Scripts/Data/GameDataTypes.cs",
+                    "Assets/Scripts/UI/SomersetChurchUI.cs",
                     "Assets/Scripts/UI/SceneBackgroundApplier.cs",
                     "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
                     "Assets/Editor/ArthurianSyncFromGitHub.cs",
@@ -108,6 +109,11 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0))
                             throw new Exception("GameDataTypes missing embedded Appliers");
+                        if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
+                            && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
+                                || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
+                                || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0))
+                            throw new Exception("SomersetChurchUI missing tip church markers");
                         // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
                         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                             || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
@@ -223,6 +229,7 @@ public static class DemonKnightPackageVersion
             "architect-legend-pew-portraits",
             "fix-architect-pool-apply",
             "sprite-outline-highlight",
+            "church-train-scout-ux",
         };
         foreach (string s in stale)
         {

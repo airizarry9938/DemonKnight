@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "church-train-scout-ux";
+    public const string TipPackageId = "fix-somerset-church-ui-cs0246";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -41,7 +41,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (church-train-scout-ux)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-somerset-church-ui-cs0246)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -136,6 +136,7 @@ public static class DemonKnightTipEscape
             "architect-legend-pew-portraits",
             "fix-architect-pool-apply",
             "sprite-outline-highlight",
+            "church-train-scout-ux",
         };
         foreach (string s in stale)
         {
@@ -183,6 +184,11 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
                         || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0))
                     throw new Exception("GameDataTypes missing embedded Appliers");
+                if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
+                        || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
+                        || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0))
+                    throw new Exception("SomersetChurchUI missing tip church markers");
                 if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                     || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
                 {
