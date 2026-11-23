@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-endless-compile-loop";
+    public const string TipPackageId = "fix-hud-bar-button-layout";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -26,7 +26,7 @@ public static class DemonKnightTipEscape
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
         // Named MonoScript Profiles + shared types BEFORE GameDataTypes Appliers.
-        // tip: fix-endless-compile-loop — Force Sync wipe/never-pull → CS0246.
+        // tip: fix-hud-bar-button-layout — Force Sync wipe/never-pull → CS0246.
         // Applier embed host — Appliers stay in GameDataTypes.
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
@@ -34,6 +34,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/SomersetChurchUI.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
+        "Assets/Editor/ArthurianSceneBuilder.cs",
         "Assets/Editor/ArthurianSyncFromGitHub.cs",
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
@@ -45,7 +46,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-endless-compile-loop)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-hud-bar-button-layout)", false, 0)]
     public static void EscapeMenu()
     {
         // Manual Escape clears session gates so a stuck Downloads project can recover.
@@ -70,7 +71,7 @@ public static class DemonKnightTipEscape
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-endless-compile-loop — one-shot; SET GATE BEFORE EscapeNow (Refresh mid-Escape = loop).
+            // tip: fix-hud-bar-button-layout — one-shot; SET GATE BEFORE EscapeNow (Refresh mid-Escape = loop).
             if (SessionState.GetBool(OnLoadSessionGate, false)) return;
             SessionState.SetBool(OnLoadSessionGate, true);
             try
@@ -174,6 +175,7 @@ public static class DemonKnightTipEscape
             "fix-tipescape-profile-embeds",
             "fix-gdt-profile-always-compile",
             "fix-profiles-in-gdt-always",
+            "fix-endless-compile-loop",
         };
         foreach (string s in stale)
         {
@@ -184,7 +186,7 @@ public static class DemonKnightTipEscape
         // ClassPoolKind→UnitType CS0019; keep pew-body Persist/fileID belt.
         if (archBody.IndexOf("selectedClassPool == UnitType.", StringComparison.Ordinal) >= 0) return true;
         if (archBody.IndexOf("ClassPoolKind.Warrior => UnitType.Warrior", StringComparison.Ordinal) < 0) return true;
-        // tip: fix-endless-compile-loop — TipEscape delegates NukeNamedProfileFiles; GDT must hold Profile SOs.
+        // tip: fix-hud-bar-button-layout — TipEscape delegates NukeNamedProfileFiles; GDT must hold Profile SOs.
         string tipEscapePath = Path.Combine(root, "Assets", "Editor", "DemonKnightTipEscape.cs");
         if (!File.Exists(tipEscapePath)) return true;
         string tipEscapeBody = File.ReadAllText(tipEscapePath);
@@ -200,7 +202,7 @@ public static class DemonKnightTipEscape
         if (!File.Exists(bootPath)) return true;
         string bootBody = File.ReadAllText(bootPath);
         if (bootBody.IndexOf("NukeNamedProfileFiles", StringComparison.Ordinal) < 0
-            && bootBody.IndexOf("fix-endless-compile-loop", StringComparison.Ordinal) < 0) return true;
+            && bootBody.IndexOf("fix-hud-bar-button-layout", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
         string ensureBody = File.ReadAllText(ensurePath);
@@ -211,12 +213,21 @@ public static class DemonKnightTipEscape
             && File.ReadAllText(Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs"))
                 .IndexOf("TryPewBodyFallbackFromGoodTroops", StringComparison.Ordinal) < 0)
             return true;
+        // tip: fix-hud-bar-button-layout — stacked HUD after hierarchy rebuild needs HLG path.
+        string churchPath = Path.Combine(root, "Assets", "Scripts", "UI", "SomersetChurchUI.cs");
+        if (!File.Exists(churchPath)) return true;
+        string churchBody = File.ReadAllText(churchPath);
+        if (churchBody.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0) return true;
+        string builderPath = Path.Combine(root, "Assets", "Editor", "ArthurianSceneBuilder.cs");
+        if (!File.Exists(builderPath)) return true;
+        string builderBody = File.ReadAllText(builderPath);
+        if (builderBody.IndexOf("AddHudLayoutElement", StringComparison.Ordinal) < 0) return true;
         return false;
     }
 
 
     /// <summary>
-    /// tip: fix-endless-compile-loop — Profiles live in GameDataTypes. Delegate to Sync Nuke.
+    /// tip: fix-hud-bar-button-layout — Profiles live in GameDataTypes. Delegate to Sync Nuke.
     /// </summary>
     public static int HardWriteNamedProfilesIfMissing(string root = null, System.Text.StringBuilder log = null)
     {
@@ -291,8 +302,10 @@ public static class DemonKnightTipEscape
                 if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
                         || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
-                        || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0))
-                    throw new Exception("SomersetChurchUI missing tip church markers");
+                        || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
+                        || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
+                        || body.IndexOf("fix-hud-bar-button-layout", StringComparison.Ordinal) < 0))
+                    throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                 if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
                         || body.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0))
@@ -325,7 +338,7 @@ public static class DemonKnightTipEscape
 
         // Pew rebuild via reflection — TipEscape must compile even when Profile MonoScripts are
         // missing (Ensure → StageLayoutProfile CS0246 would otherwise block OnLoad restore).
-        // tip: fix-endless-compile-loop — skip during compile; never touch .cs from Ensure path here.
+        // tip: fix-hud-bar-button-layout — skip during compile; never touch .cs from Ensure path here.
         try
         {
             if (!EditorApplication.isCompiling && !EditorApplication.isUpdating
@@ -360,7 +373,7 @@ public static class DemonKnightTipEscape
         }
         catch (Exception ex) { log.AppendLine("PV nuke: " + ex.Message); }
 
-        // tip: fix-endless-compile-loop — Refresh ONLY when bytes changed.
+        // tip: fix-hud-bar-button-layout — Refresh ONLY when bytes changed.
         if (ok > 0) AssetDatabase.Refresh();
         EditorPrefs.SetString(PrefsKey, DateTime.UtcNow.ToString("o"));
         log.AppendLine($"Wrote {ok}/{HostRels.Length}. Wait compile → Diagnose: compiled=disk={TipPackageId}.");

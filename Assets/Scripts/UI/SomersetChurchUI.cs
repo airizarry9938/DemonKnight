@@ -26,7 +26,7 @@ namespace ArthurianAutobattler
         public Button menuButton;
 
         [Header("HUD Layout")]
-        [Tooltip("Off (default): Play keeps editor-authored HUD_Bar / button RectTransforms. On: legacy equal-slot auto layout overwrites positions.")]
+        [Tooltip("Off (default): HorizontalLayoutGroup + preferred widths (Night|Timer|Gold|Dice|Legends|Warband|March). On: legacy equal-slot strip.")]
         public bool forceEqualHudSlots = false;
 
         [Header("Church Stage")]
@@ -1106,9 +1106,9 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Wire HUD controls for Play. By default preserves editor-authored RectTransforms
-        /// (Andrew can move HUD icons in the Inspector and Play keeps them).
-        /// Set <see cref="forceEqualHudSlots"/> to restore the legacy equal-slot strip.
+        /// Wire HUD controls for Play. Default: HorizontalLayoutGroup with preferred widths
+        /// so post-rebuild / Library-wipe hierarchy buttons are spaced (tip fix-hud-bar-button-layout).
+        /// Set <see cref="forceEqualHudSlots"/> for the legacy equal-width strip.
         /// </summary>
         public void EnsureTopHubLayout()
         {
@@ -1131,20 +1131,14 @@ namespace ArthurianAutobattler
             RewireMarchButton();
             EnsureMenuHudButton(hud);
 
-            // Kill auto layout groups so they cannot fight authored positions.
-            var oldLayout = hud.GetComponent<HorizontalLayoutGroup>();
-            if (oldLayout != null) UnityEngine.Object.Destroy(oldLayout);
-            var fitter = hud.GetComponent<ContentSizeFitter>();
-            if (fitter != null) UnityEngine.Object.Destroy(fitter);
-
             if (nightText == null)
             {
                 var existing = hud.Find("NightText");
                 if (existing != null) nightText = existing.GetComponent<TextMeshProUGUI>();
             }
-            if (nightText == null && forceEqualHudSlots)
+            if (nightText == null)
                 nightText = CreateHudLabel(hud, "NightText", "Night 1 · Wave 1 (Horde)",
-                    Vector2.zero, new Vector2(220f, 40f), 18);
+                    Vector2.zero, new Vector2(200f, 40f), 18);
 
             if (timerText == null)
             {
@@ -1176,21 +1170,134 @@ namespace ArthurianAutobattler
                 party.gameObject.SetActive(false);
 
             EnsureMenuHudButton(hud);
-            PlaceMenuButtonFarLeft(hud);
 
-            // Labels only — do not move other authored RectTransforms unless legacy equal-slot mode is on.
             ApplyHudButtonLabel(tavernDiceButton, "Dice");
             ApplyHudButtonLabel(codexButton, "Legends");
             ApplyHudButtonLabel(goToWarButton, "MARCH TO WAR");
             ApplyHudButtonLabel(menuButton, "☰ Esc");
 
-            if (!forceEqualHudSlots)
+            if (forceEqualHudSlots)
             {
-                Debug.Log("[DemonKnight] HUD layout preserved (editor RectTransforms). Menu→far left. Codex=Legends.");
+                // Equal-slot path owns positions — drop HLG so it cannot fight.
+                var oldLayout = hud.GetComponent<HorizontalLayoutGroup>();
+                if (oldLayout != null) UnityEngine.Object.Destroy(oldLayout);
+                var fitter = hud.GetComponent<ContentSizeFitter>();
+                if (fitter != null) UnityEngine.Object.Destroy(fitter);
+                ApplyLegacyEqualHudSlots(hud, codex);
                 return;
             }
 
-            ApplyLegacyEqualHudSlots(hud, codex);
+            ApplyHorizontalHudBarLayout(hud, codex);
+        }
+
+        /// <summary>
+        /// tip: fix-hud-bar-button-layout — spaced HUD row via HorizontalLayoutGroup
+        /// (childForceExpandWidth=false + LayoutElement preferred widths).
+        /// </summary>
+        private void ApplyHorizontalHudBarLayout(Transform hud, Button codex)
+        {
+            StretchHudBar(hud as RectTransform);
+
+            var fitter = hud.GetComponent<ContentSizeFitter>();
+            if (fitter != null) UnityEngine.Object.Destroy(fitter);
+
+            var hlg = hud.GetComponent<HorizontalLayoutGroup>();
+            if (hlg == null) hlg = hud.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hlg.padding = new RectOffset(12, 12, 10, 10);
+            hlg.spacing = 10f;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            hlg.childScaleWidth = false;
+            hlg.childScaleHeight = false;
+
+            RectTransform warbandRt = ResolveWarbandInfo(hud);
+            var slots = new List<(RectTransform rt, float width)>(9);
+            if (menuButton != null)
+                slots.Add((menuButton.transform as RectTransform, 110f));
+            if (nightText != null)
+                slots.Add((nightText.rectTransform, 200f));
+            if (timerText != null)
+                slots.Add((timerText.rectTransform, 200f));
+            if (goldText != null)
+                slots.Add((goldText.rectTransform, 150f));
+            if (tavernDiceButton != null)
+                slots.Add((tavernDiceButton.transform as RectTransform, 120f));
+            if (codex != null)
+                slots.Add((codex.transform as RectTransform, 120f));
+            if (warbandRt != null)
+                slots.Add((warbandRt, 160f));
+            if (goToWarButton != null)
+                slots.Add((goToWarButton.transform as RectTransform, 170f));
+
+            const float height = 56f;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var rt = slots[i].rt;
+                if (rt == null) continue;
+                if (rt.parent != hud)
+                    rt.SetParent(hud, false);
+                rt.SetSiblingIndex(i);
+                rt.localScale = Vector3.one;
+                rt.anchorMin = new Vector2(0f, 0.5f);
+                rt.anchorMax = new Vector2(0f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(slots[i].width, height);
+
+                var le = rt.GetComponent<LayoutElement>();
+                if (le == null) le = rt.gameObject.AddComponent<LayoutElement>();
+                le.ignoreLayout = false;
+                le.minWidth = 48f;
+                le.preferredWidth = slots[i].width;
+                le.flexibleWidth = 0f;
+                le.minHeight = 40f;
+                le.preferredHeight = height;
+                le.flexibleHeight = 0f;
+
+                var tmp = rt.GetComponent<TextMeshProUGUI>()
+                          ?? rt.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null)
+                {
+                    tmp.alignment = TextAlignmentOptions.Center;
+                    tmp.enableAutoSizing = true;
+                    tmp.fontSizeMin = 14f;
+                    tmp.fontSizeMax = 24f;
+                    tmp.textWrappingMode = TextWrappingModes.NoWrap;
+                    tmp.overflowMode = TextOverflowModes.Ellipsis;
+                }
+            }
+
+            for (int i = 0; i < hud.childCount; i++)
+            {
+                var child = hud.GetChild(i) as RectTransform;
+                if (child == null) continue;
+                bool known = false;
+                for (int s = 0; s < slots.Count; s++)
+                {
+                    if (slots[s].rt == child) { known = true; break; }
+                }
+                if (known) continue;
+                if (child.name == "DiceButton" || child.name == "TavernDiceButton") continue;
+                if (child.name == "PartyText") child.gameObject.SetActive(false);
+                else
+                {
+                    var le = child.GetComponent<LayoutElement>();
+                    if (le == null) le = child.gameObject.AddComponent<LayoutElement>();
+                    le.ignoreLayout = true;
+                }
+            }
+
+            Canvas.ForceUpdateCanvases();
+            var hudRt = hud as RectTransform;
+            if (hudRt != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(hudRt);
+
+            EnsureDiceHudButtonVisible();
+            ApplyHudButtonLabel(tavernDiceButton, "Dice");
+            ApplyHudButtonLabel(codexButton, "Legends");
+            Debug.Log("[DemonKnight] HUD HorizontalLayoutGroup applied (fix-hud-bar-button-layout).");
         }
 
         /// <summary>Legacy: stretch bar + equal-width Night|Timer|Gold|Dice|Legends|Warband|March|Esc.</summary>
@@ -1423,12 +1530,19 @@ namespace ArthurianAutobattler
 
         private Button CreateHudButton(Transform hud, string name, string label, Color color)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
             go.transform.SetParent(hud, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(120f, 56f);
             var img = go.GetComponent<Image>();
             img.color = color;
             var btn = go.GetComponent<Button>();
             btn.targetGraphic = img;
+            var le = go.GetComponent<LayoutElement>();
+            le.preferredWidth = 120f;
+            le.preferredHeight = 56f;
+            le.flexibleWidth = 0f;
+            le.flexibleHeight = 0f;
 
             var textGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             textGo.transform.SetParent(go.transform, false);
@@ -1520,23 +1634,23 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Far-left of HUD_Bar only — does not reposition Dice/Legends/Warband/March.
+        /// Menu is first sibling under HorizontalLayoutGroup (preferred width 110).
         /// </summary>
         private void PlaceMenuButtonFarLeft(Transform hud)
         {
             if (menuButton == null || hud == null) return;
             if (menuButton.transform.parent != hud)
-                menuButton.transform.SetParent(hud, true);
+                menuButton.transform.SetParent(hud, false);
             menuButton.transform.SetAsFirstSibling();
-
-            // Legacy equal-slot path places Menu via ApplyLegacyEqualHudSlots.
-            if (forceEqualHudSlots) return;
 
             var rt = menuButton.transform as RectTransform;
             if (rt == null) return;
-            rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
-            rt.pivot = new Vector2(0f, 0.5f);
-            rt.anchoredPosition = new Vector2(10f, 0f);
+            var le = rt.GetComponent<LayoutElement>();
+            if (le == null) le = rt.gameObject.AddComponent<LayoutElement>();
+            le.ignoreLayout = forceEqualHudSlots;
+            le.preferredWidth = 110f;
+            le.preferredHeight = 56f;
+            le.flexibleWidth = 0f;
             if (rt.sizeDelta.x < 90f || rt.sizeDelta.y < 40f)
                 rt.sizeDelta = new Vector2(110f, 56f);
         }
