@@ -11,7 +11,7 @@ using UnityEngine;
 
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: battle-good-evil-sprite-pools
+/// tip: fix-architect-build-persist-cs0103
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -19,7 +19,7 @@ using UnityEngine;
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "battle-good-evil-sprite-pools";
+    public const string TipId = "fix-architect-build-persist-cs0103";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";
