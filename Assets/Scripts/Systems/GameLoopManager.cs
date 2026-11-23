@@ -150,8 +150,23 @@ namespace ArthurianAutobattler
         /// <summary>Phase 5 Shepherd's Vow — combat deaths this run (fusions do not count).</summary>
         public int soulsLostThisRun;
 
+        /// <summary>
+        /// tip: fix-survivor-stats-victory-morale — cumulative combat deaths that tax party morale.
+        /// Each death → −5% HP/ATK on remaining recruits (capped at −25%).
+        /// </summary>
+        public int moraleDeathStacksThisRun;
+
+        public const float MoraleLossPerDeath = 0.05f;
+        public const float MoraleLossCap = 0.25f;
+
         /// <summary>Last wave flock upkeep breakdown (Victory UI).</summary>
         [System.NonSerialized] public string lastFlockUpkeepBreakdown = "";
+
+        /// <summary>Last wave death / survivor rows for DeathsSurvivorsMorale panel.</summary>
+        [System.NonSerialized] public readonly List<WaveCasualtyEntry> lastWaveDeaths = new List<WaveCasualtyEntry>();
+        [System.NonSerialized] public readonly List<WaveCasualtyEntry> lastWaveSurvivors = new List<WaveCasualtyEntry>();
+        /// <summary>This wave's morale hit as percent points (e.g. 10 = −10%), before cumulative cap display.</summary>
+        [System.NonSerialized] public float lastWaveMoraleLossPercent;
 
         private Coroutine seatPopulateRoutine;
         private const string NightPrefsKey = "SomersetNight";
@@ -331,6 +346,10 @@ namespace ArthurianAutobattler
             townSecondsSpentThisPhase = 0f;
             trainingVouchers = 0;
             soulsLostThisRun = 0;
+            moraleDeathStacksThisRun = 0;
+            lastWaveMoraleLossPercent = 0f;
+            lastWaveDeaths.Clear();
+            lastWaveSurvivors.Clear();
             lastFlockUpkeepBreakdown = "";
             townTimeLimit = UnityEngine.Random.Range(300f, 600f);
             DiceManager.Ensure().freeRollsRemaining = 0;
@@ -423,6 +442,7 @@ namespace ArthurianAutobattler
         /// Mid-run Victory → Next Night: advance night HUD, keep wave index
         /// (EndBattle already did currentBattleNumber++), return to church.
         /// Must NOT reset currentBattleNumber to 1 — that stuck players on Wave 1 forever.
+        /// tip: fix-survivor-stats-victory-morale — keep pew town + trained stats (no GenerateNewRunTown).
         /// </summary>
         public void ContinueAfterWaveVictory()
         {
@@ -459,20 +479,264 @@ namespace ArthurianAutobattler
                 if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
                 if (townCanvasObj != null) townCanvasObj.SetActive(true);
 
-                ContinueTimelineFromAutosave();
-                // Defense: autosave restore must not clobber the kept wave.
-                if (battleEngine != null && battleEngine.currentBattleNumber < waveKeep)
-                    battleEngine.currentBattleNumber = waveKeep;
+                // Keep current pews + trained/upgraded veterans already returned by ForceWaveDisband.
+                // ContinueTimelineFromAutosave → BeginTownNight → GenerateNewRunTown was resetting
+                // experienced soldiers across wave transitions.
+                ContinueMidRunKeepTownAndTrainedStats(waveKeep);
 
                 RefreshNightHUD();
                 var church = ResolveChurchUI();
                 church?.SetNight(CurrentWaveNumber());
                 church?.RefreshHUD();
+                DemonKnightCompatApi.RefreshWarbandPanel(church);
             }
             finally
             {
                 advancingNight = false;
             }
+        }
+
+        /// <summary>
+        /// Mid-run wave win: re-assert trained/★ from autosave onto the LIVE town pool.
+        /// Does not call GenerateNewRunTown / BeginTownNight.
+        /// tip: fix-survivor-stats-victory-morale
+        /// </summary>
+        public void ContinueMidRunKeepTownAndTrainedStats(int waveKeep)
+        {
+            waveKeep = Mathf.Max(1, waveKeep);
+            if (battleEngine == null) battleEngine = FindFirstObjectByType<AutoBattlerEngine>();
+
+            var data = WarbandAutosave.Load();
+            if (data != null)
+            {
+                int savedWave = data.battleNumber > 0 ? data.battleNumber : waveKeep;
+                if (battleEngine != null)
+                    battleEngine.currentBattleNumber = Mathf.Max(waveKeep, savedWave);
+
+                if (currentTownPool == null)
+                    currentTownPool = new List<RecruitInstance>();
+
+                var veterans = WarbandAutosave.ToVeteranList(data);
+                if (veterans != null && veterans.Count > 0)
+                {
+                    foreach (var v in veterans)
+                    {
+                        if (v == null) continue;
+                        v.intelTierUnlocked = Mathf.Max(v.intelTierUnlocked, 3);
+                        GrudgeSaveManager.Instance?.RememberIntel(v.unitID, v.intelTierUnlocked);
+                        RebindPaperDoll(v);
+                    }
+                    // Overlay trained/upgraded stats onto matching pew instances (or insert).
+                    WarbandAutosave.MergeVeteransIntoTown(currentTownPool, veterans);
+                }
+
+                if (recruitedParty == null)
+                    recruitedParty = new List<RecruitInstance>();
+
+                // Persist-across-waves legends (Mordred) stay hired — restore if missing.
+                var survivors = WarbandAutosave.ToRecruitList(data);
+                if (survivors != null)
+                {
+                    foreach (var s in survivors)
+                    {
+                        if (s == null || string.IsNullOrEmpty(s.unitID)) continue;
+                        if (!UnitPersistsAcrossWaves(s.unitType)) continue;
+                        var existing = recruitedParty.Find(p => p != null && p.unitID == s.unitID);
+                        if (existing != null)
+                            WarbandAutosave.ApplyVeteranStats(s, existing);
+                        else
+                        {
+                            RebindPaperDoll(s);
+                            recruitedParty.Add(s);
+                        }
+                    }
+                }
+
+                Debug.LogError(
+                    $"[DemonKnight] Mid-run keep-town: pews={currentTownPool.Count}, "
+                    + $"hired={recruitedParty.Count}, veteransMerged={veterans?.Count ?? 0} "
+                    + $"(trained stats preserved; no GenerateNewRunTown).");
+            }
+            else if (battleEngine != null)
+            {
+                battleEngine.currentBattleNumber = waveKeep;
+            }
+
+            if (battleEngine != null && battleEngine.currentBattleNumber < waveKeep)
+                battleEngine.currentBattleNumber = waveKeep;
+
+            StartTownPhase();
+            RedrawVeteranStarIcons();
+            AutosaveWarband();
+        }
+
+        /// <summary>1.0 = full strength; each combat death −5% HP/ATK, capped at −25%.</summary>
+        public float GetMoraleStatMultiplier()
+        {
+            float loss = Mathf.Min(MoraleLossCap, Mathf.Max(0, moraleDeathStacksThisRun) * MoraleLossPerDeath);
+            return Mathf.Clamp(1f - loss, 1f - MoraleLossCap, 1f);
+        }
+
+        /// <summary>Cumulative morale loss as percent points (0–25).</summary>
+        public float GetMoraleLossPercent()
+        {
+            return (1f - GetMoraleStatMultiplier()) * 100f;
+        }
+
+        /// <summary>
+        /// Stack death morale after a wave. Returns this wave's loss percent points.
+        /// tip: fix-survivor-stats-victory-morale
+        /// </summary>
+        public float ApplyDeathMoraleFromWave(int deathCount)
+        {
+            if (deathCount <= 0)
+            {
+                lastWaveMoraleLossPercent = 0f;
+                return 0f;
+            }
+            moraleDeathStacksThisRun = Mathf.Max(0, moraleDeathStacksThisRun) + deathCount;
+            float uncapped = deathCount * MoraleLossPerDeath * 100f;
+            lastWaveMoraleLossPercent = uncapped;
+            Debug.LogError(
+                $"[DemonKnight] Morale −{uncapped:0}% this wave from {deathCount} death(s) "
+                + $"(run stacks={moraleDeathStacksThisRun}, effective −{GetMoraleLossPercent():0}% HP/ATK cap {MoraleLossCap * 100f:0}%).");
+            return uncapped;
+        }
+
+        /// <summary>Build DeathsSurvivorsMorale rows from the marched army before/after end.</summary>
+        public void CaptureWaveCasualties(
+            System.Collections.Generic.IEnumerable<CombatUnit> playerArmy,
+            HashSet<string> deadIds,
+            bool playerWon)
+        {
+            lastWaveDeaths.Clear();
+            lastWaveSurvivors.Clear();
+            if (playerArmy == null) return;
+
+            var dead = deadIds ?? new HashSet<string>();
+            foreach (var u in playerArmy)
+            {
+                if (u == null || u.isDemon || string.IsNullOrEmpty(u.unitID)) continue;
+                bool died = !u.IsAlive || dead.Contains(u.unitID);
+                var entry = new WaveCasualtyEntry
+                {
+                    unitID = u.unitID,
+                    characterName = u.unitName,
+                    unitType = u.unitType,
+                    effectiveHp = u.maxHealth,
+                    effectiveAtk = u.attackDamage,
+                    effectiveSpd = u.attacksPerSecond,
+                    died = died
+                };
+
+                // Pull trained / ★ from canonical recruit when available.
+                RecruitInstance canonical = FindCanonicalRecruit(u.unitID);
+                if (canonical != null)
+                {
+                    entry.trainedHP = canonical.trainedHP;
+                    entry.trainedATK = canonical.trainedATK;
+                    entry.trainedSPD = canonical.trainedSPD;
+                    entry.veteranRank = canonical.EffectiveVeteranRank;
+                    if (string.IsNullOrEmpty(entry.characterName))
+                        entry.characterName = canonical.characterName;
+                }
+
+                if (died)
+                {
+                    entry.rewardNote = $"Fallen — morale −{MoraleLossPerDeath * 100f:0}% HP/ATK";
+                    lastWaveDeaths.Add(entry);
+                }
+                else
+                {
+                    if (playerWon)
+                    {
+                        int stars = entry.veteranRank + 1; // award lands around the same beat
+                        entry.rewardNote = $"Survived — +1★ (now ★{Mathf.Max(1, stars)}) · trained kept";
+                    }
+                    else
+                        entry.rewardNote = "Survived the fall — trained stats kept";
+                    lastWaveSurvivors.Add(entry);
+                }
+            }
+        }
+
+        RecruitInstance FindCanonicalRecruit(string unitId)
+        {
+            if (string.IsNullOrEmpty(unitId)) return null;
+            if (recruitedParty != null)
+            {
+                foreach (var r in recruitedParty)
+                {
+                    if (r != null && r.unitID == unitId) return r;
+                    if (r != null && r.IsFusedLegend && r.fusionIngredients != null)
+                    {
+                        foreach (var leaf in r.fusionIngredients)
+                            if (leaf != null && leaf.unitID == unitId) return leaf;
+                    }
+                }
+            }
+            if (currentTownPool != null)
+            {
+                foreach (var r in currentTownPool)
+                    if (r != null && r.unitID == unitId) return r;
+            }
+            return null;
+        }
+
+        /// <summary>Rich text block for victory / defeat / Merlin end screens.</summary>
+        public string FormatDeathsSurvivorsMoralePanel()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("<b>DEATHS / SURVIVORS / MORALE</b>");
+            float waveLoss = lastWaveMoraleLossPercent;
+            float runLoss = GetMoraleLossPercent();
+            if (lastWaveDeaths.Count == 0 && lastWaveSurvivors.Count == 0)
+            {
+                sb.AppendLine("<i>No march roster recorded.</i>");
+                return sb.ToString();
+            }
+
+            sb.AppendLine($"<color=#FF8888>Deaths ({lastWaveDeaths.Count})</color>");
+            if (lastWaveDeaths.Count == 0)
+                sb.AppendLine("  — none —");
+            else
+            {
+                foreach (var d in lastWaveDeaths)
+                {
+                    if (d == null) continue;
+                    sb.AppendLine(
+                        $"  ✕ <b>{d.characterName}</b> ({d.unitType}) — {d.rewardNote}");
+                }
+            }
+
+            sb.AppendLine($"<color=#7CFF9A>Survivors ({lastWaveSurvivors.Count})</color>");
+            if (lastWaveSurvivors.Count == 0)
+                sb.AppendLine("  — none —");
+            else
+            {
+                foreach (var s in lastWaveSurvivors)
+                {
+                    if (s == null) continue;
+                    string train = (s.trainedHP + s.trainedATK + s.trainedSPD) > 0
+                        ? $" · trained HP+{s.trainedHP}/ATK+{s.trainedATK}/SPD+{s.trainedSPD}"
+                        : "";
+                    sb.AppendLine(
+                        $"  ✓ <b>{s.characterName}</b> ({s.unitType})  "
+                        + $"HP {s.effectiveHp} | ATK {s.effectiveAtk} | SPD {s.effectiveSpd:F1}/s"
+                        + $"{train}\n     {s.rewardNote}");
+                }
+            }
+
+            if (waveLoss > 0.01f || runLoss > 0.01f)
+            {
+                sb.AppendLine(
+                    $"<color=#FFAA66>Lost Morale: −{waveLoss:0}% this wave "
+                    + $"(run −{runLoss:0}% HP/ATK on remaining, cap −{MoraleLossCap * 100f:0}%)</color>");
+            }
+            else
+                sb.AppendLine("<color=#B8E986>Morale steady — no deaths this wave.</color>");
+
+            return sb.ToString().TrimEnd();
         }
 
         /// <summary>

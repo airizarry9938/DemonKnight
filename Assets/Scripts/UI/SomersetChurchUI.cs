@@ -3316,8 +3316,25 @@ namespace ArthurianAutobattler
                     ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
                     : "");
 
+            // tip: fix-survivor-stats-victory-morale — show current effective stats (trained+★+morale).
+            int hp = m.GetEffectiveMaxHealth();
+            int atk = m.GetEffectiveAttackDamage();
+            float spd = m.GetEffectiveAttackSpeed();
+            string growth = (m.trainedHP + m.trainedATK + m.trainedSPD) > 0
+                            || m.EffectiveVeteranRank > 0
+                ? $"\n<color=#B8E986>Trained HP+{m.trainedHP} ATK+{m.trainedATK} SPD+{m.trainedSPD}"
+                  + (m.EffectiveVeteranRank > 0 ? $" · ★{m.EffectiveVeteranRank}" : "")
+                  + "</color>"
+                : "";
+            float moraleLoss = GameLoopManager.Instance != null
+                ? GameLoopManager.Instance.GetMoraleLossPercent()
+                : 0f;
+            string moraleBit = moraleLoss > 0.01f
+                ? $"\n<color=#FFAA66>Morale −{moraleLoss:0}% HP/ATK</color>"
+                : "";
+
             return $"<b>{numBit}{m.characterName}</b>  ({m.unitType})  ·  {m.assignedRole} → <b>{row}</b>{reachWarn}\n"
-                   + $"HP {m.maxHealth}  |  ATK {m.attackDamage}  |  SPD {m.attackSpeed:F1}/s\n"
+                   + $"HP {hp}  |  ATK {atk}  |  SPD {spd:F1}/s{growth}{moraleBit}\n"
                    + $"Mood: {mood}  ·  Trait: {m.primaryTrait}\n"
                    + $"<color=#7CFF9A>Friends:</color> {friends}\n"
                    + $"<color=#FF8888>Rivals:</color> {rivals}";

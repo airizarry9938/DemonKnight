@@ -156,13 +156,20 @@ namespace ArthurianAutobattler
             }
         }
 
-        /// <summary>Hired, trained, fused, or fully scouted townsfolk keep progress across nights.</summary>
+        /// <summary>
+        /// Hired, trained, starred, fused, or fully scouted townsfolk keep progress across nights.
+        /// tip: fix-survivor-stats-victory-morale — trained* / ★ must never drop on wave continue.
+        /// </summary>
         public static bool IsVeteran(RecruitInstance r)
         {
             if (r == null) return false;
             if (r.intelTierUnlocked >= 3) return true;
             if (r.assignedRole != CombatRole.Unassigned) return true;
             if (RecruitInstance.IsLegendUnit(r.unitType)) return true;
+            if (r.trainedHP + r.trainedATK + r.trainedSPD > 0) return true;
+            if (r.EffectiveVeteranRank > 0) return true;
+            if (r.wavesSurvived > 0) return true;
+            if (r.isScouted) return true;
             return false;
         }
 

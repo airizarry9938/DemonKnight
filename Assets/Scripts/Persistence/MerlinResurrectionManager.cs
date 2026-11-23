@@ -39,6 +39,8 @@ namespace ArthurianAutobattler
 
         private Button endRunButton;
         private Button nextNightButton;
+        /// <summary>tip: fix-survivor-stats-victory-morale — deaths / survivors / morale panel body.</summary>
+        private TextMeshProUGUI deathsSurvivorsMoraleText;
         /// <summary>Blocks double AdvanceNight when scene persistent + runtime listeners both fire.</summary>
         private bool advancingNight;
         /// <summary>One wire pass per victory/resurrection show — stops EndBattle double-bind logs.</summary>
@@ -487,6 +489,7 @@ namespace ArthurianAutobattler
             ResolveLoreNarrativeText();
             if (loreNarrativeText != null)
                 loreNarrativeText.text = msg;
+            RefreshDeathsSurvivorsMoralePanel();
             WireAbandonScreenButtons(promoteOverlay: true, force: true);
             // Hard guarantee: Next Night exists, active, on canvas, clickable.
             ForceVictoryNextNightVisible();
@@ -494,6 +497,72 @@ namespace ArthurianAutobattler
             if (victorySequenceRoutine != null)
                 StopCoroutine(victorySequenceRoutine);
             victorySequenceRoutine = StartCoroutine(PlayWaveVictorySequence(msg));
+        }
+
+        /// <summary>
+        /// tip: fix-survivor-stats-victory-morale — ensure DeathsSurvivorsMorale panel exists
+        /// on the victory / Merlin canvas and fill it from GameLoopManager.
+        /// </summary>
+        public void RefreshDeathsSurvivorsMoralePanel()
+        {
+            EnsureDeathsSurvivorsMoralePanel();
+            var loop = GameLoopManager.Instance ?? FindFirstObjectByType<GameLoopManager>();
+            string body = loop != null
+                ? loop.FormatDeathsSurvivorsMoralePanel()
+                : "<b>DEATHS / SURVIVORS / MORALE</b>\n<i>No roster.</i>";
+            if (deathsSurvivorsMoraleText != null)
+            {
+                deathsSurvivorsMoraleText.text = body;
+                deathsSurvivorsMoraleText.gameObject.SetActive(true);
+            }
+            // Also mirror into runeStatus when dedicated TMP missing (Downloads partial UI).
+            else if (runeStatusText != null)
+                runeStatusText.text = body;
+        }
+
+        void EnsureDeathsSurvivorsMoralePanel()
+        {
+            EnsureResurrectionCanvas();
+            if (deathsSurvivorsMoraleText != null) return;
+
+            Transform host = resurrectionCanvas != null
+                ? (resurrectionCanvas.transform.Find("ResurrectionPanel")
+                   ?? resurrectionCanvas.transform)
+                : null;
+            if (host == null) return;
+
+            Transform existing = host.Find("DeathsSurvivorsMorale");
+            if (existing != null)
+            {
+                deathsSurvivorsMoraleText = existing.GetComponent<TextMeshProUGUI>();
+                if (deathsSurvivorsMoraleText != null) return;
+            }
+
+            var go = new GameObject("DeathsSurvivorsMorale", typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(host, false);
+            var rt = go.GetComponent<RectTransform>();
+            // Sit under the lore block, above Next Night / End Run.
+            rt.anchorMin = new Vector2(0.08f, 0.22f);
+            rt.anchorMax = new Vector2(0.92f, 0.48f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            deathsSurvivorsMoraleText = go.GetComponent<TextMeshProUGUI>();
+            deathsSurvivorsMoraleText.alignment = TextAlignmentOptions.TopLeft;
+            deathsSurvivorsMoraleText.fontSize = 20f;
+            deathsSurvivorsMoraleText.color = new Color(0.9f, 0.88f, 0.78f, 1f);
+            deathsSurvivorsMoraleText.textWrappingMode = TextWrappingModes.Normal;
+            deathsSurvivorsMoraleText.richText = true;
+
+            // Give lore a bit more headroom so the panel does not collide.
+            if (loreNarrativeText != null)
+            {
+                var lrt = loreNarrativeText.rectTransform;
+                if (lrt != null && lrt.anchorMin.y < 0.48f)
+                {
+                    lrt.anchorMin = new Vector2(lrt.anchorMin.x, 0.50f);
+                    lrt.anchorMax = new Vector2(lrt.anchorMax.x, 0.90f);
+                }
+            }
         }
 
         /// <summary>Last-resort: always leave a clickable Next Night on the victory canvas.</summary>
@@ -574,6 +643,7 @@ namespace ArthurianAutobattler
 
             HideLegacyBankPanel();
             RefreshBankUI();
+            RefreshDeathsSurvivorsMoralePanel();
             PromoteVictoryCanvas();
             ForceVictoryNextNightVisible();
             Debug.LogError("[DemonKnight] Wave victory screen ready — Next Night visible.");
@@ -756,6 +826,7 @@ namespace ArthurianAutobattler
                     + "Press <b>Next Night</b> to continue, or <b>End Run</b> for the Main Menu.";
             }
             HideLegacyBankPanel();
+            RefreshDeathsSurvivorsMoralePanel();
             RefreshBankUI();
             PromoteVictoryCanvas();
             resurrectionSequenceRoutine = null;
