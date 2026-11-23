@@ -36,7 +36,7 @@ namespace ArthurianAutobattler
         public GameObject paperDollSeatPrefab;
         /// <summary>~1.55× prior 56×72 — pew sprites read larger on church art.</summary>
         public Vector2 baseSeatSize = new Vector2(64f, 84f); // tip: fix-architect-48-seat-preview — 4 fit/pew
-        // tip: fix-battle-ground-layout — Stage Layout Save/Load SoftPromote prefs
+        // tip: fix-evil-facing-profile-build — Stage Layout Save/Load SoftPromote prefs
 
         [Header("Modals (mutual exclusion)")]
         public GameObject diceModal;

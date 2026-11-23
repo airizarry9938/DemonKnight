@@ -21,7 +21,11 @@ namespace ArthurianAutobattler
         private Vector3 homePosition;
         private Image healthFill;
         private bool deathAnimPlayed;
-        /// <summary>True when this token faces left (evil). Facing uses negative scale.x — not flipX alone.</summary>
+        /// <summary>
+        /// Desired facing: true = face LEFT (evil toward good). Art is authored facing LEFT —
+        /// so facing left needs NO scale flip; facing right needs negative scale.x.
+        /// tip: fix-evil-facing-profile-build
+        /// </summary>
         bool faceLeft;
         float visualScaleAbs = 1f;
 
@@ -30,9 +34,9 @@ namespace ArthurianAutobattler
             boundUnit = unit;
             homePosition = spawnPos;
             transform.position = spawnPos;
-            // tip: fix-architect-apply-persist-facing — evil faces LEFT via negative scale.x
-            // (flipX alone was unreliable with SoftQuad / animator scale writes).
-            // Do NOT combine flipX + negative scale (double-flip → both sides face the same way).
+            // tip: fix-evil-facing-profile-build — battle sprites authored facing LEFT.
+            // flipX here means "should face left" (Visualizer passes true for evil).
+            // Do NOT use SpriteRenderer.flipX — scale.x is the reliable SoftQuad signal.
             faceLeft = flipX;
             visualScaleAbs = Mathf.Max(0.1f, Mathf.Abs(visualScale));
             ApplyFacingScale();
@@ -75,10 +79,14 @@ namespace ArthurianAutobattler
             anim?.RecaptureBaseScale();
         }
 
-        /// <summary>Good faces right (+x); evil faces left (−x). tip: fix-architect-apply-persist-facing</summary>
+        /// <summary>
+        /// Art faces LEFT by default. Good (want RIGHT) → −scale.x; evil (want LEFT) → +scale.x.
+        /// tip: fix-evil-facing-profile-build
+        /// </summary>
         public void ApplyFacingScale()
         {
-            float sx = faceLeft ? -visualScaleAbs : visualScaleAbs;
+            // Natural art = left. Mirror only when we need to face right (good / left side).
+            float sx = faceLeft ? visualScaleAbs : -visualScaleAbs;
             transform.localScale = new Vector3(sx, visualScaleAbs, 1f);
         }
 

@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-battle-ground-layout";
+    public const string UiBuildId = "fix-evil-facing-profile-build";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -957,7 +957,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// <summary>
     /// Create or reopen a named pool .asset at exactly {folder}/{sanitizedName}.asset.
     /// Missing Script / multi-class GameDataTypes: Type.GetType CreateInstance + YAML m_Script fileID remap.
-    /// tip: fix-architect-pool-load-list
+    /// tip: fix-evil-facing-profile-build — never CreateInstance / delete mid-compile.
     /// </summary>
     static T EnsureNamedPoolAssetAtPath<T>(string dest) where T : ScriptableObject
     {
@@ -978,13 +978,29 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 existing = AssetDatabase.LoadAssetAtPath<T>(dest);
                 if (existing != null) return existing;
             }
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                Debug.LogWarning(
+                    "[DemonKnight] EnsureNamedPoolAssetAtPath deferred during compile: " + dest);
+                return null;
+            }
             AssetDatabase.DeleteAsset(dest);
             try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
             try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
         }
         else if (!string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(dest)))
         {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                return null;
             AssetDatabase.DeleteAsset(dest);
+        }
+
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+        {
+            Debug.LogWarning(
+                "[DemonKnight] EnsureNamedPoolAssetAtPath CreateInstance skipped during compile: "
+                + typeof(T).Name);
+            return null;
         }
 
         // CreateInstance via Type.GetType for multi-class GameDataTypes MonoScript fileID.
@@ -1258,7 +1274,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         to.churchSpriteScale = from.churchSpriteScale;
         to.churchSeatGap = from.churchSeatGap;
         to.churchSeatSpreadMul = from.churchSeatSpreadMul;
-        // tip: fix-battle-ground-layout — battle aisle/spacing SoftPromote with Save/Load.
+        // tip: fix-evil-facing-profile-build — battle aisle/spacing SoftPromote with Save/Load.
         to.battleAisleGap = from.battleAisleGap;
         to.battleSeatGap = from.battleSeatGap;
         to.battleDepthGap = from.battleDepthGap;
@@ -2660,7 +2676,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Battle mini-layout prefs (aisle / seat / depth) — SoftPromote Persist like church prefs.
-    /// tip: fix-battle-ground-layout
+    /// tip: fix-evil-facing-profile-build
     /// </summary>
     void DrawBattleLayoutPrefsPanel()
     {
@@ -2774,7 +2790,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (churchMode)
             DrawPlayPewLayoutOnChurch(canvas, content, slots, e);
         else if (stageView == StageViewMode.ChurchyardBattle)
-            DrawBattleMiniLayout(canvas, e); // tip: fix-battle-ground-layout — both sides + sprites
+            DrawBattleMiniLayout(canvas, e); // tip: fix-evil-facing-profile-build — both sides + sprites
         else
             DrawAbstractSlotHandles(canvas, slots, e);
 
@@ -2847,7 +2863,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Mini battle ground: Good 48 LEFT + Evil 20 RIGHT on one canvas with full sprite previews.
-    /// tip: fix-battle-ground-layout
+    /// tip: fix-evil-facing-profile-build
     /// </summary>
     void DrawBattleMiniLayout(Rect canvas, Event e)
     {
@@ -2909,8 +2925,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
                 float pw = size * 2.6f * Mathf.Max(0.5f, s.aspectMultiplier.x);
                 float ph = size * 3.2f * Mathf.Max(0.5f, s.aspectMultiplier.y);
                 Rect pr = new Rect(screen.x - pw * 0.5f, screen.y - ph * 0.88f, pw, ph);
-                // Evil faces left — mirror preview so Architect matches UnitVisualActor facing.
-                if (evil)
+                // tip: fix-evil-facing-profile-build — art authored facing LEFT.
+                // Good needs mirror (face RIGHT); evil keeps natural left (no flip).
+                if (!evil)
                 {
                     Matrix4x4 prev = GUI.matrix;
                     GUIUtility.ScaleAroundPivot(new Vector2(-1f, 1f), pr.center);
@@ -4357,7 +4374,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         if (s == null) return null;
         if (s.previewOrOverrideSprite != null) return s.previewOrOverrideSprite;
-        // tip: fix-battle-ground-layout — fall back to Tab 6 pool art on battle slots.
+        // tip: fix-evil-facing-profile-build — fall back to Tab 6 pool art on battle slots.
         if (stageView == StageViewMode.ChurchyardBattle)
             return ResolveBattleSlotPreviewSprite(s, battleSide, s.slotNumber);
         return null;
@@ -4365,7 +4382,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Full unit art on battle layout slots: override first, else Tab 6 Good/Evil pools.
-    /// tip: fix-battle-ground-layout
+    /// tip: fix-evil-facing-profile-build
     /// </summary>
     Sprite ResolveBattleSlotPreviewSprite(SlotTransformConfig s, BattleSlotSide side, int index)
     {
@@ -4577,7 +4594,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (stageProfile == null) return;
         stageProfile.EnsureSlotCounts();
         Undo.RecordObject(stageProfile, "Auto-Arrange 48/20 Aisle-Outward");
-        // tip: fix-battle-ground-layout — Good 48 LEFT / Evil 20 RIGHT; front from aisle outward.
+        // tip: fix-evil-facing-profile-build — Good 48 LEFT / Evil 20 RIGHT; front from aisle outward.
         stageProfile.ApplyAisleOutwardBattleDefaults(preservePreviewSprites: true);
         EditorUtility.SetDirty(stageProfile);
         PersistStageProfile("AutoArrangeBattle48x20");
@@ -5121,7 +5138,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-battle-ground-layout (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-evil-facing-profile-build (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -5130,7 +5147,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-battle-ground-layout";
+    public const string TipId = "fix-evil-facing-profile-build";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";
@@ -5155,6 +5172,15 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
     {
         try
         {
+            // tip: fix-evil-facing-profile-build — never Ensure CreateInstance mid-compile;
+            // soft-skip so player builds do not abort on stale Profile MonoScript.
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                Debug.LogWarning(
+                    "[DemonKnight] Architect build persist skipped during compile/import ("
+                    + TipId + ") — profiles remapped after scripts finish.");
+                return;
+            }
             string msg = PrepareForPlayerBuild(forceCopyStreaming: true);
             Debug.Log("[DemonKnight] Architect build persist (" + TipId + "):\n" + msg);
         }
@@ -5168,11 +5194,18 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
     /// <summary>
     /// Ensure profile assets exist, rematerialize path backups, promote sprites into
     /// Resources/ArchitectArt, mirror files into StreamingAssets. Never deletes profile YAML.
+    /// tip: fix-evil-facing-profile-build — soft when Ensure returns null mid-compile.
     /// </summary>
     public static string PrepareForPlayerBuild(bool forceCopyStreaming)
     {
         var log = new StringBuilder();
         log.AppendLine("tip=" + TipId);
+
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+        {
+            log.AppendLine("SKIP Ensure during compile/import (no CreateInstance / no recreate).");
+            return log.ToString().TrimEnd();
+        }
 
         EnsureFolder("Assets/Resources");
         EnsureFolder(ArchitectArtRoot);

@@ -1182,7 +1182,7 @@ namespace ArthurianAutobattler
     /// <summary>
     /// Numbered Somerset church pews (48 = 12×4), player battle slots (48 LEFT), enemy slots (20 RIGHT),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
-    /// tip: fix-battle-ground-layout — front fills from aisle/inside outward; good faces right, evil left.
+    /// tip: fix-evil-facing-profile-build — front fills from aisle/inside outward; art faces left: good flipped (−x) faces right; evil natural left.
     /// </summary>
     [CreateAssetMenu(fileName = "StageLayoutProfile", menuName = "DemonKnight/Stage Layout Profile")]
     public class StageLayoutProfile : ScriptableObject
@@ -1224,7 +1224,7 @@ namespace ArthurianAutobattler
         [Range(0.5f, 1.6f)]
         public float churchSeatSpreadMul = 1f;
 
-        // tip: fix-battle-ground-layout — SoftPromote Persist battle aisle / spacing prefs.
+        // tip: fix-evil-facing-profile-build — SoftPromote Persist battle aisle / spacing prefs.
         [Tooltip("World X gap from mid-line (x=0) to the first front seat (inside/aisle).")]
         [Range(0.4f, 3.5f)]
         public float battleAisleGap = 1.15f;
@@ -1350,7 +1350,7 @@ namespace ArthurianAutobattler
             FillSlots(enemyBattleSlots, EnemyBattleCount, EnemyBattleDefault);
             EnsureChurchLayoutPrefs();
             EnsureBattleLayoutPrefs();
-            // tip: fix-battle-ground-layout — migrate 52→48 + aisle-outward defaults once.
+            // tip: fix-evil-facing-profile-build — migrate 52→48 + aisle-outward defaults once.
             if (battleLayoutVersion < CurrentBattleLayoutVersion)
             {
                 ApplyAisleOutwardBattleDefaults(preservePreviewSprites: true);
@@ -1371,7 +1371,7 @@ namespace ArthurianAutobattler
         /// <summary>
         /// Good LEFT / Evil RIGHT; front row fills from aisle (mid) outward.
         /// Preserves preview sprites / character ids / slot bonuses when migrating.
-        /// tip: fix-battle-ground-layout
+        /// tip: fix-evil-facing-profile-build
         /// </summary>
         public void ApplyAisleOutwardBattleDefaults(bool preservePreviewSprites = true)
         {
@@ -1453,14 +1453,14 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// Good LEFT: front (depth 0) fills from aisle (rightmost-of-left) outward to left edge.
-        /// tip: fix-battle-ground-layout
+        /// tip: fix-evil-facing-profile-build
         /// </summary>
         static SlotTransformConfig PlayerBattleDefault(int i)
             => BattleSlotDefault(i, player: true, aisleGap: 1.15f, seatGap: 1.05f, depthGap: 0.85f);
 
         /// <summary>
         /// Evil RIGHT: front fills from aisle (leftmost-of-right) outward to right edge.
-        /// tip: fix-battle-ground-layout
+        /// tip: fix-evil-facing-profile-build
         /// </summary>
         static SlotTransformConfig EnemyBattleDefault(int i)
             => BattleSlotDefault(i, player: false, aisleGap: 1.15f, seatGap: 1.0f, depthGap: 0.9f);

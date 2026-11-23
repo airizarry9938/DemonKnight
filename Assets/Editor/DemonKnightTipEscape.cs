@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-battle-ground-layout";
+    public const string TipPackageId = "fix-evil-facing-profile-build";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -48,7 +48,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-battle-ground-layout)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-evil-facing-profile-build)", false, 0)]
     public static void EscapeMenu()
     {
         // Manual Escape clears session gates so a stuck Downloads project can recover.
@@ -186,6 +186,8 @@ public static class DemonKnightTipEscape
             "fix-architect-save-load-pool-ux",
             "fix-architect-pool-load-list",
             "fix-architect-48-seat-preview",
+            "fix-stage-placer-profiles",
+            "fix-battle-ground-layout",
         };
         foreach (string s in stale)
         {
@@ -213,10 +215,10 @@ public static class DemonKnightTipEscape
         // tip: fix-architect-48-seat-preview — Layout prefs + 48 hitbox preview.
         if (archBody.IndexOf("DrawChurchLayoutPrefsPanel", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("churchHitboxSize", StringComparison.Ordinal) < 0) return true;
-        // tip: fix-battle-ground-layout — Stage Placer named Save/Load.
+        // tip: fix-evil-facing-profile-build — Stage Placer named Save/Load.
         if (archBody.IndexOf("SaveNamedStageLayoutProfile", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("ArchitectPoolsStageFolder", StringComparison.Ordinal) < 0) return true;
-        // tip: fix-battle-ground-layout — mini battle + aisle-outward.
+        // tip: fix-evil-facing-profile-build — mini battle + aisle-outward.
         if (archBody.IndexOf("DrawBattleMiniLayout", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("ApplyAisleOutwardBattleDefaults", StringComparison.Ordinal) < 0
             && File.ReadAllText(Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs"))
@@ -228,6 +230,8 @@ public static class DemonKnightTipEscape
         string uvaPath = Path.Combine(root, "Assets", "Scripts", "Combat", "UnitVisualActor.cs");
         if (!File.Exists(uvaPath)) return true;
         if (File.ReadAllText(uvaPath).IndexOf("ApplyFacingScale", StringComparison.Ordinal) < 0) return true;
+        // tip: fix-evil-facing-profile-build
+        if (File.ReadAllText(uvaPath).IndexOf("Art faces LEFT by default", StringComparison.Ordinal) < 0) return true;
         if (gdtBody.IndexOf("IsLiveResourcesPool", StringComparison.Ordinal) < 0) return true;
         // tip: fix-architect-pool-load-list — TipEscape delegates NukeNamedProfileFiles; GDT must hold Profile SOs.
         string tipEscapePath = Path.Combine(root, "Assets", "Editor", "DemonKnightTipEscape.cs");
@@ -245,8 +249,8 @@ public static class DemonKnightTipEscape
         if (!File.Exists(bootPath)) return true;
         string bootBody = File.ReadAllText(bootPath);
         if (bootBody.IndexOf("NukeNamedProfileFiles", StringComparison.Ordinal) < 0
+            && bootBody.IndexOf("fix-evil-facing-profile-build", StringComparison.Ordinal) < 0
             && bootBody.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
-            && bootBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
             && bootBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
@@ -254,7 +258,11 @@ public static class DemonKnightTipEscape
         if (ensureBody.IndexOf("TryResolveScriptRef", StringComparison.Ordinal) < 0) return true;
         if (ensureBody.IndexOf("CreateNamedPoolInstance", StringComparison.Ordinal) < 0) return true;
         if (ensureBody.IndexOf("TryRemapNamedPoolScript", StringComparison.Ordinal) < 0) return true;
+        // tip: fix-evil-facing-profile-build — never CreateInstance mid-compile / defer Ensure.
+        if (ensureBody.IndexOf("ScheduleEnsureAfterCompile", StringComparison.Ordinal) < 0) return true;
+        if (ensureBody.IndexOf("ScriptsBusy", StringComparison.Ordinal) < 0) return true;
         if (ensureBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("Art authored facing LEFT", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("TryPewBodyFallbackFromGoodTroops", StringComparison.Ordinal) < 0
             && File.ReadAllText(Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs"))
@@ -265,11 +273,11 @@ public static class DemonKnightTipEscape
         if (!File.Exists(churchPath)) return true;
         string churchBody = File.ReadAllText(churchPath);
         if (churchBody.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0) return true;
-        if (churchBody.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
-            && churchBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+        if (churchBody.IndexOf("fix-evil-facing-profile-build", StringComparison.Ordinal) < 0
+            && churchBody.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
             && churchBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
-        if (gdtBody.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
-            && gdtBody.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
+        if (gdtBody.IndexOf("fix-evil-facing-profile-build", StringComparison.Ordinal) < 0
+            && gdtBody.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
             && gdtBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0) return true;
         // tip: fix-architect-48-seat-preview — CS0104 TownRNG Random belt (Force Sync / Escape).
         string townRngPath = Path.Combine(root, "Assets", "Scripts", "Systems", "TownRNGGenerator.cs");
@@ -365,9 +373,9 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                         || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
                         || body.IndexOf("ApplySeatSpriteVisualScale", StringComparison.Ordinal) < 0
-                        || (body.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
-                            && body.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0
-                            && body.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)))
+                        || (body.IndexOf(TipPackageId, StringComparison.Ordinal) < 0
+                            && body.IndexOf("fix-battle-ground-layout", StringComparison.Ordinal) < 0
+                            && body.IndexOf("fix-stage-placer-profiles", StringComparison.Ordinal) < 0)))
                     throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                 if (rel.EndsWith("TownRNGGenerator.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class TownRNGGenerator", StringComparison.Ordinal) < 0
