@@ -1005,7 +1005,7 @@ namespace ArthurianAutobattler
     // ===== DA-59 Phase25 helpers (Force Sync nuclear — do not remove) =====
     // Architect *Profile ScriptableObjects live in Assets/Scripts/Data/<ExactClassName>.cs
     // (Unity MonoScript requires SO class name == file name). Appliers stay embedded below.
-    // tip: fix-named-profile-sync-cs0246
+    // tip: fix-tipescape-profile-embeds
     /// <summary>
     /// Multi-frame clip for modular paper-doll parts (Pose / Outfit / Head / Weapon / EnemyBoss).
     /// Standard clip names: "Idle", "Attack", "Hit", "Death".
@@ -1328,6 +1328,7 @@ namespace ArthurianAutobattler
     // MustRestore of those paths still fails when Force Delete runs under a STALE compiled Sync
     // host (ScriptPaths/MustRestore arrays baked into the old assembly). GameDataTypes has been
     // MustRestore since DA-59 — even old Sync hosts re-land this file from tip → types exist.
+    // tip: fix-tipescape-profile-embeds — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
 
     /// <summary>
     /// Applies Architect-assigned SceneBackgroundProfile entries (jpg/png or mp4)
@@ -1359,6 +1360,7 @@ namespace ArthurianAutobattler
                     catch (Exception ex)
                     {
                         Debug.LogWarning("[DemonKnight] SceneBackgroundProfile.Load soft-fail: " + ex.Message);
+                        _cache = null;
                         return null;
                     }
                 }
@@ -1575,6 +1577,8 @@ namespace ArthurianAutobattler
                 {
                     try
                     {
+                        // SoftPromote belt: Load soft-fails when Profile MonoScript still missing after Sync.
+                        // tip: fix-tipescape-profile-embeds
                         _cache = ClassSpritePoolProfile.Load();
                         if (_cache != null)
                         {
@@ -1586,6 +1590,7 @@ namespace ArthurianAutobattler
                     catch (Exception ex)
                     {
                         Debug.LogWarning("[DemonKnight] ClassSpritePoolProfile.Load soft-fail: " + ex.Message);
+                        _cache = null;
                         return null;
                     }
                 }
@@ -1703,6 +1708,7 @@ namespace ArthurianAutobattler
                     catch (Exception ex)
                     {
                         Debug.LogWarning("[DemonKnight] LegendPewPortraitProfile.Load soft-fail: " + ex.Message);
+                        _cache = null;
                         return null;
                     }
                 }
@@ -1917,6 +1923,7 @@ namespace ArthurianAutobattler
                     catch (Exception ex)
                     {
                         Debug.LogWarning("[DemonKnight] BattleGoodEvilSpritePoolProfile.Load soft-fail: " + ex.Message);
+                        _cache = null;
                         return null;
                     }
                 }

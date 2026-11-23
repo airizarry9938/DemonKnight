@@ -13,7 +13,7 @@ using UnityEngine;
 /// Ensures Assets/Resources/StageLayoutProfile.asset exists with 52/52/20 slots.
 /// Profiles are named MonoScript files (Assets/Scripts/Data/<ExactClassName>.cs).
 /// Old assets may still point at GameDataTypes embed GUID/fileID → remap via probe.
-/// tip: fix-named-profile-sync-cs0246
+/// tip: fix-tipescape-profile-embeds
 ///
 /// ALSO: chicken-egg escape from architect-breakglass-hosts. This file is Force-Synced via
 /// tip SHA (not HardTip host overwrite). OnLoad pulls tip PackageVersion/Sync/Bootstrap/Architect
@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-named-profile-sync-cs0246";
+    const string TipPackageId = "fix-tipescape-profile-embeds";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -565,7 +565,7 @@ public static class ArthurianStageLayoutProfileEnsure
     /// <summary>
     /// Bind asset m_Script to the named MonoScript for this SO type (class name == file name).
     /// Probe CreateAsset reads Unity's exact fileID+guid (11500000 for single-SO files).
-    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-named-profile-sync-cs0246
+    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-tipescape-profile-embeds
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
@@ -603,7 +603,7 @@ public static class ArthurianStageLayoutProfileEnsure
 
     /// <summary>
     /// Probe CreateAsset writes the exact MonoScript fileID+guid Unity expects for this SO type.
-    /// Named Profile files use fileID 11500000; fallback still probes for safety. tip: fix-named-profile-sync-cs0246
+    /// Named Profile files use fileID 11500000; fallback still probes for safety. tip: fix-tipescape-profile-embeds
     /// </summary>
     static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
     {
@@ -756,7 +756,7 @@ public static class ArthurianStageLayoutProfileEnsure
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
             // Named MonoScript Profiles BEFORE GameDataTypes — Escape without these → CS0246.
-            // tip: fix-named-profile-sync-cs0246
+            // tip: fix-tipescape-profile-embeds
             "Assets/Scripts/Data/StageLayoutProfile.cs",
             "Assets/Scripts/Data/SceneBackgroundProfile.cs",
             "Assets/Scripts/Data/ClassSpritePoolProfile.cs",

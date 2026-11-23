@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-named-profile-sync-cs0246 — named MonoScript for Unity SO binding
+    // tip: fix-tipescape-profile-embeds — named MonoScript for Unity SO binding
     /// <summary>One Good-side Legend / Evil boss battle-sprite slot (Architect Tab 6).</summary>
     [Serializable]
     public class BattleSpriteSlotEntry

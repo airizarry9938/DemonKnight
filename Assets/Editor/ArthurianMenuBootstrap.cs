@@ -34,7 +34,7 @@ public static class ArthurianMenuBootstrap
     const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Phase 2–5 standalones to DELETE (types embedded elsewhere). CS0101 kill list.</summary>
-    /// <summary>Phase 2–5 standalones to DELETE when they redefine embeds. Profiles are real named MonoScripts (tip fix-named-profile-sync-cs0246).</summary>
+    /// <summary>Phase 2–5 standalones to DELETE when they redefine embeds. Profiles are real named MonoScripts (tip fix-tipescape-profile-embeds).</summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
         "Assets/Scripts/Data/SpriteAnimClip.cs",
