@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
 
-    private const string ExpectedPackageId = "fix-architect-pool-load-list";
+    private const string ExpectedPackageId = "fix-survivor-stats-victory-morale";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -89,6 +89,7 @@ public static class ArthurianSyncFromGitHub
         "fix-architect-apply-persist-facing",
         "fix-architect-load-pool-profiles",
         "fix-architect-save-load-pool-ux",
+        "fix-architect-pool-load-list",
     };
 
     /// <summary>
@@ -1332,7 +1333,7 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
-                || text.IndexOf("fix-architect-pool-load-list", StringComparison.Ordinal) < 0)
+                || text.IndexOf("fix-survivor-stats-victory-morale", StringComparison.Ordinal) < 0)
                 throw new Exception("GameDataTypes Appliers/helpers/Profile SOs/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
@@ -1447,7 +1448,7 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("SaveNamedClassPoolProfile", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("ArchitectPools", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-architect-pool-load-list", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-survivor-stats-victory-morale", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist / Save Pool Profile (" + source + ")");
@@ -1588,12 +1589,16 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("mustDisbandPartyAfterCurrentWave")
                    && body.Contains("AdvanceNightCounterAfterWaveWin")
                    && body.Contains("ContinueAfterWaveVictory")
+                   && body.Contains("ContinueMidRunKeepTownAndTrainedStats")
                    && body.Contains("pendingMidRunWaveVictory")
                    && body.Contains("SyncNightToCombatWave")
                    && body.Contains("AwardWaveVictoryVeteranRanks")
                    && body.Contains("RedrawVeteranStarIcons")
                    && body.Contains("StartTownRecruitPhase")
                    && body.Contains("soulsLostThisRun")
+                   && body.Contains("GetMoraleStatMultiplier")
+                   && body.Contains("FormatDeathsSurvivorsMoralePanel")
+                   && body.Contains("CaptureWaveCasualties")
                    && body.Contains("DiceManager")
                    && body.Contains("DA-59 EMBEDDED StageParallaxController")
                    && body.Contains("MicroShake")
@@ -1663,7 +1668,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
                    && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
-                   && body.Contains("fix-architect-pool-load-list");
+                   && body.Contains("fix-survivor-stats-victory-morale");
         }
 
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
@@ -1725,7 +1730,7 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-architect-pool-load-list")
+                   && (body.Contains("fix-survivor-stats-victory-morale")
                        || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
                        || body.Contains("fix-build-persist-embed"));
@@ -1813,6 +1818,8 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("BindButtonOnce")
                    && body.Contains("ForceVictoryNextNightVisible")
                    && body.Contains("GetVictoryButtonHost")
+                   && body.Contains("RefreshDeathsSurvivorsMoralePanel")
+                   && body.Contains("DeathsSurvivorsMorale")
                    && !body.Contains("nextRunButtonWired")
                    && !body.Contains("endRunButtonWired");
         }
@@ -2071,7 +2078,7 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-architect-pool-load-list")
+        if (!body.Contains("fix-survivor-stats-victory-morale")
             && !body.Contains("fix-architect-save-load-pool-ux")
             && !body.Contains("fix-architect-load-pool-profiles")
             && !body.Contains("fix-profile-so-script-assets")

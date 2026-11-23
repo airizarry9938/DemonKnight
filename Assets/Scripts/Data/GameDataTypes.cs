@@ -33,6 +33,27 @@ namespace ArthurianAutobattler
     public enum SinRuneID { None, Jealousy, Lust }
 
     /// <summary>
+    /// One row for the DeathsSurvivorsMorale end-screen panel.
+    /// tip: fix-survivor-stats-victory-morale
+    /// </summary>
+    [Serializable]
+    public class WaveCasualtyEntry
+    {
+        public string unitID;
+        public string characterName;
+        public UnitType unitType;
+        public int effectiveHp;
+        public int effectiveAtk;
+        public float effectiveSpd;
+        public int trainedHP;
+        public int trainedATK;
+        public int trainedSPD;
+        public int veteranRank;
+        public bool died;
+        public string rewardNote;
+    }
+
+    /// <summary>
     /// Legends / Warband list sort chips. Lives in GameDataTypes so Force Sync lands the
     /// type with early ScriptPaths (avoids CS0246 when MenuListSortBar.cs lags a Sync).
     /// </summary>
@@ -516,23 +537,99 @@ namespace ArthurianAutobattler
             }
         }
 
-        /// <summary>Effective combat HP after trained+star growth × potentialMultiplier.</summary>
+        /// <summary>Effective combat HP after trained+star growth × potential × death-morale.</summary>
         public int GetEffectiveMaxHealth()
         {
             int g = HiddenPotentialSystem.EffectiveGrowth(trainedHP, EffectiveVeteranRank, potentialMultiplier);
-            return Mathf.Max(1, maxHealth + g);
+            return ApplyPartyMoraleToStat(Mathf.Max(1, maxHealth + g));
         }
 
         public int GetEffectiveAttackDamage()
         {
             int g = HiddenPotentialSystem.EffectiveGrowth(trainedATK, EffectiveVeteranRank, potentialMultiplier);
-            return Mathf.Max(1, attackDamage + g);
+            return ApplyPartyMoraleToStat(Mathf.Max(1, attackDamage + g));
         }
 
         public float GetEffectiveAttackSpeed()
         {
             int g = HiddenPotentialSystem.EffectiveGrowth(trainedSPD, EffectiveVeteranRank, potentialMultiplier);
+            // SPD is not morale-nerfed — deaths tax HP/ATK only.
             return Mathf.Clamp(attackSpeed + g * 0.1f, 0.4f, 3.0f);
+        }
+
+        /// <summary>tip: fix-survivor-stats-victory-morale — party death morale nerfs HP/ATK.</summary>
+        public static int ApplyPartyMoraleToStat(int value)
+        {
+            float m = GameLoopManager.Instance != null
+                ? GameLoopManager.Instance.GetMoraleStatMultiplier()
+                : 1f;
+            if (m >= 0.999f) return Mathf.Max(1, value);
+            return Mathf.Max(1, Mathf.RoundToInt(value * m));
+        }
+
+        /// <summary>
+        /// Battle clone: copy persistent trained/upgraded fields, then bake growth.
+        /// Never mutates the canonical pew / warband instance (clone-before-battle).
+        /// </summary>
+        public static RecruitInstance CloneForBattle(RecruitInstance src, int bonusHp = 0, int bonusAtk = 0, int bonusSpd = 0)
+        {
+            if (src == null) return null;
+            var copy = new RecruitInstance
+            {
+                unitID = src.unitID,
+                characterName = src.characterName,
+                unitType = src.unitType,
+                assignedRole = src.assignedRole,
+                maxHealth = src.maxHealth + bonusHp,
+                attackDamage = src.attackDamage + bonusAtk,
+                attackSpeed = src.attackSpeed + bonusSpd * 0.1f,
+                baseHireCost = src.baseHireCost,
+                primaryTrait = src.primaryTrait,
+                hatedTrait = src.hatedTrait,
+                lovedTrait = src.lovedTrait,
+                intelTierUnlocked = src.intelTierUnlocked,
+                pewSeatIndex = src.pewSeatIndex,
+                battleSlotIndex = src.battleSlotIndex,
+                isDeployed = true,
+                isScouted = src.isScouted,
+                hiddenTraitId = src.hiddenTraitId,
+                veteranRank = src.EffectiveVeteranRank,
+                victoryStars = src.EffectiveVeteranRank,
+                canAttackFromBack = src.canAttackFromBack && src.unitType != UnitType.Warrior,
+                isSirenEnchantress = src.isSirenEnchantress,
+                trainedHP = src.trainedHP,
+                trainedATK = src.trainedATK,
+                trainedSPD = src.trainedSPD,
+                lastTrainWaveNumber = src.lastTrainWaveNumber,
+                wavesSurvived = src.wavesSurvived,
+                potentialMultiplier = src.potentialMultiplier > 0.01f ? src.potentialMultiplier : 1f,
+                secretArchetype = src.secretArchetype,
+                traitAwakened = src.traitAwakened,
+                hasAscended = src.hasAscended,
+                randomAvatar = src.randomAvatar,
+                bodySprite = src.bodySprite,
+                headSprite = src.headSprite,
+                moodOverlaySprite = src.moodOverlaySprite,
+                appearance = src.appearance,
+                modularPoseId = src.modularPoseId,
+                modularOutfitId = src.modularOutfitId,
+                modularHeadId = src.modularHeadId,
+                modularWeaponId = src.modularWeaponId,
+                skinTint = src.skinTint,
+                hairTint = src.hairTint,
+                armorTint = src.armorTint
+            };
+            HiddenPotentialSystem.ApplyGrowthToClone(copy, src);
+            // Bake death-morale into battle clone HP/ATK (SPD untouched).
+            float morale = GameLoopManager.Instance != null
+                ? GameLoopManager.Instance.GetMoraleStatMultiplier()
+                : 1f;
+            if (morale < 0.999f)
+            {
+                copy.maxHealth = Mathf.Max(1, Mathf.RoundToInt(copy.maxHealth * morale));
+                copy.attackDamage = Mathf.Max(1, Mathf.RoundToInt(copy.attackDamage * morale));
+            }
+            return copy;
         }
 
         /// <summary>

@@ -57,30 +57,11 @@ namespace ArthurianAutobattler
                     bonusSpd = cfg.bonusSPD;
                 }
 
-                // Clone stats so permanent run buffs don't double-stack across waves
-                RecruitInstance copy = new RecruitInstance
-                {
-                    unitID = r.unitID,
-                    characterName = r.characterName,
-                    unitType = r.unitType,
-                    assignedRole = r.assignedRole,
-                    maxHealth = r.maxHealth + bonusHp,
-                    attackDamage = r.attackDamage + bonusAtk,
-                    attackSpeed = r.attackSpeed + bonusSpd * 0.1f,
-                    primaryTrait = r.primaryTrait,
-                    hatedTrait = r.hatedTrait,
-                    lovedTrait = r.lovedTrait,
-                    battleSlotIndex = slot,
-                    isDeployed = true,
-                    isScouted = r.isScouted,
-                    hiddenTraitId = r.hiddenTraitId,
-                    veteranRank = r.EffectiveVeteranRank,
-                    victoryStars = r.EffectiveVeteranRank,
-                    // Warriors never fight from BACK — strip stale kits from older saves.
-                    canAttackFromBack = r.canAttackFromBack && r.unitType != UnitType.Warrior
-                };
-                copy.isSirenEnchantress = r.isSirenEnchantress;
-                HiddenPotentialSystem.ApplyGrowthToClone(copy, r);
+                // tip: fix-survivor-stats-victory-morale — full clone (trained/★/morale) so
+                // permanent buffs never double-stack and never mutate the pew/warband instance.
+                RecruitInstance copy = RecruitInstance.CloneForBattle(r, bonusHp, bonusAtk, bonusSpd);
+                if (copy == null) continue;
+                copy.battleSlotIndex = slot;
                 // Keep canonical slot for upkeep / next wave.
                 r.battleSlotIndex = slot;
                 combatRoster.Add(copy);
@@ -1127,17 +1108,17 @@ namespace ArthurianAutobattler
             if (loop != null) loop.lastFlockUpkeepBreakdown = flockBreakdown;
 
             // Hire-price memory: Balance V2 death penalty is +0 (call kept for compatibility).
+            // Always collect deadIds (morale + panel) even if GrudgeSaveManager is missing.
             var deadIds = new HashSet<string>();
+            foreach (var u in playerArmy)
+            {
+                if (u != null && !u.isDemon && !u.IsAlive && !string.IsNullOrEmpty(u.unitID))
+                    deadIds.Add(u.unitID);
+            }
             if (GrudgeSaveManager.Instance != null)
             {
-                foreach (var u in playerArmy)
-                {
-                    if (u != null && !u.isDemon && !u.IsAlive && !string.IsNullOrEmpty(u.unitID))
-                    {
-                        deadIds.Add(u.unitID);
-                        GrudgeSaveManager.Instance.RecordArmyDeath(u.unitID);
-                    }
-                }
+                foreach (var id in deadIds)
+                    GrudgeSaveManager.Instance.RecordArmyDeath(id);
             }
 
             // Silver Tongue: sacrifice highest-ATK living marcher before disband (+40g grudge).
@@ -1155,6 +1136,14 @@ namespace ArthurianAutobattler
             }
 
             int sirensMarched = playerArmy.Count(u => u != null && !u.isDemon && u.isSirenEnchantress);
+
+            // tip: fix-survivor-stats-victory-morale — capture deaths/survivors + apply morale
+            // BEFORE disband so the victory/defeat panel can list the marched roster.
+            if (loop != null)
+            {
+                loop.CaptureWaveCasualties(playerArmy, deadIds, playerWon);
+                loop.ApplyDeathMoraleFromWave(deadIds.Count);
+            }
 
             // Master Spec Phase 1: surviving battle clones → canonical veteranRank before disband.
             if (playerWon)
