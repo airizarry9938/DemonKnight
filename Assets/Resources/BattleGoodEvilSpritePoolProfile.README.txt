@@ -1,11 +1,14 @@
 BattleGoodEvilSpritePoolProfile (Architect Tab 6)
 ================================================
-tip: fix-build-persist-embed
+tip: fix-pew-body-pool-empty
 
 Autobattle UnitVisualActor Good vs Evil sprite pools.
 Keep SEPARATE from:
   Tab 4 ClassSpritePoolProfile = BODY (pew avatar)
   Tab 5 LegendPewPortraitProfile = FACE
+
+Optional: when Tab 4 BODY is empty, Good troop pools (P/W/K) may soft-fallback
+as pew bodySprite only — prefer filling Tab 4.
 
 Asset path (must ship in player builds):
   Assets/Resources/BattleGoodEvilSpritePoolProfile.asset
@@ -14,5 +17,5 @@ After assigning art: Arthurian → Prepare Architect Art for Player Build
 Promotes into Assets/Resources/ArchitectArt/Battle/**
 
 Force Sync: Arthurian → Force Delete+Sync ALL Scripts
-Diagnose = fix-build-persist-embed
-Escape: !!! Escape to Tip (fix-build-persist-embed)
+Diagnose = fix-pew-body-pool-empty
+Escape: !!! Escape to Tip (fix-pew-body-pool-empty)

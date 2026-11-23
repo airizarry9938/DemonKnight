@@ -24,7 +24,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-build-persist-embed";
+    const string TipPackageId = "fix-pew-body-pool-empty";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -72,6 +72,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "body-face-pool-build-persist",
         "battle-good-evil-sprite-pools",
         "fix-architect-build-persist-cs0103",
+        "fix-build-persist-embed",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
@@ -186,6 +187,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 if (existing != null)
                 {
                     existing.EnsureSlotCounts();
+                    existing.RematerializeSpritesFromPaths();
                     int n = CountAssignedSprites(existing);
                     Debug.Log(
                         $"[DemonKnight] StageLayoutProfile script GUID remapped — preserved {n} assigned seat sprite(s).");
@@ -242,7 +244,13 @@ public static class ArthurianStageLayoutProfileEnsure
         }
 
         AssetDatabase.Refresh();
-        return AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(AssetPath) ?? created;
+        var stageLoaded = AssetDatabase.LoadAssetAtPath<StageLayoutProfile>(AssetPath);
+        if (stageLoaded != null)
+        {
+            stageLoaded.EnsureSlotCounts();
+            stageLoaded.RematerializeSpritesFromPaths();
+        }
+        return RefuseStandIn(stageLoaded, created, AssetPath);
     }
 
     /// <summary>Ensure SceneBackgroundProfile.asset exists (Architect Tab 3). Never wipe assignments.</summary>
@@ -255,6 +263,7 @@ public static class ArthurianStageLayoutProfileEnsure
         if (existing != null)
         {
             existing.EnsureDefaultEntries();
+            existing.RematerializeSpritesFromPaths();
             return existing;
         }
 
@@ -271,6 +280,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 if (existing != null)
                 {
                     existing.EnsureDefaultEntries();
+                    existing.RematerializeSpritesFromPaths();
                     return existing;
                 }
             }
@@ -303,7 +313,13 @@ public static class ArthurianStageLayoutProfileEnsure
             }
         }
 
-        return AssetDatabase.LoadAssetAtPath<SceneBackgroundProfile>(SceneBgAssetPath) ?? created;
+        var sceneLoaded = AssetDatabase.LoadAssetAtPath<SceneBackgroundProfile>(SceneBgAssetPath);
+        if (sceneLoaded != null)
+        {
+            sceneLoaded.EnsureDefaultEntries();
+            sceneLoaded.RematerializeSpritesFromPaths();
+        }
+        return RefuseStandIn(sceneLoaded, created, SceneBgAssetPath);
     }
 
     public static int CountAssignedSprites(StageLayoutProfile p)
@@ -342,6 +358,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 if (existing != null)
                 {
                     existing.EnsureLists();
+                    existing.RematerializeSpritesFromPaths();
                     return existing;
                 }
             }
@@ -375,7 +392,13 @@ public static class ArthurianStageLayoutProfileEnsure
             }
         }
 
-        return AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(ClassPoolAssetPath) ?? created;
+        var poolLoaded = AssetDatabase.LoadAssetAtPath<ClassSpritePoolProfile>(ClassPoolAssetPath);
+        if (poolLoaded != null)
+        {
+            poolLoaded.EnsureLists();
+            poolLoaded.RematerializeSpritesFromPaths();
+        }
+        return RefuseStandIn(poolLoaded, created, ClassPoolAssetPath);
     }
 
     /// <summary>Ensure LegendPewPortraitProfile.asset exists (Architect Tab 5). Never wipe assignments.</summary>
@@ -405,6 +428,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 if (existing != null)
                 {
                     existing.EnsureSlotsAndLists();
+                    existing.RematerializeSpritesFromPaths();
                     return existing;
                 }
             }
@@ -437,8 +461,14 @@ public static class ArthurianStageLayoutProfileEnsure
             }
         }
 
-        existing = AssetDatabase.LoadAssetAtPath<LegendPewPortraitProfile>(LegendPewAssetPath) ?? created;
-        existing.EnsureSlotsAndLists();
+        existing = AssetDatabase.LoadAssetAtPath<LegendPewPortraitProfile>(LegendPewAssetPath);
+        if (existing != null)
+        {
+            existing.EnsureSlotsAndLists();
+            existing.RematerializeSpritesFromPaths();
+        }
+        existing = RefuseStandIn(existing, created, LegendPewAssetPath);
+        existing?.EnsureSlotsAndLists();
         return existing;
     }
 
@@ -469,6 +499,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 if (existing != null)
                 {
                     existing.EnsureSlotsAndLists();
+                    existing.RematerializeSpritesFromPaths();
                     return existing;
                 }
             }
@@ -501,8 +532,14 @@ public static class ArthurianStageLayoutProfileEnsure
             }
         }
 
-        existing = AssetDatabase.LoadAssetAtPath<BattleGoodEvilSpritePoolProfile>(BattleGoodEvilAssetPath) ?? created;
-        existing.EnsureSlotsAndLists();
+        existing = AssetDatabase.LoadAssetAtPath<BattleGoodEvilSpritePoolProfile>(BattleGoodEvilAssetPath);
+        if (existing != null)
+        {
+            existing.EnsureSlotsAndLists();
+            existing.RematerializeSpritesFromPaths();
+        }
+        existing = RefuseStandIn(existing, created, BattleGoodEvilAssetPath);
+        existing?.EnsureSlotsAndLists();
         return existing;
     }
 
@@ -521,29 +558,37 @@ public static class ArthurianStageLayoutProfileEnsure
     static bool TryRemapBattleGoodEvilScriptGuid(string fullPath)
         => TryRemapScriptGuid(fullPath, typeof(BattleGoodEvilSpritePoolProfile));
 
+    /// <summary>
+    /// After embed into GameDataTypes.cs, SO assets need BOTH the host .cs GUID and the
+    /// multi-class MonoScript local fileID (not hardcoded 11500000). Wrong fileID → Unity
+    /// logs "referenced script … is missing", Resources.Load returns null, Ensure wiped
+    /// pools on reopen. tip: fix-pew-body-pool-empty
+    /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
         try
         {
-            var tmp = ScriptableObject.CreateInstance(soType);
-            var ms = MonoScript.FromScriptableObject((ScriptableObject)tmp);
-            UnityEngine.Object.DestroyImmediate(tmp);
-            if (ms == null) return false;
-            string scriptPath = AssetDatabase.GetAssetPath(ms);
-            string newGuid = AssetDatabase.AssetPathToGUID(scriptPath);
+            if (!TryResolveScriptRef(soType, out long localId, out string newGuid))
+                return false;
             if (string.IsNullOrEmpty(newGuid) || newGuid.Length != 32) return false;
 
             string yaml = File.ReadAllText(fullPath);
             var re = new System.Text.RegularExpressions.Regex(
-                @"m_Script:\s*\{fileID:\s*11500000,\s*guid:\s*([0-9a-fA-F]+),\s*type:\s*3\}");
+                @"m_Script:\s*\{fileID:\s*(-?\d+),\s*guid:\s*([0-9a-fA-F]+),\s*type:\s*3\}");
             var m = re.Match(yaml);
             if (!m.Success) return false;
-            if (string.Equals(m.Groups[1].Value, newGuid, StringComparison.OrdinalIgnoreCase))
-                return false; // already correct — typed load failed for another reason
-            string replaced = re.Replace(yaml,
-                "m_Script: {fileID: 11500000, guid: " + newGuid + ", type: 3}", 1);
+            string oldFileId = m.Groups[1].Value;
+            string oldGuid = m.Groups[2].Value;
+            if (string.Equals(oldGuid, newGuid, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(oldFileId, localId.ToString(), StringComparison.Ordinal))
+                return false; // fully correct — typed load failed for another reason
+            string want = "m_Script: {fileID: " + localId + ", guid: " + newGuid + ", type: 3}";
+            string replaced = re.Replace(yaml, want, 1);
             if (replaced == yaml) return false;
             File.WriteAllText(fullPath, replaced);
+            Debug.Log(
+                "[DemonKnight] Remapped " + soType.Name + " m_Script fileID "
+                + oldFileId + "→" + localId + " guid " + oldGuid + "→" + newGuid);
             return true;
         }
         catch (Exception ex)
@@ -551,6 +596,87 @@ public static class ArthurianStageLayoutProfileEnsure
             Debug.LogWarning("[DemonKnight] TryRemapScriptGuid: " + ex.Message);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Probe CreateAsset writes the exact multi-class fileID Unity expects for this SO type.
+    /// Fallback: MonoScript TryGetGUIDAndLocalFileIdentifier / path GUID + 11500000.
+    /// </summary>
+    static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
+    {
+        localId = 11500000L;
+        newGuid = null;
+        const string probePath = "Assets/Resources/_DkScriptRemapProbe.asset";
+        try
+        {
+            if (AssetDatabase.LoadMainAssetAtPath(probePath) != null)
+                AssetDatabase.DeleteAsset(probePath);
+            string probeFull = Path.Combine(
+                Directory.GetParent(Application.dataPath)!.FullName,
+                probePath.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(probeFull)) try { File.Delete(probeFull); } catch { /* ignore */ }
+            if (File.Exists(probeFull + ".meta")) try { File.Delete(probeFull + ".meta"); } catch { /* ignore */ }
+
+            var probe = ScriptableObject.CreateInstance(soType);
+            AssetDatabase.CreateAsset(probe, probePath);
+            AssetDatabase.SaveAssets();
+            if (File.Exists(probeFull))
+            {
+                string py = File.ReadAllText(probeFull);
+                var re = new System.Text.RegularExpressions.Regex(
+                    @"m_Script:\s*\{fileID:\s*(-?\d+),\s*guid:\s*([0-9a-fA-F]+),\s*type:\s*3\}");
+                var m = re.Match(py);
+                AssetDatabase.DeleteAsset(probePath);
+                if (m.Success)
+                {
+                    localId = long.Parse(m.Groups[1].Value);
+                    newGuid = m.Groups[2].Value;
+                    return !string.IsNullOrEmpty(newGuid);
+                }
+            }
+            else
+            {
+                try { AssetDatabase.DeleteAsset(probePath); } catch { /* ignore */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] ScriptRef probe soft-fail: " + ex.Message);
+            try { AssetDatabase.DeleteAsset(probePath); } catch { /* ignore */ }
+        }
+
+        try
+        {
+            var tmp = ScriptableObject.CreateInstance(soType);
+            var ms = MonoScript.FromScriptableObject((ScriptableObject)tmp);
+            UnityEngine.Object.DestroyImmediate(tmp);
+            if (ms == null) return false;
+            if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(ms, out newGuid, out localId)
+                && !string.IsNullOrEmpty(newGuid) && newGuid.Length == 32)
+                return true;
+            string scriptPath = AssetDatabase.GetAssetPath(ms);
+            newGuid = AssetDatabase.AssetPathToGUID(scriptPath);
+            localId = 11500000L;
+            return !string.IsNullOrEmpty(newGuid) && newGuid.Length == 32;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] TryResolveScriptRef: " + ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>Never hand Architect a CreateInstance stand-in — Persist would SetDirty a non-asset.</summary>
+    static T RefuseStandIn<T>(T loaded, T created, string assetPath) where T : ScriptableObject
+    {
+        if (loaded != null && !string.IsNullOrEmpty(AssetDatabase.GetAssetPath(loaded)))
+            return loaded;
+        if (created != null && !string.IsNullOrEmpty(AssetDatabase.GetAssetPath(created)))
+            return created;
+        Debug.LogError(
+            "[DemonKnight] Ensure refused CreateInstance stand-in for " + assetPath
+            + " — typed Load failed after CreateAsset. Run Arthurian → Ensure Stage Layout Profile.");
+        return loaded ?? created;
     }
 
     /// <summary>Keep fresh m_Script header; transplant church/battle/parallax lists from backup YAML.</summary>

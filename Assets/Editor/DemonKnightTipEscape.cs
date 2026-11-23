@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-build-persist-embed";
+    public const string TipPackageId = "fix-pew-body-pool-empty";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -42,7 +42,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-build-persist-embed)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-pew-body-pool-empty)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -152,12 +152,23 @@ public static class DemonKnightTipEscape
             "body-face-pool-build-persist",
             "battle-good-evil-sprite-pools",
             "fix-architect-build-persist-cs0103",
+            "fix-build-persist-embed",
         };
         foreach (string s in stale)
         {
             if (pvBody.IndexOf("Id = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
             if (archBody.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
         }
+        // tip fix-pew-body-pool-empty: multi-class MonoScript fileID remap + PersistAll on close.
+        string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
+        if (!File.Exists(ensurePath)) return true;
+        string ensureBody = File.ReadAllText(ensurePath);
+        if (ensureBody.IndexOf("TryResolveScriptRef", StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("TryPewBodyFallbackFromGoodTroops", StringComparison.Ordinal) < 0
+            && File.ReadAllText(Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs"))
+                .IndexOf("TryPewBodyFallbackFromGoodTroops", StringComparison.Ordinal) < 0)
+            return true;
         return false;
     }
 
