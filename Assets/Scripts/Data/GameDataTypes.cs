@@ -924,8 +924,8 @@ namespace ArthurianAutobattler
     public static class IntelGossip
     {
         /// <summary>
-        /// Same as StageLayoutProfile.PewRowSize (13). Local const so GameDataTypes
-        /// compiles even if StageLayoutProfile.cs is missing mid-Force-Sync (CS0103).
+        /// Same as StageLayoutProfile.PewRowSize (13). Local const (kept for call sites).
+        /// tip: fix-profiles-in-gdt-always — StageLayoutProfile also lives in this file.
         /// </summary>
         public const int PewRowSize = 13;
 
@@ -1003,10 +1003,9 @@ namespace ArthurianAutobattler
     }
 
 
-    // ===== fix-gdt-profile-always-compile — non-SO helpers LIVE HERE (MustRestore) =====
-    // Named *Profile.cs files keep ONLY ScriptableObject classes (Unity class==filename).
-    // Helpers permanently in GameDataTypes so Force Sync / GDT alone always compiles Slot/Parallax/SceneBg/BattleSprite types
-    // even when named Profile MonoScripts are mid-HardWrite. tip: fix-gdt-profile-always-compile
+    // ===== fix-profiles-in-gdt-always — helpers + Profile SOs LIVE HERE (MustRestore) =====
+    // Helpers + all five Architect Profile ScriptableObjects permanently in GameDataTypes.
+    // Named *Profile.cs files are deleted/stubbed (CS0101 kill). tip: fix-profiles-in-gdt-always
     [Serializable]
     public class SlotTransformConfig
     {
@@ -1077,10 +1076,1118 @@ namespace ArthurianAutobattler
     }
 
 
+    // ===== Architect Profile ScriptableObjects LIVE HERE (MustRestore) =====
+    // tip: fix-profiles-in-gdt-always — named *Profile.cs removed from Sync/HardWrite.
+    // Ensure remaps YAML m_Script via CreateInstance probe (multi-class MonoScript fileID).
+
+    // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
+    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    /// <summary>
+    /// Numbered Somerset church pews (52), player battle slots (52), enemy slots (20),
+    /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
+    /// </summary>
+    [CreateAssetMenu(fileName = "StageLayoutProfile", menuName = "DemonKnight/Stage Layout Profile")]
+    public class StageLayoutProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "StageLayoutProfile";
+        public const int ChurchPewCount = 52;
+        public const int PlayerBattleCount = 52;
+        public const int EnemyBattleCount = 20;
+        /// <summary>Gossip / pew row size (pewSeatIndex / 13).</summary>
+        public const int PewRowSize = 13;
+
+        public List<SlotTransformConfig> churchPewSlots = new List<SlotTransformConfig>();
+        public List<SlotTransformConfig> playerBattleSlots = new List<SlotTransformConfig>();
+        public List<SlotTransformConfig> enemyBattleSlots = new List<SlotTransformConfig>();
+        public List<StageParallaxLayer> parallaxLayers = new List<StageParallaxLayer>();
+
+        public bool enableRainFX;
+        public bool enableLightningFlashes;
+        public bool enableCandleFlicker = true;
+
+        /// <summary>True when this is a CreateInstance stand-in (not a Resources asset).</summary>
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
+        public static StageLayoutProfile Load()
+        {
+            StageLayoutProfile p = null;
+            try { p = Resources.Load<StageLayoutProfile>(ResourcesPath); }
+            catch { /* missing MonoScript GUID after embed — fall through */ }
+            if (p != null)
+            {
+                p.EnsureSlotCounts();
+                p.isRuntimeStandIn = false;
+                p.RematerializeSpritesFromPaths();
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<StageLayoutProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureSlotCounts();
+                        all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset */ }
+            // Runtime fallback when the Resources asset has a stale script GUID (Force Sync embed).
+            // Never wipe authored Resources — stand-in is last resort only.
+            p = CreateInstance<StageLayoutProfile>();
+            p.name = "StageLayoutProfile_Runtime";
+            p.isRuntimeStandIn = true;
+            p.EnsureSlotCounts();
+            return p;
+        }
+
+        /// <summary>
+        /// Restore Missing pew/battle seat sprites from path backups.
+        /// Works in player builds via Resources.Load / StreamingAssets (not Editor-only).
+        /// Never clears path backups when sprites are temporarily null.
+        /// </summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureSlotCounts();
+            int n = 0;
+            n += RematerializeSlotList(churchPewSlots);
+            n += RematerializeSlotList(playerBattleSlots);
+            n += RematerializeSlotList(enemyBattleSlots);
+            return n;
+        }
+
+        static int RematerializeSlotList(List<SlotTransformConfig> slots)
+        {
+            if (slots == null) return 0;
+            int restored = 0;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var s = slots[i];
+                if (s == null || s.previewOrOverrideSprite != null) continue;
+                if (string.IsNullOrEmpty(s.previewAssetPath)) continue;
+                Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(s.previewAssetPath);
+                if (sp == null) continue;
+                s.previewOrOverrideSprite = sp;
+                restored++;
+            }
+            return restored;
+        }
+
+        /// <summary>Pad / trim lists to 52 / 52 / 20 with default transforms.</summary>
+        public void EnsureSlotCounts()
+        {
+            churchPewSlots ??= new List<SlotTransformConfig>();
+            playerBattleSlots ??= new List<SlotTransformConfig>();
+            enemyBattleSlots ??= new List<SlotTransformConfig>();
+            parallaxLayers ??= new List<StageParallaxLayer>();
+
+            FillSlots(churchPewSlots, ChurchPewCount, ChurchPewDefault);
+            FillSlots(playerBattleSlots, PlayerBattleCount, PlayerBattleDefault);
+            FillSlots(enemyBattleSlots, EnemyBattleCount, EnemyBattleDefault);
+        }
+
+        static void FillSlots(List<SlotTransformConfig> list, int count, Func<int, SlotTransformConfig> factory)
+        {
+            while (list.Count < count)
+                list.Add(factory(list.Count));
+            if (list.Count > count)
+                list.RemoveRange(count, list.Count - count);
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] == null) list[i] = factory(i);
+                list[i].slotNumber = i;
+            }
+        }
+
+        /// <summary>
+        /// Play-normalized 0–1 church seat (matches SomersetPewLayout defaults).
+        /// World-space defaults (-6..6) were ignored by PopulatePews, so Stage Placer
+        /// edits never showed in Play until Architect re-seeded — fixed here.
+        /// </summary>
+        static SlotTransformConfig ChurchPewDefault(int i)
+        {
+            Vector2 norm = DefaultChurchNormalizedPosition(i);
+            return new SlotTransformConfig
+            {
+                slotNumber = i,
+                position = norm,
+                scale = Vector2.one,
+                aspectMultiplier = Vector2.one,
+                sortingOrder = -Mathf.RoundToInt(norm.y * 100f)
+            };
+        }
+
+        /// <summary>Normalized 0–1 pew seat matching SomersetPewLayout.CreateDefaultPews capacities.</summary>
+        public static Vector2 DefaultChurchNormalizedPosition(int globalSeatIndex)
+        {
+            // Mirror SomersetPewLayout.CreateDefaultPews (v4) — keep in sync.
+            float[][] colXByRow =
+            {
+                new[] { 0.220f, 0.500f, 0.780f },
+                new[] { 0.226f, 0.500f, 0.775f },
+                new[] { 0.232f, 0.500f, 0.770f },
+                new[] { 0.238f, 0.500f, 0.765f }
+            };
+            float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
+            float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.120f };
+            int[,] caps =
+            {
+                { 5, 5, 5 },
+                { 4, 5, 4 },
+                { 4, 4, 4 },
+                { 4, 4, 4 }
+            };
+
+            int remaining = Mathf.Clamp(globalSeatIndex, 0, ChurchPewCount - 1);
+            for (int row = 0; row < 4; row++)
+            {
+                for (int col = 0; col < 3; col++)
+                {
+                    int cap = Mathf.Max(1, caps[row, col]);
+                    if (remaining < cap)
+                    {
+                        float t = cap == 1 ? 0.5f : remaining / (float)(cap - 1);
+                        float x = colXByRow[row][col]
+                                  + Mathf.Lerp(-rowSpread[row] * 0.5f, rowSpread[row] * 0.5f, t);
+                        return new Vector2(x, rowY[row]);
+                    }
+                    remaining -= cap;
+                }
+            }
+            return new Vector2(0.5f, 0.5f);
+        }
+
+        /// <summary>Staggered columns of 6 (frontlineSize = 6) — matches Phase 3 auto-arrange math.</summary>
+        static SlotTransformConfig PlayerBattleDefault(int i)
+        {
+            const int frontlineSize = 6;
+            int col = i / frontlineSize;
+            int row = i % frontlineSize;
+            float scale = col <= 1 ? 1f : Mathf.Lerp(0.95f, 0.70f, Mathf.InverseLerp(2f, 8f, col));
+            float x = -3.5f + row * 1.1f;
+            float y = 2.0f - col * 0.85f;
+            return new SlotTransformConfig
+            {
+                slotNumber = i,
+                position = new Vector2(x, y),
+                scale = new Vector2(scale, scale),
+                aspectMultiplier = Vector2.one,
+                sortingOrder = Mathf.RoundToInt(-y * 10f)
+            };
+        }
+
+        static SlotTransformConfig EnemyBattleDefault(int i)
+        {
+            int col = i / 5;
+            int row = i % 5;
+            float x = 3.5f + row * 1.0f;
+            float y = 1.5f - col * 1.0f;
+            return new SlotTransformConfig
+            {
+                slotNumber = i,
+                position = new Vector2(x, y),
+                scale = Vector2.one,
+                aspectMultiplier = Vector2.one,
+                sortingOrder = Mathf.RoundToInt(-y * 10f)
+            };
+        }
+    }
+
+    // ===== SceneBackgroundProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
+    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    /// <summary>
+    /// Architect-assigned scene/screen backgrounds (image or video). Resources path: SceneBackgroundProfile.
+    /// Assign-only — empty slots keep each screen's built-in default art.
+    /// </summary>
+    [CreateAssetMenu(fileName = "SceneBackgroundProfile", menuName = "DemonKnight/Scene Background Profile")]
+    public class SceneBackgroundProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "SceneBackgroundProfile";
+
+        public List<SceneBackgroundEntry> entries = new List<SceneBackgroundEntry>();
+
+        public static SceneBackgroundProfile Load()
+        {
+            SceneBackgroundProfile p = null;
+            try { p = Resources.Load<SceneBackgroundProfile>(ResourcesPath); }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
+            if (p != null)
+            {
+                p.EnsureDefaultEntries();
+                p.RematerializeSpritesFromPaths();
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<SceneBackgroundProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureDefaultEntries();
+                        all[i].RematerializeSpritesFromPaths();
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset / missing script spam — soft stand-in */ }
+            p = CreateInstance<SceneBackgroundProfile>();
+            p.name = "SceneBackgroundProfile_Runtime";
+            p.EnsureDefaultEntries();
+            return p;
+        }
+
+        /// <summary>
+        /// Restore Missing image sprites from path backups (Resources / StreamingAssets).
+        /// tip: fix-class-pool-kind-cs0019
+        /// </summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureDefaultEntries();
+            if (entries == null) return 0;
+            int restored = 0;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var e = entries[i];
+                if (e == null || e.imageSprite != null) continue;
+                if (string.IsNullOrEmpty(e.imageAssetPath)) continue;
+                Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(e.imageAssetPath);
+                if (sp == null) continue;
+                e.imageSprite = sp;
+                restored++;
+            }
+            return restored;
+        }
+
+        public void EnsureDefaultEntries()
+        {
+            entries ??= new List<SceneBackgroundEntry>();
+            EnsureEntry(SceneBackgroundSlot.MainMenu, "Main Menu");
+            EnsureEntry(SceneBackgroundSlot.SomersetChurch, "Somerset Church");
+            EnsureEntry(SceneBackgroundSlot.ChurchyardBattle, "Churchyard Battle");
+            EnsureEntry(SceneBackgroundSlot.VictoryOverlay, "Victory Overlay");
+            EnsureEntry(SceneBackgroundSlot.MerlinResurrection, "Merlin Resurrection");
+            EnsureEntry(SceneBackgroundSlot.LegendCodex, "Legends Codex");
+        }
+
+        void EnsureEntry(SceneBackgroundSlot slot, string label)
+        {
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (entries[i] != null && entries[i].slot == slot)
+                {
+                    if (string.IsNullOrEmpty(entries[i].displayName))
+                        entries[i].displayName = label;
+                    return;
+                }
+            }
+            entries.Add(new SceneBackgroundEntry { slot = slot, displayName = label });
+        }
+
+        public SceneBackgroundEntry GetEntry(SceneBackgroundSlot slot)
+        {
+            EnsureDefaultEntries();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (entries[i] != null && entries[i].slot == slot)
+                    return entries[i];
+            }
+            return null;
+        }
+
+        public bool HasAssignment(SceneBackgroundSlot slot)
+        {
+            var e = GetEntry(slot);
+            return e != null && (e.imageSprite != null || e.videoClip != null
+                                 || !string.IsNullOrEmpty(e.imageAssetPath)
+                                 || !string.IsNullOrEmpty(e.videoAssetPath));
+        }
+    }
+
+    // ===== ClassSpritePoolProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
+    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    /// <summary>
+    /// Architect class sprite pools (Peasant / Warrior / Knight). Resources path:
+    /// ClassSpritePoolProfile. StageLayoutProfile pew slots stay position/scale guides —
+    /// church/combat visuals pick from these pools by unit class.
+    /// </summary>
+    [CreateAssetMenu(fileName = "ClassSpritePoolProfile", menuName = "DemonKnight/Class Sprite Pool Profile")]
+    public class ClassSpritePoolProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "ClassSpritePoolProfile";
+
+        public List<Sprite> peasantSprites = new List<Sprite>();
+        public List<Sprite> warriorSprites = new List<Sprite>();
+        public List<Sprite> knightSprites = new List<Sprite>();
+
+        /// <summary>Editor path backups so list entries survive reimports.</summary>
+        public List<string> peasantAssetPaths = new List<string>();
+        public List<string> warriorAssetPaths = new List<string>();
+        public List<string> knightAssetPaths = new List<string>();
+
+        /// <summary>True when this is a CreateInstance stand-in (not a Resources asset).</summary>
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
+        public static ClassSpritePoolProfile Load()
+        {
+            ClassSpritePoolProfile p = null;
+            try { p = Resources.Load<ClassSpritePoolProfile>(ResourcesPath); }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
+            if (p != null)
+            {
+                p.EnsureLists();
+                p.isRuntimeStandIn = false;
+                // Paths filled + Sprite Missing after Sync → rematerialize before Applier picks.
+                p.RematerializeSpritesFromPaths();
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<ClassSpritePoolProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureLists();
+                        all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset / missing script — soft stand-in */ }
+            p = CreateInstance<ClassSpritePoolProfile>();
+            p.name = "ClassSpritePoolProfile_Runtime";
+            p.isRuntimeStandIn = true;
+            p.EnsureLists();
+            return p;
+        }
+
+        public void EnsureLists()
+        {
+            peasantSprites ??= new List<Sprite>();
+            warriorSprites ??= new List<Sprite>();
+            knightSprites ??= new List<Sprite>();
+            peasantAssetPaths ??= new List<string>();
+            warriorAssetPaths ??= new List<string>();
+            knightAssetPaths ??= new List<string>();
+        }
+
+        /// <summary>
+        /// Restore Missing sprite refs from path backups (editor AssetDatabase).
+        /// Never wipe path backups when sprites are temporarily null — Persist syncs
+        /// paths only when a live sprite is present.
+        /// </summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureLists();
+            int n = 0;
+            n += RematerializeList(peasantSprites, peasantAssetPaths);
+            n += RematerializeList(warriorSprites, warriorAssetPaths);
+            n += RematerializeList(knightSprites, knightAssetPaths);
+            return n;
+        }
+
+        public static int RematerializeList(List<Sprite> sprites, List<string> paths)
+        {
+            if (sprites == null || paths == null) return 0;
+            int restored = 0;
+            int count = Mathf.Max(sprites.Count, paths.Count);
+            while (sprites.Count < count) sprites.Add(null);
+            while (paths.Count < count) paths.Add("");
+            for (int i = 0; i < count; i++)
+            {
+                if (sprites[i] != null) continue;
+                if (string.IsNullOrEmpty(paths[i])) continue;
+                Sprite sp = TryLoadSpriteAtPath(paths[i]);
+                if (sp == null) continue;
+                sprites[i] = sp;
+                restored++;
+            }
+            return restored;
+        }
+
+        public static Sprite TryLoadSpriteAtPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            string norm = path.Replace("\\", "/");
+#if UNITY_EDITOR
+            try
+            {
+                var sp = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(norm);
+                if (sp != null) return sp;
+                // Texture with multiple sprites — take first sub-asset Sprite.
+                var objs = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(norm);
+                if (objs != null)
+                {
+                    for (int i = 0; i < objs.Length; i++)
+                        if (objs[i] is Sprite s) return s;
+                }
+            }
+            catch { /* ignore */ }
+#endif
+            // Player builds: Resources.Load (profiles + promoted ArchitectArt copies).
+            try
+            {
+                int idx = norm.IndexOf("Resources/", System.StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                {
+                    string res = norm.Substring(idx + "Resources/".Length);
+                    int dot = res.LastIndexOf('.');
+                    if (dot > 0) res = res.Substring(0, dot);
+                    var fromRes = Resources.Load<Sprite>(res);
+                    if (fromRes != null) return fromRes;
+                    var all = Resources.LoadAll<Sprite>(res);
+                    if (all != null && all.Length > 0 && all[0] != null) return all[0];
+                }
+                // Bare Resources key (no Assets/ prefix) — ArchitectArt/Body/foo
+                if (!norm.StartsWith("Assets/", System.StringComparison.OrdinalIgnoreCase)
+                    && norm.IndexOf(':') < 0)
+                {
+                    string key = norm;
+                    int dot = key.LastIndexOf('.');
+                    if (dot > 0) key = key.Substring(0, dot);
+                    var bare = Resources.Load<Sprite>(key);
+                    if (bare != null) return bare;
+                }
+            }
+            catch { /* ignore */ }
+
+            // StreamingAssets fallback (png/jpg copied by build prepare). Soft-fail — no wipe.
+            try
+            {
+                string fileName = System.IO.Path.GetFileName(norm);
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    string sa = System.IO.Path.Combine(Application.streamingAssetsPath, "DemonKnightArchitect", fileName);
+                    if (System.IO.File.Exists(sa))
+                    {
+                        byte[] bytes = System.IO.File.ReadAllBytes(sa);
+                        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                        if (tex.LoadImage(bytes))
+                        {
+                            tex.name = System.IO.Path.GetFileNameWithoutExtension(fileName);
+                            return Sprite.Create(
+                                tex,
+                                new Rect(0, 0, tex.width, tex.height),
+                                new Vector2(0.5f, 0.5f),
+                                100f);
+                        }
+                    }
+                }
+            }
+            catch { /* ignore */ }
+            return null;
+        }
+
+        public List<Sprite> GetPool(UnitType type)
+        {
+            EnsureLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantSprites,
+                UnitType.Warrior => warriorSprites,
+                UnitType.Knight => knightSprites,
+                _ => null
+            };
+        }
+
+        public int CountUsable(UnitType type)
+        {
+            var pool = GetPool(type);
+            if (pool == null) return 0;
+            EnsureLists();
+            List<string> paths = type switch
+            {
+                UnitType.Peasant => peasantAssetPaths,
+                UnitType.Warrior => warriorAssetPaths,
+                UnitType.Knight => knightAssetPaths,
+                _ => null
+            };
+            int n = 0;
+            int count = pool.Count;
+            if (paths != null && paths.Count > count) count = paths.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (i < pool.Count && pool[i] != null) { n++; continue; }
+                // Path backup counts as usable — Rematerialize restores the Missing Sprite ref.
+                if (paths != null && i < paths.Count && !string.IsNullOrEmpty(paths[i])) n++;
+            }
+            return n;
+        }
+    }
+
+    // ===== LegendPewPortraitProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
+    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    /// <summary>One Legend face-portrait slot (Architect Tab 5).</summary>
+    [Serializable]
+    public class LegendPortraitEntry
+    {
+        public UnitType unitType;
+        public string displayName;
+        public Sprite facePortrait;
+        public string assetPath;
+        [Tooltip("Merlin and other soft slots stay in the list but are not required for playable Codex.")]
+        public bool softOptional;
+    }
+
+    /// <summary>
+    /// Architect legend face portraits + townsfolk pew FACE-ONLY profile pools.
+    /// Distinct from ClassSpritePoolProfile (full-body pew/combat avatars). Resources path:
+    /// LegendPewPortraitProfile. Never assign these as bodySprite.
+    /// </summary>
+    [CreateAssetMenu(fileName = "LegendPewPortraitProfile", menuName = "DemonKnight/Legend Pew Portrait Profile")]
+    public class LegendPewPortraitProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "LegendPewPortraitProfile";
+
+        /// <summary>14 playable legends + soft Merlin slot (last).</summary>
+        public static readonly UnitType[] CanonicalLegendSlots =
+        {
+            UnitType.SirKay,
+            UnitType.SirBedivere,
+            UnitType.LadyGuinevere,
+            UnitType.ArchPriestOfGlastonbury,
+            UnitType.SirGawain,
+            UnitType.SirTristan,
+            UnitType.SirLancelot,
+            UnitType.KingArthur,
+            UnitType.SirGalahad,
+            UnitType.SirPercival,
+            UnitType.Nimue,
+            UnitType.Mordred,
+            UnitType.MorganLeFay,
+            UnitType.TheGreenKnight,
+            UnitType.Merlin, // soft — out of playable Codex pool
+        };
+
+        public List<LegendPortraitEntry> legendPortraits = new List<LegendPortraitEntry>();
+
+        [Header("Townsfolk pew FACE profiles only (never bodySprite — distinct from Tab 4 ClassSpritePool)")]
+        public List<Sprite> peasantFaceProfiles = new List<Sprite>();
+        public List<Sprite> warriorFaceProfiles = new List<Sprite>();
+        public List<Sprite> knightFaceProfiles = new List<Sprite>();
+
+        public List<string> peasantFaceAssetPaths = new List<string>();
+        public List<string> warriorFaceAssetPaths = new List<string>();
+        public List<string> knightFaceAssetPaths = new List<string>();
+
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
+        public static LegendPewPortraitProfile Load()
+        {
+            LegendPewPortraitProfile p = null;
+            try { p = Resources.Load<LegendPewPortraitProfile>(ResourcesPath); }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
+            if (p != null)
+            {
+                p.EnsureSlotsAndLists();
+                p.isRuntimeStandIn = false;
+                p.RematerializeSpritesFromPaths();
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<LegendPewPortraitProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureSlotsAndLists();
+                        all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset / missing script — soft stand-in */ }
+            p = CreateInstance<LegendPewPortraitProfile>();
+            p.name = "LegendPewPortraitProfile_Runtime";
+            p.isRuntimeStandIn = true;
+            p.EnsureSlotsAndLists();
+            return p;
+        }
+
+        /// <summary>Restore Missing face/pool sprites from path backups (editor + Resources).</summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            n += ClassSpritePoolProfile.RematerializeList(peasantFaceProfiles, peasantFaceAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(warriorFaceProfiles, warriorFaceAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(knightFaceProfiles, knightFaceAssetPaths);
+            if (legendPortraits != null)
+            {
+                for (int i = 0; i < legendPortraits.Count; i++)
+                {
+                    var e = legendPortraits[i];
+                    if (e == null || e.facePortrait != null) continue;
+                    if (string.IsNullOrEmpty(e.assetPath)) continue;
+                    Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(e.assetPath);
+                    if (sp == null) continue;
+                    e.facePortrait = sp;
+                    n++;
+                }
+            }
+            return n;
+        }
+
+        public void EnsureSlotsAndLists()
+        {
+            legendPortraits ??= new List<LegendPortraitEntry>();
+            peasantFaceProfiles ??= new List<Sprite>();
+            warriorFaceProfiles ??= new List<Sprite>();
+            knightFaceProfiles ??= new List<Sprite>();
+            peasantFaceAssetPaths ??= new List<string>();
+            warriorFaceAssetPaths ??= new List<string>();
+            knightFaceAssetPaths ??= new List<string>();
+
+            for (int i = 0; i < CanonicalLegendSlots.Length; i++)
+            {
+                UnitType want = CanonicalLegendSlots[i];
+                LegendPortraitEntry found = null;
+                for (int j = 0; j < legendPortraits.Count; j++)
+                {
+                    if (legendPortraits[j] != null && legendPortraits[j].unitType == want)
+                    {
+                        found = legendPortraits[j];
+                        break;
+                    }
+                }
+                if (found == null)
+                {
+                    found = new LegendPortraitEntry
+                    {
+                        unitType = want,
+                        displayName = DefaultDisplayName(want),
+                        softOptional = want == UnitType.Merlin
+                    };
+                    legendPortraits.Add(found);
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(found.displayName))
+                        found.displayName = DefaultDisplayName(want);
+                    found.softOptional = want == UnitType.Merlin;
+                }
+            }
+        }
+
+        public static string DefaultDisplayName(UnitType t) => t switch
+        {
+            UnitType.KingArthur => "King Arthur",
+            UnitType.SirLancelot => "Sir Lancelot",
+            UnitType.MorganLeFay => "Morgan le Fay",
+            UnitType.LadyOfTheLake => "Lady of the Lake",
+            UnitType.SirGawain => "Sir Gawain",
+            UnitType.SirGalahad => "Sir Galahad",
+            UnitType.SirTristan => "Sir Tristan",
+            UnitType.SirPercival => "Sir Percival",
+            UnitType.SirKay => "Sir Kay",
+            UnitType.SirBedivere => "Sir Bedivere",
+            UnitType.LadyGuinevere => "Lady Guinevere",
+            UnitType.Guinevere => "Lady Guinevere",
+            UnitType.ArchPriestOfGlastonbury => "Arch-Priest of Glastonbury",
+            UnitType.Priest => "Arch-Priest of Glastonbury",
+            UnitType.TheGreenKnight => "The Green Knight",
+            UnitType.Merlin => "Merlin (soft)",
+            _ => t.ToString()
+        };
+
+        /// <summary>Normalize aliases so Guinevere/Priest map onto canonical slots.</summary>
+        public static UnitType NormalizeLegendSlot(UnitType type) => type switch
+        {
+            UnitType.Guinevere => UnitType.LadyGuinevere,
+            UnitType.Priest => UnitType.ArchPriestOfGlastonbury,
+            _ => type
+        };
+
+        public LegendPortraitEntry FindLegendEntry(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            UnitType want = NormalizeLegendSlot(type);
+            for (int i = 0; i < legendPortraits.Count; i++)
+            {
+                var e = legendPortraits[i];
+                if (e != null && e.unitType == want) return e;
+            }
+            return null;
+        }
+
+        public Sprite GetLegendFace(UnitType type)
+        {
+            var e = FindLegendEntry(type);
+            return e != null ? e.facePortrait : null;
+        }
+
+        public List<Sprite> GetPewFacePool(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantFaceProfiles,
+                UnitType.Warrior => warriorFaceProfiles,
+                UnitType.Knight => knightFaceProfiles,
+                _ => null
+            };
+        }
+
+        public int CountUsablePewFaces(UnitType type)
+        {
+            var pool = GetPewFacePool(type);
+            if (pool == null) return 0;
+            int n = 0;
+            for (int i = 0; i < pool.Count; i++)
+                if (pool[i] != null) n++;
+            return n;
+        }
+
+        public int CountAssignedLegendFaces()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            for (int i = 0; i < legendPortraits.Count; i++)
+            {
+                var e = legendPortraits[i];
+                if (e != null && e.facePortrait != null && !e.softOptional) n++;
+            }
+            return n;
+        }
+    }
+
+    // ===== BattleGoodEvilSpritePoolProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
+    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    /// <summary>
+    /// Architect Tab 6 — Autobattle Good vs Evil battle sprites for UnitVisualActor.
+    /// Distinct from Tab 4 pew BODY pools and Tab 5 FACE portraits. Resources path:
+    /// BattleGoodEvilSpritePoolProfile. tip: battle-good-evil-sprite-pools
+    /// </summary>
+    [CreateAssetMenu(fileName = "BattleGoodEvilSpritePoolProfile", menuName = "DemonKnight/Battle Good Evil Sprite Pool Profile")]
+    public class BattleGoodEvilSpritePoolProfile : ScriptableObject
+    {
+        public const string ResourcesPath = "BattleGoodEvilSpritePoolProfile";
+
+        /// <summary>14 playable legends + soft Merlin (same order as Tab 5 CanonicalLegendSlots).</summary>
+        public static readonly UnitType[] CanonicalGoodLegendSlots = LegendPewPortraitProfile.CanonicalLegendSlots;
+
+        /// <summary>Wave 3–10+ bosses (lore-boss-wave-order).</summary>
+        public static readonly UnitType[] CanonicalBossSlots =
+        {
+            UnitType.BossBlackKnight,   // Wave 3
+            UnitType.BossMeleagant,     // Wave 4
+            UnitType.BossKingLot,       // Wave 5
+            UnitType.BossVortigern,     // Wave 6
+            UnitType.BossAccolon,       // Wave 7
+            UnitType.BossQuestingBeast, // Wave 8
+            UnitType.BossGreenKnight,   // Wave 9
+            UnitType.BossNimue,         // Wave 10+
+        };
+
+        [Header("Good — troop battle pools (multi-sprite)")]
+        public List<Sprite> peasantBattleSprites = new List<Sprite>();
+        public List<Sprite> warriorBattleSprites = new List<Sprite>();
+        public List<Sprite> knightBattleSprites = new List<Sprite>();
+        public List<Sprite> priestBattleSprites = new List<Sprite>();
+
+        public List<string> peasantBattleAssetPaths = new List<string>();
+        public List<string> warriorBattleAssetPaths = new List<string>();
+        public List<string> knightBattleAssetPaths = new List<string>();
+        public List<string> priestBattleAssetPaths = new List<string>();
+
+        [Header("Good — playable Legend battle slots (single sprite each)")]
+        public List<BattleSpriteSlotEntry> goodLegendSlots = new List<BattleSpriteSlotEntry>();
+
+        [Header("Evil — wave-unit battle pools")]
+        public List<Sprite> demonImpBattleSprites = new List<Sprite>();
+        public List<Sprite> hellhoundBattleSprites = new List<Sprite>();
+        public List<Sprite> dreadLordBattleSprites = new List<Sprite>();
+
+        public List<string> demonImpBattleAssetPaths = new List<string>();
+        public List<string> hellhoundBattleAssetPaths = new List<string>();
+        public List<string> dreadLordBattleAssetPaths = new List<string>();
+
+        [Header("Evil — Wave 3–10+ boss battle slots")]
+        public List<BattleSpriteSlotEntry> evilBossSlots = new List<BattleSpriteSlotEntry>();
+
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
+        public static BattleGoodEvilSpritePoolProfile Load()
+        {
+            BattleGoodEvilSpritePoolProfile p = null;
+            try { p = Resources.Load<BattleGoodEvilSpritePoolProfile>(ResourcesPath); }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
+            if (p != null)
+            {
+                p.EnsureSlotsAndLists();
+                p.isRuntimeStandIn = false;
+                p.RematerializeSpritesFromPaths();
+                return p;
+            }
+            try
+            {
+                var all = Resources.LoadAll<BattleGoodEvilSpritePoolProfile>("");
+                if (all != null)
+                {
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i] == null) continue;
+                        all[i].EnsureSlotsAndLists();
+                        all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
+                        return all[i];
+                    }
+                }
+            }
+            catch { /* broken Resources asset */ }
+            p = CreateInstance<BattleGoodEvilSpritePoolProfile>();
+            p.name = "BattleGoodEvilSpritePoolProfile_Runtime";
+            p.isRuntimeStandIn = true;
+            p.EnsureSlotsAndLists();
+            return p;
+        }
+
+        public void EnsureSlotsAndLists()
+        {
+            peasantBattleSprites ??= new List<Sprite>();
+            warriorBattleSprites ??= new List<Sprite>();
+            knightBattleSprites ??= new List<Sprite>();
+            priestBattleSprites ??= new List<Sprite>();
+            peasantBattleAssetPaths ??= new List<string>();
+            warriorBattleAssetPaths ??= new List<string>();
+            knightBattleAssetPaths ??= new List<string>();
+            priestBattleAssetPaths ??= new List<string>();
+
+            demonImpBattleSprites ??= new List<Sprite>();
+            hellhoundBattleSprites ??= new List<Sprite>();
+            dreadLordBattleSprites ??= new List<Sprite>();
+            demonImpBattleAssetPaths ??= new List<string>();
+            hellhoundBattleAssetPaths ??= new List<string>();
+            dreadLordBattleAssetPaths ??= new List<string>();
+
+            goodLegendSlots ??= new List<BattleSpriteSlotEntry>();
+            evilBossSlots ??= new List<BattleSpriteSlotEntry>();
+
+            EnsureSlotList(goodLegendSlots, CanonicalGoodLegendSlots, softMerlin: true);
+            EnsureSlotList(evilBossSlots, CanonicalBossSlots, softMerlin: false);
+        }
+
+        static void EnsureSlotList(List<BattleSpriteSlotEntry> list, UnitType[] wantTypes, bool softMerlin)
+        {
+            for (int i = 0; i < wantTypes.Length; i++)
+            {
+                UnitType want = wantTypes[i];
+                BattleSpriteSlotEntry found = null;
+                for (int j = 0; j < list.Count; j++)
+                {
+                    if (list[j] != null && list[j].unitType == want)
+                    {
+                        found = list[j];
+                        break;
+                    }
+                }
+                if (found == null)
+                {
+                    found = new BattleSpriteSlotEntry
+                    {
+                        unitType = want,
+                        displayName = DefaultBattleDisplayName(want),
+                        softOptional = softMerlin && want == UnitType.Merlin
+                    };
+                    list.Add(found);
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(found.displayName))
+                        found.displayName = DefaultBattleDisplayName(want);
+                    if (softMerlin)
+                        found.softOptional = want == UnitType.Merlin;
+                }
+            }
+        }
+
+        public static string DefaultBattleDisplayName(UnitType t) => t switch
+        {
+            UnitType.KingArthur => "King Arthur",
+            UnitType.SirLancelot => "Sir Lancelot",
+            UnitType.MorganLeFay => "Morgan le Fay",
+            UnitType.LadyOfTheLake => "Lady of the Lake",
+            UnitType.SirGawain => "Sir Gawain",
+            UnitType.SirGalahad => "Sir Galahad",
+            UnitType.SirTristan => "Sir Tristan",
+            UnitType.SirPercival => "Sir Percival",
+            UnitType.SirKay => "Sir Kay",
+            UnitType.SirBedivere => "Sir Bedivere",
+            UnitType.LadyGuinevere => "Lady Guinevere",
+            UnitType.Guinevere => "Lady Guinevere",
+            UnitType.ArchPriestOfGlastonbury => "Arch-Priest of Glastonbury",
+            UnitType.Priest => "Priest",
+            UnitType.TheGreenKnight => "The Green Knight",
+            UnitType.Merlin => "Merlin (soft)",
+            UnitType.DemonImp => "Demon Imp",
+            UnitType.DemonHellhound => "Hellhound",
+            UnitType.DemonDreadLord => "Dread Lord",
+            UnitType.BossBlackKnight => "Black Knight (W3)",
+            UnitType.BossMeleagant => "Meleagant (W4)",
+            UnitType.BossKingLot => "King Lot (W5)",
+            UnitType.BossVortigern => "Vortigern (W6)",
+            UnitType.BossAccolon => "Accolon (W7)",
+            UnitType.BossQuestingBeast => "Questing Beast (W8)",
+            UnitType.BossGreenKnight => "Green Knight Boss (W9)",
+            UnitType.BossNimue => "Nimue (W10+)",
+            _ => t.ToString()
+        };
+
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            n += ClassSpritePoolProfile.RematerializeList(peasantBattleSprites, peasantBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(warriorBattleSprites, warriorBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(knightBattleSprites, knightBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(priestBattleSprites, priestBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(demonImpBattleSprites, demonImpBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(hellhoundBattleSprites, hellhoundBattleAssetPaths);
+            n += ClassSpritePoolProfile.RematerializeList(dreadLordBattleSprites, dreadLordBattleAssetPaths);
+            n += RematerializeSlots(goodLegendSlots);
+            n += RematerializeSlots(evilBossSlots);
+            return n;
+        }
+
+        static int RematerializeSlots(List<BattleSpriteSlotEntry> slots)
+        {
+            if (slots == null) return 0;
+            int n = 0;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var e = slots[i];
+                if (e == null || e.battleSprite != null) continue;
+                if (string.IsNullOrEmpty(e.assetPath)) continue;
+                Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(e.assetPath);
+                if (sp == null) continue;
+                e.battleSprite = sp;
+                n++;
+            }
+            return n;
+        }
+
+        public List<Sprite> GetTroopOrWavePool(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantBattleSprites,
+                UnitType.Warrior => warriorBattleSprites,
+                UnitType.Knight => knightBattleSprites,
+                UnitType.Priest => priestBattleSprites,
+                UnitType.DemonImp => demonImpBattleSprites,
+                UnitType.DemonHellhound => hellhoundBattleSprites,
+                UnitType.DemonDreadLord => dreadLordBattleSprites,
+                _ => null
+            };
+        }
+
+        public List<string> GetTroopOrWavePaths(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            return type switch
+            {
+                UnitType.Peasant => peasantBattleAssetPaths,
+                UnitType.Warrior => warriorBattleAssetPaths,
+                UnitType.Knight => knightBattleAssetPaths,
+                UnitType.Priest => priestBattleAssetPaths,
+                UnitType.DemonImp => demonImpBattleAssetPaths,
+                UnitType.DemonHellhound => hellhoundBattleAssetPaths,
+                UnitType.DemonDreadLord => dreadLordBattleAssetPaths,
+                _ => null
+            };
+        }
+
+        public BattleSpriteSlotEntry FindLegendSlot(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            // LadyGuinevere / Guinevere alias
+            for (int i = 0; i < goodLegendSlots.Count; i++)
+            {
+                var e = goodLegendSlots[i];
+                if (e == null) continue;
+                if (e.unitType == type) return e;
+                if ((type == UnitType.Guinevere || type == UnitType.LadyGuinevere)
+                    && (e.unitType == UnitType.Guinevere || e.unitType == UnitType.LadyGuinevere))
+                    return e;
+            }
+            return null;
+        }
+
+        public BattleSpriteSlotEntry FindBossSlot(UnitType type)
+        {
+            EnsureSlotsAndLists();
+            for (int i = 0; i < evilBossSlots.Count; i++)
+            {
+                var e = evilBossSlots[i];
+                if (e != null && e.unitType == type) return e;
+            }
+            return null;
+        }
+
+        public Sprite GetLegendBattleSprite(UnitType type)
+        {
+            var e = FindLegendSlot(type);
+            return e != null ? e.battleSprite : null;
+        }
+
+        public Sprite GetBossBattleSprite(UnitType type)
+        {
+            var e = FindBossSlot(type);
+            return e != null ? e.battleSprite : null;
+        }
+
+        public int CountUsablePool(UnitType type)
+        {
+            var pool = GetTroopOrWavePool(type);
+            if (pool == null) return 0;
+            int n = 0;
+            for (int i = 0; i < pool.Count; i++)
+                if (pool[i] != null) n++;
+            return n;
+        }
+
+        public int CountAssignedLegendBattles()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            for (int i = 0; i < goodLegendSlots.Count; i++)
+            {
+                var e = goodLegendSlots[i];
+                if (e == null || e.softOptional) continue;
+                if (e.battleSprite != null) n++;
+            }
+            return n;
+        }
+
+        public int CountAssignedBossBattles()
+        {
+            EnsureSlotsAndLists();
+            int n = 0;
+            for (int i = 0; i < evilBossSlots.Count; i++)
+            {
+                var e = evilBossSlots[i];
+                if (e != null && e.battleSprite != null) n++;
+            }
+            return n;
+        }
+    }
+
     // ===== DA-59 Phase25 helpers (Force Sync nuclear — do not remove) =====
-    // Architect *Profile ScriptableObjects live in Assets/Scripts/Data/<ExactClassName>.cs
-    // (Unity MonoScript requires SO class name == file name). Appliers stay embedded below.
-    // tip: fix-gdt-profile-always-compile
+    // Architect *Profile ScriptableObjects ALSO live above in this file (tip fix-profiles-in-gdt-always).
+    // Appliers stay embedded below.
+    // tip: fix-profiles-in-gdt-always
     /// <summary>
     /// Multi-frame clip for modular paper-doll parts (Pose / Outfit / Head / Weapon / EnemyBoss).
     /// Standard clip names: "Idle", "Attack", "Hit", "Death".
@@ -1403,7 +2510,7 @@ namespace ArthurianAutobattler
     // MustRestore of those paths still fails when Force Delete runs under a STALE compiled Sync
     // host (ScriptPaths/MustRestore arrays baked into the old assembly). GameDataTypes has been
     // MustRestore since DA-59 — even old Sync hosts re-land this file from tip → types exist.
-    // tip: fix-gdt-profile-always-compile — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
+    // tip: fix-profiles-in-gdt-always — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
 
     /// <summary>
     /// Applies Architect-assigned SceneBackgroundProfile entries (jpg/png or mp4)
@@ -1653,7 +2760,7 @@ namespace ArthurianAutobattler
                     try
                     {
                         // SoftPromote belt: Load soft-fails when Profile MonoScript still missing after Sync.
-                        // tip: fix-gdt-profile-always-compile
+                        // tip: fix-profiles-in-gdt-always
                         _cache = ClassSpritePoolProfile.Load();
                         if (_cache != null)
                         {
