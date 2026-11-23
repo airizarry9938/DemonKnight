@@ -24,7 +24,12 @@ namespace ArthurianAutobattler
                 string[] rels =
                 {
                     "Scripts/Data/SpriteAnimClip.cs",
+                    // tip: fix-profiles-in-gdt-always — Profiles in GameDataTypes; nuke leftover named files.
                     "Scripts/Data/StageLayoutProfile.cs",
+                    "Scripts/Data/SceneBackgroundProfile.cs",
+                    "Scripts/Data/ClassSpritePoolProfile.cs",
+                    "Scripts/Data/LegendPewPortraitProfile.cs",
+                    "Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
                     "Scripts/Data/ModularSpriteLibrary.cs",
                     "Scripts/UI/ModularSpriteAnimator.cs",
                     "Scripts/Systems/StageParallaxController.cs",

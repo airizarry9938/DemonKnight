@@ -88,11 +88,6 @@ public static class ArthurianFixMisplacedScripts
         Add("SinRuneManager.cs", "Scripts/Systems/SinRuneManager.cs");
 
         Add("GameDataTypes.cs", "Scripts/Data/GameDataTypes.cs");
-        Add("StageLayoutProfile.cs", "Scripts/Data/StageLayoutProfile.cs");
-        Add("SceneBackgroundProfile.cs", "Scripts/Data/SceneBackgroundProfile.cs");
-        Add("ClassSpritePoolProfile.cs", "Scripts/Data/ClassSpritePoolProfile.cs");
-        Add("LegendPewPortraitProfile.cs", "Scripts/Data/LegendPewPortraitProfile.cs");
-        Add("BattleGoodEvilSpritePoolProfile.cs", "Scripts/Data/BattleGoodEvilSpritePoolProfile.cs");
         Add("CharacterDefinition.cs", "Scripts/Data/Characters/CharacterDefinition.cs");
         Add("CharacterDatabase.cs", "Scripts/Data/Characters/CharacterDatabase.cs");
         Add("TownsfolkAppearance.cs", "Scripts/Data/TownsfolkAppearance.cs");

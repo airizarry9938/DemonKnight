@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-gdt-profile-always-compile";
+    public const string UiBuildId = "fix-profiles-in-gdt-always";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -235,7 +235,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Flush every Architect profile to disk + SoftPromote into Resources/ArchitectArt.
-    /// tip: fix-gdt-profile-always-compile — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
+    /// tip: fix-profiles-in-gdt-always — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
     /// </summary>
     void PersistAllProfiles(string reason)
     {
@@ -2542,7 +2542,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     + "• Empty seats fall back to StageLayout assign-guides / solid color.\n"
                     + "• Optional: if Tab 6 Good battle pools have troops, Play may use those as "
                     + "pew BODY fallback ONLY while Tab 4 stays empty (prefer filling Tab 4).\n"
-                    + "• Assigns stick after close — tip fix-gdt-profile-always-compile Persists on OnDisable/OnDestroy.",
+                    + "• Assigns stick after close — tip fix-profiles-in-gdt-always Persists on OnDisable/OnDestroy.",
                     MessageType.Warning);
             }
         }
@@ -4089,7 +4089,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         try
         {
             // SoftPromote: if Profile MonoScripts still missing, arg may be null / type unload — soft-fail.
-            // tip: fix-gdt-profile-always-compile
+            // tip: fix-profiles-in-gdt-always
             if (arg == null)
             {
                 Debug.LogWarning("[DemonKnight] SoftPromote " + methodName + " soft-fail: null profile (types missing?)");
@@ -4167,12 +4167,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
 }
 
 
-// ===== fix-gdt-profile-always-compile EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
+// ===== fix-profiles-in-gdt-always EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
 // Standalone ArthurianArchitectBuildPersist.cs is a stub only. Type lives HERE so MustRestore
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-gdt-profile-always-compile (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-profiles-in-gdt-always (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -4181,7 +4181,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-gdt-profile-always-compile";
+    public const string TipId = "fix-profiles-in-gdt-always";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

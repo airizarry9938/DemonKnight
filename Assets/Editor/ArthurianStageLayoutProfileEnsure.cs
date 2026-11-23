@@ -11,9 +11,9 @@ using UnityEngine;
 
 /// <summary>
 /// Ensures Assets/Resources/StageLayoutProfile.asset exists with 52/52/20 slots.
-/// Profiles are named MonoScript files (Assets/Scripts/Data/<ExactClassName>.cs).
-/// Old assets may still point at GameDataTypes embed GUID/fileID → remap via probe.
-/// tip: fix-gdt-profile-always-compile
+/// Profile SOs live in GameDataTypes (tip fix-profiles-in-gdt-always).
+/// Ensure CreateInstance via Type.GetType + probe remap for multi-class MonoScript fileID.
+/// tip: fix-profiles-in-gdt-always
 ///
 /// ALSO: chicken-egg escape from architect-breakglass-hosts. This file is Force-Synced via
 /// tip SHA (not HardTip host overwrite). OnLoad pulls tip PackageVersion/Sync/Bootstrap/Architect
@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-gdt-profile-always-compile";
+    const string TipPackageId = "fix-profiles-in-gdt-always";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -77,7 +77,27 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-pew-body-pool-empty",
         "fix-class-pool-kind-cs0019",
         "fix-profile-so-script-assets",
+        "fix-named-profile-sync-cs0246",
+        "fix-tipescape-profile-embeds",
+        "fix-gdt-profile-always-compile",
     };
+
+
+    /// <summary>
+    /// tip: fix-profiles-in-gdt-always — CreateInstance by Type from GameDataTypes assembly
+    /// (multi-class MonoScript). Prefer Type.GetType so Ensure works even mid-recompile.
+    /// </summary>
+    static T CreateProfileInstance<T>() where T : ScriptableObject
+    {
+        string fullName = "ArthurianAutobattler." + typeof(T).Name;
+        Type t = Type.GetType(fullName)
+                 ?? Type.GetType(fullName + ", Assembly-CSharp")
+                 ?? typeof(T);
+        var so = ScriptableObject.CreateInstance(t) as T;
+        if (so == null)
+            so = ScriptableObject.CreateInstance<T>();
+        return so;
+    }
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
     public static void EnsureFromMenu()
@@ -215,7 +235,7 @@ public static class ArthurianStageLayoutProfileEnsure
             AssetDatabase.Refresh();
         }
 
-        var created = ScriptableObject.CreateInstance<StageLayoutProfile>();
+        var created = CreateProfileInstance<StageLayoutProfile>();
         created.EnsureSlotCounts();
         AssetDatabase.CreateAsset(created, AssetPath);
         AssetDatabase.SaveAssets();
@@ -294,7 +314,7 @@ public static class ArthurianStageLayoutProfileEnsure
             AssetDatabase.Refresh();
         }
 
-        var created = ScriptableObject.CreateInstance<SceneBackgroundProfile>();
+        var created = CreateProfileInstance<SceneBackgroundProfile>();
         created.EnsureDefaultEntries();
         AssetDatabase.CreateAsset(created, SceneBgAssetPath);
         AssetDatabase.SaveAssets();
@@ -372,7 +392,7 @@ public static class ArthurianStageLayoutProfileEnsure
             AssetDatabase.Refresh();
         }
 
-        var created = ScriptableObject.CreateInstance<ClassSpritePoolProfile>();
+        var created = CreateProfileInstance<ClassSpritePoolProfile>();
         created.EnsureLists();
         AssetDatabase.CreateAsset(created, ClassPoolAssetPath);
         AssetDatabase.SaveAssets();
@@ -442,7 +462,7 @@ public static class ArthurianStageLayoutProfileEnsure
             AssetDatabase.Refresh();
         }
 
-        var created = ScriptableObject.CreateInstance<LegendPewPortraitProfile>();
+        var created = CreateProfileInstance<LegendPewPortraitProfile>();
         created.EnsureSlotsAndLists();
         AssetDatabase.CreateAsset(created, LegendPewAssetPath);
         AssetDatabase.SaveAssets();
@@ -513,7 +533,7 @@ public static class ArthurianStageLayoutProfileEnsure
             AssetDatabase.Refresh();
         }
 
-        var created = ScriptableObject.CreateInstance<BattleGoodEvilSpritePoolProfile>();
+        var created = CreateProfileInstance<BattleGoodEvilSpritePoolProfile>();
         created.EnsureSlotsAndLists();
         AssetDatabase.CreateAsset(created, BattleGoodEvilAssetPath);
         AssetDatabase.SaveAssets();
@@ -563,9 +583,9 @@ public static class ArthurianStageLayoutProfileEnsure
         => TryRemapScriptGuid(fullPath, typeof(BattleGoodEvilSpritePoolProfile));
 
     /// <summary>
-    /// Bind asset m_Script to the named MonoScript for this SO type (class name == file name).
-    /// Probe CreateAsset reads Unity's exact fileID+guid (11500000 for single-SO files).
-    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-gdt-profile-always-compile
+    /// Bind asset m_Script to GameDataTypes MonoScript for this SO type (multi-class fileID).
+    /// Probe CreateAsset reads Unity's exact fileID+guid for the embedded class.
+    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-profiles-in-gdt-always
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
@@ -603,7 +623,7 @@ public static class ArthurianStageLayoutProfileEnsure
 
     /// <summary>
     /// Probe CreateAsset writes the exact MonoScript fileID+guid Unity expects for this SO type.
-    /// Named Profile files use fileID 11500000; fallback still probes for safety. tip: fix-gdt-profile-always-compile
+    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-profiles-in-gdt-always
     /// </summary>
     static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
     {
@@ -739,7 +759,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 && s.IndexOf("API tip + raw@main FIRST", StringComparison.OrdinalIgnoreCase) < 0)
                 return true;
         }
-        // CS0246: Escape must re-pull when named Profiles / shared types are missing.
+        // CS0246: Escape must re-pull when GameDataTypes is missing Profile SO classes.
         if (DemonKnightPackageVersion.NamedProfileScriptsNeedRestore(root)) return true;
         return false;
     }
@@ -751,18 +771,18 @@ public static class ArthurianStageLayoutProfileEnsure
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         string tip = TryResolveTipSha() ?? "main";
         string root = Directory.GetParent(Application.dataPath)!.FullName;
+        // tip: fix-profiles-in-gdt-always — stub leftover named *Profile.cs before host pull.
+        try
+        {
+            int n = ArthurianSyncFromGitHub.NukeNamedProfileFiles(root);
+            if (n > 0) log.AppendLine("NukeNamedProfile files: " + n);
+        }
+        catch (Exception ex) { log.AppendLine("NukeNamedProfile: " + ex.Message); }
         string[] rels =
         {
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
-            // Named MonoScript Profiles BEFORE GameDataTypes — Escape without these → CS0246.
-            // tip: fix-gdt-profile-always-compile
-            "Assets/Scripts/Data/StageLayoutProfile.cs",
-            "Assets/Scripts/Data/SceneBackgroundProfile.cs",
-            "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
-            "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
-            "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
-            // Applier embed host — Force Sync CS0103 hardfix.
+            // tip: fix-profiles-in-gdt-always — Profile SOs live in GameDataTypes (MustRestore).
             "Assets/Scripts/Data/GameDataTypes.cs",
             "Assets/Scripts/UI/SceneBackgroundApplier.cs",
             "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
