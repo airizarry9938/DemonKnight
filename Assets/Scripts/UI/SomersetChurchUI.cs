@@ -120,7 +120,7 @@ namespace ArthurianAutobattler
             StartCoroutine(RelayoutHudNextFrame());
 
             if (GameLoopManager.Instance != null)
-                SetNight(GameLoopManager.Instance.CurrentWaveNumber());
+                SetNight(GameLoopManager.Instance.currentNight);
 
             // Dice/codex/warband start closed. Selection menu starts closed.
             // Bottom NPC quote strip removed (Andrew church UX).
@@ -1389,10 +1389,9 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// HUD Night/Wave bar. Display always uses combat wave
-        /// (<see cref="AutoBattlerEngine.currentBattleNumber"/>) — same index as
-        /// DemonHordeGenerator budget + GetBossForWave. The <paramref name="night"/>
-        /// arg is ignored when it disagrees with combat (stale calendar).
+        /// HUD Night/Wave bar. tip: fix-night-wave-hud-progression —
+        /// Night (calendar from Next Night) and Wave (combat) are independent.
+        /// Loss → Night 2 · Wave 1; victory → Night 2 · Wave 2.
         /// </summary>
         public void SetNight(int night)
         {
@@ -1407,22 +1406,21 @@ namespace ArthurianAutobattler
             }
             if (nightText == null) return;
 
+            int shownNight = Mathf.Max(1, night);
             int wave = 1;
             var loop = GameLoopManager.Instance;
             if (loop != null)
             {
-                loop.SyncNightToCombatWave();
+                shownNight = Mathf.Max(1, loop.currentNight > 0 ? loop.currentNight : night);
                 wave = loop.CurrentWaveNumber();
             }
             else
             {
                 var eng = FindFirstObjectByType<AutoBattlerEngine>();
                 if (eng != null) wave = Mathf.Max(1, eng.currentBattleNumber);
-                else wave = Mathf.Max(1, night);
             }
 
-            // Night number == Wave number == combat SoT (no Night 2 · Wave 1 drift).
-            nightText.text = GameLoopManager.FormatNightWaveLabel(wave, wave);
+            nightText.text = GameLoopManager.FormatNightWaveLabel(shownNight, wave);
             // Slightly smaller so "Night N · Wave N (Boss)" fits the HUD slot.
             if (nightText.fontSize > 18f) nightText.fontSize = 18f;
             nightText.textWrappingMode = TextWrappingModes.NoWrap;
@@ -3316,7 +3314,7 @@ namespace ArthurianAutobattler
                     ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
                     : "");
 
-            // tip: fix-survivor-stats-victory-morale — show current effective stats (trained+★+morale).
+            // tip: fix-night-wave-hud-progression — show current effective stats (trained+★+morale).
             int hp = m.GetEffectiveMaxHealth();
             int atk = m.GetEffectiveAttackDamage();
             float spd = m.GetEffectiveAttackSpeed();
@@ -3631,8 +3629,8 @@ namespace ArthurianAutobattler
         {
             var town = Town;
             var loop = GameLoopManager.Instance;
-            // Combat wave SoT — not stale currentNight calendar alone.
-            if (loop != null) SetNight(loop.CurrentWaveNumber());
+            // tip: fix-night-wave-hud-progression — calendar Night + combat Wave.
+            if (loop != null) SetNight(loop.currentNight);
             if (goldText != null && town != null) goldText.text = $"Royal Gold: {town.playerGold}g";
             UpdateWarbandHudLabel();
             RefreshShepherdsVowBadge(loop);
