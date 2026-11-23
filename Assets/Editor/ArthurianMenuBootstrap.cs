@@ -34,7 +34,7 @@ public static class ArthurianMenuBootstrap
     const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Phase 2–5 standalones to DELETE (types embedded elsewhere). CS0101 kill list.</summary>
-    /// <summary>Phase 2–5 standalones to DELETE when they redefine embeds. Named Profile files are kill-listed (SO classes live in GameDataTypes — tip fix-hud-bar-button-layout).</summary>
+    /// <summary>Phase 2–5 standalones to DELETE when they redefine embeds. Named Profile files are kill-listed (SO classes live in GameDataTypes — tip fix-architect-apply-persist-facing).</summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
         "Assets/Scripts/Data/SpriteAnimClip.cs",
@@ -42,7 +42,7 @@ public static class ArthurianMenuBootstrap
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/Systems/DiceManager.cs",
-        // tip: fix-hud-bar-button-layout — Profiles in GameDataTypes; nuke leftover named files.
+        // tip: fix-architect-apply-persist-facing — Profiles in GameDataTypes; nuke leftover named files.
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -475,7 +475,7 @@ public static class ArthurianMenuBootstrap
 
     /// <summary>
     /// Precompile CS0246 belt: stub leftover named Profile MonoScripts when TipEscape/Sync
-    /// hosts are mid-upgrade. tip: fix-hud-bar-button-layout — one-shot; no Refresh if unchanged.
+    /// hosts are mid-upgrade. tip: fix-architect-apply-persist-facing — one-shot; no Refresh if unchanged.
     /// </summary>
     [InitializeOnLoadMethod]
     static void DkHardWriteNamedProfilesOnLoad()
@@ -483,7 +483,7 @@ public static class ArthurianMenuBootstrap
         try
         {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            const string gate = "DemonKnight.MenuBootstrap.NukeProfiles." + "fix-hud-bar-button-layout";
+            const string gate = "DemonKnight.MenuBootstrap.NukeProfiles." + "fix-architect-apply-persist-facing";
             if (SessionState.GetBool(gate, false)) return;
             SessionState.SetBool(gate, true);
             string root = Directory.GetParent(Application.dataPath)!.FullName;
@@ -507,8 +507,8 @@ public static class ArthurianMenuBootstrap
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-hud-bar-button-layout — ForceArchitectTipIfStale + Refresh every reload = loop.
-            const string gate = "DemonKnight.MenuBootstrap.AutoVerify." + "fix-hud-bar-button-layout";
+            // tip: fix-architect-apply-persist-facing — ForceArchitectTipIfStale + Refresh every reload = loop.
+            const string gate = "DemonKnight.MenuBootstrap.AutoVerify." + "fix-architect-apply-persist-facing";
             if (SessionState.GetBool(gate, false)) return;
             SessionState.SetBool(gate, true);
             try
@@ -562,7 +562,7 @@ public static class ArthurianMenuBootstrap
             ArthurianSyncFromGitHub.CloseOpenArchitectWindows();
             var errors = new List<string>();
             int n = ArthurianSyncFromGitHub.ForceOverwriteSyncHostsFromMain(errors);
-            // tip: fix-hud-bar-button-layout — Refresh only when hosts actually changed.
+            // tip: fix-architect-apply-persist-facing — Refresh only when hosts actually changed.
             if (n > 0) AssetDatabase.Refresh();
             string after = File.Exists(dest) ? File.ReadAllText(dest) : "";
             Debug.Log("[DemonKnight] " + ArthurianSyncFromGitHub.ArchitectTipMarkersReport());
@@ -1487,7 +1487,7 @@ public static class ArthurianMenuBootstrap
     }
 
     /// <summary>
-    /// tip: fix-hud-bar-button-layout — Profiles live in GameDataTypes. Delegate to Sync Nuke.
+    /// tip: fix-architect-apply-persist-facing — Profiles live in GameDataTypes. Delegate to Sync Nuke.
     /// </summary>
     public static int HardWriteNamedProfilesFromEmbeds(string root = null, System.Text.StringBuilder log = null)
     {

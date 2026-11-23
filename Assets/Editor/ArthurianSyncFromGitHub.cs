@@ -23,7 +23,7 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-hud-bar-button-layout). Prefer API tip / raw@main FIRST.
+    // Ship pin = this tip feature SHA (fix-architect-apply-persist-facing). Prefer API tip / raw@main FIRST.
     private const string FallbackCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
 
     /// <summary>
@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
 
-    private const string ExpectedPackageId = "fix-hud-bar-button-layout";
+    private const string ExpectedPackageId = "fix-architect-apply-persist-facing";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -85,6 +85,7 @@ public static class ArthurianSyncFromGitHub
         "fix-gdt-profile-always-compile",
         "fix-profiles-in-gdt-always",
         "fix-endless-compile-loop",
+        "fix-hud-bar-button-layout",
     };
 
     /// <summary>
@@ -108,7 +109,7 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// EDITOR InitializeOnLoad — runs even when runtime Assembly-CSharp is CS0101-broken
     /// (GameLoopManager Init never runs in that state). Nukes Phase 2–5 standalones on disk.
-    /// tip: fix-hud-bar-button-layout — never Refresh unless bytes actually changed.
+    /// tip: fix-architect-apply-persist-facing — never Refresh unless bytes actually changed.
     /// </summary>
     [InitializeOnLoadMethod]
     static void DkEditorNukePhase25StandalonesOnLoad()
@@ -140,7 +141,7 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// tip: fix-hud-bar-button-layout — write only when missing or content differs.
+    /// tip: fix-architect-apply-persist-facing — write only when missing or content differs.
     /// Never rewrite identical bytes (mtime churn → AssetDatabase refresh → compile loop).
     /// </summary>
     public static bool WriteTextIfChanged(string dest, string body)
@@ -329,7 +330,7 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// Standalones that redefine types still embedded elsewhere (CS0101).
     /// StageLayoutProfile (+ other Architect *Profiles) are REAL named MonoScripts now — NOT killed.
-    /// tip: fix-hud-bar-button-layout
+    /// tip: fix-architect-apply-persist-facing
     /// </summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
@@ -338,7 +339,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/Systems/DiceManager.cs",
-        // tip: fix-hud-bar-button-layout — Profiles in GameDataTypes; nuke leftover named files (CS0101).
+        // tip: fix-architect-apply-persist-facing — Profiles in GameDataTypes; nuke leftover named files (CS0101).
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -731,7 +732,7 @@ public static class ArthurianSyncFromGitHub
     /// Force-Sync / Editor OnLoad nuke: DELETE standalones (+ .meta). Optionally overwrite with
     /// a comment stub when delete fails or when GameDataTypes Sync demands a safe on-disk body.
     /// Runs from Editor assembly — does NOT wait for runtime compile.
-    /// tip: fix-hud-bar-button-layout — already-stubbed / absent files are left alone (no mtime churn).
+    /// tip: fix-architect-apply-persist-facing — already-stubbed / absent files are left alone (no mtime churn).
     /// </summary>
     public static int NukePhase25Standalones(
         string projectRoot = null,
@@ -932,7 +933,7 @@ public static class ArthurianSyncFromGitHub
 
         // NUCLEAR: HardWrite named Profile MonoScripts from embeds BEFORE Nuke/Delete/download.
         // Sync host is already compiled — offline embeds break the TipEscape chicken-egg (CS0246).
-        // tip: fix-hud-bar-button-layout
+        // tip: fix-architect-apply-persist-facing
         try
         {
             int hw = NukeNamedProfileFiles(projectRoot);
@@ -975,7 +976,7 @@ public static class ArthurianSyncFromGitHub
                     if (IsMustRestoreUiHelper(rel)) continue;
                     // Never wipe GameDataTypes even if somehow missing from MustRestore (Applier embed).
                     if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)) continue;
-                    // tip: fix-hud-bar-button-layout — named Profiles kill-listed; allow Force Delete wipe.
+                    // tip: fix-architect-apply-persist-facing — named Profiles kill-listed; allow Force Delete wipe.
                     // Never wipe SomersetChurchUI — stale Sync MustRestore omitted it → CS0246.
                     if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)) continue;
                     // Never wipe ArchitectBuildPersist — ForceOverwrite host + Force Delete skip race → CS0103.
@@ -1328,7 +1329,7 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
-                || text.IndexOf("fix-hud-bar-button-layout", StringComparison.Ordinal) < 0)
+                || text.IndexOf("fix-architect-apply-persist-facing", StringComparison.Ordinal) < 0)
                 throw new Exception("GameDataTypes Appliers/helpers/Profile SOs/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
@@ -1344,7 +1345,7 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// tip: fix-hud-bar-button-layout — Profiles live in GameDataTypes; nuke named leftovers.
+    /// tip: fix-architect-apply-persist-facing — Profiles live in GameDataTypes; nuke named leftovers.
     /// Independent of MustRestore so a stale Sync cannot leave CS0101 named Profile files.
     /// </summary>
     static void HardRestoreNamedProfileScripts(
@@ -1439,7 +1440,7 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-hud-bar-button-layout", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-architect-apply-persist-facing", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist (" + source + ")");
@@ -1466,7 +1467,7 @@ public static class ArthurianSyncFromGitHub
                     + "// Types live in ArthurianArtArchitectWindow.cs (Force Sync embed — avoids CS0103 when this" + "\n"
                     + "// standalone path is wiped by Force Delete under a stale compiled Sync host)." + "\n"
                     + "// This stub overwrites any leftover full copy so we never get CS0101 duplicates." + "\n"
-                    + "// tip: fix-hud-bar-button-layout" + "\n"
+                    + "// tip: fix-architect-apply-persist-facing" + "\n"
                     + "#endif" + "\n";
             }
             WriteReplacing(stubDest, stubBody, deleteFirst: true);
@@ -1482,7 +1483,7 @@ public static class ArthurianSyncFromGitHub
 
 
     /// <summary>
-    /// tip: fix-hud-bar-button-layout — skip rewrite when on-disk bytes already match (no mtime churn).
+    /// tip: fix-architect-apply-persist-facing — skip rewrite when on-disk bytes already match (no mtime churn).
     /// Returns true only when bytes changed.
     /// </summary>
     private static bool WriteReplacing(string dest, string text, bool deleteFirst)
@@ -1618,7 +1619,7 @@ public static class ArthurianSyncFromGitHub
         if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
         {
             // MenuListSortMode must live here so LegendCodexUI / SomersetChurchUI never CS0246.
-            // tip: fix-hud-bar-button-layout — ALL five Profile SOs MUST live here (MustRestore always-compile).
+            // tip: fix-architect-apply-persist-facing — ALL five Profile SOs MUST live here (MustRestore always-compile).
             return body.Contains("enum MenuListSortMode")
                    && body.Contains("HighestHp")
                    && body.Contains("HighestAttack")
@@ -1655,36 +1656,36 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
                    && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
-                   && body.Contains("fix-hud-bar-button-layout");
+                   && body.Contains("fix-architect-apply-persist-facing");
         }
 
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-hud-bar-button-layout — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-architect-apply-persist-facing — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class StageLayoutProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-hud-bar-button-layout — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-architect-apply-persist-facing — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class SceneBackgroundProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-hud-bar-button-layout — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-architect-apply-persist-facing — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class ClassSpritePoolProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("LegendPewPortraitProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-hud-bar-button-layout — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-architect-apply-persist-facing — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class LegendPewPortraitProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-hud-bar-button-layout — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-architect-apply-persist-facing — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0;
         }
@@ -1702,7 +1703,7 @@ public static class ArthurianSyncFromGitHub
         }
 
         // Remaining Phase 2–5 standalones are NOT synced (still embedded elsewhere).
-        // tip: fix-hud-bar-button-layout — Profile SOs live in GameDataTypes; named *Profile.cs are kill-listed.
+        // tip: fix-architect-apply-persist-facing — Profile SOs live in GameDataTypes; named *Profile.cs are kill-listed.
         if (rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase)
@@ -1717,7 +1718,7 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-hud-bar-button-layout")
+                   && (body.Contains("fix-architect-apply-persist-facing")
                        || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
                        || body.Contains("fix-build-persist-embed"));
@@ -2063,7 +2064,7 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-hud-bar-button-layout")
+        if (!body.Contains("fix-architect-apply-persist-facing")
             && !body.Contains("fix-profile-so-script-assets")
             && !body.Contains("fix-class-pool-kind-cs0019")
             && !body.Contains("fix-pew-body-pool-empty")
@@ -2248,10 +2249,10 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// Nuclear CS0246 belt (tip fix-hud-bar-button-layout): Profile SO classes live ONLY in
+    /// Nuclear CS0246 belt (tip fix-architect-apply-persist-facing): Profile SO classes live ONLY in
     /// MustRestore GameDataTypes. Stub leftover named *Profile.cs so Force Sync never depends
     /// on separate MonoScripts / HardWrite embeds (which failed on Andrew disk).
-    /// tip: fix-hud-bar-button-layout — NEVER rewrite when already a matching stub (no mtime churn).
+    /// tip: fix-architect-apply-persist-facing — NEVER rewrite when already a matching stub (no mtime churn).
     /// </summary>
     public static int NukeNamedProfileFiles(string root = null, System.Text.StringBuilder log = null)
     {
@@ -2267,7 +2268,7 @@ public static class ArthurianSyncFromGitHub
         };
         const string stub =
             "#if false\n"
-            + "// tip: fix-hud-bar-button-layout — SO class lives in GameDataTypes.cs (MustRestore).\n"
+            + "// tip: fix-architect-apply-persist-facing — SO class lives in GameDataTypes.cs (MustRestore).\n"
             + "// Named MonoScript removed: HardWrite embeds / Sync ScriptPaths no longer ship this file.\n"
             + "#endif\n";
         int touched = 0;

@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-hud-bar-button-layout";
+    public const string UiBuildId = "fix-architect-apply-persist-facing";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -235,7 +235,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 
     /// <summary>
     /// Flush every Architect profile to disk + SoftPromote into Resources/ArchitectArt.
-    /// tip: fix-hud-bar-button-layout — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
+    /// tip: fix-architect-apply-persist-facing — ClassPoolKind→UnitType CS0019 fix; assigns survive close.
     /// </summary>
     void PersistAllProfiles(string reason)
     {
@@ -345,8 +345,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (sceneBgProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sceneBgProfile)))
             return;
-        sceneBgProfile.RematerializeSpritesFromPaths();
+        // tip: fix-architect-apply-persist-facing — SoftPromote images+videos into Resources; never clear.
         SoftPromoteSceneBackgroundIntoResources(sceneBgProfile);
+        sceneBgProfile.RematerializeSpritesFromPaths();
         EditorUtility.SetDirty(sceneBgProfile);
         AssetDatabase.SaveAssets();
         try { SceneBackgroundApplier.InvalidateCache(); } catch { /* ignore */ }
@@ -405,10 +406,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (classPoolProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(classPoolProfile)))
             return;
-        classPoolProfile.RematerializeSpritesFromPaths();
+        // tip: fix-architect-apply-persist-facing — Sync path backups FIRST (so individual ObjectField
+        // picks survive SoftPromote / rematerialize), then SoftPromote into Resources, then Save.
+        // Never Clear() pools here.
         SyncClassPoolAssetPaths(classPoolProfile);
         SoftPromoteClassPoolIntoResources(classPoolProfile);
         SyncClassPoolAssetPaths(classPoolProfile);
+        // Rematerialize only fills Missing — never wipes live ObjectField assigns.
+        classPoolProfile.RematerializeSpritesFromPaths();
         EditorUtility.SetDirty(classPoolProfile);
         AssetDatabase.SaveAssets();
         try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
@@ -433,10 +438,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (legendPewProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(legendPewProfile)))
             return;
-        legendPewProfile.RematerializeSpritesFromPaths();
+        // tip: fix-architect-apply-persist-facing — Sync → SoftPromote → Rematerialize (no clear).
         SyncLegendPewAssetPaths(legendPewProfile);
         SoftPromoteLegendPewIntoResources(legendPewProfile);
         SyncLegendPewAssetPaths(legendPewProfile);
+        legendPewProfile.RematerializeSpritesFromPaths();
         EditorUtility.SetDirty(legendPewProfile);
         AssetDatabase.SaveAssets();
         try { LegendPewPortraitApplier.InvalidateCache(); } catch { /* ignore */ }
@@ -462,10 +468,11 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (battleGoodEvilProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(battleGoodEvilProfile)))
             return;
-        battleGoodEvilProfile.RematerializeSpritesFromPaths();
+        // tip: fix-architect-apply-persist-facing — Sync → SoftPromote → Rematerialize (no clear).
         SyncBattleGoodEvilAssetPaths(battleGoodEvilProfile);
         SoftPromoteBattleGoodEvilIntoResources(battleGoodEvilProfile);
         SyncBattleGoodEvilAssetPaths(battleGoodEvilProfile);
+        battleGoodEvilProfile.RematerializeSpritesFromPaths();
         EditorUtility.SetDirty(battleGoodEvilProfile);
         AssetDatabase.SaveAssets();
         try { BattleGoodEvilSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
@@ -640,7 +647,15 @@ public class ArthurianArtArchitectWindow : EditorWindow
             // (reimport / Force Sync). RematerializeSpritesFromPaths restores from paths.
             if (sprites[i] == null) continue;
             string ap = AssetDatabase.GetAssetPath(sprites[i]);
-            if (!string.IsNullOrEmpty(ap)) paths[i] = ap;
+            if (string.IsNullOrEmpty(ap)) continue;
+            // tip: fix-architect-apply-persist-facing — SoftPromote writes Resources path backups
+            // while keeping live ObjectField sprites outside Resources. Do not overwrite a
+            // Resources path with the non-Resources live asset path (that wiped pools on exit).
+            if (!string.IsNullOrEmpty(paths[i])
+                && paths[i].IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0
+                && ap.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            paths[i] = ap;
         }
     }
 
@@ -2542,7 +2557,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
                     + "• Empty seats fall back to StageLayout assign-guides / solid color.\n"
                     + "• Optional: if Tab 6 Good battle pools have troops, Play may use those as "
                     + "pew BODY fallback ONLY while Tab 4 stays empty (prefer filling Tab 4).\n"
-                    + "• Assigns stick after close — tip fix-hud-bar-button-layout Persists on OnDisable/OnDestroy.",
+                    + "• Assigns stick after close — tip fix-architect-apply-persist-facing Persists on OnDisable/OnDestroy.",
                     MessageType.Warning);
             }
         }
@@ -4089,7 +4104,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         try
         {
             // SoftPromote: if Profile MonoScripts still missing, arg may be null / type unload — soft-fail.
-            // tip: fix-hud-bar-button-layout
+            // tip: fix-architect-apply-persist-facing
             if (arg == null)
             {
                 Debug.LogWarning("[DemonKnight] SoftPromote " + methodName + " soft-fail: null profile (types missing?)");
@@ -4167,12 +4182,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
 }
 
 
-// ===== fix-hud-bar-button-layout EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
+// ===== fix-architect-apply-persist-facing EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
 // Standalone ArthurianArchitectBuildPersist.cs is a stub only. Type lives HERE so MustRestore
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-hud-bar-button-layout (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-architect-apply-persist-facing (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
@@ -4181,7 +4196,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-hud-bar-button-layout";
+    public const string TipId = "fix-architect-apply-persist-facing";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";
@@ -4242,11 +4257,12 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         var battle = ArthurianStageLayoutProfileEnsure.EnsureBattleGoodEvilSpritePoolAsset();
 
         int promoted = 0;
-        promoted += PromoteStageLayoutIntoResources(stage);
-        promoted += PromoteSceneBackgroundIntoResources(scene);
-        promoted += PromoteClassPoolIntoResources(body);
-        promoted += PromoteLegendPewIntoResources(face);
-        promoted += PromoteBattleGoodEvilIntoResources(battle);
+        // Build prepare swaps live refs onto Resources copies so player builds keep sprites.
+        promoted += PromoteStageLayoutIntoResources(stage, swapLiveRefs: true);
+        promoted += PromoteSceneBackgroundIntoResources(scene, swapLiveRefs: true);
+        promoted += PromoteClassPoolIntoResources(body, swapLiveRefs: true);
+        promoted += PromoteLegendPewIntoResources(face, swapLiveRefs: true);
+        promoted += PromoteBattleGoodEvilIntoResources(battle, swapLiveRefs: true);
 
         // Rematerialize after promote (Editor + runtime-safe paths).
         stage?.RematerializeSpritesFromPaths();
@@ -4270,26 +4286,26 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         return log.ToString().TrimEnd();
     }
 
-    public static int PromoteClassPoolIntoResources(ClassSpritePoolProfile p)
+    public static int PromoteClassPoolIntoResources(ClassSpritePoolProfile p, bool swapLiveRefs = false)
     {
         if (p == null) return 0;
         p.EnsureLists();
         int n = 0;
-        n += PromoteList(p.peasantSprites, p.peasantAssetPaths, "Body/Peasant");
-        n += PromoteList(p.warriorSprites, p.warriorAssetPaths, "Body/Warrior");
-        n += PromoteList(p.knightSprites, p.knightAssetPaths, "Body/Knight");
+        n += PromoteList(p.peasantSprites, p.peasantAssetPaths, "Body/Peasant", swapLiveRefs);
+        n += PromoteList(p.warriorSprites, p.warriorAssetPaths, "Body/Warrior", swapLiveRefs);
+        n += PromoteList(p.knightSprites, p.knightAssetPaths, "Body/Knight", swapLiveRefs);
         EditorUtility.SetDirty(p);
         return n;
     }
 
-    public static int PromoteLegendPewIntoResources(LegendPewPortraitProfile p)
+    public static int PromoteLegendPewIntoResources(LegendPewPortraitProfile p, bool swapLiveRefs = false)
     {
         if (p == null) return 0;
         p.EnsureSlotsAndLists();
         int n = 0;
-        n += PromoteList(p.peasantFaceProfiles, p.peasantFaceAssetPaths, "Face/Peasant");
-        n += PromoteList(p.warriorFaceProfiles, p.warriorFaceAssetPaths, "Face/Warrior");
-        n += PromoteList(p.knightFaceProfiles, p.knightFaceAssetPaths, "Face/Knight");
+        n += PromoteList(p.peasantFaceProfiles, p.peasantFaceAssetPaths, "Face/Peasant", swapLiveRefs);
+        n += PromoteList(p.warriorFaceProfiles, p.warriorFaceAssetPaths, "Face/Warrior", swapLiveRefs);
+        n += PromoteList(p.knightFaceProfiles, p.knightFaceAssetPaths, "Face/Knight", swapLiveRefs);
         if (p.legendPortraits != null)
         {
             for (int i = 0; i < p.legendPortraits.Count; i++)
@@ -4297,80 +4313,90 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
                 var e = p.legendPortraits[i];
                 if (e == null || e.facePortrait == null) continue;
                 Sprite promoted = PromoteSprite(e.facePortrait, "Face/Legend/" + e.unitType);
-                if (promoted != null && promoted != e.facePortrait)
+                if (promoted != null)
                 {
-                    e.facePortrait = promoted;
-                    n++;
+                    string ap = AssetDatabase.GetAssetPath(promoted);
+                    if (!string.IsNullOrEmpty(ap)
+                        && ap.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        e.assetPath = ap;
+                        n++;
+                    }
+                    if (swapLiveRefs || e.facePortrait == null)
+                        e.facePortrait = promoted;
                 }
-                string ap = AssetDatabase.GetAssetPath(e.facePortrait);
-                if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
+                if (string.IsNullOrEmpty(e.assetPath) && e.facePortrait != null)
+                {
+                    string ap = AssetDatabase.GetAssetPath(e.facePortrait);
+                    if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
+                }
             }
         }
         EditorUtility.SetDirty(p);
         return n;
     }
 
-    public static int PromoteBattleGoodEvilIntoResources(BattleGoodEvilSpritePoolProfile p)
+    public static int PromoteBattleGoodEvilIntoResources(BattleGoodEvilSpritePoolProfile p, bool swapLiveRefs = false)
     {
         if (p == null) return 0;
         p.EnsureSlotsAndLists();
         int n = 0;
-        n += PromoteList(p.peasantBattleSprites, p.peasantBattleAssetPaths, "Battle/Good/Peasant");
-        n += PromoteList(p.warriorBattleSprites, p.warriorBattleAssetPaths, "Battle/Good/Warrior");
-        n += PromoteList(p.knightBattleSprites, p.knightBattleAssetPaths, "Battle/Good/Knight");
-        n += PromoteList(p.priestBattleSprites, p.priestBattleAssetPaths, "Battle/Good/Priest");
-        n += PromoteList(p.demonImpBattleSprites, p.demonImpBattleAssetPaths, "Battle/Evil/Imp");
-        n += PromoteList(p.hellhoundBattleSprites, p.hellhoundBattleAssetPaths, "Battle/Evil/Hellhound");
-        n += PromoteList(p.dreadLordBattleSprites, p.dreadLordBattleAssetPaths, "Battle/Evil/DreadLord");
-        if (p.goodLegendSlots != null)
-        {
-            for (int i = 0; i < p.goodLegendSlots.Count; i++)
-            {
-                var e = p.goodLegendSlots[i];
-                if (e == null || e.battleSprite == null) continue;
-                Sprite promoted = PromoteSprite(e.battleSprite, "Battle/Good/Legend/" + e.unitType);
-                if (promoted != null && promoted != e.battleSprite)
-                {
-                    e.battleSprite = promoted;
-                    n++;
-                }
-                string ap = AssetDatabase.GetAssetPath(e.battleSprite);
-                if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
-            }
-        }
-        if (p.evilBossSlots != null)
-        {
-            for (int i = 0; i < p.evilBossSlots.Count; i++)
-            {
-                var e = p.evilBossSlots[i];
-                if (e == null || e.battleSprite == null) continue;
-                Sprite promoted = PromoteSprite(e.battleSprite, "Battle/Evil/Boss/" + e.unitType);
-                if (promoted != null && promoted != e.battleSprite)
-                {
-                    e.battleSprite = promoted;
-                    n++;
-                }
-                string ap = AssetDatabase.GetAssetPath(e.battleSprite);
-                if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
-            }
-        }
+        n += PromoteList(p.peasantBattleSprites, p.peasantBattleAssetPaths, "Battle/Good/Peasant", swapLiveRefs);
+        n += PromoteList(p.warriorBattleSprites, p.warriorBattleAssetPaths, "Battle/Good/Warrior", swapLiveRefs);
+        n += PromoteList(p.knightBattleSprites, p.knightBattleAssetPaths, "Battle/Good/Knight", swapLiveRefs);
+        n += PromoteList(p.priestBattleSprites, p.priestBattleAssetPaths, "Battle/Good/Priest", swapLiveRefs);
+        n += PromoteList(p.demonImpBattleSprites, p.demonImpBattleAssetPaths, "Battle/Evil/Imp", swapLiveRefs);
+        n += PromoteList(p.hellhoundBattleSprites, p.hellhoundBattleAssetPaths, "Battle/Evil/Hellhound", swapLiveRefs);
+        n += PromoteList(p.dreadLordBattleSprites, p.dreadLordBattleAssetPaths, "Battle/Evil/DreadLord", swapLiveRefs);
+        n += PromoteBattleSlots(p.goodLegendSlots, "Battle/Good/Legend", swapLiveRefs);
+        n += PromoteBattleSlots(p.evilBossSlots, "Battle/Evil/Boss", swapLiveRefs);
         EditorUtility.SetDirty(p);
         return n;
     }
 
-    public static int PromoteStageLayoutIntoResources(StageLayoutProfile p)
+    static int PromoteBattleSlots(List<BattleSpriteSlotEntry> slots, string sub, bool swapLiveRefs)
+    {
+        if (slots == null) return 0;
+        int n = 0;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            var e = slots[i];
+            if (e == null || e.battleSprite == null) continue;
+            Sprite promoted = PromoteSprite(e.battleSprite, sub + "/" + e.unitType);
+            if (promoted != null)
+            {
+                string ap = AssetDatabase.GetAssetPath(promoted);
+                if (!string.IsNullOrEmpty(ap)
+                    && ap.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    e.assetPath = ap;
+                    n++;
+                }
+                if (swapLiveRefs || e.battleSprite == null)
+                    e.battleSprite = promoted;
+            }
+            if (string.IsNullOrEmpty(e.assetPath) && e.battleSprite != null)
+            {
+                string ap = AssetDatabase.GetAssetPath(e.battleSprite);
+                if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
+            }
+        }
+        return n;
+    }
+
+    public static int PromoteStageLayoutIntoResources(StageLayoutProfile p, bool swapLiveRefs = false)
     {
         if (p == null) return 0;
         p.EnsureSlotCounts();
         int n = 0;
-        n += PromoteSlots(p.churchPewSlots, "Stage/Church");
-        n += PromoteSlots(p.playerBattleSlots, "Stage/Player");
-        n += PromoteSlots(p.enemyBattleSlots, "Stage/Enemy");
+        n += PromoteSlots(p.churchPewSlots, "Stage/Church", swapLiveRefs);
+        n += PromoteSlots(p.playerBattleSlots, "Stage/Player", swapLiveRefs);
+        n += PromoteSlots(p.enemyBattleSlots, "Stage/Enemy", swapLiveRefs);
         EditorUtility.SetDirty(p);
         return n;
     }
 
-    public static int PromoteSceneBackgroundIntoResources(SceneBackgroundProfile p)
+    public static int PromoteSceneBackgroundIntoResources(SceneBackgroundProfile p, bool swapLiveRefs = false)
     {
         if (p == null) return 0;
         p.EnsureDefaultEntries();
@@ -4383,20 +4409,101 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
             if (e.imageSprite != null)
             {
                 Sprite promoted = PromoteSprite(e.imageSprite, "SceneBg/" + e.slot);
-                if (promoted != null && promoted != e.imageSprite)
+                if (promoted != null)
                 {
-                    e.imageSprite = promoted;
-                    n++;
+                    string ap = AssetDatabase.GetAssetPath(promoted);
+                    if (!string.IsNullOrEmpty(ap)
+                        && ap.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        e.imageAssetPath = ap;
+                        n++;
+                    }
+                    if (swapLiveRefs || e.imageSprite == null)
+                        e.imageSprite = promoted;
                 }
-                string ap = AssetDatabase.GetAssetPath(e.imageSprite);
-                if (!string.IsNullOrEmpty(ap)) e.imageAssetPath = ap;
+                if (string.IsNullOrEmpty(e.imageAssetPath) && e.imageSprite != null)
+                {
+                    string ap = AssetDatabase.GetAssetPath(e.imageSprite);
+                    if (!string.IsNullOrEmpty(ap)) e.imageAssetPath = ap;
+                }
+            }
+            // tip: fix-architect-apply-persist-facing — SoftPromote videos into Resources too
+            // (layouts/videos were not reaching scene slots after exit / player build).
+            if (e.videoClip != null)
+            {
+                VideoClip promotedVid = PromoteVideoClip(e.videoClip, "SceneBg/" + e.slot);
+                if (promotedVid != null)
+                {
+                    string vp = AssetDatabase.GetAssetPath(promotedVid);
+                    if (!string.IsNullOrEmpty(vp)
+                        && vp.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        e.videoAssetPath = vp;
+                        n++;
+                    }
+                    if (swapLiveRefs || e.videoClip == null)
+                        e.videoClip = promotedVid;
+                }
+                if (string.IsNullOrEmpty(e.videoAssetPath) && e.videoClip != null)
+                {
+                    string vp = AssetDatabase.GetAssetPath(e.videoClip);
+                    if (!string.IsNullOrEmpty(vp)) e.videoAssetPath = vp;
+                }
             }
         }
         EditorUtility.SetDirty(p);
         return n;
     }
 
-    static int PromoteSlots(List<SlotTransformConfig> slots, string sub)
+    /// <summary>
+    /// Copy mp4 VideoClip into Resources/ArchitectArt when not already under Resources.
+    /// Soft-fail — never clears the source assignment.
+    /// </summary>
+    public static VideoClip PromoteVideoClip(VideoClip clip, string logicalSubPath)
+    {
+        if (clip == null) return null;
+        string src = AssetDatabase.GetAssetPath(clip);
+        if (string.IsNullOrEmpty(src)) return clip;
+        string norm = src.Replace('\\', '/');
+        if (norm.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+            return clip;
+
+        try
+        {
+            string ext = Path.GetExtension(norm);
+            if (string.IsNullOrEmpty(ext)) ext = ".mp4";
+            string safe = Sanitize(logicalSubPath) + "_video" + ext;
+            string destFolder = ArchitectArtRoot + "/" + Path.GetDirectoryName(logicalSubPath)!.Replace('\\', '/');
+            EnsureFolder(destFolder);
+            string dest = destFolder + "/" + Path.GetFileName(safe);
+            string guid = AssetDatabase.AssetPathToGUID(norm);
+            if (!string.IsNullOrEmpty(guid) && guid.Length >= 8)
+            {
+                string baseName = Path.GetFileNameWithoutExtension(safe);
+                dest = destFolder + "/" + baseName + "_" + guid.Substring(0, 8) + ext;
+            }
+
+            if (!File.Exists(DestFull(dest)))
+            {
+                if (!AssetDatabase.CopyAsset(norm, dest))
+                {
+                    Debug.LogWarning("[DemonKnight] PromoteVideoClip CopyAsset soft-fail: " + norm + " → " + dest);
+                    return clip;
+                }
+            }
+
+            AssetDatabase.ImportAsset(dest);
+            var copy = AssetDatabase.LoadAssetAtPath<VideoClip>(dest);
+            return copy != null ? copy : clip;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] PromoteVideoClip soft-fail: " + ex.Message);
+            return clip;
+        }
+    }
+
+    static int PromoteSlots(List<SlotTransformConfig> slots, string sub, bool swapLiveRefs = false)
     {
         if (slots == null) return 0;
         int n = 0;
@@ -4405,18 +4512,28 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
             var s = slots[i];
             if (s == null || s.previewOrOverrideSprite == null) continue;
             Sprite promoted = PromoteSprite(s.previewOrOverrideSprite, sub + "/Seat" + i);
-            if (promoted != null && promoted != s.previewOrOverrideSprite)
+            if (promoted != null)
             {
-                s.previewOrOverrideSprite = promoted;
-                n++;
+                string ap = AssetDatabase.GetAssetPath(promoted);
+                if (!string.IsNullOrEmpty(ap)
+                    && ap.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    s.previewAssetPath = ap;
+                    n++;
+                }
+                if (swapLiveRefs || s.previewOrOverrideSprite == null)
+                    s.previewOrOverrideSprite = promoted;
             }
-            string ap = AssetDatabase.GetAssetPath(s.previewOrOverrideSprite);
-            if (!string.IsNullOrEmpty(ap)) s.previewAssetPath = ap;
+            if (string.IsNullOrEmpty(s.previewAssetPath) && s.previewOrOverrideSprite != null)
+            {
+                string ap = AssetDatabase.GetAssetPath(s.previewOrOverrideSprite);
+                if (!string.IsNullOrEmpty(ap)) s.previewAssetPath = ap;
+            }
         }
         return n;
     }
 
-    static int PromoteList(List<Sprite> sprites, List<string> paths, string sub)
+    static int PromoteList(List<Sprite> sprites, List<string> paths, string sub, bool swapLiveRefs = false)
     {
         if (sprites == null) return 0;
         paths ??= new List<string>();
@@ -4425,14 +4542,29 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         for (int i = 0; i < sprites.Count; i++)
         {
             if (sprites[i] == null) continue;
-            Sprite promoted = PromoteSprite(sprites[i], sub + "/" + i);
-            if (promoted != null && promoted != sprites[i])
+            Sprite original = sprites[i];
+            Sprite promoted = PromoteSprite(original, sub + "/" + i);
+            // tip: fix-architect-apply-persist-facing — write Resources path backup always, but
+            // keep the live ObjectField sprite when it is still valid (SoftPromote used to swap
+            // to a mid-import Missing Sprite → picks stuck briefly then vanished).
+            // Build prepare passes swapLiveRefs:true so player builds bind Resources copies.
+            if (promoted != null)
             {
-                sprites[i] = promoted;
-                n++;
+                string promotedPath = AssetDatabase.GetAssetPath(promoted);
+                if (!string.IsNullOrEmpty(promotedPath)
+                    && promotedPath.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    paths[i] = promotedPath;
+                    n++;
+                }
+                if (swapLiveRefs || sprites[i] == null)
+                    sprites[i] = promoted;
             }
-            string ap = AssetDatabase.GetAssetPath(sprites[i]);
-            if (!string.IsNullOrEmpty(ap)) paths[i] = ap;
+            if (string.IsNullOrEmpty(paths[i]))
+            {
+                string ap = AssetDatabase.GetAssetPath(sprites[i] != null ? sprites[i] : original);
+                if (!string.IsNullOrEmpty(ap)) paths[i] = ap;
+            }
         }
         return n;
     }
@@ -4476,7 +4608,10 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
                 }
             }
 
-            AssetDatabase.ImportAsset(dest);
+            // tip: fix-architect-apply-persist-facing — force Sprite importer so SoftPromote
+            // ObjectField picks stick (CopyAsset alone left Texture without Sprite → Missing).
+            EnsureSpriteImporter(dest, sp);
+            AssetDatabase.ImportAsset(dest, ImportAssetOptions.ForceUpdate);
             var copy = AssetDatabase.LoadAssetAtPath<Sprite>(dest);
             if (copy == null)
             {
@@ -4487,12 +4622,68 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
                         if (objs[i] is Sprite s) { copy = s; break; }
                 }
             }
+            // Soft-fail: keep original assignment if promote Sprite load failed (never clear).
             return copy != null ? copy : sp;
         }
         catch (Exception ex)
         {
             Debug.LogWarning("[DemonKnight] PromoteSprite soft-fail: " + ex.Message);
             return sp;
+        }
+    }
+
+    static void EnsureSpriteImporter(string assetPath, Sprite sourceHint)
+    {
+        try
+        {
+            var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            if (importer == null) return;
+            bool dirty = false;
+            if (importer.textureType != TextureImporterType.Sprite)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                dirty = true;
+            }
+            if (importer.spriteImportMode != SpriteImportMode.Single)
+            {
+                importer.spriteImportMode = SpriteImportMode.Single;
+                dirty = true;
+            }
+            if (importer.mipmapEnabled)
+            {
+                importer.mipmapEnabled = false;
+                dirty = true;
+            }
+            if (!importer.alphaIsTransparency)
+            {
+                importer.alphaIsTransparency = true;
+                dirty = true;
+            }
+            if (importer.filterMode != FilterMode.Point)
+            {
+                importer.filterMode = FilterMode.Point;
+                dirty = true;
+            }
+            if (sourceHint != null)
+            {
+                var srcPath = AssetDatabase.GetAssetPath(sourceHint);
+                var srcImp = AssetImporter.GetAtPath(srcPath) as TextureImporter;
+                if (srcImp != null && Math.Abs(importer.spritePixelsPerUnit - srcImp.spritePixelsPerUnit) > 0.01f)
+                {
+                    importer.spritePixelsPerUnit = srcImp.spritePixelsPerUnit;
+                    dirty = true;
+                }
+            }
+            // Do NOT SaveAndReimport here — caller ImportAsset once. Avoids ObjectField flicker /
+            // endless import loops during SoftPromote-on-every-change.
+            if (dirty)
+            {
+                // TextureImporter settings apply on next ImportAsset(ForceUpdate).
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] EnsureSpriteImporter soft-fail: " + ex.Message);
         }
     }
 

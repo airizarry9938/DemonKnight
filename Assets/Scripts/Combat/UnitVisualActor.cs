@@ -21,21 +21,28 @@ namespace ArthurianAutobattler
         private Vector3 homePosition;
         private Image healthFill;
         private bool deathAnimPlayed;
+        /// <summary>True when this token faces left (evil). Facing uses negative scale.x — not flipX alone.</summary>
+        bool faceLeft;
+        float visualScaleAbs = 1f;
 
         public void Initialize(CombatUnit unit, Sprite artwork, Vector3 spawnPos, bool flipX, float visualScale = 1f)
         {
             boundUnit = unit;
             homePosition = spawnPos;
             transform.position = spawnPos;
-            float scale = Mathf.Max(0.1f, visualScale);
-            transform.localScale = new Vector3(scale, scale, 1f);
+            // tip: fix-architect-apply-persist-facing — evil faces LEFT via negative scale.x
+            // (flipX alone was unreliable with SoftQuad / animator scale writes).
+            // Do NOT combine flipX + negative scale (double-flip → both sides face the same way).
+            faceLeft = flipX;
+            visualScaleAbs = Mathf.Max(0.1f, Mathf.Abs(visualScale));
+            ApplyFacingScale();
 
-            EnsureVisualChrome(unit, flipX);
+            EnsureVisualChrome(unit, flipX: false);
 
             if (spriteRenderer != null)
             {
                 spriteRenderer.sprite = artwork;
-                spriteRenderer.flipX = flipX;
+                spriteRenderer.flipX = false;
                 spriteRenderer.enabled = artwork != null;
             }
 
@@ -44,7 +51,7 @@ namespace ArthurianAutobattler
                 // Solid color block when no portrait sprite (heroes/demons/bosses still readable).
                 blockRenderer.enabled = artwork == null;
                 blockRenderer.color = ColorForUnit(unit);
-                blockRenderer.flipX = flipX;
+                blockRenderer.flipX = false;
             }
 
             ApplyYSorting();
@@ -63,7 +70,19 @@ namespace ArthurianAutobattler
             // Phase 4 — battle token Idle/Attack/Hit/Death juice.
             var anim = ModularSpriteAnimator.EnsureOn(gameObject);
             anim?.ConfigureBattleActor(this);
+            // Re-assert facing after animator CaptureBase so breath bob keeps sign(scale.x).
+            ApplyFacingScale();
+            anim?.RecaptureBaseScale();
         }
+
+        /// <summary>Good faces right (+x); evil faces left (−x). tip: fix-architect-apply-persist-facing</summary>
+        public void ApplyFacingScale()
+        {
+            float sx = faceLeft ? -visualScaleAbs : visualScaleAbs;
+            transform.localScale = new Vector3(sx, visualScaleAbs, 1f);
+        }
+
+        public bool FacesLeft => faceLeft;
 
         private void Update()
         {

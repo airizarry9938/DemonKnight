@@ -174,10 +174,11 @@ namespace ArthurianAutobattler
         {
             if (battleBackground == null) return;
             // Architect Tab 3 SceneBackgroundProfile wins when assigned (assign-only).
+            // tip: fix-architect-apply-persist-facing — scene-enter rematerialize + apply.
             bool fromArchitect = false;
             try
             {
-                fromArchitect = SceneBackgroundApplier.ApplyToSpriteRenderer(
+                fromArchitect = SceneBackgroundApplier.ApplyOnSceneEnterWorld(
                     SceneBackgroundSlot.ChurchyardBattle, battleBackground);
             }
             catch { /* ignore */ }
@@ -394,8 +395,8 @@ namespace ArthurianAutobattler
                 UnitVisualActor actor = SpawnActor();
                 Sprite art = ResolveBattleSprite(d.unitType, d.unitID) ?? GetDemonSprite(d.unitType);
                 float scale = ResolveVisualScale(d.unitType);
-                // Enemies / bosses face left (flipX = true).
-                actor.Initialize(d, art, CalculateSlotPosition(false, i), true, scale);
+                // tip: fix-architect-apply-persist-facing — evil faces LEFT (Initialize → negative scale.x).
+                actor.Initialize(d, art, CalculateSlotPosition(false, i), flipX: true, scale);
                 activeActors[d.unitID] = actor;
             }
         }

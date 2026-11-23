@@ -1207,6 +1207,13 @@ namespace ArthurianAutobattler
             if (townCanvasObj != null) townCanvasObj.SetActive(true);
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(false);
             StageParallaxController.EnsureOnStageRoots();
+            // tip: fix-architect-apply-persist-facing — StageLayout + SceneBackground on town enter.
+            try
+            {
+                var church = ResolveChurchUI();
+                church?.ApplyArchitectOnTownEnter();
+            }
+            catch { /* soft */ }
 
             if (seatPopulateRoutine != null) StopCoroutine(seatPopulateRoutine);
             seatPopulateRoutine = StartCoroutine(PopulateTownSeatsNextFrame());
@@ -1274,6 +1281,16 @@ namespace ArthurianAutobattler
             if (townCanvasObj != null) townCanvasObj.SetActive(false);
             if (battlefieldArenaObj != null) battlefieldArenaObj.SetActive(true);
             DemonKnightCompatApi.PrepareBattlefield();
+            // tip: fix-architect-apply-persist-facing — SceneBackground + battle pools on battle enter.
+            try
+            {
+                SceneBackgroundApplier.InvalidateCache();
+                BattleGoodEvilSpritePoolApplier.InvalidateCache();
+                var viz = BattlefieldVisualizer.Instance
+                          ?? FindFirstObjectByType<BattlefieldVisualizer>();
+                viz?.ResolveArenaBindings();
+            }
+            catch { /* soft */ }
             Debug.LogError($"[DemonKnight] MARCH TO WAR — party {recruitedParty.Count}, wave {battleEngine.currentBattleNumber}.");
             battleEngine.StartAutoBattle(recruitedParty);
         }
