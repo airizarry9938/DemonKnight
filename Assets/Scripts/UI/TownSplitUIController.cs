@@ -27,7 +27,7 @@ namespace ArthurianAutobattler
         public Transform townGridContainer;
         public GameObject recruitAvatarButtonPrefab;
         public SomersetPewLayout pewLayout;
-        public Vector2 baseSeatSize = new Vector2(100f, 128f); // tip: fix-townrng-name-pools — fit 4 avatars/pew
+        public Vector2 baseSeatSize = new Vector2(58f, 76f); // tip: fix-architect-48-seat-preview — fit 4/pew
 
         [Header("Bottom: Dossier, Role Training & Mediation")]
         public Image selectedAvatarImage;
@@ -227,6 +227,18 @@ namespace ArthurianAutobattler
             var rt = btnObj.GetComponent<RectTransform>();
             if (rt == null) rt = btnObj.AddComponent<RectTransform>();
 
+            StageLayoutProfile layoutPrefs = null;
+            try { layoutPrefs = StageLayoutProfile.Load(); } catch { /* soft-fail */ }
+            layoutPrefs?.EnsureChurchLayoutPrefs();
+            Vector2 hitbox = layoutPrefs != null
+                ? layoutPrefs.ResolveChurchHitboxSize()
+                : baseSeatSize;
+            float spriteScale = layoutPrefs != null
+                ? layoutPrefs.ResolveChurchSpriteScale()
+                : SomersetPewLayout.DefaultSpriteScale;
+            float seatGap = layoutPrefs != null ? layoutPrefs.ResolveChurchSeatGap() : 0.008f;
+            float spreadMul = layoutPrefs != null ? layoutPrefs.ResolveChurchSeatSpreadMul() : 1f;
+
             // Prefer StageLayoutProfile church authoring (normalized 0–1 + scale) when set —
             // matches SomersetChurchUI.PopulatePews so Architect Tab 2 layout shows in Play.
             SlotTransformConfig authored = GetAuthoredChurchSlot(seatIndex);
@@ -239,12 +251,17 @@ namespace ArthurianAutobattler
                     float mul = authored.scale.x > 0.01f ? authored.scale.x : 1f;
                     float rowScale = pewLayout.GetSeatScale(seatIndex);
                     pewLayout.ApplyNormalizedSeatTransform(
-                        rt, authored.position, baseSeatSize, rowScale * mul, 0f);
+                        rt, authored.position, hitbox, rowScale * mul, 0f);
                 }
                 else
-                    pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize);
+                {
+                    Vector2 norm = pewLayout.GetNormalizedSeatPosition(seatIndex, spreadMul, seatGap);
+                    float rowScale = pewLayout.GetSeatScale(seatIndex);
+                    pewLayout.ApplyNormalizedSeatTransform(rt, norm, hitbox, rowScale, 0f);
+                }
             }
 
+            // tip: fix-architect-48-seat-preview — all 48 seats visible (no row-3 hide).
             bool showSprite = SomersetPewLayout.SeatShowsSprite(seatIndex);
             Image img = btnObj.GetComponent<Image>();
             if (img == null) img = btnObj.AddComponent<Image>();

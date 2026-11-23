@@ -33,11 +33,12 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
 
-    private const string ExpectedPackageId = "fix-townrng-name-pools";
+    private const string ExpectedPackageId = "fix-architect-48-seat-preview";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
     {
+        "fix-townrng-name-pools",
         "fix-48-pew-seats",
         "fix-night-wave-hud-progression",
         "fix-survivor-stats-victory-morale",
@@ -1336,7 +1337,7 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
-                || text.IndexOf("fix-townrng-name-pools", StringComparison.Ordinal) < 0)
+                || text.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0)
                 throw new Exception("GameDataTypes Appliers/helpers/Profile SOs/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
@@ -1451,7 +1452,7 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("SaveNamedClassPoolProfile", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("ArchitectPools", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-townrng-name-pools", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-architect-48-seat-preview", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist / Save Pool Profile (" + source + ")");
@@ -1596,7 +1597,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("pendingMidRunWaveVictory")
                    && body.Contains("PruneDeadFromWarbandAndPews")
                    && body.Contains("SyncNightToCombatWave")
-                   && body.Contains("fix-townrng-name-pools")
+                   && body.Contains("fix-architect-48-seat-preview")
                    && body.Contains("AwardWaveVictoryVeteranRanks")
                    && body.Contains("RedrawVeteranStarIcons")
                    && body.Contains("StartTownRecruitPhase")
@@ -1626,11 +1627,13 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("SomersetPewLayout.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-townrng-name-pools — 12×4 uniform pews.
+            // tip: fix-architect-48-seat-preview — 12×4 · all 4 rows · compact hitboxes.
             return body.Contains("TotalSeats = 48")
                    && body.Contains("SeatsPerPew = 4")
-                   && body.Contains("CurrentLayoutVersion = 5")
-                   && body.Contains("fix-townrng-name-pools");
+                   && body.Contains("VisualSpriteRowCount = 4")
+                   && body.Contains("CurrentLayoutVersion = 6")
+                   && body.Contains("DefaultHitboxSize")
+                   && body.Contains("fix-architect-48-seat-preview");
         }
 
         if (rel.EndsWith("VictoryStarBadge.cs", StringComparison.OrdinalIgnoreCase))
@@ -1660,6 +1663,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class FlockEconomy")
                    && body.Contains("PewRowSize = 4")
                    && body.Contains("ChurchPewCount = 48")
+                   && body.Contains("churchHitboxSize")
+                   && body.Contains("churchSpriteScale")
+                   && body.Contains("ResolveChurchHitboxSize")
                    && body.Contains("class SpriteAnimClip")
                    && body.Contains("class ModularSpriteLibrary")
                    && body.Contains("class StageLayoutProfile")
@@ -1683,7 +1689,7 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
                    && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
-                   && body.Contains("fix-townrng-name-pools");
+                   && body.Contains("fix-architect-48-seat-preview");
         }
 
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
@@ -1745,7 +1751,7 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-townrng-name-pools")
+                   && (body.Contains("fix-architect-48-seat-preview")
                        || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
                        || body.Contains("fix-build-persist-embed"));
@@ -1784,7 +1790,11 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("GetMouseButtonDown(1)")
                    && body.Contains("LegendPewPortraitApplier.ResolvePewVisual")
                    && body.Contains("ApplyFaceOverlay")
-                   && body.Contains("ResolvePewFaceOverlay");
+                   && body.Contains("ResolvePewFaceOverlay")
+                   // tip: fix-architect-48-seat-preview — compact hitboxes + independent sprite scale.
+                   && body.Contains("ApplySeatSpriteVisualScale")
+                   && body.Contains("64f, 84f")
+                   && !body.Contains("110f, 140f");
         }
 
         if (rel.EndsWith("ChurchStageUIController.cs", StringComparison.OrdinalIgnoreCase))
@@ -2093,7 +2103,7 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-townrng-name-pools")
+        if (!body.Contains("fix-architect-48-seat-preview")
             && !body.Contains("fix-architect-save-load-pool-ux")
             && !body.Contains("fix-architect-load-pool-profiles")
             && !body.Contains("fix-profile-so-script-assets")
@@ -2104,6 +2114,9 @@ public static class ArthurianSyncFromGitHub
         if (body.Contains("selectedClassPool == UnitType.")) return false;
         if (!body.Contains("ClassPoolKind.Warrior => UnitType.Warrior")) return false;
         if (!body.Contains("UiBuildId")) return false;
+        // tip: fix-architect-48-seat-preview — Layout tab hitbox/sprite prefs + 48-seat preview.
+        if (!body.Contains("DrawChurchLayoutPrefsPanel")) return false;
+        if (!body.Contains("churchHitboxSize")) return false;
         if (!body.Contains("PersistAllProfiles")) return false;
         // Embed + SoftPromote belt (CS0103 after Force Sync wiping standalone BuildPersist).
         if (!body.Contains("class ArthurianArchitectBuildPersist")) return false;

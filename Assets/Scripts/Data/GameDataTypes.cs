@@ -1182,7 +1182,7 @@ namespace ArthurianAutobattler
     /// <summary>
     /// Numbered Somerset church pews (48 = 12×4), player battle slots (52), enemy slots (20),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
-    /// tip: fix-townrng-name-pools
+    /// tip: fix-architect-48-seat-preview
     /// </summary>
     [CreateAssetMenu(fileName = "StageLayoutProfile", menuName = "DemonKnight/Stage Layout Profile")]
     public class StageLayoutProfile : ScriptableObject
@@ -1203,8 +1203,47 @@ namespace ArthurianAutobattler
         public bool enableLightningFlashes;
         public bool enableCandleFlicker = true;
 
+        // tip: fix-architect-48-seat-preview — Architect Layout tab prefs (SoftPromote Persist).
+        [Tooltip("Church pew hitbox size in UI pixels (4 must fit per pew strip).")]
+        public Vector2 churchHitboxSize = new Vector2(64f, 84f);
+        [Tooltip("Unit sprite scale relative to hitbox (1 = match hitbox).")]
+        [Range(0.35f, 2.5f)]
+        public float churchSpriteScale = 1.15f;
+        [Tooltip("Normalized gap between seats on a pew (shrinks usable strip).")]
+        [Range(0f, 0.06f)]
+        public float churchSeatGap = 0.008f;
+        [Tooltip("Multiplies default pew seatSpread (strip width).")]
+        [Range(0.5f, 1.6f)]
+        public float churchSeatSpreadMul = 1f;
+
         /// <summary>True when this is a CreateInstance stand-in (not a Resources asset).</summary>
         [System.NonSerialized] public bool isRuntimeStandIn;
+
+        public Vector2 ResolveChurchHitboxSize()
+        {
+            float w = churchHitboxSize.x > 8f ? churchHitboxSize.x : SomersetPewLayout.DefaultHitboxSize.x;
+            float h = churchHitboxSize.y > 8f ? churchHitboxSize.y : SomersetPewLayout.DefaultHitboxSize.y;
+            // Guard against the old oversized 110×140 tip that overflowed strips to ~33 visible boxes.
+            w = Mathf.Clamp(w, 28f, 96f);
+            h = Mathf.Clamp(h, 36f, 120f);
+            return new Vector2(w, h);
+        }
+
+        public float ResolveChurchSpriteScale()
+            => Mathf.Clamp(churchSpriteScale > 0.05f ? churchSpriteScale : SomersetPewLayout.DefaultSpriteScale, 0.35f, 2.5f);
+
+        public float ResolveChurchSeatGap() => Mathf.Clamp(churchSeatGap, 0f, 0.06f);
+        public float ResolveChurchSeatSpreadMul() => Mathf.Clamp(churchSeatSpreadMul > 0.05f ? churchSeatSpreadMul : 1f, 0.5f, 1.6f);
+
+        public void EnsureChurchLayoutPrefs()
+        {
+            if (churchHitboxSize.x < 8f || churchHitboxSize.y < 8f
+                || churchHitboxSize.x > 100f || churchHitboxSize.y > 130f)
+                churchHitboxSize = SomersetPewLayout.DefaultHitboxSize;
+            if (churchSpriteScale < 0.05f) churchSpriteScale = SomersetPewLayout.DefaultSpriteScale;
+            churchSeatGap = Mathf.Clamp(churchSeatGap, 0f, 0.06f);
+            if (churchSeatSpreadMul < 0.05f) churchSeatSpreadMul = 1f;
+        }
 
         public static StageLayoutProfile Load()
         {
@@ -1286,6 +1325,7 @@ namespace ArthurianAutobattler
             FillSlots(churchPewSlots, ChurchPewCount, ChurchPewDefault);
             FillSlots(playerBattleSlots, PlayerBattleCount, PlayerBattleDefault);
             FillSlots(enemyBattleSlots, EnemyBattleCount, EnemyBattleDefault);
+            EnsureChurchLayoutPrefs();
         }
 
         static void FillSlots(List<SlotTransformConfig> list, int count, Func<int, SlotTransformConfig> factory)
@@ -1319,45 +1359,10 @@ namespace ArthurianAutobattler
             };
         }
 
-        /// <summary>Normalized 0–1 pew seat matching SomersetPewLayout.CreateDefaultPews capacities.</summary>
+        /// <summary>Normalized 0–1 pew seat matching SomersetPewLayout.CreateDefaultPews (v6 · 12×4 · all rows).</summary>
         public static Vector2 DefaultChurchNormalizedPosition(int globalSeatIndex)
-        {
-            // Mirror SomersetPewLayout.CreateDefaultPews (v5 · 12×4) — keep in sync.
-            float[][] colXByRow =
-            {
-                new[] { 0.220f, 0.500f, 0.780f },
-                new[] { 0.226f, 0.500f, 0.775f },
-                new[] { 0.232f, 0.500f, 0.770f },
-                new[] { 0.238f, 0.500f, 0.765f }
-            };
-            float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
-            float[] rowSpread = { 0.220f, 0.200f, 0.180f, 0.150f };
-            int[,] caps =
-            {
-                { 4, 4, 4 },
-                { 4, 4, 4 },
-                { 4, 4, 4 },
-                { 4, 4, 4 }
-            };
-
-            int remaining = Mathf.Clamp(globalSeatIndex, 0, ChurchPewCount - 1);
-            for (int row = 0; row < 4; row++)
-            {
-                for (int col = 0; col < 3; col++)
-                {
-                    int cap = Mathf.Max(1, caps[row, col]);
-                    if (remaining < cap)
-                    {
-                        float t = cap == 1 ? 0.5f : remaining / (float)(cap - 1);
-                        float x = colXByRow[row][col]
-                                  + Mathf.Lerp(-rowSpread[row] * 0.5f, rowSpread[row] * 0.5f, t);
-                        return new Vector2(x, rowY[row]);
-                    }
-                    remaining -= cap;
-                }
-            }
-            return new Vector2(0.5f, 0.5f);
-        }
+            => SomersetPewLayout.GetStaticNormalizedSeatPosition(
+                SomersetPewLayout.CreateDefaultPews(), globalSeatIndex);
 
         /// <summary>Staggered columns of 6 (frontlineSize = 6) — matches Phase 3 auto-arrange math.</summary>
         static SlotTransformConfig PlayerBattleDefault(int i)

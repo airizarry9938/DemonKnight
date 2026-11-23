@@ -239,7 +239,8 @@ public static class ArthurianAlignCrowdPews
             rt.anchorMin = rt.anchorMax = anchor;
             rt.pivot = new Vector2(0.5f, 0.12f);
             rt.anchoredPosition = Vector2.zero;
-            rt.sizeDelta = new Vector2(80f, 104f) * scale;
+            // tip: fix-architect-48-seat-preview — compact hitboxes so 4 fit per pew
+            rt.sizeDelta = new Vector2(52f, 68f) * scale;
 
             var img = go.GetComponent<Image>();
             if (img != null)
@@ -305,9 +306,9 @@ public static class ArthurianAlignCrowdPews
             new[] { 0.228f, 0.500f, 0.773f },
             new[] { 0.235f, 0.500f, 0.768f }
         };
-        // Match SomersetPewLayout — upper 4 pew bands; camera-front pews stay empty.
-        float[] rowY = { 0.375f, 0.490f, 0.600f, 0.715f };
-        float[] rowSpread = { 0.220f, 0.200f, 0.180f, 0.150f };
+        // Match SomersetPewLayout v6 — all 4 pew-rows visible (48 hitboxes).
+        float[] rowY = { 0.355f, 0.490f, 0.625f, 0.760f };
+        float[] rowSpread = { 0.240f, 0.220f, 0.200f, 0.180f };
 
         float t = cap == 1 ? 0.5f : slot / (float)(cap - 1);
         float x = colXByRow[row][col] + Mathf.Lerp(-rowSpread[row] * 0.5f, rowSpread[row] * 0.5f, t);
@@ -317,7 +318,7 @@ public static class ArthurianAlignCrowdPews
     private static float GetSeatScale(int globalSeatIndex)
     {
         int row = GetPewIndex(globalSeatIndex) / PewColumns;
-        float[] rowScale = { 1.00f, 0.88f, 0.76f, 0.66f };
+        float[] rowScale = { 1.18f, 1.08f, 0.98f, 0.90f };
         return rowScale[Mathf.Clamp(row, 0, PewRows - 1)];
     }
 

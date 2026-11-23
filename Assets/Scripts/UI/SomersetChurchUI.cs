@@ -35,7 +35,7 @@ namespace ArthurianAutobattler
         public RectTransform pewSeatLayer;
         public GameObject paperDollSeatPrefab;
         /// <summary>~1.55× prior 56×72 — pew sprites read larger on church art.</summary>
-        public Vector2 baseSeatSize = new Vector2(110f, 140f); // tip: fix-townrng-name-pools
+        public Vector2 baseSeatSize = new Vector2(64f, 84f); // tip: fix-architect-48-seat-preview — 4 fit/pew
 
         [Header("Modals (mutual exclusion)")]
         public GameObject diceModal;
@@ -1814,9 +1814,24 @@ namespace ArthurianAutobattler
             if (pewLayout == null) pewLayout = gameObject.AddComponent<SomersetPewLayout>();
             pewLayout.ApplyLatestDefaultsIfNeeded();
             pewLayout.EnsureValid();
-            // Scene-serialized seat size may lag tip — keep pew sprites visibly large.
-            if (baseSeatSize.x < 100f || baseSeatSize.y < 128f)
-                baseSeatSize = new Vector2(110f, 140f);
+            // tip: fix-architect-48-seat-preview — hitbox from StageLayoutProfile (Architect Layout tab).
+            StageLayoutProfile layoutPrefs = null;
+            try { layoutPrefs = StageLayoutProfile.Load(); } catch { /* soft-fail */ }
+            layoutPrefs?.EnsureChurchLayoutPrefs();
+            Vector2 hitbox = layoutPrefs != null
+                ? layoutPrefs.ResolveChurchHitboxSize()
+                : SomersetPewLayout.DefaultHitboxSize;
+            float spriteScale = layoutPrefs != null
+                ? layoutPrefs.ResolveChurchSpriteScale()
+                : SomersetPewLayout.DefaultSpriteScale;
+            float seatGap = layoutPrefs != null ? layoutPrefs.ResolveChurchSeatGap() : 0.008f;
+            float spreadMul = layoutPrefs != null ? layoutPrefs.ResolveChurchSeatSpreadMul() : 1f;
+            // Scene-serialized seat size may lag tip — prefer profile, else compact default.
+            if (baseSeatSize.x > 96f || baseSeatSize.y > 120f
+                || baseSeatSize.x < 20f || baseSeatSize.y < 24f)
+                baseSeatSize = hitbox;
+            else
+                baseSeatSize = hitbox;
 
             if (pewSeatLayer == null)
             {
@@ -1889,12 +1904,19 @@ namespace ArthurianAutobattler
                         rt, authored.position, baseSeatSize, rowScale * mul, jitterX);
                 }
                 else
-                    pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize, jitterX);
+                {
+                    Vector2 norm = pewLayout.GetNormalizedSeatPosition(seatIndex, spreadMul, seatGap);
+                    float rowScale = pewLayout.GetSeatScale(seatIndex);
+                    pewLayout.ApplyNormalizedSeatTransform(
+                        rt, norm, baseSeatSize, rowScale, jitterX);
+                }
 
-                // Visual sprites on 3 pew-rows only (pewSeatIndex / 4 → pew row 0–2). Row 3 = hidden.
+                // tip: fix-architect-48-seat-preview — all 48 seats show hitboxes (4 rows × 12 pews).
                 bool showSprite = SomersetPewLayout.SeatShowsSprite(seatIndex);
                 if (!showSprite)
                     HidePewSeatVisual(go);
+                else
+                    ApplySeatSpriteVisualScale(go, spriteScale);
 
                 var view = go.GetComponent<PaperDollSeatView>();
                 if (view != null)
@@ -2100,6 +2122,38 @@ namespace ArthurianAutobattler
             var btn = go.GetComponent<Button>();
             if (btn != null) btn.interactable = false;
             go.transform.localScale = Vector3.zero;
+        }
+
+        /// <summary>
+        /// Scale unit sprite layers independently of the seat hitbox RectTransform.
+        /// tip: fix-architect-48-seat-preview
+        /// </summary>
+        static void ApplySeatSpriteVisualScale(GameObject go, float spriteScale)
+        {
+            if (go == null) return;
+            float s = Mathf.Clamp(spriteScale, 0.35f, 2.5f);
+            var view = go.GetComponent<PaperDollSeatView>();
+            if (view != null)
+            {
+                ScaleLayer(view.bodyLayer, s);
+                ScaleLayer(view.outfitLayer, s);
+                ScaleLayer(view.headLayer, s);
+                ScaleLayer(view.propLayer, s);
+                ScaleLayer(view.moodLayer, s);
+                return;
+            }
+            // Non-PaperDoll: scale child Images only — keep root RT as the hitbox.
+            foreach (var img in go.GetComponentsInChildren<Image>(true))
+            {
+                if (img == null || img.gameObject == go) continue;
+                img.rectTransform.localScale = new Vector3(s, s, 1f);
+            }
+        }
+
+        static void ScaleLayer(Image img, float s)
+        {
+            if (img == null) return;
+            img.rectTransform.localScale = new Vector3(s, s, 1f);
         }
 
         private static void EnsureSeatImage(GameObject go, RecruitInstance recruit)
