@@ -23,7 +23,7 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-profiles-in-gdt-always). Prefer API tip / raw@main FIRST.
+    // Ship pin = this tip feature SHA (fix-endless-compile-loop). Prefer API tip / raw@main FIRST.
     private const string FallbackCommitSha = "3679e76777c27cbd1a41b636abf014af9c4adec5";
 
     /// <summary>
@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "3679e76777c27cbd1a41b636abf014af9c4adec5";
 
-    private const string ExpectedPackageId = "fix-profiles-in-gdt-always";
+    private const string ExpectedPackageId = "fix-endless-compile-loop";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -83,6 +83,7 @@ public static class ArthurianSyncFromGitHub
         "fix-named-profile-sync-cs0246",
         "fix-tipescape-profile-embeds",
         "fix-gdt-profile-always-compile",
+        "fix-profiles-in-gdt-always",
     };
 
     /// <summary>
@@ -106,26 +107,66 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// EDITOR InitializeOnLoad — runs even when runtime Assembly-CSharp is CS0101-broken
     /// (GameLoopManager Init never runs in that state). Nukes Phase 2–5 standalones on disk.
+    /// tip: fix-endless-compile-loop — never Refresh unless bytes actually changed.
     /// </summary>
     [InitializeOnLoadMethod]
     static void DkEditorNukePhase25StandalonesOnLoad()
     {
         try
         {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            const string gate = "DemonKnight.Sync.OnLoadNuke." + ExpectedPackageId;
+            // SET GATE FIRST — Refresh after nuke must not re-enter OnLoad nuke.
+            if (SessionState.GetBool(gate, false)) return;
+            SessionState.SetBool(gate, true);
+
             string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
-            // Precompile belt: HardWrite Profiles from embeds before nuke (CS0246 chicken-egg).
-            try { NukeNamedProfileFiles(projectRoot); } catch { /* ignore */ }
+            // Precompile belt: stub leftover named Profiles (no-op when already stubbed).
+            int hw = 0;
+            try { hw = NukeNamedProfileFiles(projectRoot); } catch { /* ignore */ }
             int n = NukePhase25Standalones(projectRoot, writeStubIfNeeded: true, errors: null);
             int a = StubApplierStandalonesOver(projectRoot, errors: null);
-            if (n > 0 || a > 0)
+            if (hw > 0 || n > 0 || a > 0)
             {
-                Debug.Log($"[DemonKnight] Editor OnLoad nuked Phase25={n} stubbed Appliers={a} (CS0101 guard).");
+                Debug.Log($"[DemonKnight] Editor OnLoad nuked Profiles={hw} Phase25={n} Appliers={a} (CS0101 guard).");
                 EditorApplication.delayCall += () => AssetDatabase.Refresh();
             }
         }
         catch (Exception ex)
         {
             Debug.LogWarning("[DemonKnight] DA-59 Editor OnLoad nuke skipped: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// tip: fix-endless-compile-loop — write only when missing or content differs.
+    /// Never rewrite identical bytes (mtime churn → AssetDatabase refresh → compile loop).
+    /// </summary>
+    public static bool WriteTextIfChanged(string dest, string body)
+    {
+        if (string.IsNullOrEmpty(dest) || body == null) return false;
+        try
+        {
+            if (File.Exists(dest))
+            {
+                string existing = File.ReadAllText(dest);
+                if (string.Equals(existing, body, StringComparison.Ordinal))
+                    return false;
+                try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+            }
+            else
+            {
+                string dir = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+            }
+            File.WriteAllText(dest, body);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[DemonKnight] WriteTextIfChanged FAIL " + dest + ": " + ex.Message);
+            return false;
         }
     }
 
@@ -287,7 +328,7 @@ public static class ArthurianSyncFromGitHub
     /// <summary>
     /// Standalones that redefine types still embedded elsewhere (CS0101).
     /// StageLayoutProfile (+ other Architect *Profiles) are REAL named MonoScripts now — NOT killed.
-    /// tip: fix-profiles-in-gdt-always
+    /// tip: fix-endless-compile-loop
     /// </summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
@@ -296,7 +337,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/Systems/DiceManager.cs",
-        // tip: fix-profiles-in-gdt-always — Profiles in GameDataTypes; nuke leftover named files (CS0101).
+        // tip: fix-endless-compile-loop — Profiles in GameDataTypes; nuke leftover named files (CS0101).
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -515,9 +556,26 @@ public static class ArthurianSyncFromGitHub
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
                 {
                     NukeStaleArchitectAndPaperDollEditors(projectRoot);
+                    // Only delete if content will differ — avoid mtime churn on identical tip body.
+                    if (File.Exists(dest))
+                    {
+                        try
+                        {
+                            if (string.Equals(File.ReadAllText(dest), body, StringComparison.Ordinal))
+                            {
+                                Debug.Log($"[DemonKnight] FORCE host unchanged {rel}");
+                                continue;
+                            }
+                        }
+                        catch { /* fall through */ }
+                    }
                     TryDeleteFile(dest);
                 }
-                WriteReplacing(dest, body, deleteFirst: true);
+                if (!WriteReplacing(dest, body, deleteFirst: true))
+                {
+                    Debug.Log($"[DemonKnight] FORCE host unchanged {rel}");
+                    continue;
+                }
                 ok++;
                 Debug.Log($"[DemonKnight] FORCE host overwrite {rel} via {source} ({body.Length} bytes)");
                 if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
@@ -672,6 +730,7 @@ public static class ArthurianSyncFromGitHub
     /// Force-Sync / Editor OnLoad nuke: DELETE standalones (+ .meta). Optionally overwrite with
     /// a comment stub when delete fails or when GameDataTypes Sync demands a safe on-disk body.
     /// Runs from Editor assembly — does NOT wait for runtime compile.
+    /// tip: fix-endless-compile-loop — already-stubbed / absent files are left alone (no mtime churn).
     /// </summary>
     public static int NukePhase25Standalones(
         string projectRoot = null,
@@ -686,11 +745,10 @@ public static class ArthurianSyncFromGitHub
             {
                 string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
                 bool existed = File.Exists(dest);
-                bool hadType = false;
-                if (existed)
-                {
-                    string body = File.ReadAllText(dest);
-                    hadType = body.IndexOf("public class ", StringComparison.Ordinal) >= 0
+                if (!existed) continue; // nothing on disk — no-op (do NOT recreate stubs every reload)
+
+                string body = File.ReadAllText(dest);
+                bool hadType = body.IndexOf("public class ", StringComparison.Ordinal) >= 0
                               || body.IndexOf("public partial class ", StringComparison.Ordinal) >= 0
                               || body.IndexOf("class SpriteAnimClip", StringComparison.Ordinal) >= 0
                               || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
@@ -702,56 +760,39 @@ public static class ArthurianSyncFromGitHub
                               || body.IndexOf("class ModularHeadEntry", StringComparison.Ordinal) >= 0
                               || body.IndexOf("class ModularAnimRegistration", StringComparison.Ordinal) >= 0
                               || body.IndexOf("class StageParallaxLayer", StringComparison.Ordinal) >= 0;
-                }
 
-                if (existed)
+                // Already a type-free stub (#if false / comment-only) — leave bytes alone.
+                if (!hadType)
+                    continue;
+
+                try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
+                try { File.Delete(dest); } catch (Exception delEx)
                 {
-                    try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
-                    try { File.Delete(dest); } catch (Exception delEx)
-                    {
-                        Debug.LogWarning($"[DemonKnight] Delete failed {rel}: {delEx.Message} — will stub.");
-                    }
-                    string meta = dest + ".meta";
-                    if (File.Exists(meta))
-                    {
-                        try { File.SetAttributes(meta, FileAttributes.Normal); } catch { /* ignore */ }
-                        try { File.Delete(meta); } catch { /* ignore */ }
-                    }
+                    Debug.LogWarning($"[DemonKnight] Delete failed {rel}: {delEx.Message} — will stub.");
+                }
+                string meta = dest + ".meta";
+                if (File.Exists(meta))
+                {
+                    try { File.SetAttributes(meta, FileAttributes.Normal); } catch { /* ignore */ }
+                    try { File.Delete(meta); } catch { /* ignore */ }
                 }
 
                 // After GameDataTypes Sync / when delete fails: overwrite with type-free stub.
-                if (writeStubIfNeeded && (hadType || File.Exists(dest) || existed))
+                if (writeStubIfNeeded && File.Exists(dest))
                 {
-                    // Prefer gone; if still present OR we want a hard overwrite after GameDataTypes:
-                    if (File.Exists(dest) || hadType)
+                    try
                     {
-                        try
-                        {
-                            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                            if (File.Exists(dest))
-                            {
-                                try { File.SetAttributes(dest, FileAttributes.Normal); } catch { /* ignore */ }
-                            }
-                            // If delete succeeded, skip re-creating unless writeStubAlways path.
-                            // When hadType and delete succeeded, leave deleted (cleanest).
-                            if (File.Exists(dest))
-                            {
-                                File.WriteAllText(dest, Phase25StandaloneStub(rel));
-                                Debug.Log($"[DemonKnight] DA-59 stubbed Phase 2–5 standalone {rel}");
-                            }
-                        }
-                        catch (Exception stubEx)
-                        {
-                            errors?.Add($"{rel} (stub): {stubEx.Message}");
-                        }
+                        if (WriteTextIfChanged(dest, Phase25StandaloneStub(rel)))
+                            Debug.Log($"[DemonKnight] DA-59 stubbed Phase 2–5 standalone {rel}");
+                    }
+                    catch (Exception stubEx)
+                    {
+                        errors?.Add($"{rel} (stub): {stubEx.Message}");
                     }
                 }
 
-                if (existed || hadType)
-                {
-                    touched++;
-                    Debug.Log($"[DemonKnight] DA-59 nuked Phase 2–5 standalone {rel} (hadType={hadType}, gone={!File.Exists(dest)})");
-                }
+                touched++;
+                Debug.Log($"[DemonKnight] DA-59 nuked Phase 2–5 standalone {rel} (hadType={hadType}, gone={!File.Exists(dest)})");
             }
             catch (Exception ex)
             {
@@ -838,7 +879,8 @@ public static class ArthurianSyncFromGitHub
                         rewrite = false;
                 }
                 if (!rewrite) continue;
-                File.WriteAllText(dest, ApplierStandaloneStub(rel));
+                if (!WriteTextIfChanged(dest, ApplierStandaloneStub(rel)))
+                    continue;
                 n++;
                 Debug.Log($"[DemonKnight] Stubbed Applier standalone {rel} (embed lives in GameDataTypes)");
             }
@@ -889,7 +931,7 @@ public static class ArthurianSyncFromGitHub
 
         // NUCLEAR: HardWrite named Profile MonoScripts from embeds BEFORE Nuke/Delete/download.
         // Sync host is already compiled — offline embeds break the TipEscape chicken-egg (CS0246).
-        // tip: fix-profiles-in-gdt-always
+        // tip: fix-endless-compile-loop
         try
         {
             int hw = NukeNamedProfileFiles(projectRoot);
@@ -932,7 +974,7 @@ public static class ArthurianSyncFromGitHub
                     if (IsMustRestoreUiHelper(rel)) continue;
                     // Never wipe GameDataTypes even if somehow missing from MustRestore (Applier embed).
                     if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)) continue;
-                    // tip: fix-profiles-in-gdt-always — named Profiles kill-listed; allow Force Delete wipe.
+                    // tip: fix-endless-compile-loop — named Profiles kill-listed; allow Force Delete wipe.
                     // Never wipe SomersetChurchUI — stale Sync MustRestore omitted it → CS0246.
                     if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)) continue;
                     // Never wipe ArchitectBuildPersist — ForceOverwrite host + Force Delete skip race → CS0103.
@@ -1285,7 +1327,7 @@ public static class ArthurianSyncFromGitHub
                 || text.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
-                || text.IndexOf("fix-profiles-in-gdt-always", StringComparison.Ordinal) < 0)
+                || text.IndexOf("fix-endless-compile-loop", StringComparison.Ordinal) < 0)
                 throw new Exception("GameDataTypes Appliers/helpers/Profile SOs/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
@@ -1301,7 +1343,7 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// tip: fix-profiles-in-gdt-always — Profiles live in GameDataTypes; nuke named leftovers.
+    /// tip: fix-endless-compile-loop — Profiles live in GameDataTypes; nuke named leftovers.
     /// Independent of MustRestore so a stale Sync cannot leave CS0101 named Profile files.
     /// </summary>
     static void HardRestoreNamedProfileScripts(
@@ -1336,7 +1378,7 @@ public static class ArthurianSyncFromGitHub
         }
         if (g.IndexOf(ExpectedPackageId, StringComparison.Ordinal) < 0
             && g.IndexOf("fix-profiles-in-gdt-always", StringComparison.Ordinal) < 0)
-            errors?.Add("HardRestore: GameDataTypes missing tip fix-profiles-in-gdt-always");
+            errors?.Add("HardRestore: GameDataTypes missing tip " + ExpectedPackageId);
         if (okFiles != null && !okFiles.Contains(gdtRel)) okFiles.Add(gdtRel);
     }
 
@@ -1396,7 +1438,7 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-profiles-in-gdt-always", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-endless-compile-loop", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist (" + source + ")");
@@ -1423,7 +1465,7 @@ public static class ArthurianSyncFromGitHub
                     + "// Types live in ArthurianArtArchitectWindow.cs (Force Sync embed — avoids CS0103 when this" + "\n"
                     + "// standalone path is wiped by Force Delete under a stale compiled Sync host)." + "\n"
                     + "// This stub overwrites any leftover full copy so we never get CS0101 duplicates." + "\n"
-                    + "// tip: fix-profiles-in-gdt-always" + "\n"
+                    + "// tip: fix-endless-compile-loop" + "\n"
                     + "#endif" + "\n";
             }
             WriteReplacing(stubDest, stubBody, deleteFirst: true);
@@ -1438,9 +1480,23 @@ public static class ArthurianSyncFromGitHub
     }
 
 
-    private static void WriteReplacing(string dest, string text, bool deleteFirst)
+    /// <summary>
+    /// tip: fix-endless-compile-loop — skip rewrite when on-disk bytes already match (no mtime churn).
+    /// Returns true only when bytes changed.
+    /// </summary>
+    private static bool WriteReplacing(string dest, string text, bool deleteFirst)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+        if (File.Exists(dest))
+        {
+            try
+            {
+                string existing = File.ReadAllText(dest);
+                if (string.Equals(existing, text, StringComparison.Ordinal))
+                    return false;
+            }
+            catch { /* fall through to write */ }
+        }
         if (deleteFirst)
             TryDeleteFile(dest);
 
@@ -1458,6 +1514,7 @@ public static class ArthurianSyncFromGitHub
         }
         else File.Move(tmp, dest);
         TryDeleteFile(tmp);
+        return true;
     }
 
     private static void TryDeleteFile(string path)
@@ -1560,7 +1617,7 @@ public static class ArthurianSyncFromGitHub
         if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
         {
             // MenuListSortMode must live here so LegendCodexUI / SomersetChurchUI never CS0246.
-            // tip: fix-profiles-in-gdt-always — ALL five Profile SOs MUST live here (MustRestore always-compile).
+            // tip: fix-endless-compile-loop — ALL five Profile SOs MUST live here (MustRestore always-compile).
             return body.Contains("enum MenuListSortMode")
                    && body.Contains("HighestHp")
                    && body.Contains("HighestAttack")
@@ -1597,36 +1654,36 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
                    && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
-                   && body.Contains("fix-profiles-in-gdt-always");
+                   && body.Contains("fix-endless-compile-loop");
         }
 
         if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-profiles-in-gdt-always — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-endless-compile-loop — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class StageLayoutProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-profiles-in-gdt-always — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-endless-compile-loop — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class SceneBackgroundProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-profiles-in-gdt-always — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-endless-compile-loop — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class ClassSpritePoolProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("LegendPewPortraitProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-profiles-in-gdt-always — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-endless-compile-loop — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class LegendPewPortraitProfile", StringComparison.Ordinal) < 0;
         }
         if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
         {
-            // tip: fix-profiles-in-gdt-always — named file must be #if false stub (SO in GameDataTypes).
+            // tip: fix-endless-compile-loop — named file must be #if false stub (SO in GameDataTypes).
             return body.IndexOf("#if false", StringComparison.Ordinal) >= 0
                    || body.IndexOf("public class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0;
         }
@@ -1644,7 +1701,7 @@ public static class ArthurianSyncFromGitHub
         }
 
         // Remaining Phase 2–5 standalones are NOT synced (still embedded elsewhere).
-        // tip: fix-profiles-in-gdt-always — Profile SOs live in GameDataTypes; named *Profile.cs are kill-listed.
+        // tip: fix-endless-compile-loop — Profile SOs live in GameDataTypes; named *Profile.cs are kill-listed.
         if (rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase)
@@ -1659,7 +1716,7 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-profiles-in-gdt-always")
+                   && (body.Contains("fix-endless-compile-loop")
                        || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
                        || body.Contains("fix-build-persist-embed"));
@@ -2005,7 +2062,7 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-profiles-in-gdt-always")
+        if (!body.Contains("fix-endless-compile-loop")
             && !body.Contains("fix-profile-so-script-assets")
             && !body.Contains("fix-class-pool-kind-cs0019")
             && !body.Contains("fix-pew-body-pool-empty")
@@ -2190,9 +2247,10 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// Nuclear CS0246 belt (tip fix-profiles-in-gdt-always): Profile SO classes live ONLY in
+    /// Nuclear CS0246 belt (tip fix-endless-compile-loop): Profile SO classes live ONLY in
     /// MustRestore GameDataTypes. Stub leftover named *Profile.cs so Force Sync never depends
     /// on separate MonoScripts / HardWrite embeds (which failed on Andrew disk).
+    /// tip: fix-endless-compile-loop — NEVER rewrite when already a matching stub (no mtime churn).
     /// </summary>
     public static int NukeNamedProfileFiles(string root = null, System.Text.StringBuilder log = null)
     {
@@ -2208,7 +2266,7 @@ public static class ArthurianSyncFromGitHub
         };
         const string stub =
             "#if false\n"
-            + "// tip: fix-profiles-in-gdt-always — SO class lives in GameDataTypes.cs (MustRestore).\n"
+            + "// tip: fix-endless-compile-loop — SO class lives in GameDataTypes.cs (MustRestore).\n"
             + "// Named MonoScript removed: HardWrite embeds / Sync ScriptPaths no longer ship this file.\n"
             + "#endif\n";
         int touched = 0;
@@ -2217,32 +2275,36 @@ public static class ArthurianSyncFromGitHub
             try
             {
                 string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
-                bool need = true;
                 if (File.Exists(dest))
                 {
                     string existing = File.ReadAllText(dest);
+                    // Already identical stub — do nothing (identical bytes → no Refresh).
+                    if (string.Equals(existing, stub, StringComparison.Ordinal))
+                        continue;
+                    // Already a non-class #if false stub (any tip generation) — leave it.
                     bool isStub = existing.IndexOf("#if false", StringComparison.Ordinal) >= 0
                                   && existing.IndexOf("public class ", StringComparison.Ordinal) < 0;
-                    need = !isStub;
-                }
-                if (!need) continue;
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                try
-                {
-                    if (File.Exists(dest))
+                    if (isStub) continue;
+                    // Real leftover class body → replace with stub (CS0101 kill).
+                    try
                     {
                         File.SetAttributes(dest, FileAttributes.Normal);
                         File.Delete(dest);
                     }
+                    catch { /* ignore */ }
                     string meta = dest + ".meta";
                     if (File.Exists(meta))
                     {
-                        File.SetAttributes(meta, FileAttributes.Normal);
-                        File.Delete(meta);
+                        try
+                        {
+                            File.SetAttributes(meta, FileAttributes.Normal);
+                            File.Delete(meta);
+                        }
+                        catch { /* ignore */ }
                     }
                 }
-                catch { /* ignore */ }
-                File.WriteAllText(dest, stub);
+                if (!WriteTextIfChanged(dest, stub))
+                    continue;
                 touched++;
                 string line = "NukeNamedProfile " + rel;
                 log?.AppendLine(line);

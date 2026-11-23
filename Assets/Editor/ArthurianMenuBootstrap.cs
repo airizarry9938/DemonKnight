@@ -34,7 +34,7 @@ public static class ArthurianMenuBootstrap
     const string JsDelivrBase = "https://cdn.jsdelivr.net/gh/" + Repo + "@";
 
     /// <summary>Phase 2–5 standalones to DELETE (types embedded elsewhere). CS0101 kill list.</summary>
-    /// <summary>Phase 2–5 standalones to DELETE when they redefine embeds. Named Profile files are kill-listed (SO classes live in GameDataTypes — tip fix-profiles-in-gdt-always).</summary>
+    /// <summary>Phase 2–5 standalones to DELETE when they redefine embeds. Named Profile files are kill-listed (SO classes live in GameDataTypes — tip fix-endless-compile-loop).</summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
         "Assets/Scripts/Data/SpriteAnimClip.cs",
@@ -42,7 +42,7 @@ public static class ArthurianMenuBootstrap
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
         "Assets/Scripts/Systems/DiceManager.cs",
-        // tip: fix-profiles-in-gdt-always — Profiles in GameDataTypes; nuke leftover named files.
+        // tip: fix-endless-compile-loop — Profiles in GameDataTypes; nuke leftover named files.
         "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/SceneBackgroundProfile.cs",
         "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
@@ -474,19 +474,23 @@ public static class ArthurianMenuBootstrap
     }
 
     /// <summary>
-    /// Precompile CS0246 belt: HardWrite named Profile MonoScripts from embeds even when
-    /// TipEscape/Sync hosts are mid-upgrade. tip: fix-profiles-in-gdt-always
+    /// Precompile CS0246 belt: stub leftover named Profile MonoScripts when TipEscape/Sync
+    /// hosts are mid-upgrade. tip: fix-endless-compile-loop — one-shot; no Refresh if unchanged.
     /// </summary>
     [InitializeOnLoadMethod]
     static void DkHardWriteNamedProfilesOnLoad()
     {
         try
         {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            const string gate = "DemonKnight.MenuBootstrap.NukeProfiles." + "fix-endless-compile-loop";
+            if (SessionState.GetBool(gate, false)) return;
+            SessionState.SetBool(gate, true);
             string root = Directory.GetParent(Application.dataPath)!.FullName;
             int n = HardWriteNamedProfilesFromEmbeds(root);
             if (n > 0)
             {
-                Debug.Log("[DemonKnight] MenuBootstrap OnLoad HardWriteEmbed Profiles wrote " + n);
+                Debug.Log("[DemonKnight] MenuBootstrap OnLoad NukeNamedProfiles wrote " + n);
                 EditorApplication.delayCall += () => AssetDatabase.Refresh();
             }
         }
@@ -502,6 +506,11 @@ public static class ArthurianMenuBootstrap
         EditorApplication.delayCall += () =>
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            // tip: fix-endless-compile-loop — ForceArchitectTipIfStale + Refresh every reload = loop.
+            const string gate = "DemonKnight.MenuBootstrap.AutoVerify." + "fix-endless-compile-loop";
+            if (SessionState.GetBool(gate, false)) return;
+            SessionState.SetBool(gate, true);
             try
             {
                 const string resPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
@@ -553,13 +562,14 @@ public static class ArthurianMenuBootstrap
             ArthurianSyncFromGitHub.CloseOpenArchitectWindows();
             var errors = new List<string>();
             int n = ArthurianSyncFromGitHub.ForceOverwriteSyncHostsFromMain(errors);
-            AssetDatabase.Refresh();
+            // tip: fix-endless-compile-loop — Refresh only when hosts actually changed.
+            if (n > 0) AssetDatabase.Refresh();
             string after = File.Exists(dest) ? File.ReadAllText(dest) : "";
             Debug.Log("[DemonKnight] " + ArthurianSyncFromGitHub.ArchitectTipMarkersReport());
             if (ArthurianSyncFromGitHub.IsTipArchitectBody(after)
                 && after.IndexOf(DemonKnightPackageVersion.Id, StringComparison.Ordinal) >= 0)
                 Debug.Log($"[DemonKnight] Architect tip landed via host overwrite ({n} hosts). Re-open Art & Stage Architect.");
-            else
+            else if (n > 0)
                 Debug.LogError("[DemonKnight] Architect still stale after host overwrite. Run Arthurian → FORCE Upgrade Sync Hosts From main, wait compile, Force Sync again.\n"
                                + string.Join("\n", errors));
         }
@@ -1477,7 +1487,7 @@ public static class ArthurianMenuBootstrap
     }
 
     /// <summary>
-    /// tip: fix-profiles-in-gdt-always — Profiles live in GameDataTypes. Delegate to Sync Nuke.
+    /// tip: fix-endless-compile-loop — Profiles live in GameDataTypes. Delegate to Sync Nuke.
     /// </summary>
     public static int HardWriteNamedProfilesFromEmbeds(string root = null, System.Text.StringBuilder log = null)
     {

@@ -11,9 +11,9 @@ using UnityEngine;
 
 /// <summary>
 /// Ensures Assets/Resources/StageLayoutProfile.asset exists with 52/52/20 slots.
-/// Profile SOs live in GameDataTypes (tip fix-profiles-in-gdt-always).
+/// Profile SOs live in GameDataTypes (tip fix-endless-compile-loop).
 /// Ensure CreateInstance via Type.GetType + probe remap for multi-class MonoScript fileID.
-/// tip: fix-profiles-in-gdt-always
+/// tip: fix-endless-compile-loop
 ///
 /// ALSO: chicken-egg escape from architect-breakglass-hosts. This file is Force-Synced via
 /// tip SHA (not HardTip host overwrite). OnLoad pulls tip PackageVersion/Sync/Bootstrap/Architect
@@ -25,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-profiles-in-gdt-always";
+    const string TipPackageId = "fix-endless-compile-loop";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -80,15 +80,25 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-named-profile-sync-cs0246",
         "fix-tipescape-profile-embeds",
         "fix-gdt-profile-always-compile",
+        "fix-profiles-in-gdt-always",
     };
 
+    const string OnLoadSessionGate = "DemonKnight.Ensure.OnLoadDone." + TipPackageId;
 
     /// <summary>
-    /// tip: fix-profiles-in-gdt-always — CreateInstance by Type from GameDataTypes assembly
+    /// tip: fix-endless-compile-loop — CreateInstance by Type from GameDataTypes assembly
     /// (multi-class MonoScript). Prefer Type.GetType so Ensure works even mid-recompile.
+    /// NEVER touches .cs files. Soft-fails during compile/import (no CreateAsset churn).
     /// </summary>
     static T CreateProfileInstance<T>() where T : ScriptableObject
     {
+        if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+        {
+            Debug.LogWarning(
+                "[DemonKnight] CreateProfileInstance<" + typeof(T).Name
+                + "> skipped during compile/import (tip fix-endless-compile-loop).");
+            return null;
+        }
         string fullName = "ArthurianAutobattler." + typeof(T).Name;
         Type t = Type.GetType(fullName)
                  ?? Type.GetType(fullName + ", Assembly-CSharp")
@@ -143,6 +153,10 @@ public static class ArthurianStageLayoutProfileEnsure
         EditorApplication.delayCall += () =>
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            // tip: fix-endless-compile-loop — one-shot; SET GATE BEFORE Escape (Refresh mid-Escape = loop).
+            if (SessionState.GetBool(OnLoadSessionGate, false)) return;
+            SessionState.SetBool(OnLoadSessionGate, true);
             try
             {
                 EnsureAsset();
@@ -236,6 +250,7 @@ public static class ArthurianStageLayoutProfileEnsure
         }
 
         var created = CreateProfileInstance<StageLayoutProfile>();
+        if (created == null) return null;
         created.EnsureSlotCounts();
         AssetDatabase.CreateAsset(created, AssetPath);
         AssetDatabase.SaveAssets();
@@ -315,6 +330,7 @@ public static class ArthurianStageLayoutProfileEnsure
         }
 
         var created = CreateProfileInstance<SceneBackgroundProfile>();
+        if (created == null) return null;
         created.EnsureDefaultEntries();
         AssetDatabase.CreateAsset(created, SceneBgAssetPath);
         AssetDatabase.SaveAssets();
@@ -393,6 +409,7 @@ public static class ArthurianStageLayoutProfileEnsure
         }
 
         var created = CreateProfileInstance<ClassSpritePoolProfile>();
+        if (created == null) return null;
         created.EnsureLists();
         AssetDatabase.CreateAsset(created, ClassPoolAssetPath);
         AssetDatabase.SaveAssets();
@@ -463,6 +480,7 @@ public static class ArthurianStageLayoutProfileEnsure
         }
 
         var created = CreateProfileInstance<LegendPewPortraitProfile>();
+        if (created == null) return null;
         created.EnsureSlotsAndLists();
         AssetDatabase.CreateAsset(created, LegendPewAssetPath);
         AssetDatabase.SaveAssets();
@@ -534,6 +552,7 @@ public static class ArthurianStageLayoutProfileEnsure
         }
 
         var created = CreateProfileInstance<BattleGoodEvilSpritePoolProfile>();
+        if (created == null) return null;
         created.EnsureSlotsAndLists();
         AssetDatabase.CreateAsset(created, BattleGoodEvilAssetPath);
         AssetDatabase.SaveAssets();
@@ -585,7 +604,7 @@ public static class ArthurianStageLayoutProfileEnsure
     /// <summary>
     /// Bind asset m_Script to GameDataTypes MonoScript for this SO type (multi-class fileID).
     /// Probe CreateAsset reads Unity's exact fileID+guid for the embedded class.
-    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-profiles-in-gdt-always
+    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-endless-compile-loop
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
@@ -623,7 +642,7 @@ public static class ArthurianStageLayoutProfileEnsure
 
     /// <summary>
     /// Probe CreateAsset writes the exact MonoScript fileID+guid Unity expects for this SO type.
-    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-profiles-in-gdt-always
+    /// Profiles in GameDataTypes use multi-class MonoScript fileID — probe CreateAsset reads exact fileID+guid. tip: fix-endless-compile-loop
     /// </summary>
     static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
     {
@@ -744,8 +763,9 @@ public static class ArthurianStageLayoutProfileEnsure
         foreach (string m in StaleHostMarkers)
         {
             if (m == TipPackageId) continue;
-            // Stale if Architect title still advertises an old UiBuildId.
-            if (archBody.IndexOf("\"" + m + "\"", StringComparison.Ordinal) >= 0) return true;
+            // tip: fix-endless-compile-loop — only Id / UiBuildId assignments (bare "m" matches
+            // StalePackageIds / comment lists → false-positive → Escape every OnLoad → compile loop).
+            if (archBody.IndexOf("UiBuildId = \"" + m + "\"", StringComparison.Ordinal) >= 0) return true;
             if (pvBody.IndexOf("Id = \"" + m + "\"", StringComparison.Ordinal) >= 0) return true;
         }
         if (File.Exists(sync))
@@ -771,7 +791,7 @@ public static class ArthurianStageLayoutProfileEnsure
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         string tip = TryResolveTipSha() ?? "main";
         string root = Directory.GetParent(Application.dataPath)!.FullName;
-        // tip: fix-profiles-in-gdt-always — stub leftover named *Profile.cs before host pull.
+        // tip: fix-endless-compile-loop — stub leftover named *Profile.cs before host pull.
         try
         {
             int n = ArthurianSyncFromGitHub.NukeNamedProfileFiles(root);
@@ -782,7 +802,7 @@ public static class ArthurianStageLayoutProfileEnsure
         {
             "Assets/Editor/DemonKnightTipEscape.cs",
             "Assets/Editor/DemonKnightPackageVersion.cs",
-            // tip: fix-profiles-in-gdt-always — Profile SOs live in GameDataTypes (MustRestore).
+            // tip: fix-endless-compile-loop — Profile SOs live in GameDataTypes (MustRestore).
             "Assets/Scripts/Data/GameDataTypes.cs",
             "Assets/Scripts/UI/SceneBackgroundApplier.cs",
             "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
@@ -810,20 +830,16 @@ public static class ArthurianStageLayoutProfileEnsure
                         throw new Exception("rejected breakglass PackageVersion");
                 }
                 string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                try
+                if (ArthurianSyncFromGitHub.WriteTextIfChanged(dest, body))
                 {
-                    if (File.Exists(dest))
-                    {
-                        File.SetAttributes(dest, FileAttributes.Normal);
-                        File.Delete(dest);
-                    }
+                    ok++;
+                    log.AppendLine($"Wrote {rel} ({body.Length} B)");
+                    Debug.Log($"[DemonKnight] EscapeBreakglass wrote {rel} ({body.Length} bytes)");
                 }
-                catch { /* ignore */ }
-                File.WriteAllText(dest, body);
-                ok++;
-                log.AppendLine($"Wrote {rel} ({body.Length} B)");
-                Debug.Log($"[DemonKnight] EscapeBreakglass wrote {rel} ({body.Length} bytes)");
+                else
+                {
+                    log.AppendLine($"SKIP unchanged {rel}");
+                }
             }
             catch (Exception ex)
             {
@@ -831,9 +847,11 @@ public static class ArthurianStageLayoutProfileEnsure
                 Debug.LogWarning($"[DemonKnight] EscapeBreakglass miss {rel}: {ex.Message}");
             }
         }
-        AssetDatabase.Refresh();
+        // tip: fix-endless-compile-loop — Refresh only when bytes changed.
+        if (ok > 0) AssetDatabase.Refresh();
         log.AppendLine($"Hosts written: {ok}/{rels.Length}");
-        log.AppendLine(RebuildPewLibraryFromSplices());
+        if (!EditorApplication.isCompiling && !EditorApplication.isUpdating)
+            log.AppendLine(RebuildPewLibraryFromSplices());
         log.AppendLine("Wait compile → Diagnose must show " + TipPackageId + ".");
         log.AppendLine("Then Force Delete+Sync ALL Scripts → New Game.");
         log.AppendLine("Bind log: body=<spliced name> outfit=NULL head=NULL.");

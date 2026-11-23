@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-profiles-in-gdt-always";
-    public const string GitHint = "fix-profiles-in-gdt-always";
-    public const string BuiltUtc = "2026-11-23T07:00:00Z";
+    public const string Id = "fix-endless-compile-loop";
+    public const string GitHint = "fix-endless-compile-loop";
+    public const string BuiltUtc = "2026-11-23T08:30:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "3679e76777c27cbd1a41b636abf014af9c4adec5";
@@ -23,6 +23,7 @@ public static class DemonKnightPackageVersion
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
     const string SplicedFolder = "Assets/Art/Spliced/Sprite";
+    const string OnLoadSessionGate = "DemonKnight.PackageVersion.OnLoadDone." + Id;
 
     public static string LastWipeReport { get; private set; } = "(wipe not run this session)";
 
@@ -32,12 +33,19 @@ public static class DemonKnightPackageVersion
         EditorApplication.delayCall += () =>
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            // tip: fix-endless-compile-loop — one-shot per editor session (domain reload still
+            // re-enters InitializeOnLoad; SessionState survives domain reload within a session).
+            // SET GATE FIRST — WipeModularPaperdollAssets used to Refresh before gate → endless loop.
+            if (SessionState.GetBool(OnLoadSessionGate, false)) return;
+            SessionState.SetBool(OnLoadSessionGate, true);
             try
             {
                 // CS0436: PackageVersion must live ONLY under Assets/Editor (not Scripts/).
-                NukeDuplicatePackageVersionOutsideEditor();
+                int dupNuked = NukeDuplicatePackageVersionOutsideEditor(refreshIfChanged: false);
 
-                LastWipeReport = WipeModularPaperdollAssets();
+                // OnLoad: wipe library slots but NEVER Refresh here (Refresh → domain reload → loop).
+                LastWipeReport = WipeModularPaperdollAssets(refresh: false);
                 Debug.Log("[DemonKnight] PackageVersion OnLoad library wipe:\n" + LastWipeReport);
 
                 string root = Directory.GetParent(Application.dataPath)!.FullName;
@@ -61,6 +69,7 @@ public static class DemonKnightPackageVersion
                     if (sync.IndexOf("LooksLikeHttpFailureBody", StringComparison.Ordinal) < 0) need = true;
                     if (sync.IndexOf("StalePackageIds", StringComparison.Ordinal) < 0) need = true;
                     if (sync.IndexOf("HardRestoreNamedProfileScripts", StringComparison.Ordinal) < 0) need = true;
+                    if (sync.IndexOf("WriteTextIfChanged", StringComparison.Ordinal) < 0) need = true;
                     if (boot.IndexOf("Clear Paperdoll Library", StringComparison.Ordinal) < 0) need = true;
                     // CS0117 chicken-egg: Architect must not call PackageVersion.Wipe*
                     if (arch.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0) need = true;
@@ -70,16 +79,18 @@ public static class DemonKnightPackageVersion
                 // while wiping/never pulling named MonoScript Profiles + shared types.
                 if (NamedProfileScriptsNeedRestore(root)) need = true;
 
+                // Soft Nuke once — no-op when already stubbed (never triple-write).
+                int nukedProfiles = 0;
+                try { nukedProfiles = ArthurianSyncFromGitHub.NukeNamedProfileFiles(root); }
+                catch { /* Sync may lack Nuke until next compile */ }
 
-                // Always Soft HardWrite — no-op when Profiles present; embed if wiped mid-session.
-                try { ArthurianSyncFromGitHub.NukeNamedProfileFiles(root); }
-                catch { /* TipEscape may lack HardWrite until next compile */ }
-                try { ArthurianSyncFromGitHub.NukeNamedProfileFiles(root); }
-                catch { /* Bootstrap embeds belt */ }
-                try { ArthurianSyncFromGitHub.NukeNamedProfileFiles(root); }
-                catch { /* Sync embeds belt */ }
-
-                if (!need) return;
+                if (!need)
+                {
+                    // Only Refresh if duplicate PackageVersion or profile stubs actually changed.
+                    if (dupNuked > 0 || nukedProfiles > 0)
+                        AssetDatabase.Refresh();
+                    return;
+                }
 
                 Debug.LogWarning(
                     "[DemonKnight] PackageVersion OnLoad: pull tip hosts (want Id=" + Id
@@ -92,7 +103,7 @@ public static class DemonKnightPackageVersion
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
                     // Named MonoScript Profile SOs + shared types BEFORE GameDataTypes Appliers.
-                    // tip: fix-profiles-in-gdt-always
+                    // tip: fix-endless-compile-loop
                     // Applier embed host — Appliers stay here; Profiles are named files.
                     "Assets/Scripts/Data/GameDataTypes.cs",
                     "Assets/Scripts/UI/SomersetChurchUI.cs",
@@ -126,10 +137,13 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
-                                || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
-                                || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0
+                                || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class SceneBackgroundProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0
                                 || body.IndexOf(Id, StringComparison.Ordinal) < 0))
-                            throw new Exception("GameDataTypes must keep Appliers and NOT redefine Profile SOs");
+                            throw new Exception("GameDataTypes must keep Appliers + Profile SOs (" + Id + ")");
                         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
@@ -155,19 +169,15 @@ public static class DemonKnightPackageVersion
                                 throw new Exception("Applier stub missing GameDataTypes embed marker");
                         }
                         string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
-                        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                        try
+                        if (ArthurianSyncFromGitHub.WriteTextIfChanged(dest, body))
                         {
-                            if (File.Exists(dest))
-                            {
-                                File.SetAttributes(dest, FileAttributes.Normal);
-                                File.Delete(dest);
-                            }
+                            ok++;
+                            Debug.Log($"[DemonKnight] PackageVersion OnLoad wrote {rel} ({body.Length} bytes)");
                         }
-                        catch { /* ignore */ }
-                        File.WriteAllText(dest, body);
-                        ok++;
-                        Debug.Log($"[DemonKnight] PackageVersion OnLoad wrote {rel} ({body.Length} bytes)");
+                        else
+                        {
+                            Debug.Log($"[DemonKnight] PackageVersion OnLoad unchanged {rel}");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -175,13 +185,15 @@ public static class DemonKnightPackageVersion
                     }
                 }
 
-                // Nuclear: write Profiles from TipEscape embeds (raw first, embed fallback).
-                // tip: fix-profiles-in-gdt-always — GitHub raw optional.
+                // Nuclear: stub leftover named Profiles (no-op when already stubbed).
                 try
                 {
                     int hw = ArthurianSyncFromGitHub.NukeNamedProfileFiles(root);
                     if (hw > 0)
+                    {
+                        ok += hw;
                         Debug.Log("[DemonKnight] PackageVersion OnLoad NukeNamedProfiles wrote " + hw);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -189,7 +201,7 @@ public static class DemonKnightPackageVersion
                 }
 
                 // Belt: stub any leftover full Applier standalones after tip pull.
-                try { ArthurianSyncFromGitHub.StubApplierStandalonesOver(root, null); } catch { /* Sync type may be stale */ }
+                try { ok += ArthurianSyncFromGitHub.StubApplierStandalonesOver(root, null); } catch { /* Sync type may be stale */ }
                 if (ok > 0) AssetDatabase.Refresh();
             }
             catch (Exception ex)
@@ -203,7 +215,7 @@ public static class DemonKnightPackageVersion
     /// CS0436: type in both Assembly-CSharp and Assembly-CSharp-Editor when a copy
     /// lands under Assets/Scripts (or elsewhere). Keep only Assets/Editor/.
     /// </summary>
-    public static int NukeDuplicatePackageVersionOutsideEditor()
+    public static int NukeDuplicatePackageVersionOutsideEditor(bool refreshIfChanged = true)
     {
         int n = 0;
         try
@@ -229,7 +241,7 @@ public static class DemonKnightPackageVersion
                     Debug.LogWarning("[DemonKnight] Could not delete duplicate PackageVersion " + full + ": " + ex.Message);
                 }
             }
-            if (n > 0) AssetDatabase.Refresh();
+            if (refreshIfChanged && n > 0) AssetDatabase.Refresh();
         }
         catch (Exception ex)
         {
@@ -240,11 +252,11 @@ public static class DemonKnightPackageVersion
 
     /// <summary>
     /// True when any named MonoScript Profile SO (or its shared types) is missing/corrupt on disk.
-    /// tip: fix-profiles-in-gdt-always — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
+    /// tip: fix-endless-compile-loop — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
     /// </summary>
     public static bool NamedProfileScriptsNeedRestore(string root = null)
     {
-        // tip: fix-profiles-in-gdt-always — Profiles live in GameDataTypes; named files must not redefine them.
+        // tip: fix-endless-compile-loop — Profiles live in GameDataTypes; named files must not redefine them.
         if (string.IsNullOrEmpty(root))
             root = System.IO.Directory.GetParent(UnityEngine.Application.dataPath)!.FullName;
         string gdt = System.IO.Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs");
@@ -331,18 +343,39 @@ public static class DemonKnightPackageVersion
             "fix-class-pool-kind-cs0019",
             "fix-profile-so-script-assets",
             "fix-named-profile-sync-cs0246",
+            "fix-tipescape-profile-embeds",
+            "fix-gdt-profile-always-compile",
+            "fix-profiles-in-gdt-always",
         };
         foreach (string s in stale)
         {
-            if (body.IndexOf("\"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
-            if (body.IndexOf("Id = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
-            if (body.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
-            if (body.IndexOf("ExpectedPackageId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
+            // tip: fix-endless-compile-loop — NEVER match bare "stale-id" (StalePackageIds lists
+            // those strings in tip Sync/Bootstrap → false-positive → endless OnLoad rewrite).
+            // Also avoid wantId / FooId substring traps (char before key must be non-identifier).
+            if (HasPackageIdAssign(body, "Id", s)) return true;
+            if (HasPackageIdAssign(body, "UiBuildId", s)) return true;
+            if (HasPackageIdAssign(body, "ExpectedPackageId", s)) return true;
+            if (HasPackageIdAssign(body, "TipPackageId", s)) return true;
         }
         return false;
     }
 
-    public static string WipeModularPaperdollAssets()
+    static bool HasPackageIdAssign(string body, string key, string value)
+    {
+        if (string.IsNullOrEmpty(body) || string.IsNullOrEmpty(key) || string.IsNullOrEmpty(value))
+            return false;
+        string needle = key + " = \"" + value + "\"";
+        int i = 0;
+        while ((i = body.IndexOf(needle, i, StringComparison.Ordinal)) >= 0)
+        {
+            if (i == 0 || !(char.IsLetterOrDigit(body[i - 1]) || body[i - 1] == '_'))
+                return true;
+            i += needle.Length;
+        }
+        return false;
+    }
+
+    public static string WipeModularPaperdollAssets(bool refresh = true)
     {
         var log = new StringBuilder();
         log.AppendLine("Package=" + Id);
@@ -405,7 +438,8 @@ public static class DemonKnightPackageVersion
                 log.AppendLine("Copied Art → Resources " + ResLibPath);
             }
 
-            AssetDatabase.Refresh();
+            // tip: fix-endless-compile-loop — OnLoad passes refresh:false (Refresh before SessionState gate = loop).
+            if (refresh) AssetDatabase.Refresh();
             log.AppendLine("libs=" + libs + " clearedSlots≈" + clearedSlots + " deletedPlaceholderTex=" + deletedTex);
             if (spliced.Count == 0)
                 log.AppendLine("Library empty of splices — pews use solid color (NOT Pose_/Outfit_ shapes). Save Splices Tab 1.");

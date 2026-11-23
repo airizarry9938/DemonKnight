@@ -14,10 +14,11 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-profiles-in-gdt-always";
+    public const string TipPackageId = "fix-endless-compile-loop";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
+    const string OnLoadSessionGate = "DemonKnight.TipEscape.OnLoadDone." + TipPackageId;
 
     static readonly string[] HostRels =
     {
@@ -25,7 +26,7 @@ public static class DemonKnightTipEscape
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
         // Named MonoScript Profiles + shared types BEFORE GameDataTypes Appliers.
-        // tip: fix-profiles-in-gdt-always — Force Sync wipe/never-pull → CS0246.
+        // tip: fix-endless-compile-loop — Force Sync wipe/never-pull → CS0246.
         // Applier embed host — Appliers stay in GameDataTypes.
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
@@ -44,9 +45,16 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-profiles-in-gdt-always)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-endless-compile-loop)", false, 0)]
     public static void EscapeMenu()
     {
+        // Manual Escape clears session gates so a stuck Downloads project can recover.
+        SessionState.EraseBool(OnLoadSessionGate);
+        SessionState.EraseBool("DemonKnight.PackageVersion.OnLoadDone." + TipPackageId);
+        SessionState.EraseBool("DemonKnight.Ensure.OnLoadDone." + TipPackageId);
+        SessionState.EraseBool("DemonKnight.Sync.OnLoadNuke." + TipPackageId);
+        SessionState.EraseBool("DemonKnight.MenuBootstrap.NukeProfiles." + TipPackageId);
+        SessionState.EraseBool("DemonKnight.MenuBootstrap.AutoVerify." + TipPackageId);
         string report = EscapeNow(force: true);
         EditorUtility.DisplayDialog(
             "Escape to Tip",
@@ -61,6 +69,10 @@ public static class DemonKnightTipEscape
         EditorApplication.delayCall += () =>
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            // tip: fix-endless-compile-loop — one-shot; SET GATE BEFORE EscapeNow (Refresh mid-Escape = loop).
+            if (SessionState.GetBool(OnLoadSessionGate, false)) return;
+            SessionState.SetBool(OnLoadSessionGate, true);
             try
             {
                 if (!NeedsEscape()) return;
@@ -160,22 +172,26 @@ public static class DemonKnightTipEscape
             "fix-profile-so-script-assets",
             "fix-named-profile-sync-cs0246",
             "fix-tipescape-profile-embeds",
+            "fix-gdt-profile-always-compile",
+            "fix-profiles-in-gdt-always",
         };
         foreach (string s in stale)
         {
+            // Only Id / UiBuildId assignments — never bare "stale-id" (lists false-positive).
             if (pvBody.IndexOf("Id = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
             if (archBody.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
         }
         // ClassPoolKind→UnitType CS0019; keep pew-body Persist/fileID belt.
         if (archBody.IndexOf("selectedClassPool == UnitType.", StringComparison.Ordinal) >= 0) return true;
         if (archBody.IndexOf("ClassPoolKind.Warrior => UnitType.Warrior", StringComparison.Ordinal) < 0) return true;
-        // tip: fix-profiles-in-gdt-always — TipEscape delegates NukeNamedProfileFiles; GDT must hold Profile SOs.
+        // tip: fix-endless-compile-loop — TipEscape delegates NukeNamedProfileFiles; GDT must hold Profile SOs.
         string tipEscapePath = Path.Combine(root, "Assets", "Editor", "DemonKnightTipEscape.cs");
         if (!File.Exists(tipEscapePath)) return true;
         string tipEscapeBody = File.ReadAllText(tipEscapePath);
         if (tipEscapeBody.IndexOf("HardWriteNamedProfilesIfMissing", StringComparison.Ordinal) < 0) return true;
         if (tipEscapeBody.IndexOf("NukeNamedProfileFiles", StringComparison.Ordinal) < 0
-            && tipEscapeBody.IndexOf("fix-profiles-in-gdt-always", StringComparison.Ordinal) < 0) return true;
+            && tipEscapeBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
+        if (tipEscapeBody.IndexOf("OnLoadSessionGate", StringComparison.Ordinal) < 0) return true;
         // CS0246: ALL named Profile MonoScripts + helpers-in-GDT must exist on disk.
         if (DemonKnightPackageVersion.NamedProfileScriptsNeedRestore(root)) return true;
         if (syncBody.IndexOf("HardRestoreNamedProfileScripts", StringComparison.Ordinal) < 0) return true;
@@ -184,7 +200,7 @@ public static class DemonKnightTipEscape
         if (!File.Exists(bootPath)) return true;
         string bootBody = File.ReadAllText(bootPath);
         if (bootBody.IndexOf("NukeNamedProfileFiles", StringComparison.Ordinal) < 0
-            && bootBody.IndexOf("fix-profiles-in-gdt-always", StringComparison.Ordinal) < 0) return true;
+            && bootBody.IndexOf("fix-endless-compile-loop", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
         string ensureBody = File.ReadAllText(ensurePath);
@@ -200,7 +216,7 @@ public static class DemonKnightTipEscape
 
 
     /// <summary>
-    /// tip: fix-profiles-in-gdt-always — Profiles live in GameDataTypes. Delegate to Sync Nuke.
+    /// tip: fix-endless-compile-loop — Profiles live in GameDataTypes. Delegate to Sync Nuke.
     /// </summary>
     public static int HardWriteNamedProfilesIfMissing(string root = null, System.Text.StringBuilder log = null)
     {
@@ -289,20 +305,16 @@ public static class DemonKnightTipEscape
                         throw new Exception("rejected full Applier standalone (want stub)");
                 }
                 string dest = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                try
+                if (ArthurianSyncFromGitHub.WriteTextIfChanged(dest, body))
                 {
-                    if (File.Exists(dest))
-                    {
-                        File.SetAttributes(dest, FileAttributes.Normal);
-                        File.Delete(dest);
-                    }
+                    ok++;
+                    log.AppendLine($"OK {rel} ({body.Length} B)");
+                    Debug.Log($"[DemonKnight] TipEscape wrote {rel} ({body.Length} bytes)");
                 }
-                catch { /* ignore */ }
-                File.WriteAllText(dest, body);
-                ok++;
-                log.AppendLine($"OK {rel} ({body.Length} B)");
-                Debug.Log($"[DemonKnight] TipEscape wrote {rel} ({body.Length} bytes)");
+                else
+                {
+                    log.AppendLine($"SKIP unchanged {rel}");
+                }
             }
             catch (Exception ex)
             {
@@ -313,10 +325,12 @@ public static class DemonKnightTipEscape
 
         // Pew rebuild via reflection — TipEscape must compile even when Profile MonoScripts are
         // missing (Ensure → StageLayoutProfile CS0246 would otherwise block OnLoad restore).
+        // tip: fix-endless-compile-loop — skip during compile; never touch .cs from Ensure path here.
         try
         {
-            if (AssetDatabase.IsValidFolder("Assets/Art/Spliced/Sprite")
-                || AssetDatabase.LoadMainAssetAtPath("Assets/Resources/Art/Modular/ModularSpriteLibrary.asset") != null)
+            if (!EditorApplication.isCompiling && !EditorApplication.isUpdating
+                && (AssetDatabase.IsValidFolder("Assets/Art/Spliced/Sprite")
+                    || AssetDatabase.LoadMainAssetAtPath("Assets/Resources/Art/Modular/ModularSpriteLibrary.asset") != null))
             {
                 var ensureType = Type.GetType("ArthurianStageLayoutProfileEnsure")
                                  ?? Type.GetType("ArthurianStageLayoutProfileEnsure, Assembly-CSharp-Editor");
@@ -342,11 +356,12 @@ public static class DemonKnightTipEscape
         try
         {
             int nuked = DemonKnightPackageVersion.NukeDuplicatePackageVersionOutsideEditor();
-            if (nuked > 0) log.AppendLine("Nuked " + nuked + " duplicate PackageVersion (CS0436).");
+            if (nuked > 0) { ok += nuked; log.AppendLine("Nuked " + nuked + " duplicate PackageVersion (CS0436)."); }
         }
         catch (Exception ex) { log.AppendLine("PV nuke: " + ex.Message); }
 
-        AssetDatabase.Refresh();
+        // tip: fix-endless-compile-loop — Refresh ONLY when bytes changed.
+        if (ok > 0) AssetDatabase.Refresh();
         EditorPrefs.SetString(PrefsKey, DateTime.UtcNow.ToString("o"));
         log.AppendLine($"Wrote {ok}/{HostRels.Length}. Wait compile → Diagnose: compiled=disk={TipPackageId}.");
         return log.ToString();

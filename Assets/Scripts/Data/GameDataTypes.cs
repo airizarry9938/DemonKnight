@@ -925,7 +925,7 @@ namespace ArthurianAutobattler
     {
         /// <summary>
         /// Same as StageLayoutProfile.PewRowSize (13). Local const (kept for call sites).
-        /// tip: fix-profiles-in-gdt-always — StageLayoutProfile also lives in this file.
+        /// tip: fix-endless-compile-loop — StageLayoutProfile also lives in this file.
         /// </summary>
         public const int PewRowSize = 13;
 
@@ -1003,9 +1003,9 @@ namespace ArthurianAutobattler
     }
 
 
-    // ===== fix-profiles-in-gdt-always — helpers + Profile SOs LIVE HERE (MustRestore) =====
+    // ===== fix-endless-compile-loop — helpers + Profile SOs LIVE HERE (MustRestore) =====
     // Helpers + all five Architect Profile ScriptableObjects permanently in GameDataTypes.
-    // Named *Profile.cs files are deleted/stubbed (CS0101 kill). tip: fix-profiles-in-gdt-always
+    // Named *Profile.cs files are deleted/stubbed (CS0101 kill). tip: fix-endless-compile-loop
     [Serializable]
     public class SlotTransformConfig
     {
@@ -1077,11 +1077,11 @@ namespace ArthurianAutobattler
 
 
     // ===== Architect Profile ScriptableObjects LIVE HERE (MustRestore) =====
-    // tip: fix-profiles-in-gdt-always — named *Profile.cs removed from Sync/HardWrite.
+    // tip: fix-endless-compile-loop — named *Profile.cs removed from Sync/HardWrite.
     // Ensure remaps YAML m_Script via CreateInstance probe (multi-class MonoScript fileID).
 
-    // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
-    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-endless-compile-loop) =====
+    // tip: fix-endless-compile-loop — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Numbered Somerset church pews (52), player battle slots (52), enemy slots (20),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
@@ -1297,8 +1297,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== SceneBackgroundProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
-    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== SceneBackgroundProfile (moved into GameDataTypes — tip fix-endless-compile-loop) =====
+    // tip: fix-endless-compile-loop — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect-assigned scene/screen backgrounds (image or video). Resources path: SceneBackgroundProfile.
     /// Assign-only — empty slots keep each screen's built-in default art.
@@ -1409,8 +1409,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== ClassSpritePoolProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
-    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== ClassSpritePoolProfile (moved into GameDataTypes — tip fix-endless-compile-loop) =====
+    // tip: fix-endless-compile-loop — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect class sprite pools (Peasant / Warrior / Knight). Resources path:
     /// ClassSpritePoolProfile. StageLayoutProfile pew slots stay position/scale guides —
@@ -1623,8 +1623,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== LegendPewPortraitProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
-    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== LegendPewPortraitProfile (moved into GameDataTypes — tip fix-endless-compile-loop) =====
+    // tip: fix-endless-compile-loop — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>One Legend face-portrait slot (Architect Tab 5).</summary>
     [Serializable]
     public class LegendPortraitEntry
@@ -1862,8 +1862,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== BattleGoodEvilSpritePoolProfile (moved into GameDataTypes — tip fix-profiles-in-gdt-always) =====
-    // tip: fix-profiles-in-gdt-always — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== BattleGoodEvilSpritePoolProfile (moved into GameDataTypes — tip fix-endless-compile-loop) =====
+    // tip: fix-endless-compile-loop — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect Tab 6 — Autobattle Good vs Evil battle sprites for UnitVisualActor.
     /// Distinct from Tab 4 pew BODY pools and Tab 5 FACE portraits. Resources path:
@@ -2185,9 +2185,9 @@ namespace ArthurianAutobattler
     }
 
     // ===== DA-59 Phase25 helpers (Force Sync nuclear — do not remove) =====
-    // Architect *Profile ScriptableObjects ALSO live above in this file (tip fix-profiles-in-gdt-always).
+    // Architect *Profile ScriptableObjects ALSO live above in this file (tip fix-endless-compile-loop).
     // Appliers stay embedded below.
-    // tip: fix-profiles-in-gdt-always
+    // tip: fix-endless-compile-loop
     /// <summary>
     /// Multi-frame clip for modular paper-doll parts (Pose / Outfit / Head / Weapon / EnemyBoss).
     /// Standard clip names: "Idle", "Attack", "Hit", "Death".
@@ -2510,7 +2510,7 @@ namespace ArthurianAutobattler
     // MustRestore of those paths still fails when Force Delete runs under a STALE compiled Sync
     // host (ScriptPaths/MustRestore arrays baked into the old assembly). GameDataTypes has been
     // MustRestore since DA-59 — even old Sync hosts re-land this file from tip → types exist.
-    // tip: fix-profiles-in-gdt-always — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
+    // tip: fix-endless-compile-loop — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
 
     /// <summary>
     /// Applies Architect-assigned SceneBackgroundProfile entries (jpg/png or mp4)
@@ -2760,7 +2760,7 @@ namespace ArthurianAutobattler
                     try
                     {
                         // SoftPromote belt: Load soft-fails when Profile MonoScript still missing after Sync.
-                        // tip: fix-profiles-in-gdt-always
+                        // tip: fix-endless-compile-loop
                         _cache = ClassSpritePoolProfile.Load();
                         if (_cache != null)
                         {
