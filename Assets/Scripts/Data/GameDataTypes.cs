@@ -34,7 +34,7 @@ namespace ArthurianAutobattler
 
     /// <summary>
     /// One row for the DeathsSurvivorsMorale end-screen panel.
-    /// tip: fix-48-pew-seats
+    /// tip: fix-townrng-name-pools
     /// </summary>
     [Serializable]
     public class WaveCasualtyEntry
@@ -557,7 +557,7 @@ namespace ArthurianAutobattler
             return Mathf.Clamp(attackSpeed + g * 0.1f, 0.4f, 3.0f);
         }
 
-        /// <summary>tip: fix-48-pew-seats — party death morale nerfs HP/ATK.</summary>
+        /// <summary>tip: fix-townrng-name-pools — party death morale nerfs HP/ATK.</summary>
         public static int ApplyPartyMoraleToStat(int value)
         {
             float m = GameLoopManager.Instance != null
@@ -1022,7 +1022,7 @@ namespace ArthurianAutobattler
     {
         /// <summary>
         /// Same as StageLayoutProfile.PewRowSize (4 seats/pew). Local const (kept for call sites).
-        /// tip: fix-48-pew-seats — Gossip adjacency groups by pew (pewSeatIndex / 4).
+        /// tip: fix-townrng-name-pools — Gossip adjacency groups by pew (pewSeatIndex / 4).
         /// </summary>
         public const int PewRowSize = 4;
 
@@ -1182,7 +1182,7 @@ namespace ArthurianAutobattler
     /// <summary>
     /// Numbered Somerset church pews (48 = 12×4), player battle slots (52), enemy slots (20),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
-    /// tip: fix-48-pew-seats
+    /// tip: fix-townrng-name-pools
     /// </summary>
     [CreateAssetMenu(fileName = "StageLayoutProfile", menuName = "DemonKnight/Stage Layout Profile")]
     public class StageLayoutProfile : ScriptableObject

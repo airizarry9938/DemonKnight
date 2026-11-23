@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-48-pew-seats";
+    public const string UiBuildId = "fix-townrng-name-pools";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -44,7 +44,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const float ChurchRefWidth = 1408f;
     const float ChurchRefHeight = 768f;
     /// <summary>Must match SomersetChurchUI.baseSeatSize tip (play pew sprite size).</summary>
-    static readonly Vector2 PlayPewBaseSize = new Vector2(110f, 140f); // tip: fix-48-pew-seats
+    static readonly Vector2 PlayPewBaseSize = new Vector2(110f, 140f); // tip: fix-townrng-name-pools
 
     enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits, BattleGoodEvil }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
@@ -3753,7 +3753,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// </summary>
     static bool SeatShowsSpriteSafe(int pewSeatIndex)
     {
-        // tip: fix-48-pew-seats — 12 pews × 4; hide pew-row ≥ 3.
+        // tip: fix-townrng-name-pools — 12 pews × 4; hide pew-row ≥ 3.
         const int total = 48;
         const int seatsPerPew = 4;
         const int pewColumns = 3;
@@ -4717,7 +4717,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-48-pew-seats";
+    public const string TipId = "fix-townrng-name-pools";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

@@ -27,7 +27,7 @@ namespace ArthurianAutobattler
         public Transform townGridContainer;
         public GameObject recruitAvatarButtonPrefab;
         public SomersetPewLayout pewLayout;
-        public Vector2 baseSeatSize = new Vector2(100f, 128f); // tip: fix-48-pew-seats — fit 4 avatars/pew
+        public Vector2 baseSeatSize = new Vector2(100f, 128f); // tip: fix-townrng-name-pools — fit 4 avatars/pew
 
         [Header("Bottom: Dossier, Role Training & Mediation")]
         public Image selectedAvatarImage;

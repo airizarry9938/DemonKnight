@@ -9,7 +9,7 @@ namespace ArthurianAutobattler
     /// columns Left/Center/Right × rows front→altar).
     /// Coordinates are normalized 0–1 over the drawn church sprite
     /// (0,0 = bottom-left, 1,1 = top-right), tuned to SomersetChurchInterior.jpg.
-    /// tip: fix-48-pew-seats
+    /// tip: fix-townrng-name-pools
     /// </summary>
     [Serializable]
     public class PewAnchor
@@ -83,7 +83,7 @@ namespace ArthurianAutobattler
             // Larger scales so pew sprites read clearly on church art.
             float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
             float[] rowScale = { 1.32f, 1.18f, 1.05f, 0.01f };
-            // Wider strips so 4 avatar hitboxes fit per pew (tip: fix-48-pew-seats).
+            // Wider strips so 4 avatar hitboxes fit per pew (tip: fix-townrng-name-pools).
             float[] rowSpread = { 0.220f, 0.200f, 0.180f, 0.150f };
 
             // Uniform 12×4 = 48.
