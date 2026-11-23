@@ -1043,6 +1043,8 @@ namespace ArthurianAutobattler
         public int bonusSPD;
         /// <summary>Editor/runtime preview sprite override for this numbered handle.</summary>
         public Sprite previewOrOverrideSprite;
+        /// <summary>Path backup so seat sprites rematerialize in player builds (Resources/StreamingAssets).</summary>
+        public string previewAssetPath;
         /// <summary>Optional CharacterDefinition.characterId pinned to this slot.</summary>
         public string assignedCharacterId;
     }
@@ -1082,6 +1084,9 @@ namespace ArthurianAutobattler
         public bool enableLightningFlashes;
         public bool enableCandleFlicker = true;
 
+        /// <summary>True when this is a CreateInstance stand-in (not a Resources asset).</summary>
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
         public static StageLayoutProfile Load()
         {
             StageLayoutProfile p = null;
@@ -1090,6 +1095,8 @@ namespace ArthurianAutobattler
             if (p != null)
             {
                 p.EnsureSlotCounts();
+                p.isRuntimeStandIn = false;
+                p.RematerializeSpritesFromPaths();
                 return p;
             }
             try
@@ -1101,16 +1108,52 @@ namespace ArthurianAutobattler
                     {
                         if (all[i] == null) continue;
                         all[i].EnsureSlotCounts();
+                        all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
                         return all[i];
                     }
                 }
             }
             catch { /* broken Resources asset */ }
             // Runtime fallback when the Resources asset has a stale script GUID (Force Sync embed).
+            // Never wipe authored Resources — stand-in is last resort only.
             p = CreateInstance<StageLayoutProfile>();
             p.name = "StageLayoutProfile_Runtime";
+            p.isRuntimeStandIn = true;
             p.EnsureSlotCounts();
             return p;
+        }
+
+        /// <summary>
+        /// Restore Missing pew/battle seat sprites from path backups.
+        /// Works in player builds via Resources.Load / StreamingAssets (not Editor-only).
+        /// Never clears path backups when sprites are temporarily null.
+        /// </summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureSlotCounts();
+            int n = 0;
+            n += RematerializeSlotList(churchPewSlots);
+            n += RematerializeSlotList(playerBattleSlots);
+            n += RematerializeSlotList(enemyBattleSlots);
+            return n;
+        }
+
+        static int RematerializeSlotList(List<SlotTransformConfig> slots)
+        {
+            if (slots == null) return 0;
+            int restored = 0;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var s = slots[i];
+                if (s == null || s.previewOrOverrideSprite != null) continue;
+                if (string.IsNullOrEmpty(s.previewAssetPath)) continue;
+                Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(s.previewAssetPath);
+                if (sp == null) continue;
+                s.previewOrOverrideSprite = sp;
+                restored++;
+            }
+            return restored;
         }
 
         /// <summary>Pad / trim lists to 52 / 52 / 20 with default transforms.</summary>
@@ -1447,13 +1490,14 @@ namespace ArthurianAutobattler
         public static Sprite TryLoadSpriteAtPath(string path)
         {
             if (string.IsNullOrEmpty(path)) return null;
+            string norm = path.Replace("\\", "/");
 #if UNITY_EDITOR
             try
             {
-                var sp = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                var sp = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(norm);
                 if (sp != null) return sp;
                 // Texture with multiple sprites — take first sub-asset Sprite.
-                var objs = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+                var objs = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(norm);
                 if (objs != null)
                 {
                     for (int i = 0; i < objs.Length; i++)
@@ -1462,17 +1506,54 @@ namespace ArthurianAutobattler
             }
             catch { /* ignore */ }
 #endif
-            // Runtime: only Resources-relative paths work without AssetDatabase.
+            // Player builds: Resources.Load (profiles + promoted ArchitectArt copies).
             try
             {
-                string res = path;
-                int idx = path.IndexOf("Resources/", System.StringComparison.OrdinalIgnoreCase);
+                int idx = norm.IndexOf("Resources/", System.StringComparison.OrdinalIgnoreCase);
                 if (idx >= 0)
                 {
-                    res = path.Substring(idx + "Resources/".Length);
+                    string res = norm.Substring(idx + "Resources/".Length);
                     int dot = res.LastIndexOf('.');
                     if (dot > 0) res = res.Substring(0, dot);
-                    return Resources.Load<Sprite>(res);
+                    var fromRes = Resources.Load<Sprite>(res);
+                    if (fromRes != null) return fromRes;
+                    var all = Resources.LoadAll<Sprite>(res);
+                    if (all != null && all.Length > 0 && all[0] != null) return all[0];
+                }
+                // Bare Resources key (no Assets/ prefix) — ArchitectArt/Body/foo
+                if (!norm.StartsWith("Assets/", System.StringComparison.OrdinalIgnoreCase)
+                    && norm.IndexOf(':') < 0)
+                {
+                    string key = norm;
+                    int dot = key.LastIndexOf('.');
+                    if (dot > 0) key = key.Substring(0, dot);
+                    var bare = Resources.Load<Sprite>(key);
+                    if (bare != null) return bare;
+                }
+            }
+            catch { /* ignore */ }
+
+            // StreamingAssets fallback (png/jpg copied by build prepare). Soft-fail — no wipe.
+            try
+            {
+                string fileName = System.IO.Path.GetFileName(norm);
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    string sa = System.IO.Path.Combine(Application.streamingAssetsPath, "DemonKnightArchitect", fileName);
+                    if (System.IO.File.Exists(sa))
+                    {
+                        byte[] bytes = System.IO.File.ReadAllBytes(sa);
+                        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                        if (tex.LoadImage(bytes))
+                        {
+                            tex.name = System.IO.Path.GetFileNameWithoutExtension(fileName);
+                            return Sprite.Create(
+                                tex,
+                                new Rect(0, 0, tex.width, tex.height),
+                                new Vector2(0.5f, 0.5f),
+                                100f);
+                        }
+                    }
                 }
             }
             catch { /* ignore */ }
@@ -1515,9 +1596,9 @@ namespace ArthurianAutobattler
     }
 
     /// <summary>
-    /// Architect legend face portraits + townsfolk pew face/body profile pools.
-    /// Distinct from ClassSpritePoolProfile (full-body class pools). Resources path:
-    /// LegendPewPortraitProfile.
+    /// Architect legend face portraits + townsfolk pew FACE-ONLY profile pools.
+    /// Distinct from ClassSpritePoolProfile (full-body pew/combat avatars). Resources path:
+    /// LegendPewPortraitProfile. Never assign these as bodySprite.
     /// </summary>
     [CreateAssetMenu(fileName = "LegendPewPortraitProfile", menuName = "DemonKnight/Legend Pew Portrait Profile")]
     public class LegendPewPortraitProfile : ScriptableObject
@@ -1546,7 +1627,7 @@ namespace ArthurianAutobattler
 
         public List<LegendPortraitEntry> legendPortraits = new List<LegendPortraitEntry>();
 
-        [Header("Townsfolk pew face/body profiles (distinct from ClassSpritePool full-body)")]
+        [Header("Townsfolk pew FACE profiles only (never bodySprite — distinct from Tab 4 ClassSpritePool)")]
         public List<Sprite> peasantFaceProfiles = new List<Sprite>();
         public List<Sprite> warriorFaceProfiles = new List<Sprite>();
         public List<Sprite> knightFaceProfiles = new List<Sprite>();
@@ -2126,23 +2207,16 @@ namespace ArthurianAutobattler
         {
             if (e == null) return null;
             if (e.imageSprite != null) return e.imageSprite;
-#if UNITY_EDITOR
+            // Player builds: rematerialize from path via Resources / StreamingAssets (no AssetDatabase wipe).
             if (!string.IsNullOrEmpty(e.imageAssetPath))
             {
-                var sp = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(e.imageAssetPath);
-                if (sp != null) return sp;
-                var tex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(e.imageAssetPath);
-                if (tex != null)
+                Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(e.imageAssetPath);
+                if (sp != null)
                 {
-                    var assets = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(e.imageAssetPath);
-                    if (assets != null)
-                    {
-                        for (int i = 0; i < assets.Length; i++)
-                            if (assets[i] is Sprite s) return s;
-                    }
+                    e.imageSprite = sp;
+                    return sp;
                 }
             }
-#endif
             return null;
         }
 
@@ -2293,24 +2367,29 @@ namespace ArthurianAutobattler
                 List<Sprite> pool = profile.GetPool(type);
                 if (pool == null || pool.Count == 0) return null;
 
-                int usable = 0;
+                // Body pipeline only — skip any sprite that also lives in Tab 5 face pools.
+                var usableList = new List<Sprite>();
                 for (int i = 0; i < pool.Count; i++)
-                    if (pool[i] != null) usable++;
-                if (usable == 0) return null;
+                {
+                    Sprite sp = pool[i];
+                    if (sp == null) continue;
+                    if (LegendPewPortraitApplier.IsFacePoolSprite(sp))
+                    {
+                        Debug.LogWarning(
+                            "[DemonKnight] Soft-fail: face-pool sprite '" + sp.name
+                            + "' found in ClassSpritePool body pool — skipped for bodySprite.");
+                        continue;
+                    }
+                    usableList.Add(sp);
+                }
+                if (usableList.Count == 0) return null;
 
                 int seed = StableHash(
                     !string.IsNullOrEmpty(unitId) ? unitId
                     : (!string.IsNullOrEmpty(characterName) ? characterName + "#" + pewSeatIndex
                     : type + "#" + pewSeatIndex));
-                int want = Math.Abs(seed) % usable;
-                int seen = 0;
-                for (int i = 0; i < pool.Count; i++)
-                {
-                    if (pool[i] == null) continue;
-                    if (seen == want) return pool[i];
-                    seen++;
-                }
-                return null;
+                int want = Math.Abs(seed) % usableList.Count;
+                return usableList[want];
             }
             catch (Exception ex)
             {
@@ -2337,10 +2416,11 @@ namespace ArthurianAutobattler
     }
 
     /// <summary>
-    /// Resolves Architect LegendPewPortraitProfile assignments for Legends FacePortrait
-    /// and townsfolk pew face/body profiles. Soft-fails when empty — callers keep
-    /// CharacterDatabase / ClassSpritePool / StageLayout fallbacks.
+    /// Resolves Architect LegendPewPortraitProfile FACE assignments for Legends FacePortrait
+    /// and optional townsfolk pew face overlays. Body avatars stay on ClassSpritePoolApplier.
+    /// Soft-fails when empty / cross-assigned — callers keep CharacterDatabase / StageLayout fallbacks.
     /// Embedded in GameDataTypes (PR #33 Force Sync CS0103 lesson — no standalone applier file).
+    /// tip: body-face-pool-build-persist
     /// </summary>
     public static class LegendPewPortraitApplier
     {
@@ -2415,24 +2495,29 @@ namespace ArthurianAutobattler
                 List<Sprite> pool = profile.GetPewFacePool(type);
                 if (pool == null || pool.Count == 0) return null;
 
-                int usable = 0;
+                // Face pipeline only — never return a Tab 4 body-pool sprite as a face overlay.
+                var usableList = new List<Sprite>();
                 for (int i = 0; i < pool.Count; i++)
-                    if (pool[i] != null) usable++;
-                if (usable == 0) return null;
+                {
+                    Sprite sp = pool[i];
+                    if (sp == null) continue;
+                    if (IsBodyPoolSprite(sp))
+                    {
+                        Debug.LogWarning(
+                            "[DemonKnight] Soft-fail: body-pool sprite '" + sp.name
+                            + "' found in LegendPew face pool — skipped for face overlay.");
+                        continue;
+                    }
+                    usableList.Add(sp);
+                }
+                if (usableList.Count == 0) return null;
 
                 int seed = ClassSpritePoolApplier.StableHash(
                     !string.IsNullOrEmpty(unitId) ? "pewface:" + unitId
                     : (!string.IsNullOrEmpty(characterName) ? "pewface:" + characterName + "#" + pewSeatIndex
                     : "pewface:" + type + "#" + pewSeatIndex));
-                int want = Math.Abs(seed) % usable;
-                int seen = 0;
-                for (int i = 0; i < pool.Count; i++)
-                {
-                    if (pool[i] == null) continue;
-                    if (seen == want) return pool[i];
-                    seen++;
-                }
-                return null;
+                int want = Math.Abs(seed) % usableList.Count;
+                return usableList[want];
             }
             catch (Exception ex)
             {
@@ -2442,16 +2527,93 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Pew visual resolve: Architect face/body profile pools first, then ClassSpritePool full-body.
-        /// Skips paperdoll Pose_/Outfit_/Head_ placeholders.
+        /// BODY only — Tab 4 ClassSpritePool full pew/combat avatar.
+        /// Never returns Tab 5 face-pool sprites as bodySprite (soft-fail skip).
         /// </summary>
         public static Sprite ResolvePewVisual(RecruitInstance recruit)
         {
-            Sprite face = PickPewProfile(recruit);
-            if (face != null && TownsfolkVisualApplier.IsUsablePewSprite(face)) return face;
             Sprite body = ClassSpritePoolApplier.PickForRecruit(recruit);
-            if (body != null && TownsfolkVisualApplier.IsUsablePewSprite(body)) return body;
+            if (body != null && TownsfolkVisualApplier.IsUsablePewSprite(body))
+            {
+                if (IsFacePoolSprite(body))
+                {
+                    Debug.LogWarning(
+                        "[DemonKnight] Soft-fail: refusing face-pool sprite as bodySprite ("
+                        + body.name + ").");
+                    return null;
+                }
+                return body;
+            }
             return null;
+        }
+
+        /// <summary>
+        /// FACE only — Tab 5 townsfolk pew face overlay (optional Head layer).
+        /// Legends use <see cref="GetLegendFace"/> for FacePortraitFrame. Never a bodySprite.
+        /// </summary>
+        public static Sprite ResolvePewFaceOverlay(RecruitInstance recruit)
+        {
+            Sprite face = PickPewProfile(recruit);
+            if (face != null && TownsfolkVisualApplier.IsUsablePewSprite(face))
+            {
+                if (IsBodyPoolSprite(face))
+                {
+                    Debug.LogWarning(
+                        "[DemonKnight] Soft-fail: refusing body-pool sprite as face overlay ("
+                        + face.name + ").");
+                    return null;
+                }
+                return face;
+            }
+            return null;
+        }
+
+        /// <summary>True when sprite is listed in Tab 5 Legend/Pew face pools (or legend face slots).</summary>
+        public static bool IsFacePoolSprite(Sprite sp)
+        {
+            if (sp == null) return false;
+            try
+            {
+                var profile = Profile;
+                if (profile == null) return false;
+                if (ListContainsSprite(profile.peasantFaceProfiles, sp)) return true;
+                if (ListContainsSprite(profile.warriorFaceProfiles, sp)) return true;
+                if (ListContainsSprite(profile.knightFaceProfiles, sp)) return true;
+                if (profile.legendPortraits != null)
+                {
+                    for (int i = 0; i < profile.legendPortraits.Count; i++)
+                    {
+                        var e = profile.legendPortraits[i];
+                        if (e != null && e.facePortrait == sp) return true;
+                    }
+                }
+            }
+            catch { /* soft-fail */ }
+            return false;
+        }
+
+        /// <summary>True when sprite is listed in Tab 4 ClassSpritePool body pools.</summary>
+        public static bool IsBodyPoolSprite(Sprite sp)
+        {
+            if (sp == null) return false;
+            try
+            {
+                var profile = ClassSpritePoolApplier.Profile;
+                if (profile == null) return false;
+                if (ListContainsSprite(profile.peasantSprites, sp)) return true;
+                if (ListContainsSprite(profile.warriorSprites, sp)) return true;
+                if (ListContainsSprite(profile.knightSprites, sp)) return true;
+            }
+            catch { /* soft-fail */ }
+            return false;
+        }
+
+        static bool ListContainsSprite(List<Sprite> list, Sprite sp)
+        {
+            if (list == null || sp == null) return false;
+            for (int i = 0; i < list.Count; i++)
+                if (list[i] == sp) return true;
+            return false;
         }
     }
 

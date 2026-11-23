@@ -1,11 +1,10 @@
-ClassSpritePoolProfile.asset is created locally by Arthurian → Ensure Stage Layout Profile
-(and Art & Stage Architect Tab 4 · Class Sprites / Unit Pools).
-Submit multiple Peasant / Warrior / Knight sprites into each pool.
-At church spawn, occupied pews pick from the matching class pool (deterministic by unitID).
-Empty pools soft-fail to StageLayoutProfile assign-only / solid fallbacks.
-Stage Placer seat sprites remain position/scale placement guides — not gameplay identity.
-Path backups (peasantAssetPaths etc.) rematerialize Missing sprites after reimport —
-Persist must never wipe those paths when a sprite is temporarily null
-(tip fix-architect-pool-apply).
-Do not commit a YAML that still references a missing MonoScript GUID — Ensure remaps or
-transplants pool lists so assignments survive Force Sync / editor reloads.
+ClassSpritePoolProfile.asset — Tab 4 BODY pools (Peasant / Warrior / Knight).
+Full pew / combat avatar → bodySprite. NEVER put face portraits here (Tab 5).
+Created by Arthurian → Ensure Stage Layout Profile / Art & Stage Architect Tab 4.
+Church spawn picks from the matching class pool (deterministic by unitID).
+Empty pools soft-fail to StageLayout assign-guide / solid fallbacks.
+Path backups rematerialize Missing sprites after reimport AND in player builds
+via Resources.Load / StreamingAssets (tip body-face-pool-build-persist).
+Before File → Build: run Arthurian → Prepare Architect Art for Player Build
+so sprites are promoted into Assets/Resources/ArchitectArt/Body/.
+Do not commit a YAML that still references a missing MonoScript GUID — Ensure remaps.

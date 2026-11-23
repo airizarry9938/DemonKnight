@@ -1,7 +1,9 @@
-LegendPewPortraitProfile.asset is created locally by Arthurian → Ensure Stage Layout Profile
-(and Art & Stage Architect Tab 5 · Legend / Pew Portraits).
-Assign one face portrait per playable Legend (14; Merlin soft slot optional).
-Submit Peasant / Warrior / Knight pew face/body profile pools (distinct from Tab 4 ClassSpritePool full-body).
-Runtime: LegendCodex FacePortrait + church pews resolve assigned art (empty → CharacterDatabase / ClassSpritePool / StageLayout soft-fail).
-Do not commit a YAML that still references a missing MonoScript GUID — Ensure remaps or
-transplants legendPortraits + face pools so assignments survive Force Sync / editor reloads.
+LegendPewPortraitProfile.asset — Tab 5 FACE only.
+Legends FacePortrait (14 + Merlin soft) + townsfolk pew FACE overlays (Head).
+NEVER assign these as bodySprite — Tab 4 owns full-body avatars.
+Created by Arthurian → Ensure / Art & Stage Architect Tab 5.
+Cross-assign with Tab 4 soft-fails (sprite skipped).
+Path backups rematerialize in Editor AND player builds (Resources / StreamingAssets).
+Before File → Build: Arthurian → Prepare Architect Art for Player Build
+→ Assets/Resources/ArchitectArt/Face/.
+tip: body-face-pool-build-persist

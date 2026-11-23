@@ -215,22 +215,21 @@ namespace ArthurianAutobattler
             else
                 r.appearance.BindSeatSalt(r.pewSeatIndex);
 
-            // Architect Tab 4/5 pools first (gameplay identity) — then library poses.
-            Sprite architect = LegendPewPortraitApplier.ResolvePewVisual(r);
-            if (architect != null && TownsfolkVisualApplier.IsUsablePewSprite(architect))
+            // BODY = Tab 4 ClassSpritePool only. FACE overlay = Tab 5 (optional headSprite).
+            // Never assign face-pool sprites as bodySprite (soft-fail inside ResolvePewVisual).
+            Sprite architectBody = LegendPewPortraitApplier.ResolvePewVisual(r);
+            if (architectBody != null && TownsfolkVisualApplier.IsUsablePewSprite(architectBody)
+                && !LegendPewPortraitApplier.IsFacePoolSprite(architectBody))
             {
-                r.bodySprite = architect;
-                r.headSprite = null;
-                r.randomAvatar = architect;
+                r.bodySprite = architectBody;
+                r.randomAvatar = architectBody;
             }
             else if (lib != null)
             {
-                // Single-sprite — no head/outfit paperdoll layers at runtime.
                 var pose = lib.GetPose(r.appearance.poseIndex);
-                if (pose != null)
+                if (pose != null && !LegendPewPortraitApplier.IsFacePoolSprite(pose))
                 {
                     r.bodySprite = pose;
-                    r.headSprite = null;
                     if (r.randomAvatar == null) r.randomAvatar = pose;
                 }
             }
@@ -243,7 +242,9 @@ namespace ArthurianAutobattler
                 if (bodyPool != null && bodyPool.Count > 0)
                     r.bodySprite = bodyPool[Random.Range(0, bodyPool.Count)];
             }
-            r.headSprite = null; // single-sprite — no separate head layer
+
+            Sprite face = LegendPewPortraitApplier.ResolvePewFaceOverlay(r);
+            r.headSprite = (face != null && !LegendPewPortraitApplier.IsBodyPoolSprite(face)) ? face : null;
 
             if (grudge > 0) r.moodOverlaySprite = moodGrudge;
             else if (r.primaryTrait == TraitTag.Loyalist) r.moodOverlaySprite = moodLoyalist;

@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-somerset-church-ui-cs0246";
+    public const string TipPackageId = "body-face-pool-build-persist";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -35,13 +35,14 @@ public static class DemonKnightTipEscape
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         "Assets/Editor/ArthurianFixMisplacedScripts.cs",
         "Assets/Editor/DemonKnightTipEscape.cs",
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-somerset-church-ui-cs0246)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (body-face-pool-build-persist)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -137,6 +138,7 @@ public static class DemonKnightTipEscape
             "fix-architect-pool-apply",
             "sprite-outline-highlight",
             "church-train-scout-ux",
+        "fix-somerset-church-ui-cs0246",
         };
         foreach (string s in stale)
         {

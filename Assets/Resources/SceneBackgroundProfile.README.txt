@@ -1,4 +1,5 @@
-SceneBackgroundProfile.asset is created locally by Arthurian → Ensure Stage Layout Profile
-(and Art & Stage Architect Tab 3). Assign jpg/png Sprites and/or mp4 VideoClips per screen.
-Do not commit a YAML that still references a missing MonoScript GUID — Ensure remaps or
-transplants entries so assignments survive Force Sync / editor reloads.
+SceneBackgroundProfile.asset — Tab 3 screen backgrounds (jpg/png / mp4).
+Must ship under Assets/Resources/ in player builds.
+imageAssetPath rematerializes via Resources.Load in builds (not Editor-only).
+Prepare Architect Art for Player Build → ArchitectArt/SceneBg/.
+tip: body-face-pool-build-persist

@@ -263,14 +263,22 @@ namespace ArthurianAutobattler
             }
             else if (recruit != null)
             {
+                // BODY only — never paint Tab 5 face pool as the pew body image.
                 Sprite poolSprite = LegendPewPortraitApplier.ResolvePewVisual(recruit);
+                if (poolSprite != null && LegendPewPortraitApplier.IsFacePoolSprite(poolSprite))
+                    poolSprite = null;
                 Sprite visual = poolSprite != null ? poolSprite : authored?.previewOrOverrideSprite;
-                if (visual != null)
+                if (visual != null && !LegendPewPortraitApplier.IsFacePoolSprite(visual))
                 {
                     img.sprite = visual;
                     img.color = Color.white;
                 }
-                else if (recruit.randomAvatar != null)
+                else if (recruit.bodySprite != null && !LegendPewPortraitApplier.IsFacePoolSprite(recruit.bodySprite))
+                {
+                    img.sprite = recruit.bodySprite;
+                    img.color = Color.white;
+                }
+                else if (recruit.randomAvatar != null && !LegendPewPortraitApplier.IsFacePoolSprite(recruit.randomAvatar))
                 {
                     img.sprite = recruit.randomAvatar;
                     img.color = Color.white;

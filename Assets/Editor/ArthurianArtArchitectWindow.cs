@@ -17,7 +17,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-somerset-church-ui-cs0246";
+    public const string UiBuildId = "body-face-pool-build-persist";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -280,6 +280,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         }
         if (stageProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(stageProfile)))
             return;
+        ArthurianArchitectBuildPersist.PromoteStageLayoutIntoResources(stageProfile);
         EditorUtility.SetDirty(stageProfile);
         AssetDatabase.SaveAssets();
         try { SomersetChurchUI.InvalidateChurchAssignCache(); } catch { /* ignore */ }
@@ -293,6 +294,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
             sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
             if (sceneBgProfile == null) return;
         }
+        ArthurianArchitectBuildPersist.PromoteSceneBackgroundIntoResources(sceneBgProfile);
         EditorUtility.SetDirty(sceneBgProfile);
         AssetDatabase.SaveAssets();
         try { SceneBackgroundApplier.InvalidateCache(); } catch { /* ignore */ }
@@ -320,6 +322,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
             return;
         classPoolProfile.RematerializeSpritesFromPaths();
         SyncClassPoolAssetPaths(classPoolProfile);
+        ArthurianArchitectBuildPersist.PromoteClassPoolIntoResources(classPoolProfile);
+        SyncClassPoolAssetPaths(classPoolProfile);
         EditorUtility.SetDirty(classPoolProfile);
         AssetDatabase.SaveAssets();
         try { ClassSpritePoolApplier.InvalidateCache(); } catch { /* ignore */ }
@@ -345,6 +349,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (legendPewProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(legendPewProfile)))
             return;
         legendPewProfile.RematerializeSpritesFromPaths();
+        SyncLegendPewAssetPaths(legendPewProfile);
+        ArthurianArchitectBuildPersist.PromoteLegendPewIntoResources(legendPewProfile);
         SyncLegendPewAssetPaths(legendPewProfile);
         EditorUtility.SetDirty(legendPewProfile);
         AssetDatabase.SaveAssets();
@@ -2218,12 +2224,12 @@ public class ArthurianArtArchitectWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Class Sprites / Unit Pools", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Submit multiple sprites into Peasant, Warrior, and Knight pools. "
-            + "Church spawn picks from the matching class pool (deterministic by unitID — "
-            + "same recruit keeps the same sprite across refreshes). "
-            + "Empty pool → soft-fail to StageLayout assign-guide / solid fallback (no crash). "
-            + "Tab 2 Stage Placer seat sprites stay POSITION/SCALE placement guides only — "
-            + "they are NOT gameplay identity. Persists on " + ClassPoolProfilePath + ".",
+            "BODY sprites only (full pew / combat avatar). Peasant / Warrior / Knight pools. "
+            + "Church spawn + battle pick from the matching class pool (deterministic by unitID). "
+            + "Do NOT put face portraits here — those belong on Tab 5. "
+            + "Cross-assign soft-fails (sprite skipped, no crash). "
+            + "Empty pool → StageLayout assign-guide / solid fallback. "
+            + "Persists on " + ClassPoolProfilePath + " (must ship in player builds under Resources).",
             MessageType.Info);
 
         classPoolProfile = (ClassSpritePoolProfile)EditorGUILayout.ObjectField(
@@ -2276,18 +2282,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUI.BeginDisabledGroup(classPoolAddSprite == null);
         if (GUILayout.Button("Add to pool", GUILayout.Width(110)))
         {
-            Undo.RecordObject(classPoolProfile, "Add Class Pool Sprite");
-            pool.Add(classPoolAddSprite);
-            classPoolAddSprite = null;
-            PersistClassPoolProfile("AddClassPoolSprite");
+            if (TryAddBodyPoolSprite(pool, classPoolAddSprite))
+            {
+                classPoolAddSprite = null;
+                PersistClassPoolProfile("AddClassPoolSprite");
+            }
         }
         EditorGUI.EndDisabledGroup();
         if (GUILayout.Button("Add selected palette", GUILayout.Width(150))
             && paletteSelectedSprite != null)
         {
-            Undo.RecordObject(classPoolProfile, "Add Palette to Class Pool");
-            pool.Add(paletteSelectedSprite);
-            PersistClassPoolProfile("AddPaletteToClassPool");
+            if (TryAddBodyPoolSprite(pool, paletteSelectedSprite))
+                PersistClassPoolProfile("AddPaletteToClassPool");
         }
         EditorGUILayout.EndHorizontal();
 
@@ -2356,28 +2362,68 @@ public class ArthurianArtArchitectWindow : EditorWindow
             if (GUI.Button(r, GUIContent.none, GUIStyle.none))
             {
                 paletteSelectedSprite = sp;
-                Undo.RecordObject(classPoolProfile, "Add Palette Click to Class Pool");
-                pool.Add(sp);
-                PersistClassPoolProfile("PaletteClickClassPool");
+                if (TryAddBodyPoolSprite(pool, sp))
+                    PersistClassPoolProfile("PaletteClickClassPool");
             }
         }
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndScrollView();
     }
 
+    bool TryAddBodyPoolSprite(List<Sprite> pool, Sprite sp)
+    {
+        if (pool == null || sp == null) return false;
+        if (LegendPewPortraitApplier.IsFacePoolSprite(sp))
+        {
+            Debug.LogWarning(
+                "[DemonKnight] Soft-fail: refusing face-pool sprite '" + sp.name
+                + "' as Tab 4 BODY. Use Tab 5 · Legend / Pew Portraits for faces.");
+            EditorUtility.DisplayDialog(
+                "Body vs Face",
+                "That sprite is already in a Tab 5 FACE pool.\n"
+                + "Tab 4 is BODY (full pew/combat avatar) only.\n"
+                + "Assign faces on Tab 5.",
+                "OK");
+            return false;
+        }
+        Undo.RecordObject(classPoolProfile, "Add Class Pool Sprite");
+        pool.Add(sp);
+        return true;
+    }
+
+    bool TryAddFacePoolSprite(List<Sprite> pool, Sprite sp)
+    {
+        if (pool == null || sp == null) return false;
+        if (LegendPewPortraitApplier.IsBodyPoolSprite(sp))
+        {
+            Debug.LogWarning(
+                "[DemonKnight] Soft-fail: refusing body-pool sprite '" + sp.name
+                + "' as Tab 5 FACE. Use Tab 4 · Class Sprites for full-body avatars.");
+            EditorUtility.DisplayDialog(
+                "Body vs Face",
+                "That sprite is already in a Tab 4 BODY pool.\n"
+                + "Tab 5 is FACE only (Legends FacePortrait + optional pew face overlay).\n"
+                + "Assign full-body avatars on Tab 4.",
+                "OK");
+            return false;
+        }
+        Undo.RecordObject(legendPewProfile, "Add Pew Face Profile");
+        pool.Add(sp);
+        return true;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
-    // Tab 5 — Legend face portraits + townsfolk pew face/body profiles
+    // Tab 5 — Legend face portraits + townsfolk pew FACE profiles
     // ═══════════════════════════════════════════════════════════════════════
 
     void DrawLegendPewPortraitsTab()
     {
         EditorGUILayout.LabelField("Legend / Pew Portraits", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Assign face portraits per playable Legend (14; Merlin soft slot kept but unused in Codex). "
-            + "Separate townsfolk pew face/body profile pools for Peasant / Warrior / Knight — "
-            + "distinct from Tab 4 Class Sprites (full-body). "
-            + "Legends FacePortraitFrame + church pews resolve assigned art at runtime. "
-            + "Persists on " + LegendPewProfilePath + ".",
+            "FACE only. Assign Legends FacePortrait (14; Merlin soft) + townsfolk pew FACE overlays "
+            + "for Peasant / Warrior / Knight. Distinct from Tab 4 BODY (full pew/combat avatar). "
+            + "Never put full-body class sprites here — cross-assign soft-fails. "
+            + "Persists on " + LegendPewProfilePath + " (must ship in player builds under Resources).",
             MessageType.Info);
 
         legendPewProfile = (LegendPewPortraitProfile)EditorGUILayout.ObjectField(
@@ -2480,8 +2526,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
     void DrawTownsfolkPewFacePools()
     {
         EditorGUILayout.HelpBox(
-            "Townsfolk pew face/body profile pools — used by church pews + dossier before Tab 4 "
-            + "full-body ClassSpritePool. Same deterministic unitID pick. Empty → ClassSpritePool / StageLayout fallback.",
+            "Townsfolk pew FACE overlays only (Head layer). Body avatars stay on Tab 4 ClassSpritePool. "
+            + "Deterministic by unitID. Empty face pool → body-only pew (no crash).",
             MessageType.None);
 
         EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
@@ -2506,18 +2552,18 @@ public class ArthurianArtArchitectWindow : EditorWindow
         EditorGUI.BeginDisabledGroup(pewFaceAddSprite == null);
         if (GUILayout.Button("Add to pool", GUILayout.Width(110)))
         {
-            Undo.RecordObject(legendPewProfile, "Add Pew Face Profile");
-            pool.Add(pewFaceAddSprite);
-            pewFaceAddSprite = null;
-            PersistLegendPewProfile("AddPewFace");
+            if (TryAddFacePoolSprite(pool, pewFaceAddSprite))
+            {
+                pewFaceAddSprite = null;
+                PersistLegendPewProfile("AddPewFace");
+            }
         }
         EditorGUI.EndDisabledGroup();
         if (GUILayout.Button("Add selected palette", GUILayout.Width(150))
             && paletteSelectedSprite != null)
         {
-            Undo.RecordObject(legendPewProfile, "Add Palette to Pew Face Pool");
-            pool.Add(paletteSelectedSprite);
-            PersistLegendPewProfile("AddPalettePewFace");
+            if (TryAddFacePoolSprite(pool, paletteSelectedSprite))
+                PersistLegendPewProfile("AddPalettePewFace");
         }
         EditorGUILayout.EndHorizontal();
 
@@ -2538,7 +2584,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (pool.Count == 0)
         {
             EditorGUILayout.HelpBox(
-                "Pool empty — pews keep Tab 4 ClassSpritePool / StageLayout fallbacks.",
+                "Face pool empty — pews show Tab 4 BODY only (no face overlay).",
                 MessageType.Warning);
         }
         for (int i = 0; i < pool.Count; i++)
@@ -2599,9 +2645,8 @@ public class ArthurianArtArchitectWindow : EditorWindow
                         PewFacePoolKind.Knight => legendPewProfile.knightFaceProfiles,
                         _ => legendPewProfile.peasantFaceProfiles
                     };
-                    Undo.RecordObject(legendPewProfile, "Palette Click → Pew Face");
-                    pool.Add(sp);
-                    PersistLegendPewProfile("PaletteClickPewFace");
+                    if (TryAddFacePoolSprite(pool, sp))
+                        PersistLegendPewProfile("PaletteClickPewFace");
                 }
             }
         }

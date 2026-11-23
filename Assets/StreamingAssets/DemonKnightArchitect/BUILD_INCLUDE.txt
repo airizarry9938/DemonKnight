@@ -1,0 +1,21 @@
+DemonKnight Architect — player build include list
+tip=body-face-pool-build-persist
+
+REQUIRED Resources profiles (Assets/Resources/):
+  StageLayoutProfile.asset
+  ClassSpritePoolProfile.asset
+  SceneBackgroundProfile.asset
+  LegendPewPortraitProfile.asset
+
+REQUIRED promoted art:
+  Assets/Resources/ArchitectArt/** (Body + Face + Stage + SceneBg)
+
+OPTIONAL fallback:
+  Assets/StreamingAssets/DemonKnightArchitect/*.(png|jpg)
+
+Before Build: Arthurian → Prepare Architect Art for Player Build
+(or it runs automatically on IPreprocessBuild).
+
+Body = Tab 4 Class Sprites → bodySprite
+Face = Tab 5 Legend/Pew Portraits → FacePortrait + optional Head overlay
+Never cross-assign (soft-fail).
