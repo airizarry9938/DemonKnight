@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "body-face-pool-build-persist";
-    public const string GitHint = "body-face-pool-build-persist";
-    public const string BuiltUtc = "2026-11-23T01:05:00Z";
+    public const string Id = "battle-good-evil-sprite-pools";
+    public const string GitHint = "battle-good-evil-sprite-pools";
+    public const string BuiltUtc = "2026-11-23T01:25:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
@@ -108,7 +108,9 @@ public static class DemonKnightPackageVersion
                         if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
-                                || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0))
+                                || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
+                                || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0))
                             throw new Exception("GameDataTypes missing embedded Appliers");
                         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
@@ -231,7 +233,8 @@ public static class DemonKnightPackageVersion
             "fix-architect-pool-apply",
             "sprite-outline-highlight",
             "church-train-scout-ux",
-        "fix-somerset-church-ui-cs0246",
+            "fix-somerset-church-ui-cs0246",
+            "body-face-pool-build-persist",
         };
         foreach (string s in stale)
         {

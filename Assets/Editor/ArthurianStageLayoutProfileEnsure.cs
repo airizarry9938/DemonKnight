@@ -24,10 +24,11 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "body-face-pool-build-persist";
+    const string TipPackageId = "battle-good-evil-sprite-pools";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
+    const string BattleGoodEvilAssetPath = "Assets/Resources/BattleGoodEvilSpritePoolProfile.asset";
     const string ArtLibPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string ResLibPath = "Assets/Resources/Art/Modular/ModularSpriteLibrary.asset";
     const string SplicedSpriteFolder = "Assets/Art/Spliced/Sprite";
@@ -66,7 +67,9 @@ public static class ArthurianStageLayoutProfileEnsure
         "class-sprite-pools",
         "force-sync-appliers-hardfix",
         "sheet-splicer-chroma-despill",
-        "church-train-scout-ux", "fix-somerset-church-ui-cs0246",
+        "church-train-scout-ux",
+        "fix-somerset-church-ui-cs0246",
+        "body-face-pool-build-persist",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
@@ -76,6 +79,7 @@ public static class ArthurianStageLayoutProfileEnsure
         var bg = EnsureSceneBackgroundAsset();
         var pools = EnsureClassSpritePoolAsset();
         var legendPew = EnsureLegendPewPortraitAsset();
+        var battle = EnsureBattleGoodEvilSpritePoolAsset();
         Selection.activeObject = p;
         EditorGUIUtility.PingObject(p);
         int assigned = CountAssignedSprites(p);
@@ -90,7 +94,13 @@ public static class ArthurianStageLayoutProfileEnsure
                   $"(legends={legendPew.CountAssignedLegendFaces()}/14 " +
                   $"pewFaces P={legendPew.CountUsablePewFaces(UnitType.Peasant)} " +
                   $"W={legendPew.CountUsablePewFaces(UnitType.Warrior)} " +
-                  $"K={legendPew.CountUsablePewFaces(UnitType.Knight)}).");
+                  $"K={legendPew.CountUsablePewFaces(UnitType.Knight)}). " +
+                  $"BattleGoodEvilSpritePoolProfile → {BattleGoodEvilAssetPath} " +
+                  $"(goodLegends={battle.CountAssignedLegendBattles()} " +
+                  $"bosses={battle.CountAssignedBossBattles()} " +
+                  $"P={battle.CountUsablePool(UnitType.Peasant)} " +
+                  $"Priest={battle.CountUsablePool(UnitType.Priest)} " +
+                  $"Imp={battle.CountUsablePool(UnitType.DemonImp)}).");
     }
 
     [MenuItem("Arthurian/Escape Breakglass → Tip Hosts + Spliced Pew Library", false, 2)]
@@ -112,6 +122,7 @@ public static class ArthurianStageLayoutProfileEnsure
                 EnsureSceneBackgroundAsset();
                 EnsureClassSpritePoolAsset();
                 EnsureLegendPewPortraitAsset();
+                EnsureBattleGoodEvilSpritePoolAsset();
                 if (HostsLookStale())
                 {
                     Debug.LogWarning(
@@ -429,6 +440,70 @@ public static class ArthurianStageLayoutProfileEnsure
         return existing;
     }
 
+    /// <summary>Ensure BattleGoodEvilSpritePoolProfile.asset exists (Architect Tab 6). Never wipe pools.</summary>
+    public static BattleGoodEvilSpritePoolProfile EnsureBattleGoodEvilSpritePoolAsset()
+    {
+        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+            AssetDatabase.CreateFolder("Assets", "Resources");
+
+        var existing = AssetDatabase.LoadAssetAtPath<BattleGoodEvilSpritePoolProfile>(BattleGoodEvilAssetPath);
+        if (existing != null)
+        {
+            existing.EnsureSlotsAndLists();
+            existing.RematerializeSpritesFromPaths();
+            return existing;
+        }
+
+        string full = Path.Combine(Directory.GetParent(Application.dataPath)!.FullName,
+            BattleGoodEvilAssetPath.Replace('/', Path.DirectorySeparatorChar));
+        string yamlBackup = null;
+        if (File.Exists(full))
+        {
+            try { yamlBackup = File.ReadAllText(full); } catch { /* ignore */ }
+            if (TryRemapBattleGoodEvilScriptGuid(full))
+            {
+                AssetDatabase.ImportAsset(BattleGoodEvilAssetPath);
+                existing = AssetDatabase.LoadAssetAtPath<BattleGoodEvilSpritePoolProfile>(BattleGoodEvilAssetPath);
+                if (existing != null)
+                {
+                    existing.EnsureSlotsAndLists();
+                    return existing;
+                }
+            }
+            AssetDatabase.DeleteAsset(BattleGoodEvilAssetPath);
+            try { if (File.Exists(full)) File.Delete(full); } catch { /* ignore */ }
+            try { if (File.Exists(full + ".meta")) File.Delete(full + ".meta"); } catch { /* ignore */ }
+            AssetDatabase.Refresh();
+        }
+
+        var created = ScriptableObject.CreateInstance<BattleGoodEvilSpritePoolProfile>();
+        created.EnsureSlotsAndLists();
+        AssetDatabase.CreateAsset(created, BattleGoodEvilAssetPath);
+        AssetDatabase.SaveAssets();
+
+        if (!string.IsNullOrEmpty(yamlBackup) && File.Exists(full))
+        {
+            try
+            {
+                string fresh = File.ReadAllText(full);
+                string merged = TransplantFromField(fresh, yamlBackup, "peasantBattleSprites:");
+                if (!string.IsNullOrEmpty(merged) && merged != fresh)
+                {
+                    File.WriteAllText(full, merged);
+                    AssetDatabase.ImportAsset(BattleGoodEvilAssetPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] BattleGoodEvil YAML transplant: " + ex.Message);
+            }
+        }
+
+        existing = AssetDatabase.LoadAssetAtPath<BattleGoodEvilSpritePoolProfile>(BattleGoodEvilAssetPath) ?? created;
+        existing.EnsureSlotsAndLists();
+        return existing;
+    }
+
     static bool TryRemapStageLayoutScriptGuid(string fullPath)
         => TryRemapScriptGuid(fullPath, typeof(StageLayoutProfile));
 
@@ -440,6 +515,9 @@ public static class ArthurianStageLayoutProfileEnsure
 
     static bool TryRemapLegendPewScriptGuid(string fullPath)
         => TryRemapScriptGuid(fullPath, typeof(LegendPewPortraitProfile));
+
+    static bool TryRemapBattleGoodEvilScriptGuid(string fullPath)
+        => TryRemapScriptGuid(fullPath, typeof(BattleGoodEvilSpritePoolProfile));
 
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {

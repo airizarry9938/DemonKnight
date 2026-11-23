@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
 
-    private const string ExpectedPackageId = "body-face-pool-build-persist";
+    private const string ExpectedPackageId = "battle-good-evil-sprite-pools";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -73,6 +73,7 @@ public static class ArthurianSyncFromGitHub
         "sprite-outline-highlight",
         "church-train-scout-ux",
         "fix-somerset-church-ui-cs0246",
+        "body-face-pool-build-persist",
     };
 
     /// <summary>
@@ -995,6 +996,7 @@ public static class ArthurianSyncFromGitHub
             ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
             ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
             ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
+            ArthurianStageLayoutProfileEnsure.EnsureBattleGoodEvilSpritePoolAsset();
         }
         catch (Exception ex)
         {
@@ -1222,7 +1224,9 @@ public static class ArthurianSyncFromGitHub
             if (text.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
                 || text.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
-                || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0)
+                || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
+                || text.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
+                || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0)
                 throw new Exception("GameDataTypes missing embedded Appliers (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
@@ -1425,7 +1429,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("PickPewProfile")
                    && body.Contains("ResolvePewFaceOverlay")
                    && body.Contains("IsFacePoolSprite")
-                   && body.Contains("body-face-pool-build-persist")
+                   && body.Contains("class BattleGoodEvilSpritePoolProfile")
+                   && body.Contains("class BattleGoodEvilSpritePoolApplier")
+                   && body.Contains("battle-good-evil-sprite-pools")
                    // force-sync-appliers-hardfix — Appliers embedded here (not standalones).
                    && body.Contains("class SceneBackgroundApplier")
                    && body.Contains("ApplyToUiHost")
@@ -1645,7 +1651,8 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("ResolveArenaBindings")
                    && body.Contains("ApplyBackgroundArt")
                    && body.Contains("ApplyVideoBackground")
-                   && body.Contains("StageLayoutProfile");
+                   && body.Contains("StageLayoutProfile")
+                   && body.Contains("BattleGoodEvilSpritePoolApplier.ResolveBattleSprite");
         }
 
         if (rel.EndsWith("BattleBossDialogUI.cs", StringComparison.OrdinalIgnoreCase))
@@ -1770,8 +1777,8 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("class ArthurianArtArchitectWindow")) return false;
         if (!body.Contains("Art & Stage Architect")) return false;
         if (!body.Contains("SpriteCategory")) return false;
-        // Tip: 5 tabs including Legend / Pew Portraits.
-        if (!body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits }"))
+        // Tip: 6 tabs including Battle Good/Evil sprite pools.
+        if (!body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits, BattleGoodEvil }"))
             return false;
         if (!body.Contains("Sheet Splicer")) return false;
         if (!body.Contains("Manual Box Crop")) return false;
@@ -1784,9 +1791,13 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("Legend / Pew Portraits")) return false;
         if (!body.Contains("LegendPewPortraitProfile")) return false;
         if (!body.Contains("DrawLegendPewPortraitsTab")) return false;
+        if (!body.Contains("Battle Good / Evil")) return false;
+        if (!body.Contains("BattleGoodEvilSpritePoolProfile")) return false;
+        if (!body.Contains("DrawBattleGoodEvilTab")) return false;
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
-        if (!body.Contains("body-face-pool-build-persist")) return false;
+        if (!body.Contains("TryAddBattlePoolSprite")) return false;
+        if (!body.Contains("battle-good-evil-sprite-pools")) return false;
         if (!body.Contains("UiBuildId")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;
@@ -1920,7 +1931,7 @@ public static class ArthurianSyncFromGitHub
                 return "Architect tip markers: SpriteCategory=NO UiBuildId=NO PaperDoll remnant=YES (file MISSING)";
             string body = File.ReadAllText(path);
             bool sprite = body.Contains("SpriteCategory")
-                          && body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits }");
+                          && body.Contains("enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits, BattleGoodEvil }");
             bool ui = body.Contains("UiBuildId");
             bool remnant = body.Contains("Paper-Doll Unit Generator")
                            || body.Contains("enum SheetCategory")

@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "body-face-pool-build-persist";
+    public const string TipPackageId = "battle-good-evil-sprite-pools";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -42,7 +42,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (body-face-pool-build-persist)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (battle-good-evil-sprite-pools)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -184,7 +184,9 @@ public static class DemonKnightTipEscape
                 if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
                         || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
-                        || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0))
+                        || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
+                        || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0))
                     throw new Exception("GameDataTypes missing embedded Appliers");
                 if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0

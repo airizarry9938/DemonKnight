@@ -11,15 +11,15 @@ using UnityEngine;
 
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: body-face-pool-build-persist
+/// tip: battle-good-evil-sprite-pools
 ///
-/// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait) live under
+/// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
 /// backups via Resources.Load / StreamingAssets — never Editor-only wipe at runtime.
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "body-face-pool-build-persist";
+    public const string TipId = "battle-good-evil-sprite-pools";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";
@@ -69,6 +69,7 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         EnsureFolder(ArchitectArtRoot + "/Face");
         EnsureFolder(ArchitectArtRoot + "/Stage");
         EnsureFolder(ArchitectArtRoot + "/SceneBg");
+        EnsureFolder(ArchitectArtRoot + "/Battle");
         EnsureFolder("Assets/StreamingAssets");
         EnsureFolder(StreamingRel);
 
@@ -76,29 +77,33 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         var scene = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
         var body = ArthurianStageLayoutProfileEnsure.EnsureClassSpritePoolAsset();
         var face = ArthurianStageLayoutProfileEnsure.EnsureLegendPewPortraitAsset();
+        var battle = ArthurianStageLayoutProfileEnsure.EnsureBattleGoodEvilSpritePoolAsset();
 
         int promoted = 0;
         promoted += PromoteStageLayoutIntoResources(stage);
         promoted += PromoteSceneBackgroundIntoResources(scene);
         promoted += PromoteClassPoolIntoResources(body);
         promoted += PromoteLegendPewIntoResources(face);
+        promoted += PromoteBattleGoodEvilIntoResources(battle);
 
         // Rematerialize after promote (Editor + runtime-safe paths).
         stage?.RematerializeSpritesFromPaths();
         body?.RematerializeSpritesFromPaths();
         face?.RematerializeSpritesFromPaths();
+        battle?.RematerializeSpritesFromPaths();
 
         if (forceCopyStreaming)
-            CopyReferencedTexturesToStreaming(stage, scene, body, face, log);
+            CopyReferencedTexturesToStreaming(stage, scene, body, face, battle, log);
 
-        WriteManifest(stage, scene, body, face, promoted, log);
+        WriteManifest(stage, scene, body, face, battle, promoted, log);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
         log.AppendLine(
             $"Profiles: Stage={(stage != null)} SceneBg={(scene != null)} "
-            + $"ClassPool={(body != null)} LegendPew={(face != null)}; promotedSprites≈{promoted}");
+            + $"ClassPool={(body != null)} LegendPew={(face != null)} "
+            + $"Battle={(battle != null)}; promotedSprites≈{promoted}");
         log.AppendLine("NO Editor wipe of Resources profiles during build preprocess.");
         return log.ToString().TrimEnd();
     }
@@ -136,6 +141,54 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
                     n++;
                 }
                 string ap = AssetDatabase.GetAssetPath(e.facePortrait);
+                if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
+            }
+        }
+        EditorUtility.SetDirty(p);
+        return n;
+    }
+
+    public static int PromoteBattleGoodEvilIntoResources(BattleGoodEvilSpritePoolProfile p)
+    {
+        if (p == null) return 0;
+        p.EnsureSlotsAndLists();
+        int n = 0;
+        n += PromoteList(p.peasantBattleSprites, p.peasantBattleAssetPaths, "Battle/Good/Peasant");
+        n += PromoteList(p.warriorBattleSprites, p.warriorBattleAssetPaths, "Battle/Good/Warrior");
+        n += PromoteList(p.knightBattleSprites, p.knightBattleAssetPaths, "Battle/Good/Knight");
+        n += PromoteList(p.priestBattleSprites, p.priestBattleAssetPaths, "Battle/Good/Priest");
+        n += PromoteList(p.demonImpBattleSprites, p.demonImpBattleAssetPaths, "Battle/Evil/Imp");
+        n += PromoteList(p.hellhoundBattleSprites, p.hellhoundBattleAssetPaths, "Battle/Evil/Hellhound");
+        n += PromoteList(p.dreadLordBattleSprites, p.dreadLordBattleAssetPaths, "Battle/Evil/DreadLord");
+        if (p.goodLegendSlots != null)
+        {
+            for (int i = 0; i < p.goodLegendSlots.Count; i++)
+            {
+                var e = p.goodLegendSlots[i];
+                if (e == null || e.battleSprite == null) continue;
+                Sprite promoted = PromoteSprite(e.battleSprite, "Battle/Good/Legend/" + e.unitType);
+                if (promoted != null && promoted != e.battleSprite)
+                {
+                    e.battleSprite = promoted;
+                    n++;
+                }
+                string ap = AssetDatabase.GetAssetPath(e.battleSprite);
+                if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
+            }
+        }
+        if (p.evilBossSlots != null)
+        {
+            for (int i = 0; i < p.evilBossSlots.Count; i++)
+            {
+                var e = p.evilBossSlots[i];
+                if (e == null || e.battleSprite == null) continue;
+                Sprite promoted = PromoteSprite(e.battleSprite, "Battle/Evil/Boss/" + e.unitType);
+                if (promoted != null && promoted != e.battleSprite)
+                {
+                    e.battleSprite = promoted;
+                    n++;
+                }
+                string ap = AssetDatabase.GetAssetPath(e.battleSprite);
                 if (!string.IsNullOrEmpty(ap)) e.assetPath = ap;
             }
         }
@@ -286,6 +339,7 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         SceneBackgroundProfile scene,
         ClassSpritePoolProfile body,
         LegendPewPortraitProfile face,
+        BattleGoodEvilSpritePoolProfile battle,
         StringBuilder log)
     {
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -298,6 +352,23 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         if (face?.legendPortraits != null)
         {
             foreach (var e in face.legendPortraits)
+                if (e != null && !string.IsNullOrEmpty(e.assetPath)) paths.Add(e.assetPath);
+        }
+        CollectPaths(battle?.peasantBattleAssetPaths, paths);
+        CollectPaths(battle?.warriorBattleAssetPaths, paths);
+        CollectPaths(battle?.knightBattleAssetPaths, paths);
+        CollectPaths(battle?.priestBattleAssetPaths, paths);
+        CollectPaths(battle?.demonImpBattleAssetPaths, paths);
+        CollectPaths(battle?.hellhoundBattleAssetPaths, paths);
+        CollectPaths(battle?.dreadLordBattleAssetPaths, paths);
+        if (battle?.goodLegendSlots != null)
+        {
+            foreach (var e in battle.goodLegendSlots)
+                if (e != null && !string.IsNullOrEmpty(e.assetPath)) paths.Add(e.assetPath);
+        }
+        if (battle?.evilBossSlots != null)
+        {
+            foreach (var e in battle.evilBossSlots)
                 if (e != null && !string.IsNullOrEmpty(e.assetPath)) paths.Add(e.assetPath);
         }
         if (stage != null)
@@ -366,6 +437,7 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         SceneBackgroundProfile scene,
         ClassSpritePoolProfile body,
         LegendPewPortraitProfile face,
+        BattleGoodEvilSpritePoolProfile battle,
         int promoted,
         StringBuilder log)
     {
@@ -379,9 +451,10 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
         sb.AppendLine("  ClassSpritePoolProfile.asset");
         sb.AppendLine("  SceneBackgroundProfile.asset");
         sb.AppendLine("  LegendPewPortraitProfile.asset");
+        sb.AppendLine("  BattleGoodEvilSpritePoolProfile.asset");
         sb.AppendLine();
         sb.AppendLine("REQUIRED promoted art:");
-        sb.AppendLine("  Assets/Resources/ArchitectArt/** (Body + Face + Stage + SceneBg)");
+        sb.AppendLine("  Assets/Resources/ArchitectArt/** (Body + Face + Battle + Stage + SceneBg)");
         sb.AppendLine();
         sb.AppendLine("OPTIONAL fallback:");
         sb.AppendLine("  Assets/StreamingAssets/DemonKnightArchitect/*.(png|jpg)");
@@ -396,11 +469,18 @@ public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
             + (face?.CountUsablePewFaces(UnitType.Warrior) ?? 0) + "/"
             + (face?.CountUsablePewFaces(UnitType.Knight) ?? 0));
         sb.AppendLine("  Legend faces = " + (face?.CountAssignedLegendFaces() ?? 0));
+        sb.AppendLine("  Battle good legends = " + (battle?.CountAssignedLegendBattles() ?? 0));
+        sb.AppendLine("  Battle bosses = " + (battle?.CountAssignedBossBattles() ?? 0));
+        sb.AppendLine("  Battle P/Priest/Imp = "
+            + (battle?.CountUsablePool(UnitType.Peasant) ?? 0) + "/"
+            + (battle?.CountUsablePool(UnitType.Priest) ?? 0) + "/"
+            + (battle?.CountUsablePool(UnitType.DemonImp) ?? 0));
         sb.AppendLine("  Promoted this pass ≈ " + promoted);
         sb.AppendLine();
-        sb.AppendLine("Body = Tab 4 Class Sprites (full pew/combat avatar → bodySprite).");
+        sb.AppendLine("Body = Tab 4 Class Sprites (full pew avatar → bodySprite).");
         sb.AppendLine("Face = Tab 5 Legend/Pew Portraits (FacePortrait + optional Head overlay).");
-        sb.AppendLine("Never assign face pool sprites as bodySprite or vice versa (soft-fail).");
+        sb.AppendLine("Battle = Tab 6 Good/Evil pools (UnitVisualActor Autobattle sprites).");
+        sb.AppendLine("Keep Tab 4 BODY / Tab 5 FACE / Tab 6 BATTLE separate (soft-fail cross-assign).");
         sb.AppendLine("Runtime Load rematerializes from path backups — no Editor wipe in player.");
 
         string full = DestFull(ManifestRel);

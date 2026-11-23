@@ -1,0 +1,18 @@
+BattleGoodEvilSpritePoolProfile (Architect Tab 6)
+================================================
+tip: battle-good-evil-sprite-pools
+
+Autobattle UnitVisualActor Good vs Evil sprite pools.
+Keep SEPARATE from:
+  Tab 4 ClassSpritePoolProfile = BODY (pew avatar)
+  Tab 5 LegendPewPortraitProfile = FACE
+
+Asset path (must ship in player builds):
+  Assets/Resources/BattleGoodEvilSpritePoolProfile.asset
+
+After assigning art: Arthurian → Prepare Architect Art for Player Build
+Promotes into Assets/Resources/ArchitectArt/Battle/**
+
+Force Sync: Arthurian → Force Delete+Sync ALL Scripts
+Diagnose = battle-good-evil-sprite-pools
+Escape: !!! Escape to Tip (battle-good-evil-sprite-pools)
