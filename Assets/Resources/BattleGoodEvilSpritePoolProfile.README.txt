@@ -1,6 +1,6 @@
 BattleGoodEvilSpritePoolProfile (Architect Tab 6)
 ================================================
-tip: fix-architect-build-persist-cs0103
+tip: fix-build-persist-embed
 
 Autobattle UnitVisualActor Good vs Evil sprite pools.
 Keep SEPARATE from:
@@ -14,5 +14,5 @@ After assigning art: Arthurian → Prepare Architect Art for Player Build
 Promotes into Assets/Resources/ArchitectArt/Battle/**
 
 Force Sync: Arthurian → Force Delete+Sync ALL Scripts
-Diagnose = fix-architect-build-persist-cs0103
-Escape: !!! Escape to Tip (fix-architect-build-persist-cs0103)
+Diagnose = fix-build-persist-embed
+Escape: !!! Escape to Tip (fix-build-persist-embed)

@@ -24,16 +24,16 @@ public static class ArthurianSyncFromGitHub
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
     // Pre-ship pin = tip before this PR; ship commit bumps both to feature SHA.
-    private const string FallbackCommitSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
+    private const string FallbackCommitSha = "ae6b1afee35fa8e36435d565597f851469fcf695";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
+    public const string HardTipCommitSha = "ae6b1afee35fa8e36435d565597f851469fcf695";
 
-    private const string ExpectedPackageId = "fix-architect-build-persist-cs0103";
+    private const string ExpectedPackageId = "fix-build-persist-embed";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -75,6 +75,7 @@ public static class ArthurianSyncFromGitHub
         "fix-somerset-church-ui-cs0246",
         "body-face-pool-build-persist",
         "battle-good-evil-sprite-pools",
+        "fix-architect-build-persist-cs0103",
     };
 
     /// <summary>
@@ -90,7 +91,7 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
-        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
+        "Assets/Editor/ArthurianArchitectBuildPersist.cs", // stub — type embedded in ArchitectWindow
         // Embed host for SceneBackgroundApplier + ClassSpritePoolApplier (CS0103 hard fix).
         "Assets/Scripts/Data/GameDataTypes.cs",
     };
@@ -1285,10 +1286,9 @@ public static class ArthurianSyncFromGitHub
     }
 
     /// <summary>
-    /// Last-resort: re-download ArthurianArchitectBuildPersist after every Force Sync.
-    /// Independent of MustRestore so a stale compiled Sync that wiped BuildPersist
-    /// (ForceOverwrite host + Force Delete skip race) still re-lands the type before
-    /// ArthurianArtArchitectWindow compile (CS0103 on Promote*).
+    /// Last-resort: re-download Architect embed host + BuildPersist stub after every Force Sync.
+    /// Type lives in ArthurianArtArchitectWindow (MustRestore). Standalone is stub-only (CS0101).
+    /// SoftPromote* reflection no-ops if type somehow missing. Independent of MustRestore arrays.
     /// </summary>
     static void HardRestoreArchitectBuildPersist(
         string projectRoot,
@@ -1296,28 +1296,55 @@ public static class ArthurianSyncFromGitHub
         List<string> errors,
         List<string> okFiles)
     {
-        const string rel = "Assets/Editor/ArthurianArchitectBuildPersist.cs";
+        const string archRel = "Assets/Editor/ArthurianArtArchitectWindow.cs";
+        const string stubRel = "Assets/Editor/ArthurianArchitectBuildPersist.cs";
         try
         {
-            string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
-            string textBody = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
-            if (textBody.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
-                || textBody.IndexOf("PromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
-                || textBody.IndexOf("PromoteLegendPewIntoResources", StringComparison.Ordinal) < 0
-                || textBody.IndexOf("PromoteBattleGoodEvilIntoResources", StringComparison.Ordinal) < 0
-                || textBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0)
-                throw new Exception("ArthurianArchitectBuildPersist missing tip markers (" + source + ")");
-            WriteReplacing(dest, textBody, deleteFirst: true);
-            VerifyOnDisk(rel, dest, relaxPackageId: true);
-            if (!okFiles.Contains(rel)) okFiles.Add(rel);
-            Debug.Log($"[DemonKnight] HardRestore ArchitectBuildPersist via {source} @ {sha}");
+            string archDest = Path.Combine(projectRoot, archRel.Replace('/', Path.DirectorySeparatorChar));
+            string archBody = DownloadPinned(archRel, sha, out string source, relaxPackageId: true);
+            if (archBody.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
+                || archBody.IndexOf("PromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
+                || archBody.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
+                || archBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
+                || archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0)
+                throw new Exception("Architect missing embedded BuildPersist (" + source + ")");
+            WriteReplacing(archDest, archBody, deleteFirst: true);
+            VerifyOnDisk(archRel, archDest, relaxPackageId: true);
+            if (!okFiles.Contains(archRel)) okFiles.Add(archRel);
+
+            // Stub standalone so leftover full copies cannot CS0101 against the embed.
+            string stubDest = Path.Combine(projectRoot, stubRel.Replace('/', Path.DirectorySeparatorChar));
+            string stubBody;
+            try
+            {
+                stubBody = DownloadPinned(stubRel, sha, out string stubSource, relaxPackageId: true);
+                if (stubBody.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0)
+                    throw new Exception("rejected full BuildPersist standalone from " + stubSource);
+                if (stubBody.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0)
+                    throw new Exception("BuildPersist stub missing embed-host marker");
+            }
+            catch (Exception stubEx)
+            {
+                Debug.LogWarning("[DemonKnight] BuildPersist stub download fallback: " + stubEx.Message);
+                stubBody =
+                    "#if UNITY_EDITOR" + "\n"
+                    + "// Types live in ArthurianArtArchitectWindow.cs (Force Sync embed — avoids CS0103 when this" + "\n"
+                    + "// standalone path is wiped by Force Delete under a stale compiled Sync host)." + "\n"
+                    + "// This stub overwrites any leftover full copy so we never get CS0101 duplicates." + "\n"
+                    + "// tip: fix-build-persist-embed" + "\n"
+                    + "#endif" + "\n";
+            }
+            WriteReplacing(stubDest, stubBody, deleteFirst: true);
+            if (!okFiles.Contains(stubRel)) okFiles.Add(stubRel);
+            Debug.Log($"[DemonKnight] HardRestore ArchitectBuildPersist embed+stub via {source} @ {sha}");
         }
         catch (Exception ex)
         {
-            errors.Add($"{rel} (architect-build-persist hard-restore): {ex.Message}");
+            errors.Add($"{archRel} (architect-build-persist hard-restore): {ex.Message}");
             Debug.LogError($"[DemonKnight] HardRestore ArchitectBuildPersist FAILED: {ex.Message}");
         }
     }
+
 
     private static void WriteReplacing(string dest, string text, bool deleteFirst)
     {
@@ -1509,13 +1536,10 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("class ArthurianArchitectBuildPersist")
-                   && body.Contains("PromoteClassPoolIntoResources")
-                   && body.Contains("PromoteLegendPewIntoResources")
-                   && body.Contains("PromoteBattleGoodEvilIntoResources")
-                   && body.Contains("PromoteStageLayoutIntoResources")
-                   && body.Contains("IPreprocessBuildWithReport")
-                   && body.Contains("PrepareForPlayerBuild");
+            // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
+            return body.Contains("ArthurianArtArchitectWindow.cs")
+                   && !body.Contains("class ArthurianArchitectBuildPersist")
+                   && body.Contains("fix-build-persist-embed");
         }
 
         if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
@@ -1797,7 +1821,8 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("church-train-scout-ux")
                    || body.Contains("body-face-pool-build-persist")
                    || body.Contains("battle-good-evil-sprite-pools")
-                   || body.Contains("fix-architect-build-persist-cs0103");
+                   || body.Contains("fix-architect-build-persist-cs0103")
+                   || body.Contains("fix-build-persist-embed");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
@@ -1854,8 +1879,12 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-architect-build-persist-cs0103")) return false;
+        if (!body.Contains("fix-build-persist-embed")) return false;
         if (!body.Contains("UiBuildId")) return false;
+        // Embed + SoftPromote belt (CS0103 after Force Sync wiping standalone BuildPersist).
+        if (!body.Contains("class ArthurianArchitectBuildPersist")) return false;
+        if (!body.Contains("SoftPromoteClassPoolIntoResources")) return false;
+        if (!body.Contains("IPreprocessBuildWithReport")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;
         if (body.Contains("enum SheetCategory")) return false;

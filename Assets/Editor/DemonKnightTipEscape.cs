@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-architect-build-persist-cs0103";
+    public const string TipPackageId = "fix-build-persist-embed";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -42,7 +42,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-architect-build-persist-cs0103)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-build-persist-embed)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -91,10 +91,14 @@ public static class DemonKnightTipEscape
         if (pvBody.IndexOf("Id = \"" + TipPackageId + "\"", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
         if (syncBody.IndexOf(TipPackageId, StringComparison.Ordinal) < 0) return true;
-        // CS0103 guard: Sync must HardRestore BuildPersist (ForceOverwrite+Force Delete skip race).
+        // CS0103 guard: Sync HardRestore + Architect embed SoftPromote belt.
         if (syncBody.IndexOf("HardRestoreArchitectBuildPersist", StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0) return true;
+        if (archBody.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0) return true;
         string bpBody = File.ReadAllText(buildPersist);
-        if (bpBody.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0) return true;
+        // Standalone must be stub (type embedded in Architect) — full class = CS0101 risk / stale.
+        if (bpBody.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0) return true;
+        if (bpBody.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0) return true;
         // CS0117: tip Architect must never call PackageVersion.Wipe*
         if (archBody.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0) return true;
 
@@ -147,6 +151,7 @@ public static class DemonKnightTipEscape
             "fix-somerset-church-ui-cs0246",
             "body-face-pool-build-persist",
             "battle-good-evil-sprite-pools",
+            "fix-architect-build-persist-cs0103",
         };
         foreach (string s in stale)
         {
@@ -189,6 +194,11 @@ public static class DemonKnightTipEscape
                 if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                     && body.IndexOf("WipeModularPaperdollAssets", StringComparison.Ordinal) >= 0)
                     throw new Exception("Architect still calls PackageVersion.Wipe* (CS0117)");
+                if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
+                    && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
+                        || body.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
+                        || body.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0))
+                    throw new Exception("Architect missing embedded BuildPersist / SoftPromote");
                 if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
                         || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
@@ -202,10 +212,9 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0))
                     throw new Exception("SomersetChurchUI missing tip church markers");
                 if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
-                    && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
-                        || body.IndexOf("PromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
-                        || body.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0))
-                    throw new Exception("ArthurianArchitectBuildPersist missing tip markers");
+                    && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0))
+                    throw new Exception("ArthurianArchitectBuildPersist must be stub → Architect embed");
                 if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                     || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
                 {
