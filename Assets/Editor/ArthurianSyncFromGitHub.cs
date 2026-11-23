@@ -23,17 +23,17 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Ship pin = this tip feature SHA (fix-class-pool-kind-cs0019). Prefer API tip / raw@main FIRST.
-    private const string FallbackCommitSha = "63985eda93c024467cc66bf4a7a62f28772018f6";
+    // Ship pin = this tip feature SHA (fix-profile-so-script-assets). Prefer API tip / raw@main FIRST.
+    private const string FallbackCommitSha = "3f02c63dc5e2bfe6809de805bd18c619ab955666";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "ec89073a9552769b588299f5a4be0bf2e992aeb2";
+    public const string HardTipCommitSha = "3f02c63dc5e2bfe6809de805bd18c619ab955666";
 
-    private const string ExpectedPackageId = "fix-class-pool-kind-cs0019";
+    private const string ExpectedPackageId = "fix-profile-so-script-assets";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -78,6 +78,7 @@ public static class ArthurianSyncFromGitHub
         "fix-architect-build-persist-cs0103",
         "fix-build-persist-embed",
         "fix-pew-body-pool-empty",
+        "fix-class-pool-kind-cs0019",
     };
 
     /// <summary>
@@ -94,7 +95,13 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         "Assets/Editor/ArthurianArchitectBuildPersist.cs", // stub — type embedded in ArchitectWindow
-        // Embed host for SceneBackgroundApplier + ClassSpritePoolApplier (CS0103 hard fix).
+        // Named MonoScript Profile SOs (Unity requires class name == file name).
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/SceneBackgroundProfile.cs",
+        "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
+        "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
+        "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
+        // Applier embed host for SceneBackgroundApplier + ClassSpritePoolApplier (CS0103 hard fix).
         "Assets/Scripts/Data/GameDataTypes.cs",
     };
 
@@ -143,9 +150,14 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // Phase 2–5 types are EMBEDDED (GameDataTypes / PaperDoll / GameLoop / TavernDice).
-        // Do NOT download SpriteAnimClip/StageLayoutProfile/ModularSpriteLibrary/
+        // Architect *Profile SOs = named MonoScript files (tip fix-profile-so-script-assets).
+        // Still do NOT download SpriteAnimClip/ModularSpriteLibrary/
         // ModularSpriteAnimator/StageParallaxController/DiceManager standalones (CS0101).
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/SceneBackgroundProfile.cs",
+        "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
+        "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
+        "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
         // BuildPersist early — before Architect Save Promote* consumer (CS0103).
@@ -215,7 +227,12 @@ public static class ArthurianSyncFromGitHub
         "Assets/Editor/ArthurianMenuBootstrap.cs",
         "Assets/Editor/DemonKnightPackageVersion.cs",
         "Assets/Scripts/Systems/DemonKnightCompatApi.cs",
-        // Phase 2–5 types embedded in hosts below — no standalone downloads.
+        // Named MonoScript Profiles + Applier embed host (tip fix-profile-so-script-assets).
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/SceneBackgroundProfile.cs",
+        "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
+        "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
+        "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
         "Assets/Scripts/Data/GameDataTypes.cs",
         // Stub paths only — real Appliers live in GameDataTypes (AtomicCritical via embed host).
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
@@ -253,6 +270,12 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     private static readonly string[] MustRestoreUiHelpers =
     {
+        // Named MonoScript Profiles — must survive Force Delete (Unity SO MonoScript binding).
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/SceneBackgroundProfile.cs",
+        "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
+        "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
+        "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
         // PRIMARY Applier embed host — must survive every Force Delete (DA-59 + hardfix).
         "Assets/Scripts/Data/GameDataTypes.cs",
         // Stub paths — rewrite leftovers so CS0101 cannot win against GameDataTypes embeds.
@@ -274,10 +297,14 @@ public static class ArthurianSyncFromGitHub
     };
 
     /// <summary>Standalone Phase 2–5 paths — never download; delete if they redefine embeds.</summary>
+    /// <summary>
+    /// Standalones that redefine types still embedded elsewhere (CS0101).
+    /// StageLayoutProfile (+ other Architect *Profiles) are REAL named MonoScripts now — NOT killed.
+    /// tip: fix-profile-so-script-assets
+    /// </summary>
     public static readonly string[] Phase25StandaloneKillList =
     {
         "Assets/Scripts/Data/SpriteAnimClip.cs",
-        "Assets/Scripts/Data/StageLayoutProfile.cs",
         "Assets/Scripts/Data/ModularSpriteLibrary.cs",
         "Assets/Scripts/UI/ModularSpriteAnimator.cs",
         "Assets/Scripts/Systems/StageParallaxController.cs",
@@ -898,6 +925,13 @@ public static class ArthurianSyncFromGitHub
                     if (IsMustRestoreUiHelper(rel)) continue;
                     // Never wipe GameDataTypes even if somehow missing from MustRestore (Applier embed).
                     if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)) continue;
+                    // Never wipe named MonoScript Profile SOs (Unity SO binding — tip fix-profile-so-script-assets).
+                    if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
+                        || rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase)
+                        || rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
+                        || rel.EndsWith("LegendPewPortraitProfile.cs", StringComparison.OrdinalIgnoreCase)
+                        || rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
+                        continue;
                     // Never wipe SomersetChurchUI — stale Sync MustRestore omitted it → CS0246.
                     if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)) continue;
                     // Never wipe ArchitectBuildPersist — ForceOverwrite host + Force Delete skip race → CS0103.
@@ -961,6 +995,7 @@ public static class ArthurianSyncFromGitHub
             StubPhase25StandalonesOver(projectRoot, errors);
             // Hard guarantee: Applier stubs on disk; types in GameDataTypes.
             StubApplierStandalonesOver(projectRoot, errors);
+            HardRestoreNamedProfileScripts(projectRoot, sha, errors, okFiles);
             HardRestoreApplierEmbedHost(projectRoot, sha, errors, okFiles);
             HardRestoreSomersetChurchUI(projectRoot, sha, errors, okFiles);
             HardRestoreArchitectBuildPersist(projectRoot, sha, errors, okFiles);
@@ -1236,10 +1271,11 @@ public static class ArthurianSyncFromGitHub
             if (text.IndexOf("class SceneBackgroundApplier", StringComparison.Ordinal) < 0
                 || text.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
                 || text.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
-                || text.IndexOf("class LegendPewPortraitProfile", StringComparison.Ordinal) < 0
                 || text.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
-                || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0)
-                throw new Exception("GameDataTypes missing embedded Appliers (" + source + ")");
+                || text.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
+                || text.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0
+                || text.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0)
+                throw new Exception("GameDataTypes Appliers/tip markers bad (" + source + ")");
             WriteReplacing(dest, text, deleteFirst: true);
             VerifyOnDisk(gdt, dest, relaxPackageId: true);
             if (!okFiles.Contains(gdt)) okFiles.Add(gdt);
@@ -1250,6 +1286,57 @@ public static class ArthurianSyncFromGitHub
         {
             errors.Add($"{gdt} (applier hard-restore): {ex.Message}");
             Debug.LogError($"[DemonKnight] HardRestore Applier embed FAILED: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Last-resort: re-download named MonoScript Profile SOs after every Force Sync.
+    /// Unity requires each SO class in Assets/Scripts/Data/&lt;ExactClassName&gt;.cs.
+    /// Independent of MustRestore so a stale Sync cannot leave "No script asset for *Profile".
+    /// tip: fix-profile-so-script-assets
+    /// </summary>
+    static void HardRestoreNamedProfileScripts(
+        string projectRoot,
+        string sha,
+        List<string> errors,
+        List<string> okFiles)
+    {
+        string[] rels =
+        {
+            "Assets/Scripts/Data/StageLayoutProfile.cs",
+            "Assets/Scripts/Data/SceneBackgroundProfile.cs",
+            "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
+            "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
+            "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
+        };
+        string[] markers =
+        {
+            "class StageLayoutProfile",
+            "class SceneBackgroundProfile",
+            "class ClassSpritePoolProfile",
+            "class LegendPewPortraitProfile",
+            "class BattleGoodEvilSpritePoolProfile",
+        };
+        for (int i = 0; i < rels.Length; i++)
+        {
+            string rel = rels[i];
+            try
+            {
+                string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+                string text = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
+                if (text.IndexOf(markers[i], StringComparison.Ordinal) < 0
+                    || text.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0)
+                    throw new Exception(rel + " missing SO class/tip (" + source + ")");
+                WriteReplacing(dest, text, deleteFirst: true);
+                VerifyOnDisk(rel, dest, relaxPackageId: true);
+                if (!okFiles.Contains(rel)) okFiles.Add(rel);
+                Debug.Log($"[DemonKnight] HardRestore named Profile {rel} via {source} @ {sha}");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{rel} (profile hard-restore): {ex.Message}");
+                Debug.LogError($"[DemonKnight] HardRestore named Profile FAILED {rel}: {ex.Message}");
+            }
         }
     }
 
@@ -1309,7 +1396,7 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
-                || (archBody.IndexOf("fix-class-pool-kind-cs0019", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
                     && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist (" + source + ")");
@@ -1336,7 +1423,7 @@ public static class ArthurianSyncFromGitHub
                     + "// Types live in ArthurianArtArchitectWindow.cs (Force Sync embed — avoids CS0103 when this" + "\n"
                     + "// standalone path is wiped by Force Delete under a stale compiled Sync host)." + "\n"
                     + "// This stub overwrites any leftover full copy so we never get CS0101 duplicates." + "\n"
-                    + "// tip: fix-class-pool-kind-cs0019" + "\n"
+                    + "// tip: fix-profile-so-script-assets" + "\n"
                     + "#endif" + "\n";
             }
             WriteReplacing(stubDest, stubBody, deleteFirst: true);
@@ -1473,6 +1560,7 @@ public static class ArthurianSyncFromGitHub
         if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase))
         {
             // MenuListSortMode must live here so LegendCodexUI / SomersetChurchUI never CS0246.
+            // Architect *Profile SOs are named MonoScript files (tip fix-profile-so-script-assets) — must NOT be redefined here.
             return body.Contains("enum MenuListSortMode")
                    && body.Contains("HighestHp")
                    && body.Contains("HighestAttack")
@@ -1486,34 +1574,62 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("class IntelGossip")
                    && body.Contains("class FlockEconomy")
                    && body.Contains("PewRowSize = 13")
-                   // DA-59 nuclear embeds — types live here so stale Sync hosts still compile.
                    && body.Contains("class SpriteAnimClip")
-                   && body.Contains("class StageLayoutProfile")
                    && body.Contains("class ModularSpriteLibrary")
-                   && body.Contains("previewOrOverrideSprite")
-                   && body.Contains("assignedCharacterId")
-                   && body.Contains("ChurchPewCount = 52")
-                   && body.Contains("class SceneBackgroundProfile")
-                   && body.Contains("enum SceneBackgroundSlot")
-                   && body.Contains("class ClassSpritePoolProfile")
-                   && body.Contains("peasantSprites")
-                   && body.Contains("warriorSprites")
-                   && body.Contains("knightSprites")
-                   && body.Contains("class LegendPewPortraitProfile")
+                   && !body.Contains("class StageLayoutProfile")
+                   && !body.Contains("class SceneBackgroundProfile")
+                   && !body.Contains("class ClassSpritePoolProfile")
+                   && !body.Contains("class LegendPewPortraitProfile")
+                   && !body.Contains("class BattleGoodEvilSpritePoolProfile")
                    && body.Contains("class LegendPewPortraitApplier")
                    && body.Contains("GetLegendFace")
                    && body.Contains("PickPewProfile")
                    && body.Contains("ResolvePewFaceOverlay")
                    && body.Contains("IsFacePoolSprite")
-                   && body.Contains("class BattleGoodEvilSpritePoolProfile")
                    && body.Contains("class BattleGoodEvilSpritePoolApplier")
-                   && body.Contains("battle-good-evil-sprite-pools")
-                   // force-sync-appliers-hardfix — Appliers embedded here (not standalones).
                    && body.Contains("class SceneBackgroundApplier")
                    && body.Contains("ApplyToUiHost")
                    && body.Contains("class ClassSpritePoolApplier")
                    && body.Contains("PickForRecruit")
-                   && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers");
+                   && body.Contains("force-sync-appliers-hardfix EMBEDDED Appliers")
+                   && body.Contains("fix-profile-so-script-assets");
+        }
+
+        if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class StageLayoutProfile")
+                   && body.Contains("ChurchPewCount = 52")
+                   && body.Contains("previewOrOverrideSprite")
+                   && body.Contains("RematerializeSpritesFromPaths")
+                   && body.Contains("fix-profile-so-script-assets");
+        }
+        if (rel.EndsWith("SceneBackgroundProfile.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class SceneBackgroundProfile")
+                   && body.Contains("enum SceneBackgroundSlot")
+                   && body.Contains("RematerializeSpritesFromPaths")
+                   && body.Contains("fix-profile-so-script-assets");
+        }
+        if (rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class ClassSpritePoolProfile")
+                   && body.Contains("peasantSprites")
+                   && body.Contains("TryLoadSpriteAtPath")
+                   && body.Contains("fix-profile-so-script-assets");
+        }
+        if (rel.EndsWith("LegendPewPortraitProfile.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class LegendPewPortraitProfile")
+                   && body.Contains("CanonicalLegendSlots")
+                   && body.Contains("RematerializeSpritesFromPaths")
+                   && body.Contains("fix-profile-so-script-assets");
+        }
+        if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class BattleGoodEvilSpritePoolProfile")
+                   && body.Contains("CanonicalBossSlots")
+                   && body.Contains("RematerializeSpritesFromPaths")
+                   && body.Contains("fix-profile-so-script-assets");
         }
 
         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase))
@@ -1528,9 +1644,9 @@ public static class ArthurianSyncFromGitHub
             return body.Contains("GameDataTypes.cs") && !body.Contains("class ClassSpritePoolApplier");
         }
 
-        // Phase 2–5 standalones are NOT synced — reject any download that would redefine embeds.
-        if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
-            || rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase)
+        // Remaining Phase 2–5 standalones are NOT synced (still embedded elsewhere).
+        // StageLayoutProfile.cs (+ sibling *Profile.cs) ARE synced — named MonoScripts (tip fix-profile-so-script-assets).
+        if (rel.EndsWith("SpriteAnimClip.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteLibrary.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("ModularSpriteAnimator.cs", StringComparison.OrdinalIgnoreCase)
             || rel.EndsWith("StageParallaxController.cs", StringComparison.OrdinalIgnoreCase)
@@ -1544,7 +1660,8 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && (body.Contains("fix-class-pool-kind-cs0019")
+                   && (body.Contains("fix-profile-so-script-assets")
+                       || body.Contains("fix-class-pool-kind-cs0019")
                        || body.Contains("fix-pew-body-pool-empty")
                        || body.Contains("fix-build-persist-embed"));
         }
@@ -1831,7 +1948,8 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("fix-architect-build-persist-cs0103")
                    || body.Contains("fix-build-persist-embed")
                    || body.Contains("fix-pew-body-pool-empty")
-                   || body.Contains("fix-class-pool-kind-cs0019");
+                   || body.Contains("fix-class-pool-kind-cs0019")
+                   || body.Contains("fix-profile-so-script-assets");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
@@ -1888,7 +2006,8 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-class-pool-kind-cs0019")
+        if (!body.Contains("fix-profile-so-script-assets")
+            && !body.Contains("fix-class-pool-kind-cs0019")
             && !body.Contains("fix-pew-body-pool-empty")
             && !body.Contains("fix-build-persist-embed")) return false;
         // CS0019 belt: ClassPoolKind must map to UnitType (never compare enums directly).

@@ -11,8 +11,9 @@ using UnityEngine;
 
 /// <summary>
 /// Ensures Assets/Resources/StageLayoutProfile.asset exists with 52/52/20 slots.
-/// After DA-59 embed into GameDataTypes.cs, old assets keep a stale MonoScript GUID →
-/// "referenced script is missing". We delete + recreate when Load fails.
+/// Profiles are named MonoScript files (Assets/Scripts/Data/<ExactClassName>.cs).
+/// Old assets may still point at GameDataTypes embed GUID/fileID → remap via probe.
+/// tip: fix-profile-so-script-assets
 ///
 /// ALSO: chicken-egg escape from architect-breakglass-hosts. This file is Force-Synced via
 /// tip SHA (not HardTip host overwrite). OnLoad pulls tip PackageVersion/Sync/Bootstrap/Architect
@@ -24,7 +25,7 @@ public static class ArthurianStageLayoutProfileEnsure
     const string AssetPath = "Assets/Resources/StageLayoutProfile.asset";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
-    const string TipPackageId = "fix-class-pool-kind-cs0019";
+    const string TipPackageId = "fix-profile-so-script-assets";
     const string SceneBgAssetPath = "Assets/Resources/SceneBackgroundProfile.asset";
     const string ClassPoolAssetPath = "Assets/Resources/ClassSpritePoolProfile.asset";
     const string LegendPewAssetPath = "Assets/Resources/LegendPewPortraitProfile.asset";
@@ -74,6 +75,7 @@ public static class ArthurianStageLayoutProfileEnsure
         "fix-architect-build-persist-cs0103",
         "fix-build-persist-embed",
         "fix-pew-body-pool-empty",
+        "fix-class-pool-kind-cs0019",
     };
 
     [MenuItem("Arthurian/Ensure Stage Layout Profile", false, 55)]
@@ -560,10 +562,9 @@ public static class ArthurianStageLayoutProfileEnsure
         => TryRemapScriptGuid(fullPath, typeof(BattleGoodEvilSpritePoolProfile));
 
     /// <summary>
-    /// After embed into GameDataTypes.cs, SO assets need BOTH the host .cs GUID and the
-    /// multi-class MonoScript local fileID (not hardcoded 11500000). Wrong fileID → Unity
-    /// logs "referenced script … is missing", Resources.Load returns null, Ensure wiped
-    /// pools on reopen. tip: fix-class-pool-kind-cs0019
+    /// Bind asset m_Script to the named MonoScript for this SO type (class name == file name).
+    /// Probe CreateAsset reads Unity's exact fileID+guid (11500000 for single-SO files).
+    /// Remap preserves YAML assigns — never wipe pools on reopen. tip: fix-profile-so-script-assets
     /// </summary>
     static bool TryRemapScriptGuid(string fullPath, Type soType)
     {
@@ -600,8 +601,8 @@ public static class ArthurianStageLayoutProfileEnsure
     }
 
     /// <summary>
-    /// Probe CreateAsset writes the exact multi-class fileID Unity expects for this SO type.
-    /// Fallback: MonoScript TryGetGUIDAndLocalFileIdentifier / path GUID + 11500000.
+    /// Probe CreateAsset writes the exact MonoScript fileID+guid Unity expects for this SO type.
+    /// Named Profile files use fileID 11500000; fallback still probes for safety. tip: fix-profile-so-script-assets
     /// </summary>
     static bool TryResolveScriptRef(Type soType, out long localId, out string newGuid)
     {

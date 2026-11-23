@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-class-pool-kind-cs0019";
+    public const string TipPackageId = "fix-profile-so-script-assets";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -24,7 +24,13 @@ public static class DemonKnightTipEscape
         "Assets/Editor/DemonKnightPackageVersion.cs",
         // PewLayout before Architect — SeatShowsSprite must exist if Architect still calls it.
         "Assets/Scripts/UI/SomersetPewLayout.cs",
-        // Embed host BEFORE stubs — Appliers live in GameDataTypes (force-sync-appliers-hardfix marker kept).
+        // Named MonoScript Profiles BEFORE GameDataTypes Appliers (tip fix-profile-so-script-assets).
+        "Assets/Scripts/Data/StageLayoutProfile.cs",
+        "Assets/Scripts/Data/SceneBackgroundProfile.cs",
+        "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
+        "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
+        "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
+        // Applier embed host — Appliers stay in GameDataTypes.
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
@@ -42,7 +48,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-class-pool-kind-cs0019)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-profile-so-script-assets)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -154,20 +160,31 @@ public static class DemonKnightTipEscape
             "fix-architect-build-persist-cs0103",
             "fix-build-persist-embed",
             "fix-pew-body-pool-empty",
+            "fix-class-pool-kind-cs0019",
         };
         foreach (string s in stale)
         {
             if (pvBody.IndexOf("Id = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
             if (archBody.IndexOf("UiBuildId = \"" + s + "\"", StringComparison.Ordinal) >= 0) return true;
         }
-        // tip fix-class-pool-kind-cs0019: ClassPoolKind→UnitType CS0019; keep pew-body Persist/fileID belt.
+        // tip fix-profile-so-script-assets: ClassPoolKind→UnitType CS0019; keep pew-body Persist/fileID belt.
         // Escape wrote tip fix-pew-body-pool-empty with ClassPoolKind == UnitType (broken Architect) — force pull.
         if (archBody.IndexOf("selectedClassPool == UnitType.", StringComparison.Ordinal) >= 0) return true;
         if (archBody.IndexOf("ClassPoolKind.Warrior => UnitType.Warrior", StringComparison.Ordinal) < 0) return true;
+        string stageSo = Path.Combine(root, "Assets", "Scripts", "Data", "StageLayoutProfile.cs");
+        string classSo = Path.Combine(root, "Assets", "Scripts", "Data", "ClassSpritePoolProfile.cs");
+        string battleSo = Path.Combine(root, "Assets", "Scripts", "Data", "BattleGoodEvilSpritePoolProfile.cs");
+        if (!File.Exists(stageSo) || !File.Exists(classSo) || !File.Exists(battleSo)) return true;
+        if (File.ReadAllText(stageSo).IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0) return true;
+        string gdtPath = Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs");
+        if (File.Exists(gdtPath)
+            && File.ReadAllText(gdtPath).IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0)
+            return true; // stale embed — need named MonoScript extract
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
         string ensureBody = File.ReadAllText(ensurePath);
         if (ensureBody.IndexOf("TryResolveScriptRef", StringComparison.Ordinal) < 0) return true;
+        if (ensureBody.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0) return true;
         if (archBody.IndexOf("TryPewBodyFallbackFromGoodTroops", StringComparison.Ordinal) < 0
             && File.ReadAllText(Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs"))
@@ -219,8 +236,16 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
                         || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
                         || body.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
-                        || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0))
-                    throw new Exception("GameDataTypes missing embedded Appliers");
+                        || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0
+                        || body.IndexOf("fix-profile-so-script-assets", StringComparison.Ordinal) < 0))
+                    throw new Exception("GameDataTypes must keep Appliers and NOT redefine Profile SOs");
+                if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
+                    && body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0)
+                    throw new Exception("StageLayoutProfile.cs missing SO class");
+                if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
+                    && body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0)
+                    throw new Exception("BattleGoodEvilSpritePoolProfile.cs missing SO class");
                 if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
                         || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0

@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-class-pool-kind-cs0019";
-    public const string GitHint = "fix-class-pool-kind-cs0019";
-    public const string BuiltUtc = "2026-11-23T04:25:00Z";
+    public const string Id = "fix-profile-so-script-assets";
+    public const string GitHint = "fix-profile-so-script-assets";
+    public const string BuiltUtc = "2026-11-23T05:30:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "ec89073a9552769b588299f5a4be0bf2e992aeb2";
+    public const string HardTipSha = "3f02c63dc5e2bfe6809de805bd18c619ab955666";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -77,7 +77,13 @@ public static class DemonKnightPackageVersion
                 {
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
-                    // Applier embed host FIRST — CS0103 hard fix under stale Sync.
+                    // Named MonoScript Profile SOs BEFORE GameDataTypes Appliers (tip fix-profile-so-script-assets).
+                    "Assets/Scripts/Data/StageLayoutProfile.cs",
+                    "Assets/Scripts/Data/SceneBackgroundProfile.cs",
+                    "Assets/Scripts/Data/ClassSpritePoolProfile.cs",
+                    "Assets/Scripts/Data/LegendPewPortraitProfile.cs",
+                    "Assets/Scripts/Data/BattleGoodEvilSpritePoolProfile.cs",
+                    // Applier embed host — Appliers stay here; Profiles are named files.
                     "Assets/Scripts/Data/GameDataTypes.cs",
                     "Assets/Scripts/UI/SomersetChurchUI.cs",
                     "Assets/Scripts/UI/SceneBackgroundApplier.cs",
@@ -110,8 +116,18 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("class ClassSpritePoolApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class LegendPewPortraitApplier", StringComparison.Ordinal) < 0
                                 || body.IndexOf("class BattleGoodEvilSpritePoolApplier", StringComparison.Ordinal) < 0
-                                || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0))
-                            throw new Exception("GameDataTypes missing embedded Appliers");
+                                || body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) >= 0
+                                || body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) >= 0))
+                            throw new Exception("GameDataTypes must keep Appliers and NOT redefine Profile SOs");
+                        if (rel.EndsWith("StageLayoutProfile.cs", StringComparison.OrdinalIgnoreCase)
+                            && body.IndexOf("class StageLayoutProfile", StringComparison.Ordinal) < 0)
+                            throw new Exception("StageLayoutProfile.cs missing SO class");
+                        if (rel.EndsWith("ClassSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
+                            && body.IndexOf("class ClassSpritePoolProfile", StringComparison.Ordinal) < 0)
+                            throw new Exception("ClassSpritePoolProfile.cs missing SO class");
+                        if (rel.EndsWith("BattleGoodEvilSpritePoolProfile.cs", StringComparison.OrdinalIgnoreCase)
+                            && body.IndexOf("class BattleGoodEvilSpritePoolProfile", StringComparison.Ordinal) < 0)
+                            throw new Exception("BattleGoodEvilSpritePoolProfile.cs missing SO class");
                         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
@@ -248,6 +264,7 @@ public static class DemonKnightPackageVersion
             "fix-architect-build-persist-cs0103",
             "fix-build-persist-embed",
             "fix-pew-body-pool-empty",
+            "fix-class-pool-kind-cs0019",
         };
         foreach (string s in stale)
         {
