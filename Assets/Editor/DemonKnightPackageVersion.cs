@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "battle-good-evil-sprite-pools";
-    public const string GitHint = "battle-good-evil-sprite-pools";
-    public const string BuiltUtc = "2026-11-23T01:25:00Z";
+    public const string Id = "fix-architect-build-persist-cs0103";
+    public const string GitHint = "fix-architect-build-persist-cs0103";
+    public const string BuiltUtc = "2026-11-23T01:34:10Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
@@ -117,6 +117,11 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                                 || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0))
                             throw new Exception("SomersetChurchUI missing tip church markers");
+                        if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
+                            && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
+                                || body.IndexOf("PromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
+                                || body.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0))
+                            throw new Exception("ArthurianArchitectBuildPersist missing tip markers");
                         // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
                         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                             || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
@@ -235,6 +240,7 @@ public static class DemonKnightPackageVersion
             "church-train-scout-ux",
             "fix-somerset-church-ui-cs0246",
             "body-face-pool-build-persist",
+            "battle-good-evil-sprite-pools",
         };
         foreach (string s in stale)
         {

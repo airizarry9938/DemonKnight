@@ -33,7 +33,7 @@ public static class ArthurianSyncFromGitHub
     /// </summary>
     public const string HardTipCommitSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
 
-    private const string ExpectedPackageId = "battle-good-evil-sprite-pools";
+    private const string ExpectedPackageId = "fix-architect-build-persist-cs0103";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -74,6 +74,7 @@ public static class ArthurianSyncFromGitHub
         "church-train-scout-ux",
         "fix-somerset-church-ui-cs0246",
         "body-face-pool-build-persist",
+        "battle-good-evil-sprite-pools",
     };
 
     /// <summary>
@@ -144,6 +145,7 @@ public static class ArthurianSyncFromGitHub
         // ModularSpriteAnimator/StageParallaxController/DiceManager standalones (CS0101).
         "Assets/Scripts/Data/GameDataTypes.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        // BuildPersist early — before Architect Save Promote* consumer (CS0103).
         "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         "Assets/Editor/DemonKnightTipEscape.cs",
@@ -216,6 +218,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        // BuildPersist before Architect consumer (Force Delete+skip race → CS0103).
+        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // PewSeatHoverHighlight + MenuListSortBar are EMBEDDED in these two files.
         "Assets/Scripts/UI/PaperDollSeatView.cs",
@@ -252,6 +256,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/SceneBackgroundApplier.cs",
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Editor/ArthurianStageLayoutProfileEnsure.cs",
+        // Architect Save Promote* type — Force Delete wiped while Architect stayed → CS0103.
+        "Assets/Editor/ArthurianArchitectBuildPersist.cs",
         "Assets/Editor/ArthurianArtArchitectWindow.cs",
         // Embed hosts (DA-59 — Phase 2–5 types live here).
         "Assets/Scripts/UI/PaperDollSeatView.cs",
@@ -891,6 +897,8 @@ public static class ArthurianSyncFromGitHub
                     if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)) continue;
                     // Never wipe SomersetChurchUI — stale Sync MustRestore omitted it → CS0246.
                     if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)) continue;
+                    // Never wipe ArchitectBuildPersist — ForceOverwrite host + Force Delete skip race → CS0103.
+                    if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)) continue;
                     TryDeleteFile(Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar)));
                 }
                 // Force Delete must not leave Phase 2–5 standalones either.
@@ -952,6 +960,7 @@ public static class ArthurianSyncFromGitHub
             StubApplierStandalonesOver(projectRoot, errors);
             HardRestoreApplierEmbedHost(projectRoot, sha, errors, okFiles);
             HardRestoreSomersetChurchUI(projectRoot, sha, errors, okFiles);
+            HardRestoreArchitectBuildPersist(projectRoot, sha, errors, okFiles);
             TryFetchPhase25Insurance(errors, okFiles);
         }
         finally
@@ -1275,6 +1284,41 @@ public static class ArthurianSyncFromGitHub
         }
     }
 
+    /// <summary>
+    /// Last-resort: re-download ArthurianArchitectBuildPersist after every Force Sync.
+    /// Independent of MustRestore so a stale compiled Sync that wiped BuildPersist
+    /// (ForceOverwrite host + Force Delete skip race) still re-lands the type before
+    /// ArthurianArtArchitectWindow compile (CS0103 on Promote*).
+    /// </summary>
+    static void HardRestoreArchitectBuildPersist(
+        string projectRoot,
+        string sha,
+        List<string> errors,
+        List<string> okFiles)
+    {
+        const string rel = "Assets/Editor/ArthurianArchitectBuildPersist.cs";
+        try
+        {
+            string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+            string textBody = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
+            if (textBody.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
+                || textBody.IndexOf("PromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
+                || textBody.IndexOf("PromoteLegendPewIntoResources", StringComparison.Ordinal) < 0
+                || textBody.IndexOf("PromoteBattleGoodEvilIntoResources", StringComparison.Ordinal) < 0
+                || textBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0)
+                throw new Exception("ArthurianArchitectBuildPersist missing tip markers (" + source + ")");
+            WriteReplacing(dest, textBody, deleteFirst: true);
+            VerifyOnDisk(rel, dest, relaxPackageId: true);
+            if (!okFiles.Contains(rel)) okFiles.Add(rel);
+            Debug.Log($"[DemonKnight] HardRestore ArchitectBuildPersist via {source} @ {sha}");
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"{rel} (architect-build-persist hard-restore): {ex.Message}");
+            Debug.LogError($"[DemonKnight] HardRestore ArchitectBuildPersist FAILED: {ex.Message}");
+        }
+    }
+
     private static void WriteReplacing(string dest, string text, bool deleteFirst)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
@@ -1461,6 +1505,17 @@ public static class ArthurianSyncFromGitHub
             || rel.EndsWith("DiceManager.cs", StringComparison.OrdinalIgnoreCase))
         {
             return false;
+        }
+
+        if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return body.Contains("class ArthurianArchitectBuildPersist")
+                   && body.Contains("PromoteClassPoolIntoResources")
+                   && body.Contains("PromoteLegendPewIntoResources")
+                   && body.Contains("PromoteBattleGoodEvilIntoResources")
+                   && body.Contains("PromoteStageLayoutIntoResources")
+                   && body.Contains("IPreprocessBuildWithReport")
+                   && body.Contains("PrepareForPlayerBuild");
         }
 
         if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
@@ -1740,7 +1795,9 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("sprite-outline-highlight")
                    || body.Contains("fix-architect-pool-apply")
                    || body.Contains("church-train-scout-ux")
-                   || body.Contains("body-face-pool-build-persist");
+                   || body.Contains("body-face-pool-build-persist")
+                   || body.Contains("battle-good-evil-sprite-pools")
+                   || body.Contains("fix-architect-build-persist-cs0103");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
@@ -1797,7 +1854,7 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("battle-good-evil-sprite-pools")) return false;
+        if (!body.Contains("fix-architect-build-persist-cs0103")) return false;
         if (!body.Contains("UiBuildId")) return false;
         // Reject stale paperdoll multi-category bodies (this was blocking tip Sync).
         if (body.Contains("Paper-Doll Unit Generator")) return false;
