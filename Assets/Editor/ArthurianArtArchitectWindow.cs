@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-build-persist-embed";
+    public const string UiBuildId = "fix-pew-body-pool-empty";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -224,11 +224,26 @@ public class ArthurianArtArchitectWindow : EditorWindow
     void OnDisable()
     {
         EditorApplication.playModeStateChanged -= OnArchitectPlayModeChanged;
-        PersistStageProfile("OnDisable");
-        PersistSceneBgProfile("OnDisable");
-        PersistClassPoolProfile("OnDisable");
-        PersistLegendPewProfile("OnDisable");
-        PersistBattleGoodEvilProfile("OnDisable");
+        PersistAllProfiles("OnDisable");
+    }
+
+    void OnDestroy()
+    {
+        // Belt: some EditorWindow close paths hit OnDestroy without a reliable OnDisable Persist.
+        PersistAllProfiles("OnDestroy");
+    }
+
+    /// <summary>
+    /// Flush every Architect profile to disk + SoftPromote into Resources/ArchitectArt.
+    /// tip: fix-pew-body-pool-empty — assigns must survive window close / domain reload.
+    /// </summary>
+    void PersistAllProfiles(string reason)
+    {
+        PersistStageProfile(reason);
+        PersistSceneBgProfile(reason);
+        PersistClassPoolProfile(reason);
+        PersistLegendPewProfile(reason);
+        PersistBattleGoodEvilProfile(reason);
     }
 
     void OnArchitectPlayModeChanged(PlayModeStateChange state)
@@ -236,11 +251,9 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (state == PlayModeStateChange.ExitingEditMode
             || state == PlayModeStateChange.EnteredEditMode)
         {
-            PersistStageProfile("PlayMode:" + state);
-            PersistSceneBgProfile("PlayMode:" + state);
-            PersistClassPoolProfile("PlayMode:" + state);
-            PersistLegendPewProfile("PlayMode:" + state);
-            PersistBattleGoodEvilProfile("PlayMode:" + state);
+            PersistAllProfiles("PlayMode:" + state);
+            if (state == PlayModeStateChange.EnteredEditMode)
+                ReloadProfilesFromDisk("PlayModeEnteredEdit");
         }
     }
 
@@ -315,15 +328,61 @@ public class ArthurianArtArchitectWindow : EditorWindow
     void PersistSceneBgProfile(string reason)
     {
         if (sceneBgProfile == null) return;
-        if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sceneBgProfile)))
+        string path = AssetDatabase.GetAssetPath(sceneBgProfile);
+        if (string.IsNullOrEmpty(path))
         {
-            sceneBgProfile = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
-            if (sceneBgProfile == null) return;
+            // Non-asset CreateInstance stand-in — copy entries into disk asset (Stage Persist lesson).
+            var disk = ArthurianStageLayoutProfileEnsure.EnsureSceneBackgroundAsset();
+            if (disk != null && !ReferenceEquals(disk, sceneBgProfile))
+            {
+                CopySceneBgEntries(sceneBgProfile, disk);
+                sceneBgProfile = disk;
+                path = AssetDatabase.GetAssetPath(sceneBgProfile);
+                Debug.LogWarning(
+                    "[DemonKnight] Architect was editing a non-asset SceneBackgroundProfile — copied into "
+                    + path + " (" + reason + ").");
+            }
         }
+        if (sceneBgProfile == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sceneBgProfile)))
+            return;
+        sceneBgProfile.RematerializeSpritesFromPaths();
         SoftPromoteSceneBackgroundIntoResources(sceneBgProfile);
         EditorUtility.SetDirty(sceneBgProfile);
         AssetDatabase.SaveAssets();
         try { SceneBackgroundApplier.InvalidateCache(); } catch { /* ignore */ }
+    }
+
+    static void CopySceneBgEntries(SceneBackgroundProfile from, SceneBackgroundProfile to)
+    {
+        if (from == null || to == null) return;
+        from.EnsureDefaultEntries();
+        to.EnsureDefaultEntries();
+        if (from.entries == null) return;
+        to.entries ??= new List<SceneBackgroundEntry>();
+        for (int i = 0; i < from.entries.Count; i++)
+        {
+            var src = from.entries[i];
+            if (src == null) continue;
+            SceneBackgroundEntry dest = null;
+            for (int j = 0; j < to.entries.Count; j++)
+            {
+                if (to.entries[j] != null && to.entries[j].slot == src.slot)
+                {
+                    dest = to.entries[j];
+                    break;
+                }
+            }
+            if (dest == null)
+            {
+                dest = new SceneBackgroundEntry { slot = src.slot, displayName = src.displayName };
+                to.entries.Add(dest);
+            }
+            dest.displayName = src.displayName;
+            dest.imageSprite = src.imageSprite;
+            dest.videoClip = src.videoClip;
+            dest.imageAssetPath = src.imageAssetPath;
+            dest.videoAssetPath = src.videoAssetPath;
+        }
     }
 
     void PersistClassPoolProfile(string reason)
@@ -583,6 +642,15 @@ public class ArthurianArtArchitectWindow : EditorWindow
             string ap = AssetDatabase.GetAssetPath(sprites[i]);
             if (!string.IsNullOrEmpty(ap)) paths[i] = ap;
         }
+    }
+
+    static int CountNonEmptyPaths(List<string> paths)
+    {
+        if (paths == null) return 0;
+        int n = 0;
+        for (int i = 0; i < paths.Count; i++)
+            if (!string.IsNullOrEmpty(paths[i])) n++;
+        return n;
     }
 
     static void CopyStageSlots(StageLayoutProfile from, StageLayoutProfile to)
@@ -2446,9 +2514,30 @@ public class ArthurianArtArchitectWindow : EditorWindow
         classPoolScroll = EditorGUILayout.BeginScrollView(classPoolScroll, GUILayout.MinHeight(320f));
         if (pool.Count == 0)
         {
-            EditorGUILayout.HelpBox(
-                "Pool empty — church seats for this class keep StageLayout assign-guide / solid fallback.",
-                MessageType.Warning);
+            int pathBackups = CountNonEmptyPaths(
+                selectedClassPool == UnitType.Peasant ? classPoolProfile?.peasantAssetPaths
+                : selectedClassPool == UnitType.Warrior ? classPoolProfile?.warriorAssetPaths
+                : classPoolProfile?.knightAssetPaths);
+
+            if (pathBackups > 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "Sprite refs empty but " + pathBackups + " path backup(s) remain — click "
+                    + "'Reload from disk' or Save to rematerialize. If list stays blank after reload, "
+                    + "run Arthurian → Ensure Stage Layout Profile (remaps MonoScript GUID/fileID).",
+                    MessageType.Warning);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "Tab 4 BODY pool empty for " + selectedClassPool + ".\n"
+                    + "• Add full-body sprites here (Peasant / Warrior / Knight) then Save.\n"
+                    + "• Empty seats fall back to StageLayout assign-guides / solid color.\n"
+                    + "• Optional: if Tab 6 Good battle pools have troops, Play may use those as "
+                    + "pew BODY fallback ONLY while Tab 4 stays empty (prefer filling Tab 4).\n"
+                    + "• Assigns stick after close — tip fix-pew-body-pool-empty Persists on OnDisable/OnDestroy.",
+                    MessageType.Warning);
+            }
         }
         for (int i = 0; i < pool.Count; i++)
         {
@@ -4049,20 +4138,21 @@ public class ArthurianArtArchitectWindow : EditorWindow
 }
 
 
-// ===== fix-build-persist-embed EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
+// ===== fix-pew-body-pool-empty EMBEDDED ArthurianArchitectBuildPersist (Force Sync nuclear — do not remove) =====
 // Standalone ArthurianArchitectBuildPersist.cs is a stub only. Type lives HERE so MustRestore
 // Architect host always compiles Promote* + IPreprocessBuild (CS0103 hard fix after #47).
 /// <summary>
 /// Keeps Architect Resources profiles + artwork in player builds.
-/// tip: fix-build-persist-embed (embedded in ArthurianArtArchitectWindow)
+/// tip: fix-pew-body-pool-empty (embedded in ArthurianArtArchitectWindow)
 ///
 /// Profiles (StageLayout, ClassSpritePool, SceneBackground, LegendPewPortrait, BattleGoodEvil) live under
 /// Assets/Resources/ and must ship with the build. Ensure/Load rematerialize from path
 /// backups via Resources.Load / StreamingAssets — never Editor-only wipe at runtime.
+/// SoftPromote runs from Architect PersistAll on OnDisable/OnDestroy/Save.
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-build-persist-embed";
+    public const string TipId = "fix-pew-body-pool-empty";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

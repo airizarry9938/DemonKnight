@@ -1317,10 +1317,11 @@ namespace ArthurianAutobattler
         {
             SceneBackgroundProfile p = null;
             try { p = Resources.Load<SceneBackgroundProfile>(ResourcesPath); }
-            catch { /* missing script — fall through */ }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
             if (p != null)
             {
                 p.EnsureDefaultEntries();
+                p.RematerializeSpritesFromPaths();
                 return p;
             }
             try
@@ -1332,15 +1333,38 @@ namespace ArthurianAutobattler
                     {
                         if (all[i] == null) continue;
                         all[i].EnsureDefaultEntries();
+                        all[i].RematerializeSpritesFromPaths();
                         return all[i];
                     }
                 }
             }
-            catch { /* broken Resources asset */ }
+            catch { /* broken Resources asset / missing script spam — soft stand-in */ }
             p = CreateInstance<SceneBackgroundProfile>();
             p.name = "SceneBackgroundProfile_Runtime";
             p.EnsureDefaultEntries();
             return p;
+        }
+
+        /// <summary>
+        /// Restore Missing image sprites from path backups (Resources / StreamingAssets).
+        /// tip: fix-pew-body-pool-empty
+        /// </summary>
+        public int RematerializeSpritesFromPaths()
+        {
+            EnsureDefaultEntries();
+            if (entries == null) return 0;
+            int restored = 0;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var e = entries[i];
+                if (e == null || e.imageSprite != null) continue;
+                if (string.IsNullOrEmpty(e.imageAssetPath)) continue;
+                Sprite sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(e.imageAssetPath);
+                if (sp == null) continue;
+                e.imageSprite = sp;
+                restored++;
+            }
+            return restored;
         }
 
         public void EnsureDefaultEntries()
@@ -1414,11 +1438,13 @@ namespace ArthurianAutobattler
         {
             ClassSpritePoolProfile p = null;
             try { p = Resources.Load<ClassSpritePoolProfile>(ResourcesPath); }
-            catch { /* missing script — fall through */ }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
             if (p != null)
             {
                 p.EnsureLists();
                 p.isRuntimeStandIn = false;
+                // Paths filled + Sprite Missing after Sync → rematerialize before Applier picks.
+                p.RematerializeSpritesFromPaths();
                 return p;
             }
             try
@@ -1431,11 +1457,12 @@ namespace ArthurianAutobattler
                         if (all[i] == null) continue;
                         all[i].EnsureLists();
                         all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
                         return all[i];
                     }
                 }
             }
-            catch { /* broken Resources asset */ }
+            catch { /* broken Resources asset / missing script — soft stand-in */ }
             p = CreateInstance<ClassSpritePoolProfile>();
             p.name = "ClassSpritePoolProfile_Runtime";
             p.isRuntimeStandIn = true;
@@ -1576,9 +1603,23 @@ namespace ArthurianAutobattler
         {
             var pool = GetPool(type);
             if (pool == null) return 0;
+            EnsureLists();
+            List<string> paths = type switch
+            {
+                UnitType.Peasant => peasantAssetPaths,
+                UnitType.Warrior => warriorAssetPaths,
+                UnitType.Knight => knightAssetPaths,
+                _ => null
+            };
             int n = 0;
-            for (int i = 0; i < pool.Count; i++)
-                if (pool[i] != null) n++;
+            int count = pool.Count;
+            if (paths != null && paths.Count > count) count = paths.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (i < pool.Count && pool[i] != null) { n++; continue; }
+                // Path backup counts as usable — Rematerialize restores the Missing Sprite ref.
+                if (paths != null && i < paths.Count && !string.IsNullOrEmpty(paths[i])) n++;
+            }
             return n;
         }
     }
@@ -1642,11 +1683,12 @@ namespace ArthurianAutobattler
         {
             LegendPewPortraitProfile p = null;
             try { p = Resources.Load<LegendPewPortraitProfile>(ResourcesPath); }
-            catch { /* missing script — fall through */ }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
             if (p != null)
             {
                 p.EnsureSlotsAndLists();
                 p.isRuntimeStandIn = false;
+                p.RematerializeSpritesFromPaths();
                 return p;
             }
             try
@@ -1659,11 +1701,12 @@ namespace ArthurianAutobattler
                         if (all[i] == null) continue;
                         all[i].EnsureSlotsAndLists();
                         all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
                         return all[i];
                     }
                 }
             }
-            catch { /* broken Resources asset */ }
+            catch { /* broken Resources asset / missing script — soft stand-in */ }
             p = CreateInstance<LegendPewPortraitProfile>();
             p.name = "LegendPewPortraitProfile_Runtime";
             p.isRuntimeStandIn = true;
@@ -2131,7 +2174,16 @@ namespace ArthurianAutobattler
             {
                 if (_cache == null)
                 {
-                    try { _cache = SceneBackgroundProfile.Load(); }
+                    try
+                    {
+                        _cache = SceneBackgroundProfile.Load();
+                        if (_cache != null)
+                        {
+                            int restored = _cache.RematerializeSpritesFromPaths();
+                            if (restored > 0)
+                                Debug.Log($"[DemonKnight] SceneBackground rematerialized {restored} image(s) from path backups.");
+                        }
+                    }
                     catch (Exception ex)
                     {
                         Debug.LogWarning("[DemonKnight] SceneBackgroundProfile.Load soft-fail: " + ex.Message);
@@ -2152,35 +2204,52 @@ namespace ArthurianAutobattler
             }
         }
 
-        /// <summary>Apply still sprite to a UI Image when the slot has an image assignment.</summary>
+        /// <summary>Apply still sprite to a UI Image when the slot has an image assignment. Soft-fails on missing script.</summary>
         public static bool ApplyToImage(SceneBackgroundSlot slot, Image target, bool preserveColor = true)
         {
             if (target == null) return false;
-            var e = Get(slot);
-            Sprite sp = ResolveSprite(e);
-            if (sp == null) return false;
-            target.sprite = sp;
-            target.type = Image.Type.Simple;
-            target.preserveAspect = true;
-            if (!preserveColor) target.color = Color.white;
-            else if (target.color.a < 0.05f) target.color = Color.white;
-            return true;
+            try
+            {
+                var e = Get(slot);
+                Sprite sp = ResolveSprite(e);
+                if (sp == null) return false;
+                target.sprite = sp;
+                target.type = Image.Type.Simple;
+                target.preserveAspect = true;
+                if (!preserveColor) target.color = Color.white;
+                else if (target.color.a < 0.05f) target.color = Color.white;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] SceneBackgroundApplier.ApplyToImage soft-fail: " + ex.Message);
+                return false;
+            }
         }
 
-        /// <summary>Apply still sprite to a world SpriteRenderer.</summary>
+        /// <summary>Apply still sprite to a world SpriteRenderer. Soft-fails on missing script.</summary>
         public static bool ApplyToSpriteRenderer(SceneBackgroundSlot slot, SpriteRenderer target)
         {
             if (target == null) return false;
-            var e = Get(slot);
-            Sprite sp = ResolveSprite(e);
-            if (sp == null) return false;
-            target.sprite = sp;
-            target.color = Color.white;
-            return true;
+            try
+            {
+                var e = Get(slot);
+                Sprite sp = ResolveSprite(e);
+                if (sp == null) return false;
+                target.sprite = sp;
+                target.color = Color.white;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] SceneBackgroundApplier.ApplyToSpriteRenderer soft-fail: " + ex.Message);
+                return false;
+            }
         }
 
         /// <summary>
         /// Prefer video when assigned; otherwise still image. Returns true if anything applied.
+        /// Soft-fails when profile MonoScript GUID/fileID is stale after embed.
         /// Video plays into <paramref name="videoHost"/> (adds VideoPlayer + RawImage child if needed).
         /// </summary>
         public static bool ApplyToUiHost(
@@ -2188,19 +2257,27 @@ namespace ArthurianAutobattler
             Image imageTarget,
             RectTransform videoHostParent = null)
         {
-            var e = Get(slot);
-            if (e == null) return false;
-
-            VideoClip clip = ResolveVideo(e);
-            if (clip != null && videoHostParent != null)
+            try
             {
-                EnsureUiVideo(videoHostParent, clip);
-                if (imageTarget != null)
-                    imageTarget.color = new Color(0.1f, 0.1f, 0.1f, 0.35f);
-                return true;
-            }
+                var e = Get(slot);
+                if (e == null) return false;
 
-            return ApplyToImage(slot, imageTarget, preserveColor: false);
+                VideoClip clip = ResolveVideo(e);
+                if (clip != null && videoHostParent != null)
+                {
+                    EnsureUiVideo(videoHostParent, clip);
+                    if (imageTarget != null)
+                        imageTarget.color = new Color(0.1f, 0.1f, 0.1f, 0.35f);
+                    return true;
+                }
+
+                return ApplyToImage(slot, imageTarget, preserveColor: false);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] SceneBackgroundApplier.ApplyToUiHost soft-fail: " + ex.Message);
+                return false;
+            }
         }
 
         public static Sprite ResolveSprite(SceneBackgroundEntry e)
@@ -2528,11 +2605,20 @@ namespace ArthurianAutobattler
 
         /// <summary>
         /// BODY only — Tab 4 ClassSpritePool full pew/combat avatar.
+        /// Rematerializes from peasant/warrior/knightAssetPaths when Sprite refs are Missing.
+        /// Optional fallback: Tab 6 Good battle troop pools ONLY when Tab 4 body pool is empty
+        /// (documented — battle tokens are not the preferred pew pipeline).
         /// Never returns Tab 5 face-pool sprites as bodySprite (soft-fail skip).
+        /// tip: fix-pew-body-pool-empty
         /// </summary>
         public static Sprite ResolvePewVisual(RecruitInstance recruit)
         {
             Sprite body = ClassSpritePoolApplier.PickForRecruit(recruit);
+            if (body == null)
+            {
+                // Tab 4 empty (sprites + paths) → optional Tab 6 Good troop body fallback.
+                body = BattleGoodEvilSpritePoolApplier.TryPewBodyFallbackFromGoodTroops(recruit);
+            }
             if (body != null && TownsfolkVisualApplier.IsUsablePewSprite(body))
             {
                 if (IsFacePoolSprite(body))
@@ -2687,11 +2773,12 @@ namespace ArthurianAutobattler
         {
             BattleGoodEvilSpritePoolProfile p = null;
             try { p = Resources.Load<BattleGoodEvilSpritePoolProfile>(ResourcesPath); }
-            catch { /* missing script — fall through */ }
+            catch { /* missing MonoScript GUID/fileID after embed — fall through */ }
             if (p != null)
             {
                 p.EnsureSlotsAndLists();
                 p.isRuntimeStandIn = false;
+                p.RematerializeSpritesFromPaths();
                 return p;
             }
             try
@@ -2704,6 +2791,7 @@ namespace ArthurianAutobattler
                         if (all[i] == null) continue;
                         all[i].EnsureSlotsAndLists();
                         all[i].isRuntimeStandIn = false;
+                        all[i].RematerializeSpritesFromPaths();
                         return all[i];
                     }
                 }
@@ -3051,6 +3139,67 @@ namespace ArthurianAutobattler
             catch (Exception ex)
             {
                 Debug.LogWarning("[DemonKnight] BattleGoodEvilSpritePoolApplier.Resolve soft-fail: " + ex.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Pew BODY emergency fallback when Tab 4 ClassSpritePool is empty (sprites + paths).
+        /// Uses Tab 6 Good troop pools (Peasant/Warrior/Knight) ONLY — never Evil, never faces.
+        /// Documented optional path; preferred pipeline remains Tab 4. tip: fix-pew-body-pool-empty
+        /// </summary>
+        public static Sprite TryPewBodyFallbackFromGoodTroops(RecruitInstance recruit)
+        {
+            if (recruit == null) return null;
+            UnitType type = recruit.unitType;
+            if (type != UnitType.Peasant && type != UnitType.Warrior && type != UnitType.Knight)
+                return null;
+            try
+            {
+                var bodyProfile = ClassSpritePoolApplier.Profile;
+                if (bodyProfile != null)
+                {
+                    bodyProfile.RematerializeSpritesFromPaths();
+                    if (bodyProfile.CountUsable(type) > 0)
+                        return null; // Tab 4 has entries — do not steal from battle pools
+                }
+
+                var profile = Profile;
+                if (profile == null) return null;
+                profile.RematerializeSpritesFromPaths();
+                List<Sprite> pool = type switch
+                {
+                    UnitType.Peasant => profile.peasantBattleSprites,
+                    UnitType.Warrior => profile.warriorBattleSprites,
+                    UnitType.Knight => profile.knightBattleSprites,
+                    _ => null
+                };
+                if (pool == null || pool.Count == 0) return null;
+                var usable = new List<Sprite>();
+                for (int i = 0; i < pool.Count; i++)
+                {
+                    Sprite sp = pool[i];
+                    if (sp == null) continue;
+                    if (LegendPewPortraitApplier.IsFacePoolSprite(sp)) continue;
+                    if (!TownsfolkVisualApplier.IsUsablePewSprite(sp)) continue;
+                    usable.Add(sp);
+                }
+                if (usable.Count == 0) return null;
+                int seed = ClassSpritePoolApplier.StableHash(
+                    !string.IsNullOrEmpty(recruit.unitID)
+                        ? "pewbody-fallback:" + recruit.unitID
+                        : "pewbody-fallback:" + type + "#" + recruit.pewSeatIndex);
+                int want = Math.Abs(seed) % usable.Count;
+                Debug.LogWarning(
+                    "[DemonKnight] Tab 4 body pool empty for " + type
+                    + " — using Tab 6 Good battle pool as pew BODY fallback ("
+                    + usable[want].name + "). Fill Architect Tab 4 to prefer class pools.");
+                return usable[want];
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning(
+                    "[DemonKnight] Tab6 pew-body fallback soft-fail: " + ex.Message);
                 return null;
             }
         }

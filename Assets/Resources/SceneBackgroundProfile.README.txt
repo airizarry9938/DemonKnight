@@ -1,5 +1,9 @@
 SceneBackgroundProfile.asset — Tab 3 screen backgrounds (jpg/png / mp4).
 Must ship under Assets/Resources/ in player builds.
 imageAssetPath rematerializes via Resources.Load in builds (not Editor-only).
+Ensure remaps MonoScript GUID + multi-class fileID after GameDataTypes embed.
+Soft-fail Apply when Load hits missing script.
 Prepare Architect Art for Player Build → ArchitectArt/SceneBg/.
-tip: body-face-pool-build-persist
+tip: fix-pew-body-pool-empty
+Diagnose = fix-pew-body-pool-empty
+Escape: !!! Escape to Tip (fix-pew-body-pool-empty)

@@ -4,7 +4,10 @@ Created by Arthurian → Ensure Stage Layout Profile / Art & Stage Architect Tab
 Church spawn picks from the matching class pool (deterministic by unitID).
 Empty pools soft-fail to StageLayout assign-guide / solid fallbacks.
 Path backups rematerialize Missing sprites after reimport AND in player builds
-via Resources.Load / StreamingAssets (tip body-face-pool-build-persist).
+via Resources.Load / StreamingAssets (tip fix-pew-body-pool-empty).
+Ensure remaps MonoScript GUID + multi-class fileID (not 11500000-only).
+If Tab 4 empty, Play may optionally use Tab 6 Good troop pools as pew BODY fallback only.
 Before File → Build: run Arthurian → Prepare Architect Art for Player Build
 so sprites are promoted into Assets/Resources/ArchitectArt/Body/.
-Do not commit a YAML that still references a missing MonoScript GUID — Ensure remaps.
+Diagnose = fix-pew-body-pool-empty
+Escape: !!! Escape to Tip (fix-pew-body-pool-empty)

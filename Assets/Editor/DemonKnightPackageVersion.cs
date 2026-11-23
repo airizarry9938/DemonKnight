@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-build-persist-embed";
-    public const string GitHint = "fix-build-persist-embed";
-    public const string BuiltUtc = "2026-11-23T01:56:08Z";
+    public const string Id = "fix-pew-body-pool-empty";
+    public const string GitHint = "fix-pew-body-pool-empty";
+    public const string BuiltUtc = "2026-11-23T03:40:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "ae6b1afee35fa8e36435d565597f851469fcf695";
+    public const string HardTipSha = "e71b4f719e3734170a80fac639e48444d1f7c5bd";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";

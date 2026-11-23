@@ -1855,9 +1855,23 @@ namespace ArthurianAutobattler
                 if (kv.Value != null && LegendPewPortraitApplier.ResolvePewVisual(kv.Value) != null)
                     poolHits++;
             }
+            int bodyPoolUsable = 0;
+            try
+            {
+                var bp = ClassSpritePoolApplier.Profile;
+                if (bp != null)
+                {
+                    bp.RematerializeSpritesFromPaths();
+                    bodyPoolUsable = bp.CountUsable(UnitType.Peasant)
+                                    + bp.CountUsable(UnitType.Warrior)
+                                    + bp.CountUsable(UnitType.Knight);
+                }
+            }
+            catch { /* soft-fail */ }
             Debug.Log(
                 $"[DemonKnight] Populated {SomersetPewLayout.TotalSeats} pew seats ({bySeat.Count} occupied); "
-                + $"body-pool sprites={poolHits}; StageLayout assign-guides={assignedCount}; "
+                + $"body-pool sprites={poolHits}; body-pool usable(P+W+K)={bodyPoolUsable}; "
+                + $"StageLayout assign-guides={assignedCount}; "
                 + $"rows 0–{SomersetPewLayout.VisualSpriteRowCount - 1}.");
             RefreshHUD();
         }

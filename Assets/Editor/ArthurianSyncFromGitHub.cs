@@ -23,17 +23,17 @@ public static class ArthurianSyncFromGitHub
     /// Emergency pin if GitHub API cannot resolve tip of main. After land, keep equal to main tip.
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
-    // Pre-ship pin = tip before this PR; ship commit bumps both to feature SHA.
-    private const string FallbackCommitSha = "ae6b1afee35fa8e36435d565597f851469fcf695";
+    // Pre-ship pin = tip before this PR (fix-build-persist-embed merge); ship commit bumps both to feature SHA.
+    private const string FallbackCommitSha = "e71b4f719e3734170a80fac639e48444d1f7c5bd";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "ae6b1afee35fa8e36435d565597f851469fcf695";
+    public const string HardTipCommitSha = "e71b4f719e3734170a80fac639e48444d1f7c5bd";
 
-    private const string ExpectedPackageId = "fix-build-persist-embed";
+    private const string ExpectedPackageId = "fix-pew-body-pool-empty";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -76,6 +76,7 @@ public static class ArthurianSyncFromGitHub
         "body-face-pool-build-persist",
         "battle-good-evil-sprite-pools",
         "fix-architect-build-persist-cs0103",
+        "fix-build-persist-embed",
     };
 
     /// <summary>
@@ -1306,7 +1307,9 @@ public static class ArthurianSyncFromGitHub
                 || archBody.IndexOf("PromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                 || archBody.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
-                || archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0)
+                || archBody.IndexOf("PersistAllProfiles", StringComparison.Ordinal) < 0
+                || (archBody.IndexOf("fix-pew-body-pool-empty", StringComparison.Ordinal) < 0
+                    && archBody.IndexOf("fix-build-persist-embed", StringComparison.Ordinal) < 0))
                 throw new Exception("Architect missing embedded BuildPersist (" + source + ")");
             WriteReplacing(archDest, archBody, deleteFirst: true);
             VerifyOnDisk(archRel, archDest, relaxPackageId: true);
@@ -1331,7 +1334,7 @@ public static class ArthurianSyncFromGitHub
                     + "// Types live in ArthurianArtArchitectWindow.cs (Force Sync embed — avoids CS0103 when this" + "\n"
                     + "// standalone path is wiped by Force Delete under a stale compiled Sync host)." + "\n"
                     + "// This stub overwrites any leftover full copy so we never get CS0101 duplicates." + "\n"
-                    + "// tip: fix-build-persist-embed" + "\n"
+                    + "// tip: fix-pew-body-pool-empty" + "\n"
                     + "#endif" + "\n";
             }
             WriteReplacing(stubDest, stubBody, deleteFirst: true);
@@ -1539,7 +1542,8 @@ public static class ArthurianSyncFromGitHub
             // Stub only — real class is embedded in ArthurianArtArchitectWindow.cs.
             return body.Contains("ArthurianArtArchitectWindow.cs")
                    && !body.Contains("class ArthurianArchitectBuildPersist")
-                   && body.Contains("fix-build-persist-embed");
+                   && (body.Contains("fix-pew-body-pool-empty")
+                       || body.Contains("fix-build-persist-embed"));
         }
 
         if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase))
@@ -1822,7 +1826,8 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("body-face-pool-build-persist")
                    || body.Contains("battle-good-evil-sprite-pools")
                    || body.Contains("fix-architect-build-persist-cs0103")
-                   || body.Contains("fix-build-persist-embed");
+                   || body.Contains("fix-build-persist-embed")
+                   || body.Contains("fix-pew-body-pool-empty");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
@@ -1879,8 +1884,10 @@ public static class ArthurianSyncFromGitHub
         if (!body.Contains("TryAddBodyPoolSprite")) return false;
         if (!body.Contains("TryAddFacePoolSprite")) return false;
         if (!body.Contains("TryAddBattlePoolSprite")) return false;
-        if (!body.Contains("fix-build-persist-embed")) return false;
+        if (!body.Contains("fix-pew-body-pool-empty")
+            && !body.Contains("fix-build-persist-embed")) return false;
         if (!body.Contains("UiBuildId")) return false;
+        if (!body.Contains("PersistAllProfiles")) return false;
         // Embed + SoftPromote belt (CS0103 after Force Sync wiping standalone BuildPersist).
         if (!body.Contains("class ArthurianArchitectBuildPersist")) return false;
         if (!body.Contains("SoftPromoteClassPoolIntoResources")) return false;
