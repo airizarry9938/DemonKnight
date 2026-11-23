@@ -5,10 +5,11 @@ using UnityEngine.UI;
 namespace ArthurianAutobattler
 {
     /// <summary>
-    /// Maps 52 citizens onto the Somerset church art: 12 pews in a 3×4 grid
-    /// (columns Left/Center/Right × rows front→altar), ~4–5 seats per pew.
+    /// Maps 48 citizens onto the Somerset church art: 12 pews × 4 seats (3×4 grid,
+    /// columns Left/Center/Right × rows front→altar).
     /// Coordinates are normalized 0–1 over the drawn church sprite
     /// (0,0 = bottom-left, 1,1 = top-right), tuned to SomersetChurchInterior.jpg.
+    /// tip: fix-48-pew-seats
     /// </summary>
     [Serializable]
     public class PewAnchor
@@ -32,25 +33,27 @@ namespace ArthurianAutobattler
         public const int PewColumns = 3;
         public const int PewRows = 4;
         public const int PewCount = 12;
-        public const int TotalSeats = 52;
+        public const int TotalSeats = 48;
+        public const int SeatsPerPew = 4;
 
         /// <summary>
-        /// Visual sprite rows only (pewSeatIndex / 13). Gameplay keeps 52 seats;
-        /// seats on row ≥ this show no sprite (hidden/empty).
+        /// Visual sprite pew-rows only (pewSeatIndex / 4 → pew, / 3 → row).
+        /// Gameplay keeps 48 seats; pew-row ≥ this shows no sprite (hidden/empty).
         /// </summary>
         public const int VisualSpriteRowCount = 3;
-        public const int PewSeatRowSize = 13;
+        /// <summary>Legacy alias — seats per pew (Gossip / adjacency group size).</summary>
+        public const int PewSeatRowSize = SeatsPerPew;
 
         /// <summary>
-        /// True when this seat should draw a pew sprite (rows 0–2).
+        /// True when this seat should draw a pew sprite (pew-rows 0–2).
         /// Visual identity comes from ClassSpritePoolApplier (by unit class) at church spawn;
         /// StageLayoutProfile pew slots remain position/scale placement guides only.
         /// </summary>
         public static bool SeatShowsSprite(int pewSeatIndex)
-            => (Mathf.Clamp(pewSeatIndex, 0, TotalSeats - 1) / PewSeatRowSize) < VisualSpriteRowCount;
+            => GetStaticPewRow(pewSeatIndex) < VisualSpriteRowCount;
 
         /// <summary>Bump when default pew anchors change so Play Mode refreshes stale scene data.</summary>
-        public const int CurrentLayoutVersion = 4;
+        public const int CurrentLayoutVersion = 5;
 
         [Header("Background (full-screen church art)")]
         public RectTransform backgroundRect;
@@ -80,14 +83,14 @@ namespace ArthurianAutobattler
             // Larger scales so pew sprites read clearly on church art.
             float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
             float[] rowScale = { 1.32f, 1.18f, 1.05f, 0.01f };
-            float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.120f };
+            // Wider strips so 4 avatar hitboxes fit per pew (tip: fix-48-pew-seats).
+            float[] rowSpread = { 0.220f, 0.200f, 0.180f, 0.150f };
 
-            // Capacities still total 52 (biggest nearest the camera among occupied rows).
-            // 5+5+5 + 4+5+4 + 4+4+4 + 4+4+4 = 15+13+12+12 = 52
+            // Uniform 12×4 = 48.
             int[,] caps =
             {
-                { 5, 5, 5 },
-                { 4, 5, 4 },
+                { 4, 4, 4 },
+                { 4, 4, 4 },
                 { 4, 4, 4 },
                 { 4, 4, 4 }
             };
@@ -162,18 +165,18 @@ namespace ArthurianAutobattler
         public int GetPewRow(int pewIndex) => Mathf.Clamp(pewIndex, 0, PewCount - 1) / PewColumns;
         public int GetPewColumn(int pewIndex) => Mathf.Clamp(pewIndex, 0, PewCount - 1) % PewColumns;
 
-        // Static helpers matching CreateDefaultPews capacities (for RecruitInstance / Gossip).
-        private static readonly int[] DefaultCapacities = { 5, 5, 5, 4, 5, 4, 4, 4, 4, 4, 4, 4 };
+        // Static helpers — uniform SeatsPerPew (for RecruitInstance / Gossip).
+        private static readonly int[] DefaultCapacities =
+        {
+            SeatsPerPew, SeatsPerPew, SeatsPerPew, SeatsPerPew,
+            SeatsPerPew, SeatsPerPew, SeatsPerPew, SeatsPerPew,
+            SeatsPerPew, SeatsPerPew, SeatsPerPew, SeatsPerPew
+        };
 
         public static int GetStaticPewIndex(int globalSeatIndex)
         {
-            int remaining = Mathf.Clamp(globalSeatIndex, 0, TotalSeats - 1);
-            for (int p = 0; p < PewCount; p++)
-            {
-                if (remaining < DefaultCapacities[p]) return p;
-                remaining -= DefaultCapacities[p];
-            }
-            return PewCount - 1;
+            int seat = Mathf.Clamp(globalSeatIndex, 0, TotalSeats - 1);
+            return Mathf.Clamp(seat / SeatsPerPew, 0, PewCount - 1);
         }
 
         public static int GetStaticPewRow(int globalSeatIndex) => GetStaticPewIndex(globalSeatIndex) / PewColumns;
@@ -310,7 +313,7 @@ namespace ArthurianAutobattler
                 sum += pews[i].seatCapacity;
             }
 
-            // Auto-fix last pew if capacities drifted off 52.
+            // Auto-fix last pew if capacities drifted off 48.
             if (sum != TotalSeats && pews.Length > 0)
             {
                 int delta = TotalSeats - (sum - pews[PewCount - 1].seatCapacity);

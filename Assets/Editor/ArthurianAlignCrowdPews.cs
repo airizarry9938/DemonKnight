@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Always-visible Arthurian menu: places 52 seat boxes on ChurchBackground pews.
+/// Always-visible Arthurian menu: places 48 seat boxes on ChurchBackground pews.
 /// Intentionally avoids TMPro and hard gameplay usings so it still shows when
 /// ArthurianSceneBuilder fails to compile.
 /// </summary>
@@ -41,13 +41,13 @@ public static class ArthurianAlignCrowdPews
         Debug.Log("[DemonKnight] Patched obsolete enableWordWrapping → textWrappingMode in ArthurianSceneBuilder.cs");
     }
 
-    private const int TotalSeats = 52;
+    private const int TotalSeats = 48;
     private const int PewColumns = 3;
     private const int PewRows = 4;
     private const int PewCount = 12;
 
-    // Capacities matching SomersetPewLayout defaults (sum = 52).
-    private static readonly int[] Caps = { 5, 5, 5, 4, 5, 4, 4, 4, 4, 4, 4, 4 };
+    // Capacities matching SomersetPewLayout defaults (12×4 = 48).
+    private static readonly int[] Caps = { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 };
 
     [MenuItem("Arthurian/Align Crowd Grid To Church Pews", false, 10)]
     public static void Align()
@@ -160,7 +160,7 @@ public static class ArthurianAlignCrowdPews
         bool gameplayOk = pewLayout != null && churchUI != null;
         EditorUtility.DisplayDialog(
             "Last Knights of Somerset",
-            "52 seat boxes placed on ChurchBackground pews.\n\n" +
+            "48 seat boxes placed on ChurchBackground pews (12×4).\n\n" +
             "• PewSeatLayer is under ChurchBackground\n" +
             "• Empty boxes are dim gold (filled at Play when scripts compile)\n" +
             (gameplayOk
@@ -239,7 +239,7 @@ public static class ArthurianAlignCrowdPews
             rt.anchorMin = rt.anchorMax = anchor;
             rt.pivot = new Vector2(0.5f, 0.12f);
             rt.anchoredPosition = Vector2.zero;
-            rt.sizeDelta = new Vector2(48f, 64f) * scale;
+            rt.sizeDelta = new Vector2(80f, 104f) * scale;
 
             var img = go.GetComponent<Image>();
             if (img != null)
@@ -307,7 +307,7 @@ public static class ArthurianAlignCrowdPews
         };
         // Match SomersetPewLayout — upper 4 pew bands; camera-front pews stay empty.
         float[] rowY = { 0.375f, 0.490f, 0.600f, 0.715f };
-        float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.130f };
+        float[] rowSpread = { 0.220f, 0.200f, 0.180f, 0.150f };
 
         float t = cap == 1 ? 0.5f : slot / (float)(cap - 1);
         float x = colXByRow[row][col] + Mathf.Lerp(-rowSpread[row] * 0.5f, rowSpread[row] * 0.5f, t);

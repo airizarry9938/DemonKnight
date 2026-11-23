@@ -34,7 +34,7 @@ namespace ArthurianAutobattler
 
     /// <summary>
     /// One row for the DeathsSurvivorsMorale end-screen panel.
-    /// tip: fix-night-wave-hud-progression
+    /// tip: fix-48-pew-seats
     /// </summary>
     [Serializable]
     public class WaveCasualtyEntry
@@ -154,7 +154,7 @@ namespace ArthurianAutobattler
         public TraitTag lovedTrait;
         public int intelTierUnlocked = 0;
 
-        /// <summary>Persistent seat in the Somerset church (0–51).</summary>
+        /// <summary>Persistent seat in the Somerset church (0–47).</summary>
         public int pewSeatIndex = 0;
 
         /// <summary>Battle formation slot (0–51) on StageLayoutProfile.playerBattleSlots.</summary>
@@ -557,7 +557,7 @@ namespace ArthurianAutobattler
             return Mathf.Clamp(attackSpeed + g * 0.1f, 0.4f, 3.0f);
         }
 
-        /// <summary>tip: fix-night-wave-hud-progression — party death morale nerfs HP/ATK.</summary>
+        /// <summary>tip: fix-48-pew-seats — party death morale nerfs HP/ATK.</summary>
         public static int ApplyPartyMoraleToStat(int value)
         {
             float m = GameLoopManager.Instance != null
@@ -1021,10 +1021,10 @@ namespace ArthurianAutobattler
     public static class IntelGossip
     {
         /// <summary>
-        /// Same as StageLayoutProfile.PewRowSize (13). Local const (kept for call sites).
-        /// tip: fix-architect-pool-load-list — StageLayoutProfile also lives in this file.
+        /// Same as StageLayoutProfile.PewRowSize (4 seats/pew). Local const (kept for call sites).
+        /// tip: fix-48-pew-seats — Gossip adjacency groups by pew (pewSeatIndex / 4).
         /// </summary>
-        public const int PewRowSize = 13;
+        public const int PewRowSize = 4;
 
         public static void ApplyIntelPurchase(RecruitInstance target, int tier, List<RecruitInstance> townPool)
         {
@@ -1055,7 +1055,7 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// Auto-scout pewSeatIndex ±1 within the same pewSeatIndex / 13 row.
+        /// Auto-scout pewSeatIndex ±1 within the same pew (pewSeatIndex / 4).
         /// </summary>
         public static void GossipAdjacentSameRow(RecruitInstance center, List<RecruitInstance> townPool)
         {
@@ -1079,7 +1079,7 @@ namespace ArthurianAutobattler
     {
         public static int ComputeUpkeep(int unitCount)
         {
-            int n = Mathf.Clamp(unitCount, 0, 52);
+            int n = Mathf.Clamp(unitCount, 0, 48);
             int upkeep = 0;
             for (int i = 1; i <= n; i++)
             {
@@ -1095,7 +1095,7 @@ namespace ArthurianAutobattler
         {
             return
                 $"Flock {unitCount}: upkeep −{upkeep}g from +{basePayout}g → net base {netBase}g "
-                + "(1–12:0 · 13–20:5 · 21–35:10 · 36–52:20).";
+                + "(1–12:0 · 13–20:5 · 21–35:10 · 36–48:20).";
         }
     }
 
@@ -1180,18 +1180,19 @@ namespace ArthurianAutobattler
     // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-architect-pool-load-list) =====
     // tip: fix-architect-pool-load-list — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
-    /// Numbered Somerset church pews (52), player battle slots (52), enemy slots (20),
+    /// Numbered Somerset church pews (48 = 12×4), player battle slots (52), enemy slots (20),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
+    /// tip: fix-48-pew-seats
     /// </summary>
     [CreateAssetMenu(fileName = "StageLayoutProfile", menuName = "DemonKnight/Stage Layout Profile")]
     public class StageLayoutProfile : ScriptableObject
     {
         public const string ResourcesPath = "StageLayoutProfile";
-        public const int ChurchPewCount = 52;
+        public const int ChurchPewCount = 48;
         public const int PlayerBattleCount = 52;
         public const int EnemyBattleCount = 20;
-        /// <summary>Gossip / pew row size (pewSeatIndex / 13).</summary>
-        public const int PewRowSize = 13;
+        /// <summary>Gossip / pew grouping size (pewSeatIndex / 4).</summary>
+        public const int PewRowSize = 4;
 
         public List<SlotTransformConfig> churchPewSlots = new List<SlotTransformConfig>();
         public List<SlotTransformConfig> playerBattleSlots = new List<SlotTransformConfig>();
@@ -1274,7 +1275,7 @@ namespace ArthurianAutobattler
             return restored;
         }
 
-        /// <summary>Pad / trim lists to 52 / 52 / 20 with default transforms.</summary>
+        /// <summary>Pad / trim lists to 48 / 52 / 20 with default transforms.</summary>
         public void EnsureSlotCounts()
         {
             churchPewSlots ??= new List<SlotTransformConfig>();
@@ -1321,7 +1322,7 @@ namespace ArthurianAutobattler
         /// <summary>Normalized 0–1 pew seat matching SomersetPewLayout.CreateDefaultPews capacities.</summary>
         public static Vector2 DefaultChurchNormalizedPosition(int globalSeatIndex)
         {
-            // Mirror SomersetPewLayout.CreateDefaultPews (v4) — keep in sync.
+            // Mirror SomersetPewLayout.CreateDefaultPews (v5 · 12×4) — keep in sync.
             float[][] colXByRow =
             {
                 new[] { 0.220f, 0.500f, 0.780f },
@@ -1330,11 +1331,11 @@ namespace ArthurianAutobattler
                 new[] { 0.238f, 0.500f, 0.765f }
             };
             float[] rowY = { 0.400f, 0.545f, 0.690f, 0.820f };
-            float[] rowSpread = { 0.175f, 0.160f, 0.145f, 0.120f };
+            float[] rowSpread = { 0.220f, 0.200f, 0.180f, 0.150f };
             int[,] caps =
             {
-                { 5, 5, 5 },
-                { 4, 5, 4 },
+                { 4, 4, 4 },
+                { 4, 4, 4 },
                 { 4, 4, 4 },
                 { 4, 4, 4 }
             };

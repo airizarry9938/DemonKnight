@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "fix-night-wave-hud-progression";
+    public const string TipPackageId = "fix-48-pew-seats";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -46,7 +46,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (fix-night-wave-hud-progression)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (fix-48-pew-seats)", false, 0)]
     public static void EscapeMenu()
     {
         // Manual Escape clears session gates so a stuck Downloads project can recover.
@@ -229,7 +229,7 @@ public static class DemonKnightTipEscape
         if (!File.Exists(bootPath)) return true;
         string bootBody = File.ReadAllText(bootPath);
         if (bootBody.IndexOf("NukeNamedProfileFiles", StringComparison.Ordinal) < 0
-            && bootBody.IndexOf("fix-night-wave-hud-progression", StringComparison.Ordinal) < 0) return true;
+            && bootBody.IndexOf("fix-48-pew-seats", StringComparison.Ordinal) < 0) return true;
         string ensurePath = Path.Combine(root, "Assets", "Editor", "ArthurianStageLayoutProfileEnsure.cs");
         if (!File.Exists(ensurePath)) return true;
         string ensureBody = File.ReadAllText(ensurePath);
@@ -333,7 +333,7 @@ public static class DemonKnightTipEscape
                         || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                         || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                         || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
-                        || body.IndexOf("fix-night-wave-hud-progression", StringComparison.Ordinal) < 0))
+                        || body.IndexOf("fix-48-pew-seats", StringComparison.Ordinal) < 0))
                     throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                 if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                     && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
