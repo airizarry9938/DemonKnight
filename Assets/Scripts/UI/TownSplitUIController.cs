@@ -27,7 +27,7 @@ namespace ArthurianAutobattler
         public Transform townGridContainer;
         public GameObject recruitAvatarButtonPrefab;
         public SomersetPewLayout pewLayout;
-        public Vector2 baseSeatSize = new Vector2(76f, 100f);
+        public Vector2 baseSeatSize = new Vector2(100f, 128f); // tip: fix-48-pew-seats — fit 4 avatars/pew
 
         [Header("Bottom: Dossier, Role Training & Mediation")]
         public Image selectedAvatarImage;
@@ -180,7 +180,7 @@ namespace ArthurianAutobattler
 
             foreach (Transform child in townGridContainer) Destroy(child.gameObject);
 
-            // Index recruits by pew seat so each of the 52 boxes can receive a character later.
+            // Index recruits by pew seat so each of the 48 boxes can receive a character later.
             var bySeat = new Dictionary<int, RecruitInstance>();
             foreach (var recruit in activeTownPool)
             {

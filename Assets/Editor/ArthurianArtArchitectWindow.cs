@@ -21,7 +21,7 @@ using UnityEngine.Video;
 public class ArthurianArtArchitectWindow : EditorWindow
 {
     /// <summary>Visible in window title/header — must match DemonKnightPackageVersion.Id tip.</summary>
-    public const string UiBuildId = "fix-night-wave-hud-progression";
+    public const string UiBuildId = "fix-48-pew-seats";
 
     const string DefaultLibraryPath = "Assets/Art/Modular/ModularSpriteLibrary.asset";
     const string DefaultSliceFolder = "Assets/Art/Modular/ArchitectSliced";
@@ -44,7 +44,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
     const float ChurchRefWidth = 1408f;
     const float ChurchRefHeight = 768f;
     /// <summary>Must match SomersetChurchUI.baseSeatSize tip (play pew sprite size).</summary>
-    static readonly Vector2 PlayPewBaseSize = new Vector2(88f, 112f);
+    static readonly Vector2 PlayPewBaseSize = new Vector2(110f, 140f); // tip: fix-48-pew-seats
 
     enum ArchitectTab { Splicer, StagePlacer, SceneBackgrounds, ClassSprites, LegendPewPortraits, BattleGoodEvil }
     enum StageViewMode { SomersetChurch, ChurchyardBattle }
@@ -2453,7 +2453,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (stageProfile.churchPewSlots != null)
             EnsureChurchSlotsSeededFromPlayLayout(stageProfile.churchPewSlots);
         EditorGUILayout.LabelField(
-            $"Assigned pew sprites: {ArthurianStageLayoutProfileEnsure.CountAssignedSprites(stageProfile)} / 52  ·  asset={AssetDatabase.GetAssetPath(stageProfile)}",
+            $"Assigned pew sprites: {ArthurianStageLayoutProfileEnsure.CountAssignedSprites(stageProfile)} / {StageLayoutProfile.ChurchPewCount}  ·  asset={AssetDatabase.GetAssetPath(stageProfile)}",
             EditorStyles.miniLabel);
 
         stageView = (StageViewMode)EditorGUILayout.EnumPopup("Stage View", stageView);
@@ -2465,7 +2465,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
         if (stageView == StageViewMode.SomersetChurch)
         {
             usePlayPewLayoutPreview = EditorGUILayout.ToggleLeft(
-                "Play pew layout + scale (SomersetPewLayout · 3 sprite rows · 88×112)",
+                "Play pew layout + scale (SomersetPewLayout · 12×4 · 3 sprite rows · 110×140)",
                 usePlayPewLayoutPreview);
         }
 
@@ -3753,10 +3753,14 @@ public class ArthurianArtArchitectWindow : EditorWindow
     /// </summary>
     static bool SeatShowsSpriteSafe(int pewSeatIndex)
     {
-        const int total = 52;
-        const int rowSize = 13;
+        // tip: fix-48-pew-seats — 12 pews × 4; hide pew-row ≥ 3.
+        const int total = 48;
+        const int seatsPerPew = 4;
+        const int pewColumns = 3;
         const int visualRows = 3;
-        return (Mathf.Clamp(pewSeatIndex, 0, total - 1) / rowSize) < visualRows;
+        int pew = Mathf.Clamp(pewSeatIndex, 0, total - 1) / seatsPerPew;
+        int pewRow = pew / pewColumns;
+        return pewRow < visualRows;
     }
 
     static Vector2 GetPlayNormalizedSeatPosition(PewAnchor[] pews, int globalSeatIndex)
@@ -4713,7 +4717,7 @@ public class ArthurianArtArchitectWindow : EditorWindow
 /// </summary>
 public class ArthurianArchitectBuildPersist : IPreprocessBuildWithReport
 {
-    public const string TipId = "fix-night-wave-hud-progression";
+    public const string TipId = "fix-48-pew-seats";
     public const string ArchitectArtRoot = "Assets/Resources/ArchitectArt";
     public const string StreamingRel = "Assets/StreamingAssets/DemonKnightArchitect";
     public const string ManifestRel = "Assets/StreamingAssets/DemonKnightArchitect/BUILD_INCLUDE.txt";

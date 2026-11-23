@@ -11,9 +11,9 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-night-wave-hud-progression";
-    public const string GitHint = "fix-night-wave-hud-progression";
-    public const string BuiltUtc = "2026-11-23T14:45:00Z";
+    public const string Id = "fix-48-pew-seats";
+    public const string GitHint = "fix-48-pew-seats";
+    public const string BuiltUtc = "2026-11-23T16:50:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
     public const string HardTipSha = "4071ffdfd0a1f4b80c7c68c68a1c8893269e1274";
@@ -150,7 +150,7 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                                 || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
-                                || body.IndexOf("fix-night-wave-hud-progression", StringComparison.Ordinal) < 0))
+                                || body.IndexOf("fix-48-pew-seats", StringComparison.Ordinal) < 0))
                             throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                         if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0

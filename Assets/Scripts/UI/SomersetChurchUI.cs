@@ -35,7 +35,7 @@ namespace ArthurianAutobattler
         public RectTransform pewSeatLayer;
         public GameObject paperDollSeatPrefab;
         /// <summary>~1.55× prior 56×72 — pew sprites read larger on church art.</summary>
-        public Vector2 baseSeatSize = new Vector2(88f, 112f);
+        public Vector2 baseSeatSize = new Vector2(110f, 140f); // tip: fix-48-pew-seats
 
         [Header("Modals (mutual exclusion)")]
         public GameObject diceModal;
@@ -1389,7 +1389,7 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// HUD Night/Wave bar. tip: fix-night-wave-hud-progression —
+        /// HUD Night/Wave bar. tip: fix-48-pew-seats —
         /// Night (calendar from Next Night) and Wave (combat) are independent.
         /// Loss → Night 2 · Wave 1; victory → Night 2 · Wave 2.
         /// </summary>
@@ -1815,8 +1815,8 @@ namespace ArthurianAutobattler
             pewLayout.ApplyLatestDefaultsIfNeeded();
             pewLayout.EnsureValid();
             // Scene-serialized seat size may lag tip — keep pew sprites visibly large.
-            if (baseSeatSize.x < 80f || baseSeatSize.y < 100f)
-                baseSeatSize = new Vector2(88f, 112f);
+            if (baseSeatSize.x < 100f || baseSeatSize.y < 128f)
+                baseSeatSize = new Vector2(110f, 140f);
 
             if (pewSeatLayer == null)
             {
@@ -1891,7 +1891,7 @@ namespace ArthurianAutobattler
                 else
                     pewLayout.ApplySeatTransform(rt, seatIndex, baseSeatSize, jitterX);
 
-                // Visual sprites on 3 rows only (pewSeatIndex / 13 → 0,1,2). Row 3 = hidden.
+                // Visual sprites on 3 pew-rows only (pewSeatIndex / 4 → pew row 0–2). Row 3 = hidden.
                 bool showSprite = SomersetPewLayout.SeatShowsSprite(seatIndex);
                 if (!showSprite)
                     HidePewSeatVisual(go);
@@ -2082,7 +2082,7 @@ namespace ArthurianAutobattler
             img.raycastTarget = recruit != null;
         }
 
-        /// <summary>Row 3+ (pewSeatIndex/13 ≥ 3): no visible sprite; 52 seats remain in data.</summary>
+        /// <summary>Pew-row 3+ (pewSeatIndex/4 ≥ 9): no visible sprite; 48 seats remain in data.</summary>
         static void HidePewSeatVisual(GameObject go)
         {
             if (go == null) return;
@@ -3314,7 +3314,7 @@ namespace ArthurianAutobattler
                     ? "\n<color=#B8E986>Crossbow — can attack from BACK</color>"
                     : "");
 
-            // tip: fix-night-wave-hud-progression — show current effective stats (trained+★+morale).
+            // tip: fix-48-pew-seats — show current effective stats (trained+★+morale).
             int hp = m.GetEffectiveMaxHealth();
             int atk = m.GetEffectiveAttackDamage();
             float spd = m.GetEffectiveAttackSpeed();
@@ -3629,7 +3629,7 @@ namespace ArthurianAutobattler
         {
             var town = Town;
             var loop = GameLoopManager.Instance;
-            // tip: fix-night-wave-hud-progression — calendar Night + combat Wave.
+            // tip: fix-48-pew-seats — calendar Night + combat Wave.
             if (loop != null) SetNight(loop.currentNight);
             if (goldText != null && town != null) goldText.text = $"Royal Gold: {town.playerGold}g";
             UpdateWarbandHudLabel();

@@ -5,7 +5,7 @@ Unity project / GitHub: **DemonKnight**. Title: *Last Knights of Somerset*. C# n
 ## Stack
 - Unity 6.6 / 6000.x — 2D URP, C#, TextMeshPro, Unity UI Canvas
 - Church full-screen stage + mutually exclusive pop-up modals (Esc / X)
-- 52 persistent pew seats (`pewSeatIndex` 0–51); Gossip adjacency uses `pewSeatIndex / 13`
+- 48 persistent pew seats (`pewSeatIndex` 0–47; 12 pews × 4); Gossip adjacency uses `pewSeatIndex / 4`
 
 ## Core Loop
 1. TownRecruit in Somerset church (300–600s, or Endless Hourglass pact)
