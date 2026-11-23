@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-tipescape-profile-embeds — named MonoScript for Unity SO binding
+    // tip: fix-gdt-profile-always-compile — named MonoScript for Unity SO binding
     /// <summary>
     /// Architect class sprite pools (Peasant / Warrior / Knight). Resources path:
     /// ClassSpritePoolProfile. StageLayoutProfile pew slots stay position/scale guides —

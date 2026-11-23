@@ -4,38 +4,7 @@ using UnityEngine;
 
 namespace ArthurianAutobattler
 {
-    // tip: fix-tipescape-profile-embeds — named MonoScript for Unity SO binding
-    [Serializable]
-    public class SlotTransformConfig
-    {
-        public int slotNumber;
-        public Vector2 position;
-        public Vector2 scale = Vector2.one;
-        public Vector2 aspectMultiplier = Vector2.one;
-        public int sortingOrder;
-        public int bonusHP;
-        public int bonusATK;
-        public int bonusSPD;
-        /// <summary>Editor/runtime preview sprite override for this numbered handle.</summary>
-        public Sprite previewOrOverrideSprite;
-        /// <summary>Path backup so seat sprites rematerialize in player builds (Resources/StreamingAssets).</summary>
-        public string previewAssetPath;
-        /// <summary>Optional CharacterDefinition.characterId pinned to this slot.</summary>
-        public string assignedCharacterId;
-    }
-
-    [Serializable]
-    public class StageParallaxLayer
-    {
-        public string layerName = "Layer";
-        public Sprite layerSprite;
-        public int sortingOrder;
-        public Vector2 scrollSpeed;
-        public Vector2 swayAmplitude;
-        public float swayFrequency = 1f;
-        public Color layerTint = Color.white;
-    }
-
+    // tip: fix-gdt-profile-always-compile — named MonoScript SO only (helpers live in GameDataTypes)
     /// <summary>
     /// Numbered Somerset church pews (52), player battle slots (52), enemy slots (20),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.

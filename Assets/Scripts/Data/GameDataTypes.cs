@@ -1002,10 +1002,85 @@ namespace ArthurianAutobattler
         }
     }
 
+
+    // ===== fix-gdt-profile-always-compile — non-SO helpers LIVE HERE (MustRestore) =====
+    // Named *Profile.cs files keep ONLY ScriptableObject classes (Unity class==filename).
+    // Helpers permanently in GameDataTypes so Force Sync / GDT alone always compiles Slot/Parallax/SceneBg/BattleSprite types
+    // even when named Profile MonoScripts are mid-HardWrite. tip: fix-gdt-profile-always-compile
+    [Serializable]
+    public class SlotTransformConfig
+    {
+        public int slotNumber;
+        public Vector2 position;
+        public Vector2 scale = Vector2.one;
+        public Vector2 aspectMultiplier = Vector2.one;
+        public int sortingOrder;
+        public int bonusHP;
+        public int bonusATK;
+        public int bonusSPD;
+        /// <summary>Editor/runtime preview sprite override for this numbered handle.</summary>
+        public Sprite previewOrOverrideSprite;
+        /// <summary>Path backup so seat sprites rematerialize in player builds (Resources/StreamingAssets).</summary>
+        public string previewAssetPath;
+        /// <summary>Optional CharacterDefinition.characterId pinned to this slot.</summary>
+        public string assignedCharacterId;
+    }
+
+    [Serializable]
+    public class StageParallaxLayer
+    {
+        public string layerName = "Layer";
+        public Sprite layerSprite;
+        public int sortingOrder;
+        public Vector2 scrollSpeed;
+        public Vector2 swayAmplitude;
+        public float swayFrequency = 1f;
+        public Color layerTint = Color.white;
+    }
+
+    /// <summary>Named screens that Architect can assign jpg/png or mp4 backgrounds to.</summary>
+    public enum SceneBackgroundSlot
+    {
+        MainMenu = 0,
+        SomersetChurch = 1,
+        ChurchyardBattle = 2,
+        VictoryOverlay = 3,
+        MerlinResurrection = 4,
+        LegendCodex = 5,
+    }
+
+    [Serializable]
+    public class SceneBackgroundEntry
+    {
+        public SceneBackgroundSlot slot = SceneBackgroundSlot.MainMenu;
+        public string displayName = "Screen";
+        [Tooltip("Still image (jpg/png Sprite). Used when no video is assigned.")]
+        public Sprite imageSprite;
+        [Tooltip("Optional looping video (mp4 VideoClip). Wins over image when set.")]
+        public UnityEngine.Video.VideoClip videoClip;
+        [Tooltip("Editor-only asset path backup so assignments survive reimports.")]
+        public string imageAssetPath;
+        [Tooltip("Editor-only asset path backup for VideoClip.")]
+        public string videoAssetPath;
+    }
+
+    /// <summary>One Good-side Legend / Evil boss battle-sprite slot (Architect Tab 6).</summary>
+    [Serializable]
+    public class BattleSpriteSlotEntry
+    {
+        public UnitType unitType;
+        public string displayName;
+        public Sprite battleSprite;
+        public string assetPath;
+        [Tooltip("Soft slots (e.g. Merlin) stay listed but are optional.")]
+        public bool softOptional;
+    }
+
+
     // ===== DA-59 Phase25 helpers (Force Sync nuclear — do not remove) =====
     // Architect *Profile ScriptableObjects live in Assets/Scripts/Data/<ExactClassName>.cs
     // (Unity MonoScript requires SO class name == file name). Appliers stay embedded below.
-    // tip: fix-tipescape-profile-embeds
+    // tip: fix-gdt-profile-always-compile
     /// <summary>
     /// Multi-frame clip for modular paper-doll parts (Pose / Outfit / Head / Weapon / EnemyBoss).
     /// Standard clip names: "Idle", "Attack", "Hit", "Death".
@@ -1328,7 +1403,7 @@ namespace ArthurianAutobattler
     // MustRestore of those paths still fails when Force Delete runs under a STALE compiled Sync
     // host (ScriptPaths/MustRestore arrays baked into the old assembly). GameDataTypes has been
     // MustRestore since DA-59 — even old Sync hosts re-land this file from tip → types exist.
-    // tip: fix-tipescape-profile-embeds — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
+    // tip: fix-gdt-profile-always-compile — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
 
     /// <summary>
     /// Applies Architect-assigned SceneBackgroundProfile entries (jpg/png or mp4)
@@ -1578,7 +1653,7 @@ namespace ArthurianAutobattler
                     try
                     {
                         // SoftPromote belt: Load soft-fails when Profile MonoScript still missing after Sync.
-                        // tip: fix-tipescape-profile-embeds
+                        // tip: fix-gdt-profile-always-compile
                         _cache = ClassSpritePoolProfile.Load();
                         if (_cache != null)
                         {
