@@ -395,8 +395,11 @@ namespace ArthurianAutobattler
                 UnitVisualActor actor = SpawnActor();
                 Sprite art = ResolveBattleSprite(d.unitType, d.unitID) ?? GetDemonSprite(d.unitType);
                 float scale = ResolveVisualScale(d.unitType);
-                // tip: fix-architect-apply-persist-facing — evil faces LEFT (Initialize → negative scale.x).
-                actor.Initialize(d, art, CalculateSlotPosition(false, i), flipX: true, scale);
+                // tip: fix-battle-ground-layout — evil RIGHT slots; faces LEFT (Initialize → negative scale.x).
+                int slot = d.battleSlotIndex >= 0 ? d.battleSlotIndex : i;
+                if (slot >= StageLayoutProfile.EnemyBattleCount)
+                    slot = i % StageLayoutProfile.EnemyBattleCount;
+                actor.Initialize(d, art, CalculateSlotPosition(false, slot), flipX: true, scale);
                 activeActors[d.unitID] = actor;
             }
         }
@@ -469,7 +472,7 @@ namespace ArthurianAutobattler
 
         private Vector3 CalculateSlotPosition(bool isPlayer, int index)
         {
-            // Phase 5: prefer StageLayoutProfile numbered slots (52 player / 20 enemy).
+            // tip: fix-battle-ground-layout — StageLayoutProfile 48 good LEFT / 20 evil RIGHT (aisle-outward).
             var profile = StageLayoutProfile.Load();
             if (profile != null)
             {
@@ -486,12 +489,11 @@ namespace ArthurianAutobattler
             if (slots != null && index >= 0 && index < slots.Length && slots[index] != null)
                 return slots[index].position;
 
-            Vector2 origin = isPlayer ? humanOrigin : demonOrigin;
-            // Columns of 6 (frontlineSize) matching StageLayoutProfile auto-arrange.
-            int col = index / 6;
-            int row = index % 6;
-            float xDir = isPlayer ? -1f : 1f;
-            return new Vector3(origin.x + (col * colOffset * xDir), origin.y - (row * rowSpacing), 0f);
+            // Fallback: aisle-outward grid (good faces right / evil faces left visually via facing scale).
+            Vector2 pos = StageLayoutProfile.BattleWorldPos(
+                index, isPlayer, aisleGap: 1.15f, seatGap: rowSpacing > 0.2f ? rowSpacing : 1.05f,
+                depthGap: colOffset > 0.2f ? colOffset * 0.7f : 0.85f);
+            return new Vector3(pos.x, pos.y, 0f);
         }
 
         private Sprite GetDemonSprite(UnitType type)

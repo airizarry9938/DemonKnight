@@ -39,11 +39,11 @@ namespace ArthurianAutobattler
             foreach (var r in recruitedParty)
             {
                 if (r == null) continue;
-                // Phase 5: only deployed units march (cap 52).
+                // tip: fix-battle-ground-layout — only deployed units march (cap 48 good LEFT slots).
                 if (!r.isDeployed) continue;
                 if (nextSlot >= StageLayoutProfile.PlayerBattleCount) break;
 
-                // Sequential formation slots 0..51 (columns of 6 for line-pierce).
+                // Sequential formation slots 0..47 (front aisle-outward; columns of 6 for line-pierce).
                 int slot = nextSlot;
                 nextSlot++;
 
@@ -74,7 +74,7 @@ namespace ArthurianAutobattler
             ApplyLegendRivalries(combatRoster);
             ApplyUsurpationStarterLegends(combatRoster);
 
-            // Re-stamp unique slots 0..51 after pact clones / mirror so line-pierce columns stay valid.
+            // Re-stamp unique slots 0..47 after pact clones / mirror so line-pierce columns stay valid.
             for (int i = 0; i < combatRoster.Count && i < StageLayoutProfile.PlayerBattleCount; i++)
             {
                 if (combatRoster[i] == null) continue;
@@ -175,7 +175,15 @@ namespace ArthurianAutobattler
                 }
             }
 
-            foreach (var d in demonArmy) d.ResetAttackCooldown();
+            // tip: fix-battle-ground-layout — stamp evil slots 0..19 (RIGHT, aisle-outward front).
+            for (int i = 0; i < demonArmy.Count; i++)
+            {
+                if (demonArmy[i] == null) continue;
+                demonArmy[i].battleSlotIndex = i < StageLayoutProfile.EnemyBattleCount
+                    ? i
+                    : (i % StageLayoutProfile.EnemyBattleCount);
+                demonArmy[i].ResetAttackCooldown();
+            }
             TriggerBattleStartPassives();
             isBattling = true;
             BattlefieldVisualizer.Instance?.EnsureParallaxHost();

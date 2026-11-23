@@ -157,7 +157,7 @@ namespace ArthurianAutobattler
         /// <summary>Persistent seat in the Somerset church (0–47).</summary>
         public int pewSeatIndex = 0;
 
-        /// <summary>Battle formation slot (0–51) on StageLayoutProfile.playerBattleSlots.</summary>
+        /// <summary>Battle formation slot (0–47 good) on StageLayoutProfile.playerBattleSlots.</summary>
         public int battleSlotIndex;
 
         /// <summary>When false, unit stays in pew reserve and does not march.</summary>
@@ -862,7 +862,7 @@ namespace ArthurianAutobattler
         /// <summary>Train Ranged crossbow — allows melee to fire from BACK.</summary>
         public bool canAttackFromBack;
 
-        /// <summary>Formation slot 0..51 — StageLayoutProfile.playerBattleSlots / line-pierce column.</summary>
+        /// <summary>Formation slot 0..47 good / 0..19 evil — StageLayoutProfile battle slots / line-pierce column.</summary>
         public int battleSlotIndex;
 
         public bool IsAlive => currentHealth > 0;
@@ -1180,17 +1180,25 @@ namespace ArthurianAutobattler
     // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-architect-pool-load-list) =====
     // tip: fix-architect-pool-load-list — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
-    /// Numbered Somerset church pews (48 = 12×4), player battle slots (52), enemy slots (20),
+    /// Numbered Somerset church pews (48 = 12×4), player battle slots (48 LEFT), enemy slots (20 RIGHT),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
-    /// tip: fix-architect-48-seat-preview
+    /// tip: fix-battle-ground-layout — front fills from aisle/inside outward; good faces right, evil left.
     /// </summary>
     [CreateAssetMenu(fileName = "StageLayoutProfile", menuName = "DemonKnight/Stage Layout Profile")]
     public class StageLayoutProfile : ScriptableObject
     {
         public const string ResourcesPath = "StageLayoutProfile";
         public const int ChurchPewCount = 48;
-        public const int PlayerBattleCount = 52;
+        /// <summary>Good / LEFT placement capacity (combat frontlineSize=6 still gates acting).</summary>
+        public const int PlayerBattleCount = 48;
+        /// <summary>Evil / RIGHT placement capacity.</summary>
         public const int EnemyBattleCount = 20;
+        /// <summary>Good front-row width (matches AutoBattlerEngine.frontlineSize columns).</summary>
+        public const int PlayerFrontWidth = 6;
+        /// <summary>Evil front-row width (20 = 5×4 depth).</summary>
+        public const int EnemyFrontWidth = 5;
+        /// <summary>Bump when aisle-outward battle defaults change (Ensure migrates authored slots).</summary>
+        public const int CurrentBattleLayoutVersion = 1;
         /// <summary>Gossip / pew grouping size (pewSeatIndex / 4).</summary>
         public const int PewRowSize = 4;
 
@@ -1215,6 +1223,19 @@ namespace ArthurianAutobattler
         [Tooltip("Multiplies default pew seatSpread (strip width).")]
         [Range(0.5f, 1.6f)]
         public float churchSeatSpreadMul = 1f;
+
+        // tip: fix-battle-ground-layout — SoftPromote Persist battle aisle / spacing prefs.
+        [Tooltip("World X gap from mid-line (x=0) to the first front seat (inside/aisle).")]
+        [Range(0.4f, 3.5f)]
+        public float battleAisleGap = 1.15f;
+        [Tooltip("World spacing along the front row (inside → outside).")]
+        [Range(0.5f, 2.2f)]
+        public float battleSeatGap = 1.05f;
+        [Tooltip("World spacing for depth columns behind the front.")]
+        [Range(0.45f, 1.8f)]
+        public float battleDepthGap = 0.85f;
+        /// <summary>0 = pre-aisle layout; Ensure upgrades to <see cref="CurrentBattleLayoutVersion"/>.</summary>
+        public int battleLayoutVersion;
 
         /// <summary>True when this is a CreateInstance stand-in (not a Resources asset).</summary>
         [System.NonSerialized] public bool isRuntimeStandIn;
@@ -1316,7 +1337,7 @@ namespace ArthurianAutobattler
             return restored;
         }
 
-        /// <summary>Pad / trim lists to 48 / 52 / 20 with default transforms.</summary>
+        /// <summary>Pad / trim lists to 48 pew / 48 good / 20 evil with default transforms.</summary>
         public void EnsureSlotCounts()
         {
             churchPewSlots ??= new List<SlotTransformConfig>();
@@ -1328,6 +1349,70 @@ namespace ArthurianAutobattler
             FillSlots(playerBattleSlots, PlayerBattleCount, PlayerBattleDefault);
             FillSlots(enemyBattleSlots, EnemyBattleCount, EnemyBattleDefault);
             EnsureChurchLayoutPrefs();
+            EnsureBattleLayoutPrefs();
+            // tip: fix-battle-ground-layout — migrate 52→48 + aisle-outward defaults once.
+            if (battleLayoutVersion < CurrentBattleLayoutVersion)
+            {
+                ApplyAisleOutwardBattleDefaults(preservePreviewSprites: true);
+                battleLayoutVersion = CurrentBattleLayoutVersion;
+            }
+        }
+
+        public void EnsureBattleLayoutPrefs()
+        {
+            if (battleAisleGap < 0.2f) battleAisleGap = 1.15f;
+            if (battleSeatGap < 0.2f) battleSeatGap = 1.05f;
+            if (battleDepthGap < 0.2f) battleDepthGap = 0.85f;
+            battleAisleGap = Mathf.Clamp(battleAisleGap, 0.4f, 3.5f);
+            battleSeatGap = Mathf.Clamp(battleSeatGap, 0.5f, 2.2f);
+            battleDepthGap = Mathf.Clamp(battleDepthGap, 0.45f, 1.8f);
+        }
+
+        /// <summary>
+        /// Good LEFT / Evil RIGHT; front row fills from aisle (mid) outward.
+        /// Preserves preview sprites / character ids / slot bonuses when migrating.
+        /// tip: fix-battle-ground-layout
+        /// </summary>
+        public void ApplyAisleOutwardBattleDefaults(bool preservePreviewSprites = true)
+        {
+            EnsureBattleLayoutPrefs();
+            playerBattleSlots ??= new List<SlotTransformConfig>();
+            enemyBattleSlots ??= new List<SlotTransformConfig>();
+            FillSlots(playerBattleSlots, PlayerBattleCount, PlayerBattleDefault);
+            FillSlots(enemyBattleSlots, EnemyBattleCount, EnemyBattleDefault);
+            for (int i = 0; i < playerBattleSlots.Count; i++)
+            {
+                var prev = preservePreviewSprites ? playerBattleSlots[i] : null;
+                var neu = BattleSlotDefault(i, true, battleAisleGap, battleSeatGap, battleDepthGap);
+                if (prev != null)
+                {
+                    neu.previewOrOverrideSprite = prev.previewOrOverrideSprite;
+                    neu.previewAssetPath = prev.previewAssetPath;
+                    neu.assignedCharacterId = prev.assignedCharacterId;
+                    neu.bonusHP = prev.bonusHP;
+                    neu.bonusATK = prev.bonusATK;
+                    neu.bonusSPD = prev.bonusSPD;
+                    neu.aspectMultiplier = prev.aspectMultiplier;
+                }
+                playerBattleSlots[i] = neu;
+            }
+            for (int i = 0; i < enemyBattleSlots.Count; i++)
+            {
+                var prev = preservePreviewSprites ? enemyBattleSlots[i] : null;
+                var neu = BattleSlotDefault(i, false, battleAisleGap, battleSeatGap, battleDepthGap);
+                if (prev != null)
+                {
+                    neu.previewOrOverrideSprite = prev.previewOrOverrideSprite;
+                    neu.previewAssetPath = prev.previewAssetPath;
+                    neu.assignedCharacterId = prev.assignedCharacterId;
+                    neu.bonusHP = prev.bonusHP;
+                    neu.bonusATK = prev.bonusATK;
+                    neu.bonusSPD = prev.bonusSPD;
+                    neu.aspectMultiplier = prev.aspectMultiplier;
+                }
+                enemyBattleSlots[i] = neu;
+            }
+            battleLayoutVersion = CurrentBattleLayoutVersion;
         }
 
         static void FillSlots(List<SlotTransformConfig> list, int count, Func<int, SlotTransformConfig> factory)
@@ -1366,38 +1451,57 @@ namespace ArthurianAutobattler
             => SomersetPewLayout.GetStaticNormalizedSeatPosition(
                 SomersetPewLayout.CreateDefaultPews(), globalSeatIndex);
 
-        /// <summary>Staggered columns of 6 (frontlineSize = 6) — matches Phase 3 auto-arrange math.</summary>
+        /// <summary>
+        /// Good LEFT: front (depth 0) fills from aisle (rightmost-of-left) outward to left edge.
+        /// tip: fix-battle-ground-layout
+        /// </summary>
         static SlotTransformConfig PlayerBattleDefault(int i)
+            => BattleSlotDefault(i, player: true, aisleGap: 1.15f, seatGap: 1.05f, depthGap: 0.85f);
+
+        /// <summary>
+        /// Evil RIGHT: front fills from aisle (leftmost-of-right) outward to right edge.
+        /// tip: fix-battle-ground-layout
+        /// </summary>
+        static SlotTransformConfig EnemyBattleDefault(int i)
+            => BattleSlotDefault(i, player: false, aisleGap: 1.15f, seatGap: 1.0f, depthGap: 0.9f);
+
+        /// <summary>World position for battle slot i (uses live SoftPromote prefs when available).</summary>
+        public Vector2 ResolveBattleWorldPos(bool player, int index)
         {
-            const int frontlineSize = 6;
-            int col = i / frontlineSize;
-            int row = i % frontlineSize;
-            float scale = col <= 1 ? 1f : Mathf.Lerp(0.95f, 0.70f, Mathf.InverseLerp(2f, 8f, col));
-            float x = -3.5f + row * 1.1f;
-            float y = 2.0f - col * 0.85f;
-            return new SlotTransformConfig
-            {
-                slotNumber = i,
-                position = new Vector2(x, y),
-                scale = new Vector2(scale, scale),
-                aspectMultiplier = Vector2.one,
-                sortingOrder = Mathf.RoundToInt(-y * 10f)
-            };
+            EnsureBattleLayoutPrefs();
+            return BattleWorldPos(index, player, battleAisleGap, battleSeatGap, battleDepthGap);
         }
 
-        static SlotTransformConfig EnemyBattleDefault(int i)
+        public static Vector2 BattleWorldPos(
+            int index, bool player, float aisleGap, float seatGap, float depthGap)
         {
-            int col = i / 5;
-            int row = i % 5;
-            float x = 3.5f + row * 1.0f;
-            float y = 1.5f - col * 1.0f;
+            int front = player ? PlayerFrontWidth : EnemyFrontWidth;
+            if (front < 1) front = player ? 6 : 5;
+            int row = index % front;   // 0 = nearest aisle (inside)
+            int depth = index / front; // 0 = front line
+            float x = player
+                ? -(aisleGap + row * seatGap)   // good: inside → left edge (more negative)
+                : (aisleGap + row * seatGap);   // evil: inside → right edge (more positive)
+            float y = (player ? 2.0f : 1.8f) - depth * depthGap;
+            return new Vector2(x, y);
+        }
+
+        static SlotTransformConfig BattleSlotDefault(
+            int i, bool player, float aisleGap, float seatGap, float depthGap)
+        {
+            int front = player ? PlayerFrontWidth : EnemyFrontWidth;
+            int depth = i / Mathf.Max(1, front);
+            float scale = depth <= 1
+                ? 1f
+                : Mathf.Lerp(0.95f, 0.70f, Mathf.InverseLerp(2f, player ? 7f : 3f, depth));
+            Vector2 pos = BattleWorldPos(i, player, aisleGap, seatGap, depthGap);
             return new SlotTransformConfig
             {
                 slotNumber = i,
-                position = new Vector2(x, y),
-                scale = Vector2.one,
+                position = pos,
+                scale = new Vector2(scale, scale),
                 aspectMultiplier = Vector2.one,
-                sortingOrder = Mathf.RoundToInt(-y * 10f)
+                sortingOrder = Mathf.RoundToInt(-pos.y * 10f)
             };
         }
     }
