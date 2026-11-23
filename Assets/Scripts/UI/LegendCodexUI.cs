@@ -79,7 +79,8 @@ namespace ArthurianAutobattler
             {
                 var img = codexPanel.GetComponent<Image>();
                 if (img == null) img = codexPanel.GetComponentInChildren<Image>();
-                SceneBackgroundApplier.ApplyToUiHost(
+                // tip: fix-architect-apply-persist-facing — rematerialize + apply on Legends enter.
+                SceneBackgroundApplier.ApplyOnSceneEnter(
                     SceneBackgroundSlot.LegendCodex,
                     img,
                     codexPanel.GetComponent<RectTransform>());

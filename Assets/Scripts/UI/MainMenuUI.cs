@@ -345,7 +345,8 @@ namespace ArthurianAutobattler
             {
                 var img = menuRoot.GetComponent<Image>();
                 var rt = menuRoot.GetComponent<RectTransform>();
-                SceneBackgroundApplier.ApplyToUiHost(SceneBackgroundSlot.MainMenu, img, rt);
+                // tip: fix-architect-apply-persist-facing — rematerialize + apply on menu enter.
+                SceneBackgroundApplier.ApplyOnSceneEnter(SceneBackgroundSlot.MainMenu, img, rt);
             }
             catch (System.Exception ex)
             {

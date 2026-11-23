@@ -2025,7 +2025,10 @@ namespace ArthurianAutobattler
             _churchProfileCache = null;
         }
 
-        /// <summary>Architect Tab 3 — apply SceneBackgroundProfile church image/video when assigned.</summary>
+        /// <summary>
+        /// Architect Tab 3 — apply SceneBackgroundProfile church image/video when assigned.
+        /// tip: fix-architect-apply-persist-facing — scene-enter rematerialize + apply.
+        /// </summary>
         void ApplyArchitectChurchBackground()
         {
             try
@@ -2040,13 +2043,27 @@ namespace ArthurianAutobattler
                 }
                 RectTransform host = img != null ? img.rectTransform : null;
                 if (host == null && pewLayout != null) host = pewLayout.backgroundRect;
-                SceneBackgroundApplier.ApplyToUiHost(
+                // Invalidate stage layout cache so Tab 2 pew positions re-apply on enter.
+                InvalidateChurchAssignCache();
+                SceneBackgroundApplier.ApplyOnSceneEnter(
                     SceneBackgroundSlot.SomersetChurch, img, host);
             }
             catch (Exception ex)
             {
                 Debug.LogWarning("[DemonKnight] ApplyArchitectChurchBackground: " + ex.Message);
             }
+        }
+
+        /// <summary>Re-apply Architect church BG + stage layout after town phase enter.</summary>
+        public void ApplyArchitectOnTownEnter()
+        {
+            ApplyArchitectChurchBackground();
+            try
+            {
+                ClassSpritePoolApplier.InvalidateCache();
+                LegendPewPortraitApplier.InvalidateCache();
+            }
+            catch { /* soft */ }
         }
 
         static void EnsureSeatImageAssignedOnly(GameObject go, Sprite assigned, RecruitInstance recruit)

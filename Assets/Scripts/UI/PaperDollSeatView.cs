@@ -582,12 +582,20 @@ namespace ArthurianAutobattler
             outfitSr = null;
             headSr = null;
             propSr = null;
+            // tip: fix-architect-apply-persist-facing — capture after UnitVisualActor.ApplyFacingScale
+            // so breath bob / death lerp keep evil negative scale.x (faces left).
             CaptureBase();
             ResolveClips();
             startOffset = UnityEngine.Random.Range(0f, 1.5f);
             state = AnimState.Idle;
             stateTime = 0f;
             enabled = true;
+        }
+
+        /// <summary>Re-read localScale after UnitVisualActor re-asserts facing (evil −x).</summary>
+        public void RecaptureBaseScale()
+        {
+            CaptureBase();
         }
 
         public void Play(AnimState next)
@@ -659,8 +667,12 @@ namespace ArthurianAutobattler
             {
                 case AnimState.Attack:
                 {
-                    // Forward X-lunge +18px (UI) / world units for battle.
-                    Vector3 peak = baseLocalPos + new Vector3(uiMode ? 18f : 0.35f, 0f, 0f);
+                    // Lunge toward opponent: good (+scale.x) → +X; evil (−scale.x) → −X.
+                    // tip: fix-architect-apply-persist-facing
+                    float facing = Mathf.Sign(baseScale.x);
+                    if (Mathf.Approximately(facing, 0f)) facing = 1f;
+                    float lunged = uiMode ? 18f : 0.35f;
+                    Vector3 peak = baseLocalPos + new Vector3(facing * lunged, 0f, 0f);
                     float t = 0f;
                     while (t < 0.1f)
                     {
@@ -682,7 +694,9 @@ namespace ArthurianAutobattler
                 case AnimState.Hit:
                 {
                     FlashLayers(Color.white);
-                    Vector3 knock = baseLocalPos + new Vector3(uiMode ? -10f : -0.2f, 0f, 0f);
+                    float facingHit = Mathf.Sign(baseScale.x);
+                    if (Mathf.Approximately(facingHit, 0f)) facingHit = 1f;
+                    Vector3 knock = baseLocalPos + new Vector3(facingHit * (uiMode ? -10f : -0.2f), 0f, 0f);
                     transform.localPosition = knock;
                     yield return new WaitForSeconds(0.07f);
                     RestoreLayerColors();

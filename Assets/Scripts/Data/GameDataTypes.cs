@@ -925,7 +925,7 @@ namespace ArthurianAutobattler
     {
         /// <summary>
         /// Same as StageLayoutProfile.PewRowSize (13). Local const (kept for call sites).
-        /// tip: fix-hud-bar-button-layout — StageLayoutProfile also lives in this file.
+        /// tip: fix-architect-apply-persist-facing — StageLayoutProfile also lives in this file.
         /// </summary>
         public const int PewRowSize = 13;
 
@@ -1003,9 +1003,9 @@ namespace ArthurianAutobattler
     }
 
 
-    // ===== fix-hud-bar-button-layout — helpers + Profile SOs LIVE HERE (MustRestore) =====
+    // ===== fix-architect-apply-persist-facing — helpers + Profile SOs LIVE HERE (MustRestore) =====
     // Helpers + all five Architect Profile ScriptableObjects permanently in GameDataTypes.
-    // Named *Profile.cs files are deleted/stubbed (CS0101 kill). tip: fix-hud-bar-button-layout
+    // Named *Profile.cs files are deleted/stubbed (CS0101 kill). tip: fix-architect-apply-persist-facing
     [Serializable]
     public class SlotTransformConfig
     {
@@ -1077,11 +1077,11 @@ namespace ArthurianAutobattler
 
 
     // ===== Architect Profile ScriptableObjects LIVE HERE (MustRestore) =====
-    // tip: fix-hud-bar-button-layout — named *Profile.cs removed from Sync/HardWrite.
+    // tip: fix-architect-apply-persist-facing — named *Profile.cs removed from Sync/HardWrite.
     // Ensure remaps YAML m_Script via CreateInstance probe (multi-class MonoScript fileID).
 
-    // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-hud-bar-button-layout) =====
-    // tip: fix-hud-bar-button-layout — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== StageLayoutProfile (moved into GameDataTypes — tip fix-architect-apply-persist-facing) =====
+    // tip: fix-architect-apply-persist-facing — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Numbered Somerset church pews (52), player battle slots (52), enemy slots (20),
     /// plus parallax / atmosphere toggles. Resources path: StageLayoutProfile.
@@ -1297,8 +1297,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== SceneBackgroundProfile (moved into GameDataTypes — tip fix-hud-bar-button-layout) =====
-    // tip: fix-hud-bar-button-layout — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== SceneBackgroundProfile (moved into GameDataTypes — tip fix-architect-apply-persist-facing) =====
+    // tip: fix-architect-apply-persist-facing — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect-assigned scene/screen backgrounds (image or video). Resources path: SceneBackgroundProfile.
     /// Assign-only — empty slots keep each screen's built-in default art.
@@ -1310,6 +1310,9 @@ namespace ArthurianAutobattler
 
         public List<SceneBackgroundEntry> entries = new List<SceneBackgroundEntry>();
 
+        /// <summary>True when this is a CreateInstance stand-in (not a Resources asset).</summary>
+        [System.NonSerialized] public bool isRuntimeStandIn;
+
         public static SceneBackgroundProfile Load()
         {
             SceneBackgroundProfile p = null;
@@ -1318,6 +1321,8 @@ namespace ArthurianAutobattler
             if (p != null)
             {
                 p.EnsureDefaultEntries();
+                p.isRuntimeStandIn = false;
+                // Rematerialize only — NEVER clear entries on load.
                 p.RematerializeSpritesFromPaths();
                 return p;
             }
@@ -1330,6 +1335,7 @@ namespace ArthurianAutobattler
                     {
                         if (all[i] == null) continue;
                         all[i].EnsureDefaultEntries();
+                        all[i].isRuntimeStandIn = false;
                         all[i].RematerializeSpritesFromPaths();
                         return all[i];
                     }
@@ -1338,6 +1344,7 @@ namespace ArthurianAutobattler
             catch { /* broken Resources asset / missing script spam — soft stand-in */ }
             p = CreateInstance<SceneBackgroundProfile>();
             p.name = "SceneBackgroundProfile_Runtime";
+            p.isRuntimeStandIn = true;
             p.EnsureDefaultEntries();
             return p;
         }
@@ -1409,8 +1416,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== ClassSpritePoolProfile (moved into GameDataTypes — tip fix-hud-bar-button-layout) =====
-    // tip: fix-hud-bar-button-layout — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== ClassSpritePoolProfile (moved into GameDataTypes — tip fix-architect-apply-persist-facing) =====
+    // tip: fix-architect-apply-persist-facing — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect class sprite pools (Peasant / Warrior / Knight). Resources path:
     /// ClassSpritePoolProfile. StageLayoutProfile pew slots stay position/scale guides —
@@ -1623,8 +1630,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== LegendPewPortraitProfile (moved into GameDataTypes — tip fix-hud-bar-button-layout) =====
-    // tip: fix-hud-bar-button-layout — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== LegendPewPortraitProfile (moved into GameDataTypes — tip fix-architect-apply-persist-facing) =====
+    // tip: fix-architect-apply-persist-facing — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>One Legend face-portrait slot (Architect Tab 5).</summary>
     [Serializable]
     public class LegendPortraitEntry
@@ -1862,8 +1869,8 @@ namespace ArthurianAutobattler
         }
     }
 
-    // ===== BattleGoodEvilSpritePoolProfile (moved into GameDataTypes — tip fix-hud-bar-button-layout) =====
-    // tip: fix-hud-bar-button-layout — SO lives in MustRestore GameDataTypes (no named MonoScript)
+    // ===== BattleGoodEvilSpritePoolProfile (moved into GameDataTypes — tip fix-architect-apply-persist-facing) =====
+    // tip: fix-architect-apply-persist-facing — SO lives in MustRestore GameDataTypes (no named MonoScript)
     /// <summary>
     /// Architect Tab 6 — Autobattle Good vs Evil battle sprites for UnitVisualActor.
     /// Distinct from Tab 4 pew BODY pools and Tab 5 FACE portraits. Resources path:
@@ -2185,9 +2192,9 @@ namespace ArthurianAutobattler
     }
 
     // ===== DA-59 Phase25 helpers (Force Sync nuclear — do not remove) =====
-    // Architect *Profile ScriptableObjects ALSO live above in this file (tip fix-hud-bar-button-layout).
+    // Architect *Profile ScriptableObjects ALSO live above in this file (tip fix-architect-apply-persist-facing).
     // Appliers stay embedded below.
-    // tip: fix-hud-bar-button-layout
+    // tip: fix-architect-apply-persist-facing
     /// <summary>
     /// Multi-frame clip for modular paper-doll parts (Pose / Outfit / Head / Weapon / EnemyBoss).
     /// Standard clip names: "Idle", "Attack", "Hit", "Death".
@@ -2510,7 +2517,7 @@ namespace ArthurianAutobattler
     // MustRestore of those paths still fails when Force Delete runs under a STALE compiled Sync
     // host (ScriptPaths/MustRestore arrays baked into the old assembly). GameDataTypes has been
     // MustRestore since DA-59 — even old Sync hosts re-land this file from tip → types exist.
-    // tip: fix-hud-bar-button-layout — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
+    // tip: fix-architect-apply-persist-facing — Applier Load soft-fails when Profile MonoScripts/assets still missing after Sync.
 
     /// <summary>
     /// Applies Architect-assigned SceneBackgroundProfile entries (jpg/png or mp4)
@@ -2527,6 +2534,29 @@ namespace ArthurianAutobattler
         {
             get
             {
+                // tip: fix-architect-apply-persist-facing — never keep empty CreateInstance forever.
+                if (_cache != null && _cache.isRuntimeStandIn)
+                {
+                    bool any = false;
+                    try
+                    {
+                        if (_cache.entries != null)
+                        {
+                            for (int i = 0; i < _cache.entries.Count; i++)
+                            {
+                                var e = _cache.entries[i];
+                                if (e == null) continue;
+                                if (e.imageSprite != null || e.videoClip != null
+                                    || !string.IsNullOrEmpty(e.imageAssetPath)
+                                    || !string.IsNullOrEmpty(e.videoAssetPath))
+                                { any = true; break; }
+                            }
+                        }
+                    }
+                    catch { /* soft */ }
+                    if (!any) _cache = null;
+                }
+
                 if (_cache == null)
                 {
                     try
@@ -2534,6 +2564,7 @@ namespace ArthurianAutobattler
                         _cache = SceneBackgroundProfile.Load();
                         if (_cache != null)
                         {
+                            // Rematerialize only — NEVER clear entries/pools on load.
                             int restored = _cache.RematerializeSpritesFromPaths();
                             if (restored > 0)
                                 Debug.Log($"[DemonKnight] SceneBackground rematerialized {restored} image(s) from path backups.");
@@ -2547,6 +2578,46 @@ namespace ArthurianAutobattler
                     }
                 }
                 return _cache;
+            }
+        }
+
+        /// <summary>
+        /// Runtime scene-enter hook — invalidate, rematerialize, apply image/video to a UI host.
+        /// tip: fix-architect-apply-persist-facing
+        /// </summary>
+        public static bool ApplyOnSceneEnter(
+            SceneBackgroundSlot slot,
+            Image imageTarget,
+            RectTransform videoHostParent = null)
+        {
+            try
+            {
+                InvalidateCache();
+                var p = Profile;
+                p?.RematerializeSpritesFromPaths();
+                return ApplyToUiHost(slot, imageTarget, videoHostParent);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] SceneBackgroundApplier.ApplyOnSceneEnter soft-fail: " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>World SpriteRenderer scene-enter apply (battle BG).</summary>
+        public static bool ApplyOnSceneEnterWorld(SceneBackgroundSlot slot, SpriteRenderer target)
+        {
+            try
+            {
+                InvalidateCache();
+                var p = Profile;
+                p?.RematerializeSpritesFromPaths();
+                return ApplyToSpriteRenderer(slot, target);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[DemonKnight] SceneBackgroundApplier.ApplyOnSceneEnterWorld soft-fail: " + ex.Message);
+                return false;
             }
         }
 
@@ -2760,7 +2831,7 @@ namespace ArthurianAutobattler
                     try
                     {
                         // SoftPromote belt: Load soft-fails when Profile MonoScript still missing after Sync.
-                        // tip: fix-hud-bar-button-layout
+                        // tip: fix-architect-apply-persist-facing
                         _cache = ClassSpritePoolProfile.Load();
                         if (_cache != null)
                         {
@@ -2795,19 +2866,41 @@ namespace ArthurianAutobattler
             try
             {
                 var profile = Profile;
-                if (profile == null || profile.isRuntimeStandIn)
-                {
-                    // Soft-fail empty stand-in — callers keep StageLayout / solid fallbacks.
-                    if (profile == null || profile.CountUsable(type) == 0) return null;
-                }
+                if (profile == null) return null;
+                // tip: fix-architect-apply-persist-facing — rematerialize preferred picks; never clear pools.
+                profile.RematerializeSpritesFromPaths();
+                if (profile.isRuntimeStandIn && profile.CountUsable(type) == 0) return null;
+
                 List<Sprite> pool = profile.GetPool(type);
-                if (pool == null || pool.Count == 0) return null;
+                if (pool == null || pool.Count == 0)
+                {
+                    // Path-only usable counts still mean Rematerialize should have filled — retry once.
+                    if (profile.CountUsable(type) == 0) return null;
+                    pool = profile.GetPool(type);
+                    if (pool == null || pool.Count == 0) return null;
+                }
 
                 // Body pipeline only — skip any sprite that also lives in Tab 5 face pools.
                 var usableList = new List<Sprite>();
                 for (int i = 0; i < pool.Count; i++)
                 {
                     Sprite sp = pool[i];
+                    if (sp == null)
+                    {
+                        // Prefer path rematerialize for this index (individual ObjectField picks).
+                        List<string> paths = type switch
+                        {
+                            UnitType.Peasant => profile.peasantAssetPaths,
+                            UnitType.Warrior => profile.warriorAssetPaths,
+                            UnitType.Knight => profile.knightAssetPaths,
+                            _ => null
+                        };
+                        if (paths != null && i < paths.Count && !string.IsNullOrEmpty(paths[i]))
+                        {
+                            sp = ClassSpritePoolProfile.TryLoadSpriteAtPath(paths[i]);
+                            if (sp != null) pool[i] = sp;
+                        }
+                    }
                     if (sp == null) continue;
                     if (LegendPewPortraitApplier.IsFacePoolSprite(sp))
                     {
@@ -2820,6 +2913,7 @@ namespace ArthurianAutobattler
                 }
                 if (usableList.Count == 0) return null;
 
+                // Preferred pick: stable hash so individual pool sprites stick across pew refreshes.
                 int seed = StableHash(
                     !string.IsNullOrEmpty(unitId) ? unitId
                     : (!string.IsNullOrEmpty(characterName) ? characterName + "#" + pewSeatIndex
@@ -3124,6 +3218,8 @@ namespace ArthurianAutobattler
             {
                 var profile = Profile;
                 if (profile == null) return null;
+                // tip: fix-architect-apply-persist-facing — rematerialize preferred picks; never clear pools.
+                profile.RematerializeSpritesFromPaths();
 
                 // Boss slots first (UnitType.Boss*)
                 string typeName = type.ToString();
@@ -3160,6 +3256,7 @@ namespace ArthurianAutobattler
                     usable.Add(sp);
                 }
                 if (usable.Count == 0) return null;
+                // Preferred pick sticks across battle re-syncs (stable hash).
                 int seed = ClassSpritePoolApplier.StableHash(
                     !string.IsNullOrEmpty(unitId) ? "battle:" + unitId : "battle:" + type);
                 int want = Math.Abs(seed) % usable.Count;
