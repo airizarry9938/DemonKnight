@@ -24,16 +24,16 @@ public static class ArthurianSyncFromGitHub
     /// RunSync prefers ResolveMainSha() so Force Sync tracks main without raw overwrites.
     /// </summary>
     // Pre-ship pin = tip before this PR; ship commit bumps both to feature SHA.
-    private const string FallbackCommitSha = "1712ca6b4a4cd704b55766cdbef264908f5cc22a";
+    private const string FallbackCommitSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
 
     /// <summary>
     /// Hard tip for FORCE host overwrite. Update every ship.
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "883e011ec849ef6101b67ff4827ff5ef5d8c30e0";
+    public const string HardTipCommitSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
 
-    private const string ExpectedPackageId = "church-train-scout-ux";
+    private const string ExpectedPackageId = "fix-somerset-church-ui-cs0246";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -71,6 +71,7 @@ public static class ArthurianSyncFromGitHub
         "architect-legend-pew-portraits",
         "fix-architect-pool-apply",
         "sprite-outline-highlight",
+        "church-train-scout-ux",
     };
 
     /// <summary>
@@ -148,8 +149,9 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/ClassSpritePoolApplier.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
-        "Assets/Scripts/Systems/GameLoopManager.cs",
+        // SomersetChurchUI BEFORE GameLoop/ChurchStage consumers (CS0246 Force Delete race).
         "Assets/Scripts/UI/SomersetChurchUI.cs",
+        "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
         // Wave boss HUD — keep early so night label Sync never references a missing type.
         "Assets/Scripts/UI/WaveBossHudView.cs",
@@ -215,8 +217,9 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/PaperDollSeatView.cs",
         "Assets/Scripts/UI/VictoryStarBadge.cs",
         "Assets/Scripts/UI/LegendCodexUI.cs",
-        "Assets/Scripts/Systems/GameLoopManager.cs",
+        // SomersetChurchUI before GameLoop/ChurchStage (CS0246).
         "Assets/Scripts/UI/SomersetChurchUI.cs",
+        "Assets/Scripts/Systems/GameLoopManager.cs",
         "Assets/Scripts/UI/ChurchStageUIController.cs",
         "Assets/Scripts/UI/WaveBossHudView.cs",
         "Assets/Scripts/UI/TownSplitUIController.cs",
@@ -253,6 +256,8 @@ public static class ArthurianSyncFromGitHub
         "Assets/Scripts/UI/LegendCodexUI.cs",
         "Assets/Scripts/UI/MenuListSortBar.cs",
         "Assets/Scripts/UI/PewSeatHoverHighlight.cs",
+        // Church stage type — Force Delete wiped this while GameLoop/ChurchStage stayed → CS0246.
+        "Assets/Scripts/UI/SomersetChurchUI.cs",
     };
 
     /// <summary>Standalone Phase 2–5 paths — never download; delete if they redefine embeds.</summary>
@@ -880,6 +885,8 @@ public static class ArthurianSyncFromGitHub
                     if (IsMustRestoreUiHelper(rel)) continue;
                     // Never wipe GameDataTypes even if somehow missing from MustRestore (Applier embed).
                     if (rel.EndsWith("GameDataTypes.cs", StringComparison.OrdinalIgnoreCase)) continue;
+                    // Never wipe SomersetChurchUI — stale Sync MustRestore omitted it → CS0246.
+                    if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase)) continue;
                     TryDeleteFile(Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar)));
                 }
                 // Force Delete must not leave Phase 2–5 standalones either.
@@ -940,6 +947,7 @@ public static class ArthurianSyncFromGitHub
             // Hard guarantee: Applier stubs on disk; types in GameDataTypes.
             StubApplierStandalonesOver(projectRoot, errors);
             HardRestoreApplierEmbedHost(projectRoot, sha, errors, okFiles);
+            HardRestoreSomersetChurchUI(projectRoot, sha, errors, okFiles);
             TryFetchPhase25Insurance(errors, okFiles);
         }
         finally
@@ -1226,6 +1234,40 @@ public static class ArthurianSyncFromGitHub
         }
     }
 
+    /// <summary>
+    /// Last-resort: re-download SomersetChurchUI after every Force Sync.
+    /// Independent of MustRestore so a stale compiled Sync that wiped Church UI still
+    /// re-lands the type before GameLoopManager / ChurchStageUIController compile (CS0246).
+    /// </summary>
+    static void HardRestoreSomersetChurchUI(
+        string projectRoot,
+        string sha,
+        List<string> errors,
+        List<string> okFiles)
+    {
+        const string rel = "Assets/Scripts/UI/SomersetChurchUI.cs";
+        try
+        {
+            string dest = Path.Combine(projectRoot, rel.Replace('/', Path.DirectorySeparatorChar));
+            string text = DownloadPinned(rel, sha, out string source, relaxPackageId: true);
+            if (text.IndexOf("class SomersetChurchUI", StringComparison.Ordinal) < 0
+                || text.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
+                || text.IndexOf("TrainATK", StringComparison.Ordinal) < 0
+                || text.IndexOf("TrainChosenStat", StringComparison.Ordinal) < 0
+                || text.IndexOf("ChurchBottomDialogue", StringComparison.Ordinal) < 0)
+                throw new Exception("SomersetChurchUI missing tip church markers (" + source + ")");
+            WriteReplacing(dest, text, deleteFirst: true);
+            VerifyOnDisk(rel, dest, relaxPackageId: true);
+            if (!okFiles.Contains(rel)) okFiles.Add(rel);
+            Debug.Log($"[DemonKnight] HardRestore SomersetChurchUI via {source} @ {sha}");
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"{rel} (somerset-church hard-restore): {ex.Message}");
+            Debug.LogError($"[DemonKnight] HardRestore SomersetChurchUI FAILED: {ex.Message}");
+        }
+    }
+
     private static void WriteReplacing(string dest, string text, bool deleteFirst)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
@@ -1414,7 +1456,10 @@ public static class ArthurianSyncFromGitHub
 
         if (rel.EndsWith("SomersetChurchUI.cs", StringComparison.OrdinalIgnoreCase))
         {
-            return body.Contains("RewireMarchButton")
+            // Tip church-train-scout-ux+: dossier 520×560 + Train ATK/HP/SPD (NOT old 420×460).
+            // Stale sanity "420f, 460f" rejected tip downloads → Force Wipe left CS0246.
+            return body.Contains("class SomersetChurchUI")
+                   && body.Contains("RewireMarchButton")
                    && body.Contains("ForceNamedTavernDicePanelsInactive")
                    && body.Contains("forceEqualHudSlots")
                    && body.Contains("MenuListSortBar")
@@ -1428,7 +1473,9 @@ public static class ArthurianSyncFromGitHub
                    && body.Contains("LockSeatHighlight")
                    && body.Contains("UnityEngine.Object.Destroy")
                    && body.Contains("using System;")
-                   && body.Contains("420f, 460f")
+                   && body.Contains("520f, 560f")
+                   && body.Contains("TrainATK")
+                   && body.Contains("TrainChosenStat")
                    && body.Contains("onLeftClick: () => ToggleUnitSelectionMenu")
                    && body.Contains("CloseUnitSelectionMenu")
                    && body.Contains("ApplyRecruitButtonLabel")
@@ -1677,7 +1724,8 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("architect-legend-pew-portraits")
                    || body.Contains("sprite-outline-highlight")
                    || body.Contains("fix-architect-pool-apply")
-                   || body.Contains("church-train-scout-ux");
+                   || body.Contains("church-train-scout-ux")
+                   || body.Contains("fix-somerset-church-ui-cs0246");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))
