@@ -11,12 +11,12 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-architect-build-persist-cs0103";
-    public const string GitHint = "fix-architect-build-persist-cs0103";
-    public const string BuiltUtc = "2026-11-23T01:34:10Z";
+    public const string Id = "fix-build-persist-embed";
+    public const string GitHint = "fix-build-persist-embed";
+    public const string BuiltUtc = "2026-11-23T01:56:08Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
-    public const string HardTipSha = "c4a0867cfece2c40d33216f06144ed9d33e03a51";
+    public const string HardTipSha = "ae6b1afee35fa8e36435d565597f851469fcf695";
 
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
@@ -118,10 +118,14 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0))
                             throw new Exception("SomersetChurchUI missing tip church markers");
                         if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
+                            && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
+                                || body.IndexOf("ArthurianArtArchitectWindow.cs", StringComparison.Ordinal) < 0))
+                            throw new Exception("ArthurianArchitectBuildPersist must be stub → Architect embed");
+                        if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
-                                || body.IndexOf("PromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
+                                || body.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
                                 || body.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0))
-                            throw new Exception("ArthurianArchitectBuildPersist missing tip markers");
+                            throw new Exception("Architect missing embedded BuildPersist / SoftPromote");
                         // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
                         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                             || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
