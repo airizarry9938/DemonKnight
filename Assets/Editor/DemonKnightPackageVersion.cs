@@ -11,8 +11,8 @@ using UnityEngine;
 /// <summary>Bump when shipping package updates so Diagnose can prove Unity loaded the new build.</summary>
 public static class DemonKnightPackageVersion
 {
-    public const string Id = "fix-architect-apply-persist-facing";
-    public const string GitHint = "fix-architect-apply-persist-facing";
+    public const string Id = "fix-architect-load-pool-profiles";
+    public const string GitHint = "fix-architect-load-pool-profiles";
     public const string BuiltUtc = "2026-11-23T08:00:00Z";
 
     /// <summary>Fallback only — OnLoad prefers API tip + raw@main (never re-land breakglass).</summary>
@@ -34,7 +34,7 @@ public static class DemonKnightPackageVersion
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
-            // tip: fix-architect-apply-persist-facing — one-shot per editor session (domain reload still
+            // tip: fix-architect-load-pool-profiles — one-shot per editor session (domain reload still
             // re-enters InitializeOnLoad; SessionState survives domain reload within a session).
             // SET GATE FIRST — WipeModularPaperdollAssets used to Refresh before gate → endless loop.
             if (SessionState.GetBool(OnLoadSessionGate, false)) return;
@@ -103,7 +103,7 @@ public static class DemonKnightPackageVersion
                     "Assets/Editor/DemonKnightTipEscape.cs",
                     "Assets/Scripts/UI/SomersetPewLayout.cs",
                     // Named MonoScript Profile SOs + shared types BEFORE GameDataTypes Appliers.
-                    // tip: fix-architect-apply-persist-facing
+                    // tip: fix-architect-load-pool-profiles
                     // Applier embed host — Appliers stay here; Profiles are named files.
                     "Assets/Scripts/Data/GameDataTypes.cs",
                     "Assets/Scripts/UI/SomersetChurchUI.cs",
@@ -150,7 +150,7 @@ public static class DemonKnightPackageVersion
                                 || body.IndexOf("520f, 560f", StringComparison.Ordinal) < 0
                                 || body.IndexOf("TrainATK", StringComparison.Ordinal) < 0
                                 || body.IndexOf("ApplyHorizontalHudBarLayout", StringComparison.Ordinal) < 0
-                                || body.IndexOf("fix-architect-apply-persist-facing", StringComparison.Ordinal) < 0))
+                                || body.IndexOf("fix-architect-load-pool-profiles", StringComparison.Ordinal) < 0))
                             throw new Exception("SomersetChurchUI missing tip church/HUD markers");
                         if (rel.EndsWith("ArthurianArchitectBuildPersist.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) >= 0
@@ -159,8 +159,10 @@ public static class DemonKnightPackageVersion
                         if (rel.EndsWith("ArthurianArtArchitectWindow.cs", StringComparison.OrdinalIgnoreCase)
                             && (body.IndexOf("class ArthurianArchitectBuildPersist", StringComparison.Ordinal) < 0
                                 || body.IndexOf("SoftPromoteClassPoolIntoResources", StringComparison.Ordinal) < 0
-                                || body.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0))
-                            throw new Exception("Architect missing embedded BuildPersist / SoftPromote");
+                                || body.IndexOf("IPreprocessBuildWithReport", StringComparison.Ordinal) < 0
+                                || body.IndexOf("SaveNamedClassPoolProfile", StringComparison.Ordinal) < 0
+                                || body.IndexOf("ArchitectPools", StringComparison.Ordinal) < 0))
+                            throw new Exception("Architect missing embedded BuildPersist / SoftPromote / Save Pool Profile");
                         // Never re-land full standalone Applier bodies (CS0101 vs GameDataTypes embed).
                         if (rel.EndsWith("SceneBackgroundApplier.cs", StringComparison.OrdinalIgnoreCase)
                             || rel.EndsWith("ClassSpritePoolApplier.cs", StringComparison.OrdinalIgnoreCase))
@@ -255,11 +257,11 @@ public static class DemonKnightPackageVersion
 
     /// <summary>
     /// True when any named MonoScript Profile SO (or its shared types) is missing/corrupt on disk.
-    /// tip: fix-architect-apply-persist-facing — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
+    /// tip: fix-architect-load-pool-profiles — Force Sync CS0246; TipEscape embeds rewrite missing Profiles.
     /// </summary>
     public static bool NamedProfileScriptsNeedRestore(string root = null)
     {
-        // tip: fix-architect-apply-persist-facing — Profiles live in GameDataTypes; named files must not redefine them.
+        // tip: fix-architect-load-pool-profiles — Profiles live in GameDataTypes; named files must not redefine them.
         if (string.IsNullOrEmpty(root))
             root = System.IO.Directory.GetParent(UnityEngine.Application.dataPath)!.FullName;
         string gdt = System.IO.Path.Combine(root, "Assets", "Scripts", "Data", "GameDataTypes.cs");
@@ -351,10 +353,11 @@ public static class DemonKnightPackageVersion
             "fix-profiles-in-gdt-always",
             "fix-endless-compile-loop",
             "fix-hud-bar-button-layout",
+            "fix-architect-apply-persist-facing",
         };
         foreach (string s in stale)
         {
-            // tip: fix-architect-apply-persist-facing — NEVER match bare "stale-id" (StalePackageIds lists
+            // tip: fix-architect-load-pool-profiles — NEVER match bare "stale-id" (StalePackageIds lists
             // those strings in tip Sync/Bootstrap → false-positive → endless OnLoad rewrite).
             // Also avoid wantId / FooId substring traps (char before key must be non-identifier).
             if (HasPackageIdAssign(body, "Id", s)) return true;
@@ -443,7 +446,7 @@ public static class DemonKnightPackageVersion
                 log.AppendLine("Copied Art → Resources " + ResLibPath);
             }
 
-            // tip: fix-architect-apply-persist-facing — OnLoad passes refresh:false (Refresh before SessionState gate = loop).
+            // tip: fix-architect-load-pool-profiles — OnLoad passes refresh:false (Refresh before SessionState gate = loop).
             if (refresh) AssetDatabase.Refresh();
             log.AppendLine("libs=" + libs + " clearedSlots≈" + clearedSlots + " deletedPlaceholderTex=" + deletedTex);
             if (spliced.Count == 0)
