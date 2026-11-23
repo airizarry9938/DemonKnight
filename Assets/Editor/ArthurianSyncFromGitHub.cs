@@ -31,9 +31,9 @@ public static class ArthurianSyncFromGitHub
     /// Never let FORCE land a 381-byte pre-OnLoad PackageVersion (architect-force-tip-ui).
     /// Prefer API tip / raw@main BEFORE HardTip — HardTip-first re-stuck Downloads on old SHAs.
     /// </summary>
-    public const string HardTipCommitSha = "b7ba01077ff3780ca6dee79c2c912f31ddfd286c";
+    public const string HardTipCommitSha = "883e011ec849ef6101b67ff4827ff5ef5d8c30e0";
 
-    private const string ExpectedPackageId = "sprite-outline-highlight";
+    private const string ExpectedPackageId = "church-train-scout-ux";
 
     /// <summary>Package Ids that must never win FORCE host overwrite (always fall through to tip/main).</summary>
     public static readonly string[] StalePackageIds =
@@ -70,6 +70,7 @@ public static class ArthurianSyncFromGitHub
         "legends-lore-portrait",
         "architect-legend-pew-portraits",
         "fix-architect-pool-apply",
+        "sprite-outline-highlight",
     };
 
     /// <summary>
@@ -1675,7 +1676,8 @@ public static class ArthurianSyncFromGitHub
                    || body.Contains("legends-lore-portrait")
                    || body.Contains("architect-legend-pew-portraits")
                    || body.Contains("sprite-outline-highlight")
-                   || body.Contains("fix-architect-pool-apply");
+                   || body.Contains("fix-architect-pool-apply")
+                   || body.Contains("church-train-scout-ux");
         }
 
         if (rel.EndsWith("ArthurianSyncFromGitHub.cs", StringComparison.OrdinalIgnoreCase))

@@ -14,7 +14,7 @@ using UnityEngine;
 /// </summary>
 public static class DemonKnightTipEscape
 {
-    public const string TipPackageId = "sprite-outline-highlight";
+    public const string TipPackageId = "church-train-scout-ux";
     const string Repo = "airizarry9938/DemonKnight";
     const string RawBase = "https://raw.githubusercontent.com/" + Repo + "/";
     const string PrefsKey = "DemonKnight.TipEscape.LastOk." + TipPackageId;
@@ -41,7 +41,7 @@ public static class DemonKnightTipEscape
         "Assets/Scripts/UI/TownsfolkVisualApplier.cs",
     };
 
-    [MenuItem("Arthurian/!!! Escape to Tip (sprite-outline-highlight)", false, 0)]
+    [MenuItem("Arthurian/!!! Escape to Tip (church-train-scout-ux)", false, 0)]
     public static void EscapeMenu()
     {
         string report = EscapeNow(force: true);
@@ -134,6 +134,8 @@ public static class DemonKnightTipEscape
             "merlin-lore-narrative",
             "legends-lore-portrait",
             "architect-legend-pew-portraits",
+            "fix-architect-pool-apply",
+            "sprite-outline-highlight",
         };
         foreach (string s in stale)
         {

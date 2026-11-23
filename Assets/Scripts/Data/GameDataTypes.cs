@@ -163,10 +163,16 @@ namespace ArthurianAutobattler
         /// <summary>Wave victories survived while recruited (ascension counter).</summary>
         public int wavesSurvived;
 
-        /// <summary>Paid Train bonuses (+2 per purchase into one pool).</summary>
+        /// <summary>Paid Train bonuses (+20 per purchase into one chosen pool).</summary>
         public int trainedHP;
         public int trainedATK;
         public int trainedSPD;
+
+        /// <summary>
+        /// Wave number of the last successful Train purchase on this unit (−1 = never).
+        /// One Train (ATK / HP / SPD) per unit per wave.
+        /// </summary>
+        public int lastTrainWaveNumber = -1;
 
         /// <summary>Dice Jackpot — hire is free regardless of floors / mods.</summary>
         public bool hireCostForcedZero;
@@ -274,10 +280,14 @@ namespace ArthurianAutobattler
         public const int KnightHireFloor = 110;
         public const int KnightHireCeil = 160;
 
-        /// <summary>Intel costs: T1 Scout free (still must click), Investigate 20g, Full Report 30g.</summary>
-        public const int IntelTier1Cost = 0;
+        /// <summary>Intel costs: Scout 10g, Investigate 20g, Full Report 30g.</summary>
+        public const int IntelTier1Cost = 10;
         public const int IntelTier2Cost = 20;
         public const int IntelTier3Cost = 30;
+
+        /// <summary>Paid Train (ATK / HP / SPD) — 50g, +20 to the chosen pool, once per unit per wave.</summary>
+        public const int TrainStatCostGold = 50;
+        public const int TrainStatBonus = 20;
 
         public static int IntelCostForTier(int tier) => tier switch
         {
@@ -414,15 +424,50 @@ namespace ArthurianAutobattler
                 canAttackFromBack = false;
         }
 
+        /// <summary>Which combat pool a paid Train purchase boosts.</summary>
+        public enum TrainStatKind { Attack, HP, Speed }
+
+        /// <summary>True when this unit already bought Train this wave (one purchase max).</summary>
+        public bool HasTrainedThisWave(int waveNumber) =>
+            waveNumber > 0 && lastTrainWaveNumber == waveNumber;
+
         /// <summary>
-        /// Paid training: Tank HP boost, or Train Ranged crossbow (+ATK, canAttackFromBack),
-        /// plus one random +2 to HP / ATK / SPD (exactly one roll).
+        /// Paid Train: +20 to the chosen ATK / HP / SPD pool. One purchase per unit per wave.
+        /// Does not grant Train Ranged / canAttackFromBack (Warriors keep NO REACH in BACK).
+        /// </summary>
+        public bool TrainChosenStat(TrainStatKind kind, int waveNumber, out string bonusLabel)
+        {
+            bonusLabel = null;
+            if (waveNumber > 0 && HasTrainedThisWave(waveNumber)) return false;
+            switch (kind)
+            {
+                case TrainStatKind.HP:
+                    trainedHP += TrainStatBonus;
+                    bonusLabel = $"+{TrainStatBonus} HP";
+                    break;
+                case TrainStatKind.Attack:
+                    trainedATK += TrainStatBonus;
+                    bonusLabel = $"+{TrainStatBonus} ATK";
+                    break;
+                case TrainStatKind.Speed:
+                    trainedSPD += TrainStatBonus;
+                    bonusLabel = $"+{TrainStatBonus} SPD";
+                    break;
+                default:
+                    return false;
+            }
+            if (waveNumber > 0) lastTrainWaveNumber = waveNumber;
+            return true;
+        }
+
+        /// <summary>
+        /// Legacy Tank / Ranged training (removed from church UI). Kept for old saves/callers.
         /// Warriors are blocked from the ranged kit — use SetFormationRole to move them BACK.
-        /// Returns false when the purchase is refused (no gold should be taken).
+        /// Prefer <see cref="TrainChosenStat"/> for new Train purchases.
         /// </summary>
         public bool TrainRole(CombatRole newRole) => TrainRole(newRole, out _);
 
-        /// <param name="bonusLabel">e.g. "+2 HP" when the purchase succeeds.</param>
+        /// <param name="bonusLabel">e.g. "+20 HP" when the purchase succeeds.</param>
         public bool TrainRole(CombatRole newRole, out string bonusLabel)
         {
             bonusLabel = null;
@@ -450,7 +495,7 @@ namespace ArthurianAutobattler
         }
 
         /// <summary>
-        /// One roll per Train purchase: +2 HP, +2 ATK, or +2 SPD.
+        /// Legacy random roll (+2). New church Train uses <see cref="TrainChosenStat"/> (+20 chosen).
         /// SPD is stored as attacks/sec — +2 SPD = +0.2 APS (0.1 APS per SPD point).
         /// </summary>
         public string ApplyRandomTrainStatBonus()
@@ -544,8 +589,8 @@ namespace ArthurianAutobattler
             if (IsMeleeStuckInBackRow)
             {
                 info += unitType == UnitType.Warrior
-                    ? "<color=#FF6644><b>NO REACH</b> — Warriors cannot Train Ranged. Move to FRONT to attack.</color>\n"
-                    : "<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Train Ranged (crossbow) or move to FRONT.</color>\n";
+                    ? "<color=#FF6644><b>NO REACH</b> — Warriors cannot attack from BACK. Move to FRONT.</color>\n"
+                    : "<color=#FF6644><b>NO REACH</b> — melee in BACK cannot attack. Move to FRONT.</color>\n";
             }
             else if (assignedRole == CombatRole.BacklineRanged && canAttackFromBack
                      && unitType != UnitType.Warrior && !IsRangedUnitType(unitType))
@@ -565,7 +610,7 @@ namespace ArthurianAutobattler
                     info += $"<color=#B8E986>(base {maxHealth}/{attackDamage}/{attackSpeed:F1} + growth)</color>\n";
             }
             else
-                info += $"HP: ??? | ATK: ??? (Scout — free)\n";
+                info += $"HP: ??? | ATK: ??? (Scout {IntelTier1Cost}g)\n";
 
             if (isScouted)
             {

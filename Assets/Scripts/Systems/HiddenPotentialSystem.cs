@@ -125,6 +125,7 @@ namespace ArthurianAutobattler
             clone.trainedHP = canonical.trainedHP;
             clone.trainedATK = canonical.trainedATK;
             clone.trainedSPD = canonical.trainedSPD;
+            clone.lastTrainWaveNumber = canonical.lastTrainWaveNumber;
             clone.wavesSurvived = canonical.wavesSurvived;
             clone.hasAscended = canonical.hasAscended;
             clone.traitAwakened = canonical.traitAwakened;

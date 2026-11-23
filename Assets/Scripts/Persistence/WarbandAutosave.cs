@@ -49,6 +49,7 @@ namespace ArthurianAutobattler
         public int trainedHP;
         public int trainedATK;
         public int trainedSPD;
+        public int lastTrainWaveNumber = -1;
         public string modularPoseId;
         public string modularOutfitId;
         public string modularHeadId;
@@ -262,6 +263,7 @@ namespace ArthurianAutobattler
             dest.trainedHP = Mathf.Max(dest.trainedHP, src.trainedHP);
             dest.trainedATK = Mathf.Max(dest.trainedATK, src.trainedATK);
             dest.trainedSPD = Mathf.Max(dest.trainedSPD, src.trainedSPD);
+            dest.lastTrainWaveNumber = Mathf.Max(dest.lastTrainWaveNumber, src.lastTrainWaveNumber);
             if (!string.IsNullOrEmpty(src.modularPoseId)) dest.modularPoseId = src.modularPoseId;
             if (!string.IsNullOrEmpty(src.modularOutfitId)) dest.modularOutfitId = src.modularOutfitId;
             if (!string.IsNullOrEmpty(src.modularHeadId)) dest.modularHeadId = src.modularHeadId;
@@ -396,6 +398,7 @@ namespace ArthurianAutobattler
                 trainedHP = r.trainedHP,
                 trainedATK = r.trainedATK,
                 trainedSPD = r.trainedSPD,
+                lastTrainWaveNumber = r.lastTrainWaveNumber,
                 modularPoseId = r.modularPoseId ?? "",
                 modularOutfitId = r.modularOutfitId ?? "",
                 modularHeadId = r.modularHeadId ?? "",
@@ -472,6 +475,7 @@ namespace ArthurianAutobattler
                 trainedHP = s.trainedHP,
                 trainedATK = s.trainedATK,
                 trainedSPD = s.trainedSPD,
+                lastTrainWaveNumber = s.lastTrainWaveNumber,
                 modularPoseId = s.modularPoseId,
                 modularOutfitId = s.modularOutfitId,
                 modularHeadId = s.modularHeadId,

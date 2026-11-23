@@ -40,10 +40,14 @@ namespace ArthurianAutobattler
         public TextMeshProUGUI hireButtonText;
 
         [Header("Role Training & Morale Buttons")]
-        public Button trainTankButton;      // 15g: Train Frontline Tank (+25% HP)
-        public Button trainRangedButton;    // 15g: Train Backline Ranged (+20% ATK)
-        public Button mediateRivalryButton; // 100g: Cancel rivalries for this wave
-        public Button tavernRoundButton;    // 50g: Reduce grudges across Peasants & Drunkards
+        [Tooltip("Remapped to Train HP 50g (+20).")]
+        public Button trainTankButton;
+        [Tooltip("Remapped to Train ATK 50g (+20).")]
+        public Button trainRangedButton;
+        [Tooltip("Train SPD 50g (+20).")]
+        public Button trainSpeedButton;
+        public Button mediateRivalryButton; // MediateCostGold: cancel rivalries for this wave
+        public Button tavernRoundButton;    // TavernRoundCostGold: −10g hire this wave
 
         private RecruitInstance selectedRecruit;
         private GameObject selectedButtonObj;
@@ -462,26 +466,27 @@ namespace ArthurianAutobattler
                 characterDialogueText.text = "<color=green>Agreed. I will march with your warband.</color>";
         }
 
-        public void TrainSelectedRole(CombatRole role)
+        public void TrainSelectedStat(RecruitInstance.TrainStatKind kind)
         {
             if (selectedRecruit == null) return;
             var loop = GameLoopManager.Instance;
-            bool useVoucher = loop != null && loop.trainingVouchers > 0;
-            if (!useVoucher && playerGold < 15) return;
-            if (role == CombatRole.BacklineRanged && !selectedRecruit.AllowsTrainRangedKit)
+            int wave = loop != null ? loop.CurrentWaveNumber() : 0;
+            if (selectedRecruit.HasTrainedThisWave(wave))
             {
                 if (characterDialogueText != null)
                     characterDialogueText.text =
-                        "<color=#FF6644>Warriors cannot Train Ranged.</color> Move them to BACK in the warband — they keep NO REACH there.";
+                        "<color=#FFAA66>Already trained this wave.</color> One Train per unit per wave.";
                 RefreshDossierUI(GrudgeSaveManager.Instance != null
                     ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
                     : 0);
                 return;
             }
-            if (!selectedRecruit.TrainRole(role, out string bonus))
+            bool useVoucher = loop != null && loop.trainingVouchers > 0;
+            if (!useVoucher && playerGold < RecruitInstance.TrainStatCostGold) return;
+            if (!selectedRecruit.TrainChosenStat(kind, wave, out string bonus))
             {
                 if (characterDialogueText != null)
-                    characterDialogueText.text = "<color=#FFAA66>Already trained that role.</color>";
+                    characterDialogueText.text = "<color=#FFAA66>Train failed.</color>";
                 RefreshDossierUI(GrudgeSaveManager.Instance != null
                     ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
                     : 0);
@@ -490,14 +495,26 @@ namespace ArthurianAutobattler
             if (useVoucher)
                 loop.trainingVouchers--;
             else
-                playerGold -= 15;
+                playerGold -= RecruitInstance.TrainStatCostGold;
             UpdateHUD();
             RefreshDossierUI(GrudgeSaveManager.Instance != null
                 ? GrudgeSaveManager.Instance.GetGrudgeCostPenalty(selectedRecruit.unitID)
                 : 0);
-            characterDialogueText.text = useVoucher
-                ? $"<color=#00FFFF>Trained as {role} — {bonus}!</color> (voucher)"
-                : $"<color=#00FFFF>Trained as {role} — {bonus}!</color>";
+            if (characterDialogueText != null)
+            {
+                characterDialogueText.text = useVoucher
+                    ? $"<color=#00FFFF>Trained {bonus}!</color> (voucher)"
+                    : $"<color=#00FFFF>Trained {bonus}!</color>";
+            }
+        }
+
+        /// <summary>Legacy entry — redirects to chosen-stat Train (HP for Tank, ATK for Ranged).</summary>
+        public void TrainSelectedRole(CombatRole role)
+        {
+            var kind = role == CombatRole.BacklineRanged
+                ? RecruitInstance.TrainStatKind.Attack
+                : RecruitInstance.TrainStatKind.HP;
+            TrainSelectedStat(kind);
         }
 
         public void MediateSelectedRecruit()
@@ -577,7 +594,9 @@ namespace ArthurianAutobattler
             {
                 tier1RevealButton.interactable = selectedRecruit.intelTierUnlocked < 1;
                 SetButtonLabel(tier1RevealButton,
-                    selectedRecruit.intelTierUnlocked >= 1 ? "Scout done" : "Scout (Free)");
+                    selectedRecruit.intelTierUnlocked >= 1
+                        ? "Scout done"
+                        : $"Scout ({RecruitInstance.IntelTier1Cost}g)");
             }
             if (tier2RevealButton != null)
             {
@@ -596,11 +615,31 @@ namespace ArthurianAutobattler
                         : $"Full Report ({RecruitInstance.IntelTier3Cost}g)");
             }
             if (hireRecruitButton != null) hireRecruitButton.interactable = true;
-            if (trainTankButton != null) trainTankButton.interactable = playerGold >= 15;
+            int wave = GameLoopManager.Instance != null
+                ? GameLoopManager.Instance.CurrentWaveNumber()
+                : 0;
+            bool alreadyTrained = selectedRecruit.HasTrainedThisWave(wave);
+            var loopTrain = GameLoopManager.Instance;
+            bool canTrainPay = !alreadyTrained
+                               && (playerGold >= RecruitInstance.TrainStatCostGold
+                                   || (loopTrain != null && loopTrain.trainingVouchers > 0));
+            string trainLbl(string stat) => alreadyTrained
+                ? $"{stat} ✓"
+                : $"{stat} {RecruitInstance.TrainStatCostGold}g";
+            if (trainTankButton != null)
+            {
+                trainTankButton.interactable = canTrainPay;
+                SetButtonLabel(trainTankButton, trainLbl("HP"));
+            }
             if (trainRangedButton != null)
             {
-                bool warriorBlocked = selectedRecruit != null && !selectedRecruit.AllowsTrainRangedKit;
-                trainRangedButton.interactable = playerGold >= 15 && !warriorBlocked;
+                trainRangedButton.interactable = canTrainPay;
+                SetButtonLabel(trainRangedButton, trainLbl("ATK"));
+            }
+            if (trainSpeedButton != null)
+            {
+                trainSpeedButton.interactable = canTrainPay;
+                SetButtonLabel(trainSpeedButton, trainLbl("SPD"));
             }
             if (mediateRivalryButton != null)
             {
@@ -625,6 +664,7 @@ namespace ArthurianAutobattler
             if (hireRecruitButton != null) hireRecruitButton.interactable = false;
             if (trainTankButton != null) trainTankButton.interactable = false;
             if (trainRangedButton != null) trainRangedButton.interactable = false;
+            if (trainSpeedButton != null) trainSpeedButton.interactable = false;
             if (mediateRivalryButton != null) mediateRivalryButton.interactable = false;
         }
 
@@ -668,8 +708,12 @@ namespace ArthurianAutobattler
                 tier2RevealButton?.onClick.AddListener(() => UnlockIntelTier(2));
                 tier3RevealButton?.onClick.AddListener(() => UnlockIntelTier(3));
                 hireRecruitButton?.onClick.AddListener(AttemptHireSelected);
-                trainTankButton?.onClick.AddListener(() => TrainSelectedRole(CombatRole.FrontlineTank));
-                trainRangedButton?.onClick.AddListener(() => TrainSelectedRole(CombatRole.BacklineRanged));
+                trainTankButton?.onClick.AddListener(() =>
+                    TrainSelectedStat(RecruitInstance.TrainStatKind.HP));
+                trainRangedButton?.onClick.AddListener(() =>
+                    TrainSelectedStat(RecruitInstance.TrainStatKind.Attack));
+                trainSpeedButton?.onClick.AddListener(() =>
+                    TrainSelectedStat(RecruitInstance.TrainStatKind.Speed));
                 mediateRivalryButton?.onClick.AddListener(MediateSelectedRecruit);
                 tavernRoundButton?.onClick.AddListener(BuyTavernRound);
             }
